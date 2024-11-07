@@ -1,0 +1,20 @@
+Before implementing the heuristic, we need to verify its feasibility. Therefore, we will first attempt to translate this description into rigorous mathematical language.
+
+Please note:
+1. The heuristic function yields an Operator, a construct intricately designed to manipulate Solution instances.f the goals of the heuristic do not align with the existing Solution structure, it will be necessary to modify the algorithm so that it is compatible with the current Solution classes. In the event that such modifications prove impossible, we may need to consider discontinuing the use of the algorithm.
+2. The state and global_data have been detailed previously. It is essential to determine whether the heuristic's logic requires any additional information beyond what has been provided. If the heuristic logic naturally requires more data, please indicate this by returning "reasonable_input: we need xxx inputs" and we will halt the implementation.
+3. The type of returned operator that the algorithm can potentially yield have been enumerated above. If the heuristic logic naturally leads to an operator type that is not listed, please indicate this by returning "reasonable_output: we need xxx operator" and we will halt the implementation.
+4. Currently our framework only support the single tour solution, so the heuristic algorithm must works on this design. We can not merge and fusion of two or more solutions to get a new solution.
+5. We must assume that operator will run on current solution outside heuristic algorithm.
+
+Now let's consider the logic for {heuristic_name}: {description}
+This involves evaluating whether the algorithm's intrinsic logic can be expressed within our Solution, and Operator constructs without necessitating further data or operator types.
+
+The response format is very important. For better communication, please respond to me in this format:
+***mathematical_analysis:
+mathematical_description: xxx (Replace "xxx" with a formal mathematical representation of the algorithm. If the heuristic is deemed infeasible for implementation, assign "None")
+reasonable_input: yes/we need xxx inputs(provide the new inputs description and reason here)
+reasonable_output: yes/we need xxx operator(provide the new operator description and reason here)
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

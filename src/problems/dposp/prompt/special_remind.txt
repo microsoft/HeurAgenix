@@ -1,0 +1,11 @@
+1. Make the result must be valid, such as: no re-fulfilled orders, not delay, production line can produce this product, transition is allowed, etc.
+2. When insert the order the order into some position, please double check with validation_single_production_schedule function in state_data, such as:
+validation_single_production_schedule = state_data["validation_single_production_schedule"]
+new_schedule = current_solution.production_schedule[line_id][:]
+new_schedule.insert(position, order_id)
+# Validate the new schedule
+validation_single_production_schedule(line_id, new_schedule):
+3. When insert a order into production schedule, we can consider the following 4 times: transition_time_before, transition_time_after, production_time_for_order, origin_transition_time.
+delta_time_cost = transition_time_before + production_time_for_order + transition_time_after - original_transition_time.
+4. Do not forget to use feasible_orders_to_fulfill, the orders in this list means that at least one production line with one feasible position can insert this order without delay others. For example, to choose a unfulfilled order to fulfill, better to choose from feasible_orders_to_fulfill.
+5. production_rate is 0 if this production line can not produce this product, be careful.

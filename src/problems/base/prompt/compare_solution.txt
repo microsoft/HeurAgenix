@@ -1,0 +1,28 @@
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external.
+
+The function {function_name} is the heuristic function:
+{function_code}
+
+The global data for this problem:
+{global_data}
+
+Negative solution from {function_name}:
+{negative_solution}
+
+Positive solution from external:
+{positive_solution}
+
+Please based on the data and solution, compare the difference between these two solution and list the difference.
+
+The response format is very important. For better communication, please respond to me in this format:
+***solution_difference:
+1. xxx
+2. xxx
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

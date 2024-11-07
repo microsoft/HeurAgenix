@@ -1,0 +1,10 @@
+Let's try to transfer {referenced_heuristic}.
+
+First generate a new heuristic name for this new heuristic and also a new detailed description to guide us how to get the new heuristic description for {problem}.
+Please consider the differences between {referenced_heuristic} and the new problem that may lead to different algorithms.
+By the way, the last 4 digits after last '_' are identifiers and we can ignore in new_heuristic_name.
+
+The response format is very important. For better communication, please respond to me in this format:
+***heuristic:new_heuristic_name;description***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

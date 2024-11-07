@@ -1,0 +1,2 @@
+1. Make the result must be valid, such as: no re-finished operations.
+2. As we consider that operations within a job need to be executed in sequence, to avoid unnecessary complications, we have provided only the AdvanceOperator during the construction phase, which simply requires specifying the job to advance it by one step.
