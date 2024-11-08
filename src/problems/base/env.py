@@ -15,8 +15,8 @@ class BaseEnv:
             self.data_path = data_name
         elif os.path.exists(os.path.join("src", "problems", problem, "data", f"{self.mode}_data", data_name)):
             self.data_path = os.path.join("src", "problems", problem, "data", f"{self.mode}_data", data_name)
-        elif os.path.exists(os.path.join("output", problem, f"{self.mode}_data", data_name)):
-            self.data_path = os.path.join(os.path.join("output", problem, f"{self.mode}_data", data_name))
+        elif os.path.exists(os.path.join("output", problem, "data", f"{self.mode}_data", data_name)):
+            self.data_path = os.path.join(os.path.join("output", problem, "data", f"{self.mode}_data", data_name))
         self.data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = None
         self.global_data: dict = None
