@@ -1,0 +1,2 @@
+1. Make the result must be valid, such as: no re-visited nodes, no overload on capacity, etc.
+2. The depot are omitted in solution route, so the route are [1, 2, 3] and depot is 0, the actual route is 0->1->2->3->0.

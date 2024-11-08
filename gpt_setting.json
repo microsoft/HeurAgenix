@@ -1,0 +1,13 @@
+{
+    "api_type": "azure",
+    "api_base": "https://rag-wus-ml-2.openai.azure.com/",
+    "api_version": "2024-05-01-preview",
+	"azure_endpoint": "https://rag-wus-ml-2.openai.azure.com/",
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "top-p": 0.95,
+    "max_tokens": 1600,
+
+    "max_attempts": 50,
+    "sleep_time": 10
+}

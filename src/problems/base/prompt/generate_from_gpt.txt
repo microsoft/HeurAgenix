@@ -1,0 +1,10 @@
+I need your help to implement some basic heuristic for this problem {problem}.
+
+The response format is very important. For better communication, please respond to me in this format:
+***heuristic:
+heuristic_name: description
+heuristic_name: description
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

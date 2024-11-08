@@ -1,0 +1,10 @@
+This problem is a new classical problems, we can reference from some classical problems.
+We have already studied the following problems:
+{studied_problems}
+
+Please tell me which of these questions are relevant to our current research.
+
+The response format is very important. For better communication, please respond to me in this format:
+***referenced_problem:problem_name1;problem_name2;...***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

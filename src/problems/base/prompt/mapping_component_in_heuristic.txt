@@ -1,0 +1,27 @@
+Now, we have already found the similarities between {referenced_problem} and this new problem {problem}:
+{similarities_in_problem}
+
+To support {referenced_problem}, I build the Solution and Operator framework.
+The Solution is designed as:
+{referenced_problem_solution_class}
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+{referenced_problem_operation_class}
+
+This is the code for {referenced_heuristic}:
+{referenced_heuristic_code}
+
+{referenced_global_data_introduction}
+{referenced_state_data_introduction}
+
+Try to make up the similarities between {referenced_heuristic} and this new problem {problem}.
+If no more similarities, return me ***similarities:None***
+
+The response format is very important. For better communication, please respond to me in this format:
+***similarities:
+components_in_{referenced_heuristic};similar_components_in_{problem};reason;
+components_in_{referenced_heuristic};similar_components_in_{problem};reason;
+...
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

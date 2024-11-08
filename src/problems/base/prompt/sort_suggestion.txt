@@ -1,0 +1,28 @@
+Now review the origin code {function_name}:
+{function_code}
+
+After analysis on between positive and negative solution, we have already got some suggestions:
+{suggestions}
+
+We hope to apply these suggestions into nearest_neighbor heuristic, while before to implement the code, we need to review and update the suggestions:
+1. Some suggestions are similar or duplicated, we can merge them.
+2. Some suggestions conflict and we need to modify them.
+3. The application conditions of some suggestions are unreasonable, we need to correct them.
+4. Some suggestions will bring too heavy calculation, we have to optimize.
+5. We only need to keep the suggestions that have a greater impact and are likely to be useful.
+
+So based on these, please refine these suggestions with clear conditions and sort them into heuristic code improve suggestion
+consider to sort suggestion:
+1. better selection
+2. better parameters
+3. insert more structure
+4. learn from other heuristics
+
+The response format is very important. For better communication, please respond to me in this format:
+***code_suggestion:
+1. xxx
+2. xxx
+...
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
