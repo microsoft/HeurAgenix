@@ -1,14 +1,36 @@
+import argparse
 import os
-import importlib
 import copy
-import numpy as np
+import importlib
 import inspect
+import numpy as np
 from datetime import datetime
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.util.util import load_heuristic
 
+def parse_arguments():
+    problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
 
-def filter_deterministic_heuristics(heuristic_dir: str, env: object) -> list[str]:
+    parser = argparse.ArgumentParser(description="Generate heuristic")
+    parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
+    parser.add_argument("-d", "--data_path", type=str, required=True, help="Path for source data.")
+    parser.add_argument("-e", "--heuristic_dir", default=None, help="Path of heuristic dir.")
+    parser.add_argument("-s", "--search_time", default=1000, help="MCTS times for each heuristic.")    
+    parser.add_argument("-sc", "--score_calculation", choices=["a8t2"], default="a8t2", help="Function to calculate score.")
+    parser.add_argument("-pf", "--prune_frequency", default=200, help="Prune and early stop frequency.")
+    parser.add_argument("-pr", "--prune_ratio", default=1.02, help="Prune and early stop threshold.")
+
+    return parser.parse_args()
+
+def a8t2(results: list[float]) -> float:
+    top_k = 20
+    average_score_ratio = 0.8
+    average_score = sum(results) / len(results)
+    top_k_score = sum(sorted(results[: top_k])) / top_k
+    score = average_score_ratio * average_score + (1 - average_score_ratio) * top_k_score
+    return score
+
+def filter_deterministic_heuristics(problem: str, heuristic_dir: str, env: object) -> list[str]:
     previous_steps = int(env.construction_steps / 5)
     try_steps = int(env.construction_steps / 5)
     try_times = 10
@@ -25,11 +47,11 @@ def filter_deterministic_heuristics(heuristic_dir: str, env: object) -> list[str
         heuristic = load_heuristic(heuristic_file, heuristic_dir)
         key_value = None
         deterministic_flag = True
-        for _ in range(try_times):
+        for try_index in range(try_times):
             env.current_solution = saved_solution
             env.state_data = saved_state
             env.algorithm_data = saved_algorithm_data
-            for _ in range(try_steps):
+            for step_index in range(try_steps):
                 env.run_heuristic(heuristic)
             if key_value == None:
                 key_value = env.key_value
@@ -46,10 +68,10 @@ def filter_deterministic_heuristics(heuristic_dir: str, env: object) -> list[str
 def data_collection(
         problem: str,
         data_path: str,
-        score_calculation: callable,
+        heuristic_dir: str=None,
+        score_calculation: callable=a8t2,
         prune_frequency: int=200,
         prune_ratio: float=1.02,
-        heuristic_dir: str=None,
         search_time: int=1000,
         output_dir: str=None
 ) -> None:
@@ -61,7 +83,7 @@ def data_collection(
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics") if heuristic_dir is None else heuristic_dir
     heuristic_name_str = ",".join([heuristic_file.split(".")[0] for heuristic_file in os.listdir(heuristic_dir)])
-    deterministic_heuristics_names, random_heuristics_names = filter_deterministic_heuristics(heuristic_dir, env)
+    deterministic_heuristics_names, random_heuristics_names = filter_deterministic_heuristics(problem, heuristic_dir, env)
     deterministic_heuristic_name_str = ",".join(deterministic_heuristics_names)
     random_heuristic_name_str = ",".join(random_heuristics_names)
     output_dir = os.path.join("output", problem, "data_collection", f"{data_name}.{datetime_str}.result") if output_dir is None else output_dir
@@ -127,23 +149,36 @@ def data_collection(
         output_file.write("---------------\n")
         output_file.write(f"best_heuristics:\t{best_heuristics}")
         output_file.close()
+        print(f"Select {best_heuristics} in round {round_index}")
 
-if __name__ == "__main__":
-    problem = "tsp"
-    data_name = "bayg29.tsp"
-    score_calculation = lambda results: 0.8 * sum(results) / len(results) + 0.2 * sum(sorted(results[: 20])) / 20
+def main():
+    args = parse_arguments()
+    problem = args.problem
+    data_path = args.data_path
+    heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics") if args.heuristic_dir is None else args.heuristic_dir
+    search_time = args.search_time
+    score_calculation = eval(args.score_calculation)
+    prune_frequency = args.prune_frequency
+    prune_ratio = args.prune_ratio
+
+    base_data_dir = os.getenv("AMLT_DATA_DIR") if os.getenv("AMLT_DATA_DIR") else "output"
+    data_path = os.path.join(base_data_dir, data_path)
+
     base_output_dir = os.getenv("AMLT_OUTPUT_DIR") if os.getenv("AMLT_OUTPUT_DIR") else "output"
-    prune_frequency = 200
-    prune_ratio = 1.02
-    search_time = 1000
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    data_name = data_path.split(os.sep)[-1]
     output_dir = os.path.join(base_output_dir, problem, "data_collection", f"{data_name}.{datetime_str}.result")
+
     data_collection(
         problem=problem,
-        data_path=data_name,
+        data_path=data_path,
+        heuristic_dir=heuristic_dir,
         score_calculation=score_calculation,
         prune_frequency=prune_frequency,
         prune_ratio=prune_ratio,
         search_time=search_time,
         output_dir=output_dir
     )
+
+if __name__ == "__main__":
+    main()    
