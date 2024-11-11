@@ -141,7 +141,7 @@ class GPTHelper:
                     "text": texts[i]
                 })
 
-    def dump(self, output_name: str=None) -> None:
+    def dump(self, output_name: str=None) -> str:
         if self.output_dir != None and output_name != None:
             if self.current_message != []:
                 self.messages.append({"role": "user", "content": self.current_message})
@@ -161,5 +161,4 @@ class GPTHelper:
                         else:
                             contents += content["text"]
                     file.write(contents + "\n------------------------------------------------------------------------------------\n\n")
-        else:
-            print(self.messages[-1]["content"][0]["text"])
+        return self.messages[-1]["content"][0]["text"]

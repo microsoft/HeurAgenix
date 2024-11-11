@@ -16,9 +16,9 @@ class RandomHyperHeuristic:
         heuristic_names = [heuristic_file.split(".")[0] for heuristic_file in heuristic_names]
         self.heuristic_pools = [load_heuristic(os.path.join(self.heuristic_dir, heuristic_name + ".py")) for heuristic_name in heuristic_names]
 
-    def run(self, env:BaseEnv, max_steps: int=None, validation: bool=True, **kwargs) -> None:
+    def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
         max_steps = max_steps if max_steps is not None else env.construction_steps * 2
-        for index in range(max_steps):
+        for _ in range(max_steps):
             heuristic = random.choice(self.heuristic_pools)
-            heuristic_works = env.run_heuristic(heuristic, validation=validation)
-        return env.is_complete_solution
+            _ = env.run_heuristic(heuristic)
+        return env.is_complete_solution and env.is_valid_solution

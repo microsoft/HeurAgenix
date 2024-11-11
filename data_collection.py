@@ -23,7 +23,7 @@ def filter_deterministic_heuristics(heuristic_dir: str, env: object) -> list[str
     saved_algorithm_data = copy.deepcopy(env.algorithm_data)
 
     for heuristic_file in os.listdir(heuristic_dir):
-        heuristic = load_heuristic(os.path.join(heuristic_dir, heuristic_file))
+        heuristic = load_heuristic(heuristic_file, heuristic_dir)
         key_value = None
         deterministic_flag = True
         for _ in range(try_times):
@@ -92,10 +92,11 @@ def data_collection(
         output_file.write(f"selected_previous_heuristics: \n{selected_previous_heuristics_str}\n")
         output_file.write("---------------\n")
         output_file.write(f"heuristic\tscore\tresults\n")
-        for heuristic in os.listdir(heuristic_dir):
+        for heuristic_file in os.listdir(heuristic_dir):
             env.reset()
+            heuristic_name = heuristic_file.split(".")[0]
             for h in selected_previous_heuristics:
-                env.run_heuristic(load_heuristic(os.path.join(heuristic_dir, h)))
+                env.run_heuristic(load_heuristic(h, heuristic_dir))
             saved_solution = copy.deepcopy(env.current_solution)
             saved_state = copy.deepcopy(env.state_data)
             saved_algorithm_data = copy.deepcopy(env.algorithm_data)
@@ -105,7 +106,7 @@ def data_collection(
                 env.current_solution = saved_solution
                 env.state_data = saved_state
                 env.algorithm_data = saved_algorithm_data
-                env.run_heuristic(load_heuristic(os.path.join(heuristic_dir, heuristic)))
+                env.run_heuristic(load_heuristic(heuristic_file, heuristic_dir))
                 random_hh.run(env)
                 results.append(env.key_value)
                 if (search_index + 1) % prune_ratio == 0:
@@ -113,11 +114,11 @@ def data_collection(
                     break
             score = score_calculation(results)
             results_str = ",".join([str(result) for result in sorted(results)])
-            output_file.write(f"{heuristic}\t{score}\t{results_str}\n")
+            output_file.write(f"{heuristic_name}\t{score}\t{results_str}\n")
 
             if env.compare(score, best_score) > 0:
                 best_score = score
-                best_heuristics = heuristic
+                best_heuristics = heuristic_name
         selected_previous_heuristics.append(best_heuristics)
         output_file.write("---------------\n")
         output_file.write(f"best_heuristics:\t{best_heuristics}")
