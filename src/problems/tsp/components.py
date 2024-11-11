@@ -10,12 +10,7 @@ class Solution(BaseSolution):
         self.node_num = node_num
 
     def __str__(self) -> str:
-        if len(self.tour) == self.node_num:
-            return "tour: " + "->".join(map(str, self.tour + [self.tour[0]]))
-        elif len(self.tour) > 0:
-            return "tour(partial): " + "->".join(map(str, self.tour))
-        else:
-            return "tour: empty"
+        return "tour: " + "->".join(map(str, self.tour))
 
 
 class AppendOperator(BaseOperator):

@@ -5,7 +5,6 @@ import numpy as np
 import inspect
 from datetime import datetime
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
-from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.util.util import load_heuristic
 
 
@@ -86,20 +85,25 @@ def data_collection(
 
     selected_previous_heuristics = []
     for round_index in range(int(env.construction_steps * 2)):
-        best_score = np.inf
+        env.reset()
+        selected_previous_heuristics_str = ""
+        for heuristic_name in selected_previous_heuristics:
+            operator = env.run_heuristic(load_heuristic(heuristic_name, heuristic_dir))
+            selected_previous_heuristics_str += f"{heuristic_name}, {operator}\n"
+        saved_solution = copy.deepcopy(env.current_solution)
+        saved_state = copy.deepcopy(env.state_data)
+        saved_algorithm_data = copy.deepcopy(env.algorithm_data)
+
         output_file = open(os.path.join(output_dir, f"round_{round_index}.txt"), "w")
-        selected_previous_heuristics_str = "\n".join(selected_previous_heuristics)
-        output_file.write(f"selected_previous_heuristics: \n{selected_previous_heuristics_str}\n")
+        output_file.write(f"selected_previous_heuristics, operators: \n{selected_previous_heuristics_str}\n")
+        output_file.write(f"current_solution: \n{saved_solution}\n")
+
+        best_score = np.inf
         output_file.write("---------------\n")
         output_file.write(f"heuristic\tscore\tresults\n")
         for heuristic_file in os.listdir(heuristic_dir):
             env.reset()
             heuristic_name = heuristic_file.split(".")[0]
-            for h in selected_previous_heuristics:
-                env.run_heuristic(load_heuristic(h, heuristic_dir))
-            saved_solution = copy.deepcopy(env.current_solution)
-            saved_state = copy.deepcopy(env.state_data)
-            saved_algorithm_data = copy.deepcopy(env.algorithm_data)
 
             results = []
             for search_index in range(search_time):
@@ -131,7 +135,7 @@ if __name__ == "__main__":
     base_output_dir = os.getenv("AMLT_OUTPUT_DIR") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     prune_frequency = 200
     prune_ratio = 1.02
-    search_time = 1000
+    search_time = 10
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join(base_output_dir, problem, "data_collection", f"{data_name}.{datetime_str}.result")
     data_collection(

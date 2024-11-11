@@ -25,7 +25,7 @@ class Env(BaseEnv):
         return node_num, distance_matrix
 
     def init_solution(self) -> None:
-        return Solution(tour=[], node_num=self.node_num)
+        return Solution(tour=[])
 
     def get_global_data(self) -> dict:
         """Retrieve the global static information data as a dictionary.
