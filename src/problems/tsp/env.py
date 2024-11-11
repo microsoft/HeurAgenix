@@ -7,8 +7,8 @@ from src.problems.tsp.components import Solution
 
 class Env(BaseEnv):
     """TSP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
-    def __init__(self, data_name: str, mode: str, **kwargs):
-        super().__init__(data_name, mode, "tsp")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, "tsp")
         self.node_num, self.distance_matrix = self.data
         self.construction_steps = self.node_num
         self.key_item = "current_cost"
@@ -85,7 +85,7 @@ class Env(BaseEnv):
         }
         return state_data_dict
 
-    def validation_solution(self, solution: Solution) -> bool:
+    def validation_solution(self, solution: Solution=None) -> bool:
         """
         Check the validation of this solution in following items:
             1. Node Existence: Each node in the solution must exist within the problem instance's range of nodes.
@@ -93,6 +93,9 @@ class Env(BaseEnv):
             3. Connectivity: Each edge (from one node to the next) must be connected, i.e., not marked as infinite distance in the distance matrix.
         """
         node_set = set()
+        if solution is None:
+            solution = self.current_solution
+
         if not isinstance(solution, Solution) or not isinstance(solution.tour, list):
             return False
         if solution is not None and solution.tour is not None:
@@ -119,11 +122,10 @@ class Env(BaseEnv):
             "Current Cost": self.state_data["current_cost"]
         }
 
-    def dump_result(self) -> str:
+    def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {
             "node_num": self.node_num,
-            "visited_num": self.state_data["visited_num"],
-            "current_cost": self.state_data["current_cost"],
+            "visited_num": self.state_data["visited_num"]
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict, dump_trajectory)
         return content

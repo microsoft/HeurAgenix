@@ -6,8 +6,8 @@ from src.problems.jssp.components import Solution
 class Env(BaseEnv):
     """JSSP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
 
-    def __init__(self, data_name: str, mode: str, **kwargs):
-        super().__init__(data_name, mode, "jssp")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, "jssp")
         self.job_num, self.machine_num, self.job_operation_sequence, self.job_operation_time = self.data
         self.construction_steps = self.job_num * self.machine_num
         self.key_item = "current_makespan"
@@ -130,11 +130,14 @@ class Env(BaseEnv):
         }
         return state_data_dict
 
-    def validation_solution(self, solution: Solution) -> bool:
+    def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
             1. Exist operation: The operation should be valid
             2. Non-repeat: Each machine processes one operation at a time
         """
+        if solution is None:
+            solution = self.current_solution
+
         if not isinstance(solution, Solution) or not isinstance(solution.job_sequences, list):
             return False
 
@@ -157,11 +160,10 @@ class Env(BaseEnv):
             "Finished Operation Num": self.state_data["finished_operation_num"],
         }
 
-    def dump_result(self) -> str:
+    def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {
             "job_num": self.job_num,
-            "machine_num": self.machine_num,
-            "current_makespan": self.state_data["current_makespan"],
+            "machine_num": self.machine_num
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict, dump_trajectory)
         return content

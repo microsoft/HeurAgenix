@@ -9,8 +9,8 @@ from src.problems.cvrp.components import Solution
 
 class Env(BaseEnv):
     """CVRP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
-    def __init__(self, data_name: str, mode: str, **kwargs):
-        super().__init__(data_name, mode, "cvrp")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, "cvrp")
         self.node_num, self.distance_matrix, self.depot, self.vehicle_num, self.capacity, self.demands = self.data
         self.construction_steps = self.node_num
         self.key_item = "total_current_cost"
@@ -120,7 +120,7 @@ class Env(BaseEnv):
         }
         return state_dict
 
-    def validation_solution(self, solution: Solution) -> bool:
+    def validation_solution(self, solution: Solution=None) -> bool:
         """
         Check the validation of this solution in following items:
             1. Node existence: Each node in each route must be within the valid range.
@@ -128,6 +128,9 @@ class Env(BaseEnv):
             3. Depot start and end: Each route must start and end at the depot.
             4. Capacity constraints: The load of each vehicle must not exceed its capacity.
         """
+        if solution is None:
+            solution = self.current_solution
+
         if not isinstance(solution, Solution) or not isinstance(solution.routes, list):
             return False
 
@@ -157,11 +160,10 @@ class Env(BaseEnv):
             "Fulfilled Demands": sum([self.demands[node] for node in self.state_data["visited_nodes"]])
         }
 
-    def dump_result(self) -> str:
+    def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {
             "node_num": self.node_num,
-            "visited_num": self.state_data["visited_num"],
-            "total_current_cost": self.state_data["total_current_cost"],
+            "visited_num": self.state_data["visited_num"]
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict, dump_trajectory)
         return content

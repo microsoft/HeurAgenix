@@ -19,22 +19,20 @@ class HeuristicEvolver:
         self,
         gpt_helper: GPTHelper,
         problem: str,
-        heuristic_dir: str=None,
         train_dir: str=None,
         validation_dir: str=None,
     ) -> None:
         self.gpt_helper = gpt_helper
         self.problem = problem
-        self.heuristic_dir = heuristic_dir if heuristic_dir is not None else os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
         self.train_dir = train_dir if train_dir is not None else os.path.join("src", "problems", problem, "data", "train_data")
         self.validation_dir = validation_dir if validation_dir is not None else os.path.join("src", "problems", problem, "data", "validation_data")
-        module = importlib.import_module(f"src.problems.{self.problem}.env")
+        module = importlib.import_module(f"src.problems.{problem}.env")
         globals()["Env"] = getattr(module, "Env")
     
     def evolution(
             self,
-            basic_heuristic: str,
-            perturbation_heuristic: str,
+            basic_heuristic_file: str,
+            perturbation_heuristic_file: str,
             perturbation_ratio: float=0.1,
             perturbation_time: int=100,
             filtered_num: int=3,
@@ -44,8 +42,7 @@ class HeuristicEvolver:
             validation: bool=True,
         ) -> None:
         # Getting baseline for basic heuristic
-        print(f"Getting baselines for {basic_heuristic}")
-        basic_heuristic_file = os.path.join(self.heuristic_dir, basic_heuristic + ".py")
+        print(f"Getting baselines for {basic_heuristic_file}")
         baselines = self.validation(self.validation_dir, basic_heuristic_file, validation=validation)
 
         total_heuristic_files = [(basic_heuristic_file, 0)]
@@ -61,7 +58,7 @@ class HeuristicEvolver:
                     negative_result_file, positive_result_file = self.perturbation(
                         env,
                         basic_heuristic_file,
-                        perturbation_heuristic,
+                        perturbation_heuristic_file,
                         perturbation_ratio,
                         perturbation_time
                     )
@@ -104,7 +101,7 @@ class HeuristicEvolver:
             self,
             env: BaseEnv,
             basic_heuristic_file: str,
-            perturbation_heuristic: str,
+            perturbation_heuristic_file: str,
             perturbation_ratio: float=0.1,
             perturbation_time: int=100
         ) -> tuple[bool, str, str]:
@@ -114,7 +111,7 @@ class HeuristicEvolver:
         # Generate negative result from basic heuristic
         hyper_heuristic = SingleHyperHeuristic(basic_heuristic_file, problem=self.problem)
         hyper_heuristic.run(env)
-        env.dump_result()
+        env.dump_result(dump_trajectory=True)
         negative_result_file = os.path.join(env.output_dir, "result.txt")
         negative_value = env.key_value
 
@@ -122,10 +119,10 @@ class HeuristicEvolver:
         positive_result_file = None
         for _ in range(perturbation_time):
             env.reset(f"{basic_heuristic}.positive")
-            hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic, perturbation_ratio, problem=self.problem, heuristic_dir=self.heuristic_dir)
+            hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, perturbation_ratio, problem=self.problem)
             hyper_heuristic.run(env)
             if env.compare(env.key_value, negative_value) > 0:
-                env.dump_result()
+                env.dump_result(dump_trajectory=True)
                 positive_result_file = os.path.join(env.output_dir, "result.txt")
                 break
         return negative_result_file, positive_result_file
@@ -236,7 +233,7 @@ class HeuristicEvolver:
             heuristic_works = True
             while not env.is_complete_solution or heuristic_works is not False:
                 heuristic_works = env.run_heuristic(heuristic)
-            proposed_result = env.dump_result()
+            env.dump_result(dump_trajectory=True)
             proposed_result = parse_text_to_dict(proposed_result)
             prompt_dict["proposed_solution"] = proposed_result["current_solution"]
             prompt_dict["proposed_result"] = proposed_result[env.key_item]
@@ -275,7 +272,7 @@ class HeuristicEvolver:
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
             is_complete_solution = hyper_heuristic.run(env, time_limitation, validation=validation)
             if is_complete_solution:
-                env.dump_result()
+                env.dump_result(dump_trajectory=False)
                 validation_results.append(env.key_value)
             else:
                 return None

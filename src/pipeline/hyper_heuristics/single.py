@@ -6,19 +6,16 @@ from src.util.util import load_heuristic
 class SingleHyperHeuristic:
     def __init__(
         self,
-        heuristic_name: str,
+        heuristic_file: str,
         problem: str="tsp",
-        heuristic_dir: str=None
     ) -> None:
-        self.heuristic_dir = heuristic_dir if heuristic_dir is not None else os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
-        heuristic_file = heuristic_name if os.path.exists(heuristic_name) else os.path.join(self.heuristic_dir, heuristic_name + ".py")
-        self.heuristic = load_heuristic(heuristic_file)
+        self.heuristic = load_heuristic(heuristic_file, heuristic_dir=os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
 
-    def run(self, env:BaseEnv, time_limitation: float=10, validation: bool=True, **kwargs) -> None:
+    def run(self, env:BaseEnv, time_limitation: float=10, **kwargs) -> bool:
         heuristic_works = True
         time_limitation = time_limitation * env.construction_steps
         while heuristic_works is not False:
-            heuristic_works = env.run_heuristic(self.heuristic, validation=validation)
+            heuristic_works = env.run_heuristic(self.heuristic)
             if env.time_cost > time_limitation:
                 return False
-        return env.is_complete_solution
+        return env.is_complete_solution and env.is_valid_solution

@@ -1,3 +1,4 @@
+import argparse
 import os
 import importlib
 from datetime import datetime
@@ -7,51 +8,66 @@ from src.pipeline.hyper_heuristics.single_construct_single_improve import Single
 from src.pipeline.hyper_heuristics.gpt_selection import GPTSelectionHyperHeuristic
 from src.util.gpt_helper import GPTHelper
 
-problem = "tsp"
-heuristic_dir = "basic_heuristics"
-validation_for_each_step = True
-hhs = ["nearest_neighbor_f91d", "cheapest_insertion_605f", "farthest_insertion_b6d3", "random_hh", "gpt_hh"] # tsp
-# hhs = ["nearest_neighbor_99ba", "min_cost_insertion_7bfa", "farthest_insertion_ce2b", "random_hh", "gpt_hh"] # cvrp
-# hhs = ["most_work_remaining_930e", "first_come_first_served_6c4f", "shortest_processing_time_first_c374", "random_hh", "gpt_hh"] # jssp
-# hhs = ["most_weight_neighbors_320c", "highest_weight_edge_eb0c", "balanced_cut_21d5", "random_hh", "gpt_hh"] # max_cut
-# hhs = ["greedy_by_profit_8df3", "greedy_by_weight_ece2", "greedy_by_density_9e8d", "random_hh", "gpt_hh"] # mkp
-# hhs = ["shortest_operation_ff40", "least_order_remaining_9c3c", "greedy_by_order_density_c702" "random_hh", "gpt_hh", "or_solver"] # dposp
+def parse_arguments():
+    problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
 
-module = importlib.import_module(f"src.problems.{problem}.env")
-globals()["Env"] = getattr(module, "Env")
+    parser = argparse.ArgumentParser(description="Generate heuristic")
+    parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
+    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'gpt_hh'/'random_hh' for GPT/random selection from the heuristic directory, and 'or_solver' for OR result.")
+    parser.add_argument("-d", "--heuristic_dir", type=str, default=None, help="Directory containing heuristic functions.")
+    parser.add_argument("-c", "--test_case", type=str, default=None, help="Path for single test case.")
+    parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
+    parser.add_argument("-r", "--dump_trajectory", action='store_true', help="Whether to dump trajectory.")
 
-problem_dir = os.path.join("src", "problems", problem)
-test_data_dir = os.path.join(problem_dir, "data", "test_data")
-heuristic_dir = os.path.join(problem_dir, "heuristics", heuristic_dir)
-test_data_names = os.listdir(test_data_dir)
-all_heuristics = [file.split(".")[0] for file in os.listdir(heuristic_dir)]
+    return parser.parse_args()
 
-for data_name in test_data_names:
-    print(data_name)
+def main():
+    args = parse_arguments()
+    problem = args.problem
+    heuristic = args.heuristic
+    heuristic_dir = args.heuristic_dir
+    test_case = args.test_case
+    test_dir = args.test_dir
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    env = Env(data_name=data_name, mode="test")
-    for hh in hhs:
-        hh = hh.split(".")[0]
-        if hh in all_heuristics:
-            env.reset(hh)
-            hyper_heuristic = SingleHyperHeuristic(hh, problem=problem, heuristic_dir=heuristic_dir)
-        elif hh == "gpt_hh":
-            env.reset(f"gpt_hh.{datetime_str}")
+
+    if test_case:
+        if os.path.exists(test_case):
+            test_dir = [test_case]
+        else:
+            test_dir = [os.path.join("src", "problems", problem, "data", "test_data", test_case)]
+    else:
+        if test_dir is None:
+            test_dir = os.listdir(os.path.join("src", "problems", problem, "data", "test_data"))
+    if heuristic_dir is None:
+        heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
+
+    module = importlib.import_module(f"src.problems.{problem}.env")
+    globals()["Env"] = getattr(module, "Env")
+
+    for test_case in test_dir:
+        env = Env(data_name=test_case)
+        env.reset(f"{heuristic}.{datetime_str}")
+
+        if heuristic == "gpt_hh":
             gpt_helper = GPTHelper(
                 prompt_dir=os.path.join("src", "problems", "base", "prompt"),
                 output_dir=env.output_dir,
             )
-            hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, problem=problem, heuristic_dir=heuristic_dir)
-        elif hh == "random_hh":
-            env.reset(f"random_hh.{datetime_str}")
-            hyper_heuristic = RandomHyperHeuristic(problem=problem, heuristic_dir=heuristic_dir)
-        elif hh == "or_solver":
-            env.reset(f"or_solver")
+            hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_dir=heuristic_dir, problem=problem)
+        elif heuristic == "random_hh":
+            hyper_heuristic = RandomHyperHeuristic(heuristic_dir=heuristic_dir, problem=problem)
+        elif heuristic == "or_solver":
             module = importlib.import_module(f"src.problems.{problem}.or_solver")
             globals()["ORSolver"] = getattr(module, "ORSolver")
             hyper_heuristic = ORSolver(problem=problem)
+        else:
+            hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
 
-        complete = hyper_heuristic.run(env, validation=validation_for_each_step)
-        if complete:
-            env.dump_result()
+        validation_result = hyper_heuristic.run(env)
+        if validation_result:
+            env.dump_result(args.dump_trajectory)
             print(os.path.join(env.output_dir, "result.txt"), env.key_item, env.key_value)
+
+
+if __name__ == "__main__":
+    main()
