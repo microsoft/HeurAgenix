@@ -4,8 +4,8 @@ from src.problems.mkp.components import Solution
 
 class Env(BaseEnv):
     """MKP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
-    def __init__(self, data_name: str, mode: str, **kwargs):
-        super().__init__(data_name, mode, "mkp")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, "mkp")
         self.item_num, self.resource_num, self.profits, self.weights, self.capacities = self.data
         self.construction_steps = self.item_num
         self.key_item = "current_profit"
@@ -103,11 +103,14 @@ class Env(BaseEnv):
         }
         return state_data_dict
 
-    def validation_solution(self, solution: Solution) -> bool:
+    def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
             1. Solution length: The length of item_inclusion matches the total number of items.
             2. Resource constraints: The total weight of the selected items does not exceed the capacities for any of the resource dimensions.
         """
+        if solution is None:
+            solution = self.current_solution
+
         if not isinstance(solution, Solution) or not isinstance(solution.item_inclusion, list):
             return False
 
@@ -131,12 +134,11 @@ class Env(BaseEnv):
             "Profit": self.state_data["current_profit"],
         }
 
-    def dump_result(self) -> str:
+    def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {
             "item_num": self.item_num,
             "resource_num": self.resource_num,
-            "current_profit": self.state_data["current_profit"],
             "selected_item_num": self.state_data["items_in_knapsack"]
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict, dump_trajectory)
         return content

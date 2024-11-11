@@ -9,25 +9,28 @@ class GPTSelectionHyperHeuristic:
     def __init__(
         self,
         gpt_helper: GPTHelper,
+        heuristic_dir: str=None,
         problem: str="tsp",
-        heuristic_dir: str=None
     ) -> None:
         self.gpt_helper = gpt_helper
         self.problem = problem
-        self.heuristic_dir = heuristic_dir if heuristic_dir is not None else os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
-        heuristic_names = [heuristic_file.split(".")[0] for heuristic_file in os.listdir(self.heuristic_dir)]
-        self.heuristic_docs = {heuristic_name: extract_function_with_short_docstring(open(os.path.join(self.heuristic_dir, heuristic_name + ".py")).read(), heuristic_name) for heuristic_name in heuristic_names}
-        self.heuristic_pools = {heuristic_name: load_heuristic(os.path.join(self.heuristic_dir, heuristic_name + ".py")) for heuristic_name in heuristic_names}
+        heuristic_dir = heuristic_dir if heuristic_dir is not None else os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
+        self.heuristic_docs = {
+            heuristic_file.split(".")[0]: extract_function_with_short_docstring(open(os.path.join(heuristic_dir, heuristic_file)).read(), heuristic_file.split(".")[0]) 
+            for heuristic_file in os.listdir(heuristic_dir)}
+        self.heuristic_pools = {
+            heuristic_file.split(".")[0]: load_heuristic(heuristic_file, heuristic_dir)
+            for heuristic_file in os.listdir(heuristic_dir)}
         if os.path.exists(os.path.join("output", problem, "evaluation_function.py")):
             evaluation_function_file = os.path.join("output", problem, "evaluation_function.py")
         elif os.path.exists(os.path.join("output", problem, "generate_evaluation_function", "evaluation_function.py")):
             evaluation_function_file = os.path.join("output", problem, "generate_evaluation_function", "evaluation_function.py")
         elif os.path.exists(os.path.join("src", "problems", problem, "evaluation_function.py")):
             evaluation_function_file = os.path.join("src", "problems", problem, "evaluation_function.py")
-        self.get_global_data_feature_function = load_heuristic(evaluation_function_file, "get_global_data_feature")
-        self.get_state_data_feature_function = load_heuristic(evaluation_function_file, "get_state_data_feature")
+        self.get_global_data_feature_function = load_heuristic(evaluation_function_file, function_name="get_global_data_feature")
+        self.get_state_data_feature_function = load_heuristic(evaluation_function_file, function_name="get_state_data_feature")
 
-    def run(self, env:BaseEnv, max_steps: int=None, validation: bool=True, data_feature_content_threshold: int=1000, **kwargs) -> None:
+    def run(self, env:BaseEnv, max_steps: int=None, data_feature_content_threshold: int=1000, **kwargs) -> bool:
         # Load background
         prompt_dict = self.gpt_helper.load_background(self.problem)
 
@@ -96,7 +99,7 @@ class GPTSelectionHyperHeuristic:
 
                     pre_status = env.get_observation()
                     for _ in range(running_step):
-                        env.run_heuristic(selected_heuristic, parameters=parameters, validation=validation)
+                        env.run_heuristic(selected_heuristic, parameters=parameters)
                     cur_status = env.get_observation()
                     heuristic_dict = {
                         "Heuristic": selected_heuristic_name,
@@ -108,8 +111,6 @@ class GPTSelectionHyperHeuristic:
                         heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
                     heuristic_traject.append(heuristic_dict)
                     current_steps += running_step
-                    if env.is_complete_solution:
-                        env.dump_result()
                 elif "Stop" in response or "None" in response:
                     if env.is_complete_solution:
                         break
@@ -118,4 +119,4 @@ class GPTSelectionHyperHeuristic:
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)
-        return env.is_complete_solution
+        return env.is_complete_solution and env.is_valid_solution

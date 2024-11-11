@@ -6,17 +6,22 @@ from src.problems.base.components import BaseSolution, BaseOperator
 
 class BaseEnv:
     """Base env that stores the static global data, current solution, dynamic state and provide necessary to support algorithm."""
-    def __init__(self, data_name: str, mode: str, problem: str, **kwargs):
+    def __init__(self, data_name: str, problem: str, **kwargs):
+        def find_file_in_folder(folder_path, file_name):
+            return next((os.path.join(root, file_name) for root, _, files in os.walk(folder_path) if file_name in files), None)
         self.data_name = data_name
-        self.mode = mode
         self.problem = problem
-        assert mode in ["train", "validation", "test", "smoke"]
-        if os.path.exists(data_name):
-            self.data_path = data_name
-        elif os.path.exists(os.path.join("src", "problems", problem, "data", f"{self.mode}_data", data_name)):
-            self.data_path = os.path.join("src", "problems", problem, "data", f"{self.mode}_data", data_name)
-        elif os.path.exists(os.path.join("output", problem, f"{self.mode}_data", data_name)):
-            self.data_path = os.path.join(os.path.join("output", problem, f"{self.mode}_data", data_name))
+        data_path1 = data_name
+        data_path2 = find_file_in_folder(os.path.join("src", "problems", problem, "data"), data_name)
+        data_path3 = find_file_in_folder(os.path.join("output", problem, "data"), data_name)
+        if os.path.exists(data_path1):
+            self.data_path = data_path1
+        elif data_path2:
+            self.data_path = data_path2
+        elif data_path3:
+            self.data_path = data_path3
+        else:
+            raise BaseException(f"No data {data_name} found.")
         self.data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = None
         self.global_data: dict = None
@@ -38,10 +43,14 @@ class BaseEnv:
         pass
 
     @property
+    def is_valid_solution(self) -> bool:
+        return self.validation_solution(self.current_solution)
+
+    @property
     def key_value(self) -> float:
         return self.state_data[self.key_item]
 
-    def reset(self, experiment_name: str=None, mode: str=None):
+    def reset(self, experiment_name: str=None):
         self.current_solution = self.init_solution()
         self.global_data = self.get_global_data()
         self.state_data = self.get_state_data()
@@ -49,10 +58,8 @@ class BaseEnv:
         self.recording = []
         self.time_cost = 0
         if experiment_name:
-            self.output_dir = os.path.join("output", self.problem, f"{self.mode}_result", self.data_name.split(os.sep)[-1], experiment_name)
+            self.output_dir = os.path.join("output", self.problem, self.data_name.split(os.sep)[-1], experiment_name)
             os.makedirs(self.output_dir, exist_ok=True)
-        if mode:
-            self.mode = mode
 
     def load_data(self, data_path: str) -> None:
         pass
@@ -76,11 +83,11 @@ class BaseEnv:
         """
         pass
 
-    def validation_solution(self, solution: BaseSolution) -> bool:
+    def validation_solution(self, solution: BaseSolution=None) -> bool:
         """Check the validation of this solution"""
         pass
 
-    def run_heuristic(self, heuristic: callable, parameters:dict={}, inplace: bool=True, validation: bool=True) -> BaseOperator:
+    def run_heuristic(self, heuristic: callable, parameters:dict={}, inplace: bool=True) -> BaseOperator:
         try:
             start_time = time.time()
             operator, delta = heuristic(
@@ -92,8 +99,8 @@ class BaseEnv:
             )
             end_time = time.time()
             if operator is not None:
-                validation_result = self.run_operator(operator, inplace, validation)
-                if validation_result:
+                result = self.run_operator(operator, inplace, heuristic.__name__)
+                if result:
                     self.algorithm_data.update(delta)
                     self.time_cost += end_time - start_time
                     return operator
@@ -103,32 +110,33 @@ class BaseEnv:
             print(trace_string)
             return trace_string
 
-    def run_operator(self, operator: BaseOperator, inplace: bool=True, validation: bool=True) -> bool:
+    def run_operator(self, operator: BaseOperator, inplace: bool=True, heuristic_name: str=None) -> bool:
         if isinstance(operator, BaseOperator):
             solution = operator.run(self.current_solution)
-            if not validation or self.validation_solution(solution):
-                if inplace:
-                    self.current_solution = solution
-                    self.recording.append((operator, str(solution)))
-                self.state_data = self.get_state_data()
-                return True
+            if inplace:
+                self.current_solution = solution
+                self.recording.append((str(heuristic_name), operator, str(solution)))
+            self.state_data = self.get_state_data()
+            return True
         return False
 
     def get_observation(self) -> dict:
         pass
 
-    def dump_result(self, content_dict: dict={}) -> str:
+    def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True) -> str:
         content = f"-data: {self.data_name}\n"
-        for item, value in content_dict.items():
-            content += f"-{item}: {value}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
-        if self.mode == "train":
+        content += f"-is_valid_solution: {self.is_valid_solution}\n"
+        content += f"-{self.key_item}: {self.key_value}\n"
+        for item, value in content_dict.items():
+            content += f"-{item}: {value}\n"
+        if dump_trajectory:
             trajectory_str = "\n".join([
-                str(index) + "\t" + str(operator) + "\t" + solution_str.replace("\n", r"\n")
-                for index, (operator, solution_str) in enumerate(self.recording)
+                str(index) + "\t" + heuristic_name + "\t" + str(operator) + "\t" + solution_str.replace("\n", r"\n")
+                for index, (heuristic_name, operator, solution_str) in enumerate(self.recording)
             ])
-            content += f"-trajectory:\noperation_id\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
+            content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
 
         if self.output_dir != None:
             output_file = os.path.join(self.output_dir, "result.txt")

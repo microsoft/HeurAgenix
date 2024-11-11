@@ -7,8 +7,8 @@ from src.problems.dposp.components import Solution
 
 class Env(BaseEnv):
     """DPOSP env that stores the static global data, current solution, dynamic state and provide necessary to support algorithm."""
-    def __init__(self, data_name: str, mode: str, **kwargs):
-        super().__init__(data_name, mode, "dposp")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, "dposp")
         self.production_line_num, self.product_num, self.order_num, self.production_rate, self.transition_time, self.order_product, self.order_quantity, self.order_deadline = self.data
         self.construction_steps = self.order_num
         self.key_item = "fulfilled_order_num"
@@ -249,12 +249,15 @@ class Env(BaseEnv):
         delta_time_cost = transition_time_before + production_time_for_order + transition_time_after - original_transition_time
         return delta_time_cost
 
-    def validation_solution(self, solution: Solution, record_time_cost: bool=False) -> bool:
+    def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
             1. Order existence: Ensure that the order IDs in Solution's production_schedule are valid (i.e., < self.order_num).
             2. No duplicate fulfilled orders: Ensure that no order appears more than once in the production schedule.
             3. Deadline fulfillment: Ensure that all orders are fulfilled before their respective deadlines.
         """
+        if solution is None:
+            solution = self.current_solution
+
         if not isinstance(solution, Solution) or not isinstance(solution.production_schedule, list):
             return False
         all_orders = [order for sublist in solution.production_schedule for order in sublist]
@@ -281,12 +284,11 @@ class Env(BaseEnv):
             "Fulfilled Order Num": self.state_data["fulfilled_order_num"],
         }
 
-    def dump_result(self) -> str:
+    def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {
             "production_line_num": self.production_line_num,
             "product_num": self.product_num,
             "order_num": self.order_num,
-            "fulfilled_order_num": self.state_data["fulfilled_order_num"]
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict, dump_trajectory)
         return content

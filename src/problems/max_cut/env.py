@@ -6,8 +6,8 @@ from src.problems.max_cut.components import Solution
 
 class Env(BaseEnv):
     """MaxCut env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
-    def __init__(self, data_name: str, mode: str, **kwargs):
-        super().__init__(data_name, mode, "max_cut")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, "max_cut")
         self.node_num, self.weight_matrix = self.data
         self.construction_steps = self.node_num
         self.key_item = "current_cut_value"
@@ -82,10 +82,13 @@ class Env(BaseEnv):
         }
         return state_data_dict
 
-    def validation_solution(self, solution: Solution) -> bool:
+    def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
             1. Non-repeat: No nodes in both set A and set B
         """
+        if solution is None:
+            solution = self.current_solution
+
         if not isinstance(solution, Solution) or not isinstance(solution.set_a, set) or not isinstance(solution.set_b, set):
             return False
 
@@ -102,12 +105,11 @@ class Env(BaseEnv):
             "Cut Value": self.state_data["current_cut_value"],
         }
 
-    def dump_result(self) -> str:
+    def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {
             "node_num": self.node_num,
             "set_a_count": self.state_data["set_a_count"],
-            "set_b_count": self.state_data["set_b_count"],
-            "current_cut_value": self.state_data["current_cut_value"]
+            "set_b_count": self.state_data["set_b_count"]
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict, dump_trajectory)
         return content
