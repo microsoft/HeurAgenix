@@ -135,7 +135,7 @@ if __name__ == "__main__":
     base_output_dir = os.getenv("AMLT_OUTPUT_DIR") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     prune_frequency = 200
     prune_ratio = 1.02
-    search_time = 10
+    search_time = 1000
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join(base_output_dir, problem, "data_collection", f"{data_name}.{datetime_str}.result")
     data_collection(
