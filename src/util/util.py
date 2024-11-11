@@ -49,11 +49,23 @@ def parse_text_to_dict(text):
         result[current_key] = "\n".join(current_content).strip()
     return result
 
-def load_heuristic(heuristic_file:str, function_name: str=None) -> callable:
+def load_heuristic(heuristic_file:str, heuristic_dir: str=None, function_name: str=None) -> callable:
+    if not "\n" in heuristic_file:
+        if heuristic_file[-3:] != ".py":
+            # Heuristic name
+            heuristic_file += ".py"
+        if os.path.exists(heuristic_file):
+            # Heuristic path
+            heuristic_code = open(heuristic_file, "r").read()
+        else:
+            # Heuristic file
+            heuristic_code = open(os.path.join(heuristic_dir, heuristic_file), "r").read()
+    else:
+        # Heuristic code
+        heuristic_code = heuristic_file
     if os.path.exists(heuristic_file):
         heuristic_code = open(os.path.join(heuristic_file), "r").read()
-    else:
-        heuristic_code = heuristic_file
+
     if function_name is None:
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
     exec(heuristic_code, globals())

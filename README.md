@@ -46,68 +46,138 @@ To generate the data for the Dynamic Production Order Scheduling Problem (DPOSP,
 
 ### Generate Heuristic
 #### Prepare
-- **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part, you need to provide smoke data in the `src/problems/{problem}/data/smoke_data` folder.
-  Smoke data should include two types of files:
+- **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part. Smoke data should include two types of files:
     - **Instance Data**: The format should be consistent with other data.
     - **previous_operations.txt (Optional)**: This file records the pre-operations for the smoke test, with each line representing a pre-operation. If not provided, it means there are no pre-operations.
 
-- **Set parameters**: Heuristics can be generated using three methods: from LLM, from paper, and from related problems. You need to set parameters in `generate_heuristic_from_llm/paper/related_problem.py`, including `problem`, `smoke_test_enabled`, `paper_path` (for from paper only), and `related_problems` (for from related problems).
+#### Run the Heuristic Generation
+To generate heuristics, use the following command:
 
-#### Generate
-Run the following command to generate heuristics:
 ```bash
-python generate_heuristic_from_llm/paper/related_problem.py
+python generate_heuristic.py -p <problem> -s <source> [-m] [-pp <paper_path>] [-r <related_problems>]
 ```
-The generation process and the generated heuristics will be stored in the `output/{problem}/generate_heuristic` folder.
+
+- `-p`, `--problem`: Specifies the type of CO problem to solve (required). Choose from available options in the `problem_pool`.
+- `-s`, `--source`: Defines the source for generating heuristics (required), with options:
+  - `gpt`: Use LLM’s internal knowledge.
+  - `paper`: Extract heuristics from a specified research paper.
+  - `related_problem`: Transfer heuristics from related CO problems.
+- `-m`, `--smoke_test`: Runs a smoke test (optional).
+- `-pp`, `--paper_path`: Path to the LaTeX paper file or directory, used only when the source is `paper`.
+- `-r`, `--related_problems`: A comma-separated list of related problems to reference, default is `"all"`.
+The generated heuristics are saved in the `output/{problem}/generate_heuristic` folder.
+
+#### Examples
+To generate heuristics for the Traveling Salesman Problem (TSP) using LLM with a smoke test:
+```bash
+python generate_heuristic.py -p TSP -s gpt -m
+```
+
+To generate heuristics from a paper for a resource allocation problem:
+```bash
+python generate_heuristic.py -p ResourceAllocation -s paper -pp "./papers/resource_allocation_paper.tex"
+```
+
+To transfer heuristics from related problems (e.g., Job Scheduling and Inventory Management) for a new problem:
+```bash
+python generate_heuristic.py -p NewProblem -s related_problem -r "JobScheduling,InventoryManagement"
+```
 
 ### Evolve Heuristic
 #### Prepare
 - **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part, you need to provide smoke data in the `src/problems/{problem}/data/smoke_data` folder.
-- **Train Data**: Training data should be small-scale instances to enhance the results. You can sample smaller data from the data source or create small data instances yourself and place them in the `src/problems/{problem}/data/train_data` folder.
-- **Validation Data (Optional)**: If you enable the validation for the evolution heuristic part, you need to provide validation data. Place the validation data in the `src/problems/{problem}/data/validation_data` folder. If validation is not enabled, this step is not necessary.
-- **Set parameters**: Set parameters in `evolution_heuristic.py`, including `problem`, `basic_heuristic`, `perturbation_ratio`, `perturbation_time`, `evolution_round`, `time_limitation`, `smoke_test`, and `validation`.
+- **Train Data**: Training data should be small-scale instances to enhance the results. You can sample smaller data from the data source or create small data instances yourself.
+- **Validation Data (Optional)**: If you enable the validation for the evolution heuristic part, you need to provide validation data. If validation is not enabled, this step is not necessary.
 
-#### Evolution
-Run the following command to evolve heuristics:
+#### Running Heuristic Evolution
+Run the heuristic evolution process using:
+
 ```bash
-python evolution_heuristic.py
+python evolution_heuristic.py -p <problem> -b <basic_heuristic> [-t <train_dir>] [-v <validation_dir>] [-ph <perturb_heuristic>] [-pr <perturb_ratio>] [-pt <perturb_time>] [-f <filter_num>] [-r <evolution_rounds>] [-l <time_limit>] [-m]
 ```
-The evolution process and the evolved heuristics will be stored in the `output/{problem}/train_result` folder.
+
+Parameters:
+- `-p`, `--problem`: Specifies the CO problem type to solve (required).
+- `-b`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
+- `-t`, `--train_dir`: Directory for training data.
+- `-v`, `--validation_dir`: Directory for validation data.
+- `-ph`, `--perturb_heuristic`: Path or name of the heuristic used for perturbations.
+- `-pr`, `--perturb_ratio`: Ratio for perturbation adjustments (default: 0.1).
+- `-pt`, `--perturb_time`: Maximum perturbation count (default: 1000).
+- `-f`, `--filter_num`: Number of heuristics to retain after validation (default: 1).
+- `-r`, `--evolution_rounds`: Number of rounds for heuristic evolution (default: 3).
+- `-l`, `--time_limit`: Time limit for running the evolution (default: 10 seconds).
+- `-m`, `--smoke_test`: Optional flag to run a smoke test.
+
+The evolved heuristics are saved in the `output/{problem}/train_result` folder.
+
+####  Example
+To evolve heuristics for a Traveling Salesman Problem (TSP) using a basic heuristic with smoke test:
+```bash
+python evolution_heuristic.py -p TSP -b nearest_neighbor -m
+```
 
 ### Generate Feature Extractors
 #### Prepare
 - **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part, you need to provide smoke data in the `src/problems/{problem}/data/smoke_data` folder.
-- **Set parameters**: Set parameters in `generate_feature_extractor.py`, including `problem`, `smoke_test`.
 
-#### Generate Feature Extractor
-Run the following command to generate extractors:
+#### Running Feature Extractor Generation
+Run the following command to generate feature extractors:
+
 ```bash
-python generate_feature_extractor.py
+python generate_feature_extractor.py -p <problem> [-m]
 ```
-The generation process and the generated extractor function will be stored in the `output/{problem}/generate_evaluation_function` folder.
+
+Parameters:
+- `-p`, `--problem`: Specifies the type of problem for which to generate the feature extractor (required).
+- `-m`, `--smoke_test`: Optional flag to perform a smoke test on the generated extractor.
+The process and resulting extractor function will be saved in the `output/{problem}/generate_evaluation_function` folder.
+
+#### Example
+To generate a feature extractor for a Traveling Salesman Problem (TSP) with a smoke test:
+```bash
+python generate_feature_extractor.py -p TSP -m
+```
+
 
 ### Run Single Heuristic and Heuristic Selector
-#### Prepare
-- **Test Data**: Provide test data in the `src/problems/{problem}/data/test_data` folder.
-- **Set parameters**: Set parameters in `launch_hyper_heuristic.py`, including `problem`, `heuristic_dir`, `validation_for_each_step`, and `hhs`.
-    - `validation_for_each_step`: Indicates whether to validate each step, it will make the problem solving slow but to ensure the correctness of heuristic and we can close it when heuristic is stable.
-    - `hhs`: List of heuristics to run, where each item represents an experiment:
-        - Name of heuristic function: Use the function name of a specific heuristic, such as `nearest_neighbor_f91d`.
-        - `random_hh`: Run random heuristic selection.
-        - `gpt_hh`: Let LLM select heuristic algorithms.
-        - `or_solver`: Run exact OR algorithm (DPOSP only).
 
-- **Feature Extractors and Heuristics**: Pre-generated feature extractors and heuristics are included in the project for convenience, or you can generate them using the steps in ### Generate Feature Extractors and ### Generate Heuristic.
+Execute a specified heuristic or enable dynamic heuristic selection for the chosen problem.
 
-### Run Heuristics
-Run the following command to run heuristics:
+#### Preparation
+- **Test Data**: Place test data.
+- **Feature Extractors and Heuristics**: Ensure feature extractors and heuristics are available. Pre-generated extractors and heuristics are included, or you can generate them following the **Generate Feature Extractors** and **Generate Heuristic** sections.
+
+#### Running Heuristics
+Run the following command with the required parameters to apply a heuristic or heuristic selector:
+
 ```bash
-python launch_hyper_heuristic.py
+python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-d <heuristic_dir>] [-c <test_case>] [-t <test_dir>] [-r]
 ```
-The running process and the result will be stored in the `output/{problem}/test_result` folder.
+
+The execution results and generated trajectories (if `-r` is specified) will be saved in the `output/{problem}/test_result` folder.
+
+Parameters:
+- `-p`, `--problem`: Specifies the type of problem to solve (required).
+- `-e`, `--heuristic`: Specifies the heuristic function. Options include:
+  - `<heuristic_function_name>`: Directly specify the name of a particular heuristic function.
+  - `'gpt_hh'`: LLM-based selection from heuristics in the specified directory.
+  - `'random_hh'`: Randomly selects a heuristic from the directory.
+  - `'or_solver'`: Uses an exact OR solver (only applicable for specific problems like DPOSP).
+- `-d`, `--heuristic_dir`: Directory containing heuristic functions (if needed).
+- `-c`, `--test_case`: Path to a single test case.
+- `-t`, `--test_dir`: Directory containing the entire test set.
+- `-r`, `--dump_trajectory`: Flag to save the heuristic application trajectory.
+
+#### Example
+To run the nearest neighbor heuristic on a test case:
+```bash
+python launch_hyper_heuristic.py -p TSP -e nearest_neighbor_f91d -c path/to/test_case
+```
+
 
 ## Solving On New Problems
-\FrameworkName excels in addressing new problems. When faced with a new problem, the following steps are required:
+HeurAgenix excels in addressing new problems. When faced with a new problem, the following steps are required:
 - Implement an `Env` class in `src/problems/{problem}/env.py` based on [BaseEnv](src/problems/base/env.py) to provide basic support for algorithm execution, including `load_data`, `init_solution`, `get_global_data`, `get_state_data`, and `validation_solution` functionalities.
 - Implement a `Solution` class based on [BaseSolution](src/problems/base/component.py) and an `Operation` class based on [BaseOperation](src/problems/base/component.py) in `src/problems/{problem}/component.py` to record solutions and modifications.
 - Create the following prompt files in `src/problems/{problem}/prompt`:

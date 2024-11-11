@@ -103,7 +103,7 @@ class HeuristicGenerator:
             return None
 
 
-    def generate_from_reference(self, referenced_problems: list[str], smoke_test: bool=False) -> list[str]:
+    def generate_from_reference(self, related_problems: list[str], smoke_test: bool=False) -> list[str]:
         heuristic_files = []
 
         # Load background
@@ -112,18 +112,18 @@ class HeuristicGenerator:
         # Find similar problem
         description_dict = {
             problem: open(os.path.join("src", "problems", problem, "prompt", "problem_description.txt")).read()
-            for problem in referenced_problems
+            for problem in related_problems
         }
         studied_problems = "\n\n".join([
             f"problem name: {problem}\ndescription: {description_dict[problem]}"
-            for problem in referenced_problems
+            for problem in related_problems
         ])
         prompt_dict["studied_problems"] = studied_problems
         self.gpt_helper.load("reference_problem", prompt_dict)
         response = self.gpt_helper.chat()
-        referenced_problems = extract(response, "referenced_problem", ";")
+        related_problems = extract(response, "referenced_problem", ";")
 
-        for referenced_problem in referenced_problems:
+        for referenced_problem in related_problems:
             if referenced_problem not in description_dict:
                 continue
 
@@ -279,7 +279,7 @@ class HeuristicGenerator:
                     return heuristic_code
                 else:
                     # Update code
-                    print("Updating code")
+                    continue
             else:
                 # Crashed during running the heuristic
                 prompt_dict["error_message"] = operator
