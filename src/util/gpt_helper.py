@@ -92,7 +92,10 @@ class GPTHelper:
     def load_background(self, problem: str) -> dict:
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
-        component_code = open(os.path.join("src", "problems", problem, "components.py")).read()
+        if os.path.exists(os.path.join("src", "problems", problem, "components.py")):
+            component_code = open(os.path.join("src", "problems", problem, "components.py")).read()
+        else:
+            component_code = open(os.path.join("src", "problems", "base", "mdp_components.py")).read()
         solution_class_str, operator_class_str = load_framework_description(component_code)
 
         prompt_dict = {

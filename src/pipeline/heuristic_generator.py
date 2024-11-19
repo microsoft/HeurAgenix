@@ -183,7 +183,7 @@ class HeuristicGenerator:
 
     def generate(self, heuristic_name: str, description: str, smoke_test: bool=False) -> str:
         # Special remind
-        special_remind_file = os.path.join("src", "problems", "tsp", "prompt", "special_remind.txt")
+        special_remind_file = os.path.join("src", "problems", self.problem, "prompt", "special_remind.txt")
         special_remind = "None"
         if os.path.exists(special_remind_file):
             special_remind = open(special_remind_file).read()
@@ -206,6 +206,10 @@ class HeuristicGenerator:
         prompt_dict = {"problem": self.problem, "heuristic_name": heuristic_name, "description": description, "function_name": function_name, "special_remind": special_remind}
 
         # Implement code
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components")):
+            prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
+        else:
+            prompt_dict["components_file"] = f"src.problems.base.mdp_components"
         self.gpt_helper.load("implement_code", prompt_dict)
         response = self.gpt_helper.chat()
         code = extract(response, "python_code")
@@ -236,11 +240,14 @@ class HeuristicGenerator:
         # Prepare env
         module = importlib.import_module(f"src.problems.{self.problem}.env")
         globals()["Env"] = getattr(module, "Env")
-        module = importlib.import_module(f"src.problems.{self.problem}.components")
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components")):
+            module = importlib.import_module(f"src.problems.{self.problem}.components")
+        else:
+            module = importlib.import_module(f"src.problems.base.mdp_components")
         names_to_import = (name for name in dir(module) if not name.startswith('_'))
         for name in names_to_import:
             globals()[name] = getattr(module, name)
-        env = Env(data_name=smoke_data, mode="smoke")
+        env = Env(data_name=smoke_data)
         for _ in range(max_try_times):
             env.reset()
             prompt_dict["smoke_global_data"] = filter_dict_to_str(env.global_data)
