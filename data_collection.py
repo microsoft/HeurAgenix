@@ -19,6 +19,7 @@ def parse_arguments():
     parser.add_argument("-sc", "--score_calculation", choices=["a8t2"], default="a8t2", help="Function to calculate score.")
     parser.add_argument("-pf", "--prune_frequency", default=200, help="Prune and early stop frequency.")
     parser.add_argument("-pr", "--prune_ratio", default=1.02, help="Prune and early stop threshold.")
+    parser.add_argument("-o", "--output_dir", default="output", help="Path of output dir")
 
     return parser.parse_args()
 
@@ -106,18 +107,21 @@ def data_collection(
     random_hh = RandomHyperHeuristic(problem=problem, heuristic_names=deterministic_heuristics_names, heuristic_dir=heuristic_dir)
 
     selected_previous_heuristics = []
+    previous_operator = []
     for round_index in range(int(env.construction_steps * 2)):
         env.reset()
         selected_previous_heuristics_str = ""
-        for heuristic_name in selected_previous_heuristics:
-            operator = env.run_heuristic(load_heuristic(heuristic_name, heuristic_dir))
-            selected_previous_heuristics_str += f"{heuristic_name}, {operator}\n"
+        for previous_step in range(len(selected_previous_heuristics)):
+            heuristic_name = selected_previous_heuristics[previous_step]
+            operator = previous_operator[previous_step]
+            env.run_operator(operator)
+            selected_previous_heuristics_str += f"{heuristic_name}\t{operator}\n"
         saved_solution = copy.deepcopy(env.current_solution)
         saved_state = copy.deepcopy(env.state_data)
         saved_algorithm_data = copy.deepcopy(env.algorithm_data)
 
         output_file = open(os.path.join(output_dir, f"round_{round_index}.txt"), "w")
-        output_file.write(f"selected_previous_heuristics, operators: \n{selected_previous_heuristics_str}\n")
+        output_file.write(f"selected_previous_heuristics\toperators: \n{selected_previous_heuristics_str}\n")
         output_file.write(f"current_solution: \n{saved_solution}\n")
 
         best_score = np.inf
@@ -128,11 +132,13 @@ def data_collection(
             heuristic_name = heuristic_file.split(".")[0]
 
             results = []
+            operators = []
             for search_index in range(search_time):
                 env.current_solution = saved_solution
                 env.state_data = saved_state
                 env.algorithm_data = saved_algorithm_data
-                env.run_heuristic(load_heuristic(heuristic_file, heuristic_dir))
+                operator = env.run_heuristic(load_heuristic(heuristic_file, heuristic_dir))
+                operators.append(str(operator))
                 random_hh.run(env)
                 results.append(env.key_value)
                 if (search_index + 1) % prune_ratio == 0:
@@ -145,9 +151,13 @@ def data_collection(
             if env.compare(score, best_score) > 0:
                 best_score = score
                 best_heuristics = heuristic_name
+                best_operator = operator
+                best_operators = operators
         selected_previous_heuristics.append(best_heuristics)
+        previous_operator.append(best_operator)
         output_file.write("---------------\n")
-        output_file.write(f"best_heuristics:\t{best_heuristics}")
+        output_file.write(f"best_heuristics:\t{best_heuristics}\n")
+        output_file.write(f"best_operators:\t{best_operators}\n")
         output_file.close()
         print(f"Select {best_heuristics} in round {round_index}")
 
@@ -160,14 +170,16 @@ def main():
     score_calculation = eval(args.score_calculation)
     prune_frequency = args.prune_frequency
     prune_ratio = args.prune_ratio
+    output_dir = args.output_dir
 
     base_data_dir = os.getenv("AMLT_DATA_DIR") if os.getenv("AMLT_DATA_DIR") else "output"
     data_path = os.path.join(base_data_dir, data_path)
 
-    base_output_dir = os.getenv("AMLT_OUTPUT_DIR") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+    os.makedirs(base_output_dir, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     data_name = data_path.split(os.sep)[-1]
-    output_dir = os.path.join(base_output_dir, problem, "data_collection", f"{data_name}.{datetime_str}.result")
+    output_dir = os.path.join(base_output_dir, problem, "heuristic_selection_data_collection", output_dir, f"{data_name}.{datetime_str}.result")
 
     data_collection(
         problem=problem,
