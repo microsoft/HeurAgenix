@@ -16,7 +16,7 @@ def parse_arguments():
     parser.add_argument("-d", "--data_path", type=str, required=True, help="Path for source data.")
     parser.add_argument("-e", "--heuristic_dir", default=None, help="Path of heuristic dir.")
     parser.add_argument("-s", "--search_time", default=1000, help="MCTS times for each heuristic.")    
-    parser.add_argument("-sc", "--score_calculation", choices=["a8t2"], default="a8t2", help="Function to calculate score.")
+    parser.add_argument("-sc", "--score_calculation", choices=["average_score", "a8t2"], default="average_score", help="Function to calculate score.")
     parser.add_argument("-pf", "--prune_frequency", default=200, help="Prune and early stop frequency.")
     parser.add_argument("-pr", "--prune_ratio", default=1.02, help="Prune and early stop threshold.")
     parser.add_argument("-o", "--output_dir", default="output", help="Path of output dir")
@@ -30,6 +30,11 @@ def a8t2(results: list[float]) -> float:
     top_k_score = sum(sorted(results[: top_k])) / top_k
     score = average_score_ratio * average_score + (1 - average_score_ratio) * top_k_score
     return score
+
+def average_score(results: list[float]) -> float:
+    average_score = sum(results) / len(results)
+    return average_score
+
 
 def filter_deterministic_heuristics(problem: str, heuristic_dir: str, env: object) -> list[str]:
     previous_steps = int(env.construction_steps / 5)
@@ -70,7 +75,7 @@ def data_collection(
         problem: str,
         data_path: str,
         heuristic_dir: str=None,
-        score_calculation: callable=a8t2,
+        score_calculation: callable=average_score,
         prune_frequency: int=200,
         prune_ratio: float=1.02,
         search_time: int=1000,
@@ -126,7 +131,7 @@ def data_collection(
 
         best_score = np.inf
         output_file.write("---------------\n")
-        output_file.write(f"heuristic\tscore\tresults\n")
+        output_file.write(f"heuristic\t{score_calculation.__name__}\tresults\n")
         for heuristic_file in os.listdir(heuristic_dir):
             env.reset()
             heuristic_name = heuristic_file.split(".")[0]
