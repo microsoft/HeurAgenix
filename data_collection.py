@@ -125,6 +125,7 @@ def data_collection(
         saved_state = copy.deepcopy(env.state_data)
         saved_algorithm_data = copy.deepcopy(env.algorithm_data)
         is_complete = env.is_complete_solution
+        all_operators = []
 
         output_file = open(os.path.join(output_dir, f"round_{round_index}.txt"), "w")
         output_file.write(f"selected_previous_heuristics\toperators: \n{selected_previous_heuristics_str}\n")
@@ -153,12 +154,12 @@ def data_collection(
             score = score_calculation(results)
             results_str = ",".join([str(result) for result in sorted(results)])
             output_file.write(f"{heuristic_name}\t{score}\t{results_str}\n")
+            all_operators.extend(operators)
 
             if env.compare(score, best_score) > 0:
                 best_score = score
                 best_heuristics = heuristic_name
                 next_operator = operator
-                best_operators = operators
                 best_operators_str = [str(operator) for operator in operators]
         selected_previous_heuristics.append(best_heuristics)
         previous_operator.append(next_operator)
@@ -167,7 +168,7 @@ def data_collection(
         output_file.write(f"best_operators:\t{best_operators_str}\n")
         output_file.write(f"next_operator:\t{next_operator}\n")
         output_file.close()
-        if is_complete and not any(best_operators):
+        if is_complete and not any(all_operators):
             break
     output_file = open(os.path.join(output_dir, f"finished.txt"), "w")
     output_file.write(f"Total rounds: {round_index}")

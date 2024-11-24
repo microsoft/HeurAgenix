@@ -40,8 +40,8 @@ def _3opt_e75b(global_data: dict, state_data: dict, algorithm_data: dict, get_st
                 current_cost = distance_matrix[a][b] + distance_matrix[c][d] + distance_matrix[e][f]  
  
                 # Calculate the cost of the new edges for each option  
-                option_1_cost = current_cost # distance_matrix[a][c] + distance_matrix[b][e] + distance_matrix[d][f]
-                option_2_cost = current_cost #distance_matrix[f][c] + distance_matrix[b][d] + distance_matrix[e][a]  
+                option_1_cost = distance_matrix[a][c] + distance_matrix[b][e] + distance_matrix[d][f]
+                option_2_cost = distance_matrix[f][c] + distance_matrix[b][d] + distance_matrix[e][a]  
                 option_3_cost = distance_matrix[f][b] + distance_matrix[c][e] + distance_matrix[d][a]
  
  
