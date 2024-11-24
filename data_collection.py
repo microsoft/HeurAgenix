@@ -125,7 +125,6 @@ def data_collection(
         saved_state = copy.deepcopy(env.state_data)
         saved_algorithm_data = copy.deepcopy(env.algorithm_data)
         is_complete = env.is_complete_solution
-        all_operators = []
 
         output_file = open(os.path.join(output_dir, f"round_{round_index}.txt"), "w")
         output_file.write(f"selected_previous_heuristics\toperators: \n{selected_previous_heuristics_str}\n")
@@ -145,7 +144,7 @@ def data_collection(
                 env.state_data = saved_state
                 env.algorithm_data = saved_algorithm_data
                 operator = env.run_heuristic(load_heuristic(heuristic_file, heuristic_dir))
-                operators.append(str(operator))
+                operators.append(operator)
                 random_hh.run(env)
                 results.append(env.key_value)
                 if (search_index + 1) % prune_ratio == 0:
@@ -158,13 +157,15 @@ def data_collection(
             if env.compare(score, best_score) > 0:
                 best_score = score
                 best_heuristics = heuristic_name
-                best_operator = operator
+                next_operator = operator
                 best_operators = operators
+                best_operators_str = [str(operator) for operator in operators]
         selected_previous_heuristics.append(best_heuristics)
-        previous_operator.append(best_operator)
+        previous_operator.append(next_operator)
         output_file.write("---------------\n")
         output_file.write(f"best_heuristics:\t{best_heuristics}\n")
-        output_file.write(f"best_operators:\t{best_operators}\n")
+        output_file.write(f"best_operators:\t{best_operators_str}\n")
+        output_file.write(f"next_operator:\t{next_operator}\n")
         output_file.close()
         if is_complete and not any(best_operators):
             break
