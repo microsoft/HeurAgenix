@@ -295,77 +295,77 @@ class RoadCharging(Env):
 
 
 
-class ConstrainAction(gym.ActionWrapper):
-    def __init__(self, config_fname: str):
-        env = RoadCharging(config_fname)
-        super()._init_(env)
-    # def __init__(self, env):
-    #     super().__init__(env)
+# class ConstrainAction(gym.ActionWrapper):
+#     def __init__(self, config_fname: str):
+#         env = RoadCharging(config_fname)
+#         super()._init_(env)
+#     # def __init__(self, env):
+#     #     super().__init__(env)
 
-    def action(self, action):
-        for i in range(self.n):
-            if self.obs["RideTime"][i] >= 1: # if on a ride, not charge
-                action[i] = 0
-            elif self.obs["SoC"][i] > 1-self.charger_speed[i]: # if full capacity, not charge
-                action[i] = 0
-            elif self.obs["SoC"][i] <= self.low_battery: # if low capacity has to charge
-                action[i] = 1
+#     def action(self, action):
+#         for i in range(self.n):
+#             if self.obs["RideTime"][i] >= 1: # if on a ride, not charge
+#                 action[i] = 0
+#             elif self.obs["SoC"][i] > 1-self.charger_speed[i]: # if full capacity, not charge
+#                 action[i] = 0
+#             elif self.obs["SoC"][i] <= self.low_battery: # if low capacity has to charge
+#                 action[i] = 1
 
-        if sum(action) + sum(self.obs["ChargingStatus"]) >= self.m: # limit charging requests to available charging capacity
-            print('Exceed charger capacity!')
-            charging_requests = sum(action)
-            available_capacity = self.m - sum(self.obs["ChargingStatus"])
-            charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
+#         if sum(action) + sum(self.obs["ChargingStatus"]) >= self.m: # limit charging requests to available charging capacity
+#             print('Exceed charger capacity!')
+#             charging_requests = sum(action)
+#             available_capacity = self.m - sum(self.obs["ChargingStatus"])
+#             charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
 
-            if available_capacity <= 0:
-                print('No charger is available now.')
-                # flip all, including those with low capacity. which will not be assigned any
-                # order. they will wait until a charger becomes available
-                # If their battery level drops to 0, it will remain at zero, and they will continue to make requests to charge at 
-                # each decision epoch until a charger becomes available
-                # This policy may lead to low overall returns, which GPT should learn to avoid.
-                # Alternatively, we can use a sorting strategy. this can guarantee no EV will drop to zero battery. but
-                # this may not be very fair for vehicles that planned to charge earlier well before
-                # their battery levels reached a low point.
+#             if available_capacity <= 0:
+#                 print('No charger is available now.')
+#                 # flip all, including those with low capacity. which will not be assigned any
+#                 # order. they will wait until a charger becomes available
+#                 # If their battery level drops to 0, it will remain at zero, and they will continue to make requests to charge at 
+#                 # each decision epoch until a charger becomes available
+#                 # This policy may lead to low overall returns, which GPT should learn to avoid.
+#                 # Alternatively, we can use a sorting strategy. this can guarantee no EV will drop to zero battery. but
+#                 # this may not be very fair for vehicles that planned to charge earlier well before
+#                 # their battery levels reached a low point.
 
-                to_flip = charging_agents
-                action[to_flip] = 0
+#                 to_flip = charging_agents
+#                 action[to_flip] = 0
 
-            elif available_capacity > 0:
+#             elif available_capacity > 0:
 
-                if np.any(action == 1):
-                    # Scheme #1:
-                    # Randomly select from the set of agents requesting charging and set their charging actions to 0
-                    to_flip = random.sample(list(charging_agents), charging_requests-available_capacity)
-                    # Scheme #2:
-                    # sort charging agents based on their SoC from low to high
-                    # battery_level = dict()
-                    # for i in charging_agents:
-                    #     battery_level[i] = self.obs['SoC'][i]
+#                 if np.any(action == 1):
+#                     # Scheme #1:
+#                     # Randomly select from the set of agents requesting charging and set their charging actions to 0
+#                     to_flip = random.sample(list(charging_agents), charging_requests-available_capacity)
+#                     # Scheme #2:
+#                     # sort charging agents based on their SoC from low to high
+#                     # battery_level = dict()
+#                     # for i in charging_agents:
+#                     #     battery_level[i] = self.obs['SoC'][i]
 
-                    # sorted_battery_level = dict(sorted(battery_level.items(), key=lambda item: item[1]))
-                    # print('sorted_battery_level:', sorted_battery_level)
-                    # to_flip = list(sorted_battery_level.keys())[self.m:]
+#                     # sorted_battery_level = dict(sorted(battery_level.items(), key=lambda item: item[1]))
+#                     # print('sorted_battery_level:', sorted_battery_level)
+#                     # to_flip = list(sorted_battery_level.keys())[self.m:]
 
-                    print('Agents requesting charging:', charging_agents)
-                    print('Agents in charging:', self.obs["ChargingStatus"])
-                    print('Flip agents:', to_flip)
+#                     print('Agents requesting charging:', charging_agents)
+#                     print('Agents in charging:', self.obs["ChargingStatus"])
+#                     print('Flip agents:', to_flip)
 
-                    action[to_flip] = 0
+#                     action[to_flip] = 0
 
-        # for i in range(self.n): # if SoC is too low, must charge | Q: What if you swap it with a vehicle that has a low SoC as well?
-        #     if self.obs["SoC"][i] <= 0.1 and action[i]==0:
-        #         print('checkpoint 3')
-        #         # Swap the action of agent i with a randomly selected agent that takes action 1
-        #         # charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
-        #         # if np.any(action == 1):
-        #         #     j = np.random.choice(charging_agents)
+#         # for i in range(self.n): # if SoC is too low, must charge | Q: What if you swap it with a vehicle that has a low SoC as well?
+#         #     if self.obs["SoC"][i] <= 0.1 and action[i]==0:
+#         #         print('checkpoint 3')
+#         #         # Swap the action of agent i with a randomly selected agent that takes action 1
+#         #         # charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
+#         #         # if np.any(action == 1):
+#         #         #     j = np.random.choice(charging_agents)
 
-        #         #     action[j] = 0
-        #         #     action[i] = 1
+#         #         #     action[j] = 0
+#         #         #     action[i] = 1
 
-        #         # assuming a backup charger is available, but at an extremely high charging price
-        #         action[i] = 1
+#         #         # assuming a backup charger is available, but at an extremely high charging price
+#         #         action[i] = 1
 
-        return action
+#         return action
 
