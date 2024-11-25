@@ -1,4 +1,5 @@
 state_data (dict): The state data dict containing the solution state data with:
+    - "current_time_step":The time step corresponding to the current state.
     - "ride_lead_time": Ride leading time and length is number of fleet_size.
     - "charging_lead_time": Charging leading time and length is number of fleet_size.
     - "battery_soc": Soc of battery of each feet and length is number of fleet_size.
