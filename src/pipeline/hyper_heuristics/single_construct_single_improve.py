@@ -20,6 +20,6 @@ class SingleConstructiveSingleImproveHyperHeuristic:
             heuristic_works = env.run_heuristic(self.constructive_heuristic)
         for _ in range(max_steps - env.construction_steps):
             heuristic_works = env.run_heuristic(self.improve_heuristic)
-            if heuristic_works is not True:
+            if heuristic_works is False:
                 break
         return env.is_complete_solution and env.is_valid_solution

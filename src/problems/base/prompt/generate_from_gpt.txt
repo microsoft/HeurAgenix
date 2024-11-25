@@ -1,7 +1,5 @@
 I need your help to implement some basic heuristic for this problem {problem}.
 
-Can we implement random heuristic?
-
 The response format is very important. For better communication, please respond to me in this format:
 ***heuristic:
 heuristic_name: description
