@@ -12,64 +12,79 @@ import json
 from gym import Env, spaces
 
 
+import json
+import pandas as pd
+import numpy as np
+from gym import spaces
+
+
 class RoadCharging(Env):
-    def __init__(self, config_fname:str):
+    def __init__(self, config_fname: str):
         super(RoadCharging, self).__init__()
 
+        # Load configuration data from the JSON file
         with open(config_fname, "r") as file:
             config = json.load(file)
 
+        # Store the configuration
         self.config = config
         self.delta_t = config["step_length"]
 
-        fleet_size = config['fleet_size'] # size of EV fleet
-        total_chargers = config['total_chargers'] # number of total chargers
-        max_time_steps = int(config["time_horizon"]/self.delta_t)
-        connection_fee = config['connection_fee'] # ($ per connection session)
-        assign_prob = config['assign_prob'] # Probability of receiving a ride order when the vehicle is in idle status
-        max_cap = config['max_cap'] # (kWh)
-        consume_rate = round(1/config["time_SoCfrom100to0"]*self.delta_t, 3) # (percentage per time step, a fully charged battery can sustain 8 hours)
-        charger_speed = round(1/config["time_SoCfrom0to100"]*self.delta_t, 3) # (percentage per time step)
-        # load data
-        RT_mean = pd.read_csv(config["trip_time_fpath"][0]).iloc[:,0].tolist()
-        RT_std = pd.read_csv(config["trip_time_fpath"][1]).iloc[:,0].tolist()
-        order_price = pd.read_csv(config["trip_fare_fpath"]).iloc[:,0].tolist()
-        charging_price = pd.read_csv(config["charging_price_fpath"]).iloc[:,0].tolist()
+        # Extract relevant configuration parameters
+        fleet_size = config['fleet_size']  # Number of EVs in the fleet
+        total_chargers = config['total_chargers']  # Total number of chargers
+        max_time_steps = int(config["time_horizon"] / self.delta_t)
+        connection_fee = config['connection_fee']  # $ per connection session
+        assign_prob = config['assign_prob']  # Probability of receiving a ride order when idle
+        max_cap = config['max_cap']  # Max battery capacity (kWh)
+        consume_rate = round(1 / config["time_SoCfrom100to0"] * self.delta_t, 3)  # Battery consumption rate per time step
+        charger_speed = round(1 / config["time_SoCfrom0to100"] * self.delta_t, 3)  # Charger speed per time step
 
-        self.n = fleet_size
-        self.m = total_chargers
-        self.k = max_time_steps
-        self.h = connection_fee
-        self.assign_prob = assign_prob
-        self.max_cap = max_cap
-        self.mu = np.repeat(RT_mean, int(60/self.delta_t))
-        self.sigma = np.repeat(RT_std, int(60/self.delta_t))
+        # Load data files for various parameters
+        RT_mean = pd.read_csv(config["trip_time_fpath"][0]).iloc[:, 0].tolist()
+        RT_std = pd.read_csv(config["trip_time_fpath"][1]).iloc[:, 0].tolist()
+        order_price = pd.read_csv(config["trip_fare_fpath"]).iloc[:, 0].tolist()
+        charging_price = pd.read_csv(config["charging_price_fpath"]).iloc[:, 0].tolist()
+
+        # Assign values to class attributes
+        self.n = fleet_size  # Number of agents (EVs)
+        self.m = total_chargers  # Number of chargers
+        self.k = max_time_steps  # Maximum number of time steps
+        self.h = connection_fee  # Connection fee
+        self.assign_prob = assign_prob  # Ride order assignment probability
+        self.max_cap = max_cap  # Max capacity of EVs
+        self.consume_rate = [consume_rate] * self.n  # Battery consumption rate per time step
+        self.charger_speed = [charger_speed] * self.n  # Charger speed per time step
+        self.mu = np.repeat(RT_mean, int(60 / self.delta_t))  # Ride time mean
+        self.sigma = np.repeat(RT_std, int(60 / self.delta_t))  # Ride time standard deviation
+        self.w = np.repeat(order_price, int(60 / self.delta_t)) * self.delta_t  # Order price per time step
+        self.r = self.charger_speed * max_cap  # Charger rate (kWh per time step)
+        self.p = np.repeat(charging_price, int(60 / self.delta_t))  # Charging price per time step
+        self.rng = np.random.default_rng()  # Random number generator
+        self.low_battery = 0.1  # Low battery threshold
+
+        # Save path for results
         self.save_path = config['save_path']
-        self.consume_rate = consume_rate
-        self.charger_speed = charger_speed
-        self.w = np.repeat(order_price, int(60/self.delta_t)) * self.delta_t
-        self.r = charger_speed * max_cap # kWh per time step
-        self.p = np.repeat(charging_price, int(60/self.delta_t))
-        self.rng = np.random.default_rng()
-        self.low_battery = 0.1
 
-        # Observation space: n agents, each has 4 state variables: time step, ride time, charging status, SoC
+        # Observation space: n agents, each with 4 state variables
         self.observation_shape = (self.n, 4)
 
+        # Define the observation space for each agent
         self.observation_space = spaces.Dict({
-            "TimeStep": spaces.MultiDiscrete([self.k+1] * self.n),  # n dimensions, each in range 0 to k
-            "RideTime": spaces.MultiDiscrete([self.k+1] * self.n),  # n dimensions, each in range 0 to k
-            "ChargingStatus": spaces.MultiDiscrete([2] * self.n),      # n dimensions, each in range 0 to 1
-            "SoC": spaces.Box(low=0.0, high=1.0, shape=(self.n, ), dtype=float),  # Continuous Box with n elements
+            "TimeStep": spaces.MultiDiscrete([self.k + 1] * self.n),  # Time step for each agent (0 to k)
+            "RideTime": spaces.MultiDiscrete([self.k + 1] * self.n),  # Ride time for each agent (0 to k)
+            "ChargingStatus": spaces.MultiDiscrete([2] * self.n),  # Charging status: 0 (not charging) or 1 (charging)
+            "SoC": spaces.Box(low=0.0, high=1.0, shape=(self.n,), dtype=float),  # State of Charge (0 to 1)
         })
 
-
-        # Action space: n agents, each takes action 0 or 1
+        # Action space: n agents, each can take a binary action (0 or 1)
         self.action_space = spaces.MultiBinary(self.n)
 
-        print('consume_rate:', self.consume_rate)
-        print('charger_speed:', self.charger_speed)
-        print('len(w):', len(self.w))
+        # Debug prints to verify some of the key values
+        print(f'Consume Rate: {self.consume_rate}')
+        print(f'Charger Speed: {self.charger_speed}')
+        print(f'Order Prices Length: {len(self.w)}')
+
 
 
     def seed(self, seed_value=None):
@@ -150,7 +165,7 @@ class RoadCharging(Env):
             else:
                 ride_time = int(self.rng.lognormal(self.mu[t], self.sigma[t])/self.delta_t) # convert to time steps
 
-            ride_time = np.minimum(ride_time, int(bLevel/self.consume_rate))
+            ride_time = np.minimum(ride_time, int(bLevel/self.consume_rate[agent]))
 
             ride_times.append(ride_time)
 
@@ -179,7 +194,7 @@ class RoadCharging(Env):
         beta = action
 
         # get next state of charge
-        theta = (1-action) * (state["SoC"]-self.consume_rate) + action * (state["SoC"]+self.charger_speed)
+        theta = (1-action) * (state["SoC"]-self.consume_rate[agent_idx]) + action * (state["SoC"]+self.charger_speed[agent_idx])
         theta = round(np.minimum(np.maximum(theta, 0), 1.0), 3)
 
         self.obs["TimeStep"][agent_idx] = state["TimeStep"] + 1
@@ -207,7 +222,7 @@ class RoadCharging(Env):
 
         reward = sum(self.w[self.obs["TimeStep"][i]] * tau[i] * (1-action[i]) * self.is_zero(alpha[i]) * (1-beta[i])
                      - self.h * action[i] * (1-beta[i])
-                     - self.p[self.obs["TimeStep"][i]] * self.r * action[i]
+                     - self.p[self.obs["TimeStep"][i]] * self.r[i] * action[i]
                      for i in range(self.n))
 
         # apply the action: modify self.obs
@@ -278,11 +293,12 @@ class RoadCharging(Env):
         plt.tight_layout()
         plt.show()
 
+
+
 class ConstrainAction(gym.ActionWrapper):
-    def __init__(self, config: str):
-        env = RoadCharging(config)
+    def __init__(self, config_fname: str):
+        env = RoadCharging(config_fname)
         super()._init_(env)
-    
     # def __init__(self, env):
     #     super().__init__(env)
 
@@ -290,7 +306,7 @@ class ConstrainAction(gym.ActionWrapper):
         for i in range(self.n):
             if self.obs["RideTime"][i] >= 1: # if on a ride, not charge
                 action[i] = 0
-            elif self.obs["SoC"][i] > 1-self.charger_speed: # if full capacity, not charge
+            elif self.obs["SoC"][i] > 1-self.charger_speed[i]: # if full capacity, not charge
                 action[i] = 0
             elif self.obs["SoC"][i] <= self.low_battery: # if low capacity has to charge
                 action[i] = 1
