@@ -81,9 +81,9 @@ class RoadCharging(Env):
         self.action_space = spaces.MultiBinary(self.n)
 
         # Debug prints to verify some of the key values
-        print(f'Consume Rate: {self.consume_rate}')
-        print(f'Charger Speed: {self.charger_speed}')
-        print(f'Order Prices Length: {len(self.w)}')
+        # print(f'Consume Rate: {self.consume_rate}')
+        # print(f'Charger Speed: {self.charger_speed}')
+        # print(f'Order Prices Length: {len(self.w)}')
 
 
 
@@ -209,8 +209,8 @@ class RoadCharging(Env):
         # Assert that it is a valid action
         assert self.action_space.contains(action), "Invalid Action"
 
-        print('Current SoC:', self.obs['SoC'])
-        print('Current action:', action)
+        # print('Current SoC:', self.obs['SoC'])
+        # print('Current action:', action)
 
         current_step = self.obs["TimeStep"][0]
         self.trajectories['actions'][:,current_step] = action
@@ -318,7 +318,7 @@ class ConstrainAction(gym.ActionWrapper):
             charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
 
             if available_capacity <= 0:
-                print('No charger available now.')
+                print('No charger is available now.')
                 # flip all, including those with low capacity. which will not be assigned any
                 # order. they will wait until a charger becomes available
                 # If their battery level drops to 0, it will remain at zero, and they will continue to make requests to charge at 
