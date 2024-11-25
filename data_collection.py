@@ -127,7 +127,7 @@ def data_collection(
         saved_key_value = env.key_value
         saved_is_complete = env.is_complete_solution
 
-        best_score = np.inf
+        best_score = None
         best_results = []
         output_file = open(os.path.join(output_dir, f"round_{round_index}.txt"), "w")
         output_file.write(f"selected_previous_heuristics\toperators\n{selected_previous_heuristics_str}")
@@ -138,7 +138,7 @@ def data_collection(
             output_file.write(f"key_value\t{saved_key_value}\n")
 
         output_file.write("---------------\n")
-        output_file.write(f"heuristic\t{score_calculation.__name__}\tany_operator\tresults\n")
+        output_file.write(f"heuristic\t{score_calculation.__name__}\tresults\n")
         for heuristic_file in os.listdir(heuristic_dir):
             env.reset()
             heuristic_name = heuristic_file.split(".")[0]
@@ -151,17 +151,20 @@ def data_collection(
                 env.algorithm_data = saved_algorithm_data
                 operator = env.run_heuristic(load_heuristic(heuristic_file, heuristic_dir))
                 operators.append(operator)
-                random_hh.run(env)
-                results.append(env.key_value)
+                if operator:
+                    random_hh.run(env)
+                    results.append(env.key_value)
                 if (search_index + 1) % prune_ratio == 0:
-                    if env.compare(best_score * prune_ratio, score_calculation(results)) > 0:
+                    if best_score and env.compare(best_score * prune_ratio, score_calculation(results)) > 0:
                         break
+            if results == []:
+                output_file.write(f"{heuristic_name}\tNone\tNone\n")
+                continue
             score = score_calculation(results)
             results_str = ",".join([str(result) for result in sorted(results)])
-            any_operator = any(operators)
-            output_file.write(f"{heuristic_name}\t{score}\t{any_operator}\t{results_str}\n")
+            output_file.write(f"{heuristic_name}\t{score}\t{results_str}\n")
 
-            if env.compare(score, best_score) > 0 and any_operator:
+            if not best_score or env.compare(score, best_score) > 0:
                 best_score = score
                 best_heuristics = heuristic_name
                 next_operator = next((operator for operator in operators if operator is not False), None)
