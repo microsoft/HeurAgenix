@@ -1,0 +1,3 @@
+1. For the circumstances that algorithm return empty operator, please return Action with all 0, not None.
+2. For the fleet that on ride, do not charge.
+3. Please do not modify the past actions since it is already happened.

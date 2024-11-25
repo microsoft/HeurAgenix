@@ -8,7 +8,7 @@ class Solution(BaseSolution):
     def __str__(self) -> str:
         solution_string = ""
         for index, actions in enumerate(self.actions):
-            solution_string += f"agent_{index}: " + ", ".join(map(str, actions)) + ";"
+            solution_string += f"agent_{index}: " + ", ".join(map(str, actions)) + "\n"
         return solution_string
 
 
