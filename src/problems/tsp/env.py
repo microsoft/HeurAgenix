@@ -67,7 +67,7 @@ class Env(BaseEnv):
 
         # The total cost of current solution.
         current_cost = sum([self.distance_matrix[solution.tour[index]][solution.tour[index + 1]] for index in range(len(solution.tour) - 1)])
-        if self.is_complete_solution:
+        if len(solution.tour) > 0:
             current_cost += self.distance_matrix[solution.tour[-1]][solution.tour[0]]
 
         # The last visited node 

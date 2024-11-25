@@ -16,10 +16,10 @@ class SingleConstructiveSingleImproveHyperHeuristic:
     def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
         max_steps = max_steps if max_steps is not None else env.construction_steps * 2
         heuristic_works = True
-        while heuristic_works is not False:
+        while heuristic_works:
             heuristic_works = env.run_heuristic(self.constructive_heuristic)
         for _ in range(max_steps - env.construction_steps):
             heuristic_works = env.run_heuristic(self.improve_heuristic)
-            if heuristic_works is False:
+            if not heuristic_works:
                 break
         return env.is_complete_solution and env.is_valid_solution

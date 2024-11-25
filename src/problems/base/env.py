@@ -104,11 +104,11 @@ class BaseEnv:
                     self.algorithm_data.update(delta)
                     self.time_cost += end_time - start_time
                     return operator
-            return False
+            return None
         except Exception as e:
             trace_string = traceback.format_exc()
             print(trace_string)
-            return trace_string
+            return None
 
     def run_operator(self, operator: BaseOperator, inplace: bool=True, heuristic_name: str=None) -> bool:
         if isinstance(operator, BaseOperator):
@@ -117,8 +117,8 @@ class BaseEnv:
                 self.current_solution = solution
                 self.recording.append((str(heuristic_name), operator, str(solution)))
             self.state_data = self.get_state_data()
-            return True
-        return False
+            return operator
+        return None
 
     def get_observation(self) -> dict:
         pass
