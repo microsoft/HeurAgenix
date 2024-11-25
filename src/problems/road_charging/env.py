@@ -4,11 +4,13 @@ from src.problems.road_charging.gym_env import ConstrainAction, RoadCharging
 
 class Env(MDPEnv):
     """RoadCharging env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
-    def __init__(self, data_name: str, constrain: bool = False, **kwargs):
-        if constrain:
-            super().__init__(data_name, ConstrainAction, "constrained_road_charging")
-        else:
-            super().__init__(data_name, RoadCharging, "road_charging")
+    # def __init__(self, data_name: str, constrain: bool = False, **kwargs):
+    #     if constrain:
+    #         super().__init__(data_name, ConstrainAction, "constrained_road_charging")
+    #     else:
+    #         super().__init__(data_name, RoadCharging, "road_charging")
+    def __init__(self, data_name: str, **kwargs):
+        super().__init__(data_name, RoadCharging, "road_charging")
         self.key_item = "return"
         self.compare = lambda x, y: y - x
         self.construction_steps = self.gym_env.k
