@@ -18,7 +18,7 @@ class PerturbationHyperHeuristic:
     def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
         max_steps = max_steps if max_steps is not None else env.construction_steps * 2
         heuristic_works = True
-        while heuristic_works is not False:
+        while heuristic_works:
             if random.random() < self.perturbation_ratio:
                 heuristic = self.perturbation_heuristic
             else:

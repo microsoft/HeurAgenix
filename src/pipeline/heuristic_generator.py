@@ -261,7 +261,7 @@ class HeuristicGenerator:
                 operator = env.run_heuristic(heuristic)
             except Exception as e:
                 operator = traceback.format_exc()
-            if operator is not False and not isinstance(operator, str):
+            if operator and not isinstance(operator, str):
                 # Expected result
                 self.gpt_helper.load("smoke_test_expected_result.txt", prompt_dict)
                 response = self.gpt_helper.chat()
