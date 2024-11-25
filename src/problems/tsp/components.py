@@ -78,11 +78,12 @@ class ReverseSegmentOperator(BaseOperator):
             assert 0 <= start_index < len(new_tour)
             assert 0 <= end_index < len(new_tour)
 
-            # Ensure the start index comes before the end index
-            if start_index > end_index:
-                start_index, end_index = end_index, start_index
+            if start_index <= end_index:
+                # Reverse the segment between start_index and end_index (inclusive)
+                new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+            else:
+                # Reverse the segment outside start_index and end_index (inclusive)
+                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index ] + list(reversed(new_tour[:end_index + 1]))
 
-            # Reverse the segment between start_index and end_index (inclusive)
-            new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
 
         return Solution(new_tour, solution.node_num)  
