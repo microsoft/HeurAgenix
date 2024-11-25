@@ -41,12 +41,10 @@ def get_global_data_feature(global_data: dict) -> dict:
     centroid = np.argmin(np.sum(distance_matrix, axis=0))
 
     return {
-        "average_distance": average_distance,
-        "min_distance": min_distance,
-        "max_distance": max_distance,
-        "std_dev_distance": std_dev_distance,
-        "density": density,
-        "centroid": centroid
+        "average_distance": average_distance / (max_distance - min_distance),
+        "min_distance": min_distance / average_distance,
+        "max_distance": max_distance / average_distance,
+        "std_dev_distance": std_dev_distance / average_distance,
     }
 
 import numpy as np
@@ -78,33 +76,39 @@ def get_state_data_feature(global_data: dict, state_data: dict) -> dict:
             - "min_edge_cost_remaining" (float): The minimum edge cost to any unvisited node from the last visited node.
             - "max_edge_cost_remaining" (float): The maximum edge cost to any unvisited node from the last visited node.
     """
+    node_num = global_data["node_num"]
     distance_matrix = global_data["distance_matrix"]
     tour = state_data["current_solution"].tour
     current_cost = state_data["current_cost"]
     last_visited = state_data["last_visited"]
     unvisited_nodes = state_data["unvisited_nodes"]
+    visited_nodes = state_data["visited_nodes"]
     validation_solution = state_data["validation_solution"]
+    std_dev_distance = np.std(distance_matrix)
+
+    average_distance = np.sum(distance_matrix) / (node_num * (node_num - 1))
     
     current_path_length = len(tour)
     remaining_nodes = len(unvisited_nodes)
     
-    average_edge_cost = current_cost / current_path_length if current_path_length > 0 else float('inf')
+    average_edge_cost = current_cost / current_path_length if current_path_length > 0 else 0
     last_edge_cost = distance_matrix[last_visited, tour[0]] if tour else 0
     edge_costs = [distance_matrix[i, j] for i, j in zip(tour[:-1], tour[1:])] if len(tour) > 1 else [0]
     std_dev_edge_cost = np.std(edge_costs) if edge_costs else 0
     solution_validity = int(validation_solution(state_data["current_solution"]))
     
-    min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float('inf')
+    min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else 0
     max_edge_cost_remaining = np.max([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else 0
+    if current_cost != 0:
+        current_cost = current_cost / average_distance / current_path_length
     
     return {
-        "current_path_length": current_path_length,
-        "remaining_nodes": remaining_nodes,
+        "current_path_length": current_path_length / node_num,
+        "remaining_nodes": remaining_nodes / node_num,
         "current_cost": current_cost,
-        "average_edge_cost": average_edge_cost,
-        "last_edge_cost": last_edge_cost,
-        "std_dev_edge_cost": std_dev_edge_cost,
-        "solution_validity": solution_validity,
-        "min_edge_cost_remaining": min_edge_cost_remaining,
-        "max_edge_cost_remaining": max_edge_cost_remaining
+        "average_edge_cost": average_edge_cost / average_distance,
+        "last_edge_cost": last_edge_cost / average_distance,
+        "std_dev_edge_cost": std_dev_edge_cost / std_dev_distance,
+        "min_edge_cost_remaining": min_edge_cost_remaining / std_dev_distance,
+        "max_edge_cost_remaining": max_edge_cost_remaining / std_dev_distance
     }
