@@ -32,6 +32,7 @@ class Env(MDPEnv):
     
     def get_state_data(self):
         return {
+            "current_time_step": self.gym_env.obs["TimeStep"],
             "ride_lead_time": self.gym_env.obs["RideTime"],
             "charging_lead_time": self.gym_env.obs["ChargingStatus"],
             "battery_soc": self.gym_env.obs["SoC"],
