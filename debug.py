@@ -6,7 +6,7 @@ from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 heuristic = "random_dc6e"
 print(f"Running heuristic algorithm {heuristic}...")
 
-env = Env(data_name="src/problems/road_charging/data/config.json")
+env = Env(data_name=r"src/problems/road_charging/data/config.json")
 env.reset("debug")
 
 hyper_heuristic = SingleHyperHeuristic(heuristic, problem="road_charging")
