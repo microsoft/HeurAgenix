@@ -25,14 +25,13 @@ def profit_maximization_4f39(global_data: dict, state_data: dict, algorithm_data
     assign_prob = global_data["assign_prob"]
     battery_soc = state_data["battery_soc"]
     ride_lead_time = state_data["ride_lead_time"]
-    current_time_step =  state_data["current_time_step"]
 
     # Initialize actions with zero (no charging)
     actions = [0] * fleet_size
 
     # Calculate potential earnings for each EV if they receive a ride
     potential_earnings = [
-        (order_price[current_time_step[i]] * battery_soc[i] * assign_prob) if ride_lead_time[i] == 0 else 0
+        (order_price[0] * battery_soc[i] * assign_prob) if ride_lead_time[i] == 0 else 0
         for i in range(fleet_size)
     ]
 
