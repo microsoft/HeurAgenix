@@ -36,4 +36,4 @@ def config_env(data_path:str):
 
     
 if __name__ == "__main__":
-    config_env("C:\\Users\\zhangling\\Documents\\GitHub\\HeurAgendix\\src\\problems\\road_charging\\data\\")
+    config_env(r"data/")
