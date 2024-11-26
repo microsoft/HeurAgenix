@@ -257,11 +257,11 @@ class HeuristicGenerator:
             prompt_dict["smoke_state_data"] = filter_dict_to_str(env.state_data)
             try:
                 # Load heuristic and run once
-                heuristic = load_heuristic(heuristic_code, function_name)
+                heuristic = load_heuristic(heuristic_code, function_name=function_name)
                 operator = env.run_heuristic(heuristic)
             except Exception as e:
                 operator = traceback.format_exc()
-            if operator and not isinstance(operator, str):
+            if operator is not False and not isinstance(operator, str):
                 # Expected result
                 self.gpt_helper.load("smoke_test_expected_result.txt", prompt_dict)
                 response = self.gpt_helper.chat()
