@@ -1,19 +1,23 @@
 \subsection{Problem Statement}
-We aim to schedule a fleet of for-hire EVs to charge during periods of surplus solar power. The goal is twofold: first, to reduce electricity costs for the fleet operator, and second, to flatten the net load profile by shifting charging to times of surplus solar generation. This can prevent the scenario where all EVs charge at night, when no solar power is available, thus reducing strain on the power grid.
+We aim to schedule a fleet of for-hire EVs to charge during periods of low charging price. The goal is twofold: first, to reduce electricity costs for the fleet operator, and second, to flatten the net load profile by distributing charging more evenly throughout the day. This helps avoid the scenario where all EVs charge at night, thereby easing pressure on the power grid.
+
+
 
 \subsection{MDP Model}
 We consider a for-hire EV fleet of size $N$, with a total number of $M$ chargers available for charging in the region ($N\gg M$), and a scheduling horizon of $T$.
 The charging management problem for this fleet can be modeled as a discrete-time MDP with finite time steps \( t = 1, 2, \cdots, T\).
 Each EV's state at time $t$ is $\mathbf{s}^i_t$ and we denote the aggregate state as $\bar{\mathbf{s}}_t=\{\mathbf{s}_t^i\}_{i=1}^N$.
-At each time $t$, the dispatcher observes the system state $\bar{\mathbf{s}}_t$ and takes an aggregate action $\bar{\mathbf{a}}_t=\{a_t^i\}_{i=1}^N$ for all agents, deciding whether each agent should begin charging or continue charging. Since this is a centralized decision-making process, we use max-min fairness to ensure no EV earns too little in cumulative earnings under the aggregate policy.
-After the action is taken, the system provides a reward $r_t$ and transitions to the next state $\bar{\mathbf{s}}_{t+1}$. 
+At each time $t$, the dispatcher observes the system state $\bar{\mathbf{s}}_t$ and takes an aggregate action $\bar{\mathbf{a}}_t=\{a_t^i\}_{i=1}^N$ for all agents, deciding whether each agent should begin charging or continue charging. 
 
+We assume both time-varying charging prices and time-varying estimated payments that a driver could receive if assigned a ride order. To prevent any EV from consistently charging when costs are low or always being assigned ride orders when payments are high, we apply max-min fairness. This ensures that no EV’s cumulative earnings under the aggregate policy fall too low. After the action is taken, the system provides a reward \(r_t\), which includes both charging benefits (low or even negative charging costs) and ride order payments, and transitions to the next state \(\bar{\mathbf{s}}_{t+1}\).
+
+ 
 \begin{itemize}
     \item[1)] \textit{State space}: The state of each agent (EV) at time \( t \) is represented by the tuple:
     \begin{align*}
         \mathbf{s}_t^i = (\alpha_t^i, \beta_t^i, \theta_t^i) \in \mathbb{Z}_{\geq 0} \times \{0,1\} \times \{0,1,2,\dots,100\}.
     \end{align*}
-    The variable \( \alpha_t^i \) denotes the remaining trip length if vehicle $i$ has been assigned an order, and \( \alpha_t^i=0 \) if no order is assigned. The variable \( \beta_t^i \) denotes the charging status. Note that a ride trip can span multiple time steps, while a charging session lasts for one time step. The pair $(\alpha_t^i, \beta_t^i)$ indicates the operational status of vehicle $i$:
+    The variable \( \alpha_t^i \) denotes the remaining trip length if vehicle $i$ has been assigned an order, and \( \alpha_t^i=0 \) if no order is assigned. The variable \( \beta_t^i \) denotes the charging status. If assigned a ride order, the ride trip may span multiple time steps, but each charging decision only applies to a single time step. Therefore, if an EV chooses to continue charging in the next time step, it must make a new charging decision. While this may seem inconvenient, it provides the EV with the flexibility to leave at any time. Moreover, since decisions are made sequentially by the centralized dispatcher, the process is more manageable than it might initially seem. Note that the pair $(\alpha_t^i, \beta_t^i)$ indicates the operational status of vehicle $i$:
     \begin{align*}
         \begin{array}{cc}
           \alpha_t^i=0, \beta_t^i=0:   &  \text{Vehicle $i$ is idle}\\
@@ -21,16 +25,16 @@ After the action is taken, the system provides a reward $r_t$ and transitions to
           \alpha_t^i=0, \beta_t^i>0:   &  \text{Vehicle $i$ is charging}
         \end{array}.
     \end{align*}
-    The variable \( \theta_t^i \) represents the battery state of charge (SoC) as a percentage (e.g., \( \theta_t^i = 10 \) represents a 10\% SoC). 
-
-\item[2)] \textit{Action space}: The action for each EV is \( a_t^i \in \{0,1\} \), where \( a_t^i = 1 \) indicates that EV \( i \) is scheduled to charge, and \( a_t^i = 0 \) means that EV \( i \) is unplugged or remains idle.
-
+    The variable \( \theta_t^i \) represents the battery state of charge (SoC) (e.g., \( \theta_t^i = 0.1 \) represents a 10\% SoC). 
+    \item[2)] \textit{Action space}: The action for each EV is \( a_t^i \in \{0,1\} \), where \( a_t^i = 1 \) indicates that EV \( i \) is scheduled to charge, and \( a_t^i = 0 \) means that EV \( i \) is unplugged or remains idle. 
     \item[3)] \textit{State evolution}: 
-    We assume that if a vehicle remains idle, i.e., takes action \( a_t^i = 0 \) in the state \( \alpha_t^i = 0, \beta_t^i = 0 \), then there is a probability \( \rho \) that it will be assigned an order. If assigned, the vehicle starts a trip with random length \( \tau_{\theta_t^i} \) and earns a payment of \( w_t \cdot \tau_{\theta_t^i} \). Here, \( \tau_{\theta_t^i} \) is a random positive integer drawn from a discrete distribution that depends on the vehicle’s current battery SoC \( \theta_t^i \), i.e., \( \tau_{\theta_t^i} \sim f(\theta_t^i) \), and \( w_t \) represents the estimated earnings per unit of ride time for vehicle \( i \) at time \( t \) of the day.
+    We assume that if a vehicle remains idle, i.e., takes action \( a_t^i = 0 \) in the state \( \alpha_t^i = 0, \beta_t^i = 0 \), then there is a probability \( \rho \) that it will be assigned an order. If assigned, the vehicle starts a trip with random duration \( \tau_{\theta_t^i} \) and earns a payment of \( w_t \cdot \tau_{\theta_t^i} \). Here, \( \tau_{\theta_t^i} \) is a random positive integer drawn from a discrete distribution that depends on the vehicle’s current battery SoC \( \theta_t^i \), i.e., \( \tau_{\theta_t^i} \sim f(\theta_t^i) \), and \( w_t \) represents the estimated earnings per unit of ride time at time \( t \) of the day.
+
+    if EV \( i \) is on a ride, the action space is restricted to \( \mathcal{A} = \{ 0 \} \), meaning the only available action is to remain idle (i.e., not charge) in this state.
     
-    If a vehicle is charging at time $t$, it can return to an idle status in the next time step by taking the action $a_t^i=0$ to unplug the vehicle.
-    
-    Specifically, each EV $i$ with state $(\alpha_t^i, \beta_t^i, \theta_t^i)$ is transitioned to the following states under  action $a_t^i=0$:
+    If a vehicle is charging at time $t$, it can return to an idle status in the next time step by taking the action $a_t^i=0$ to unplug and stop charging.
+
+    In summary, each EV $i$ with state $(\alpha_t^i, \beta_t^i, \theta_t^i)$ transitions to the following states under action $a_t^i=0$:
     \begin{align*}
     \alpha_{t+1}^i, \beta_{t+1}^i, \theta_{t}^i~|~a_t^i=0 = \left\{
     \begin{array}{cc}
@@ -40,6 +44,7 @@ After the action is taken, the system provides a reward $r_t$ and transitions to
     \alpha_{t}^i, \beta_{t}^i-1, \theta_{t}^i-\delta_i^{-}/C_i      & \text{~if~} \alpha_{t}^i=0, \beta_{t}^i=1 
     \end{array}\right. .
     \end{align*}
+   
     Under action $a_t^i=1$, the state of each agent transitions to:
     \begin{align*}
     \alpha_{t+1}^i, \beta_{t+1}^i, \theta_{t}^i~|~a_t^i=1 = \left\{
@@ -48,17 +53,15 @@ After the action is taken, the system provides a reward $r_t$ and transitions to
     \alpha_{t}^i, \beta_{t}^i, \theta_{t}^i+\delta_i^{+}/C_i      & \text{~if~} \alpha_{t}^i=0, \beta_{t}^i=1 
     \end{array}\right.
     \end{align*}
-    where $\delta_i^{+}$ and $\delta_i^{-}$ are the charging and discharging rates of EV $i$, respectively.
-    Note that if EV \( i \) is on a ride, the action space is restricted to \( \mathcal{A} = \{ 0 \} \), meaning the only available action is to remain idle (i.e., not charge).
-
-\item[4)] \textit{Reward}: At time $t$, the reward received by each EV $i$ with action $a_t^i$ in state $\mathbf{s}_t^i=(\alpha_t^i, \beta_t^i, \theta_t^i)$ is:
+    where $\delta_i^{+}$ and $\delta_i^{-}$ are the charging and discharging rates of EV $i$, respectively, and $C_i$ is the battery capacity of EV $i$. Specifically, only vehicles that are either idle or currently charging can make a charging decision, and based on that decision, they will either begin or continue charging.
+  
+    \item[4)] \textit{Reward}: At time $t$, the reward received by each EV $i$ with action $a_t^i$ in state $\mathbf{s}_t^i=(\alpha_t^i, \beta_t^i, \theta_t^i)$ is:
     \begin{align*}
         r_t^i = w_t\cdot \tau_{\theta_t^i}\cdot (1-a_t^i)\mathbb{1}(\alpha_t^i=0)(1-\beta_t^i) - h_t\cdot a_t^i\cdot(1-\beta_t^i)-p_t\cdot \delta_t^{+}\cdot a_t^i
     \end{align*}
-    where $\mathbb{1}(\cdot)$is the indicator function, $h_t$ is the base fare for plugging in to charge, and $p_t$ is per kWh charging fare.
-    The first term represents the reward EV $i$ receives if it remains idle, the second term represents the cost for transitioning from being idle to charging, and the last term represents the charging cost. 
+    where \(\mathbb{1}(\cdot)\) is the indicator function, \(h_t\) is the connection fee for plugging in to charge, and \(p_t\) is the per kWh charging fare. The first term represents the expected payment EV \(i\) could receive for remaining idle, the second term accounts for the connection fee when first connecting to a charger (if the EV connects once and charges for multiple consecutive time steps, it only pays the connection fee once), and the last term represents the cost for charging for one time step at the charging rate \(\delta_t^{+}\).
 
-\item[5)] \textit{Objective function}: Given an initial system state $\bar{\mathbf{s}}_0$ and a policy $\pi$ that generates a sequence of actions $\bar{\mathbf{a}}_t$, $t=0,1,\cdots, T$, we aim to identify a policy that maximizes the expected accumulated rewards starting from $\bar{\mathbf{s}}_0$:
+    \item[5)] \textit{Objective function}: Given an initial system state $\bar{\mathbf{s}}_0$ and a policy $\pi$ that generates a sequence of actions $\bar{\mathbf{a}}_t$, $t=0,1,\cdots, T$, we aim to identify a policy that maximizes the expected accumulated rewards starting from $\bar{\mathbf{s}}_0$:
     \begin{align}\label{obj}
         \max_{\pi} ~\mathbb{E}\left[ \sum_{t=0}^{T-1}\sum_{i=1}^N r_i^t~|~\bar{\mathbf{s}}_0\right] + r_T
     \end{align}
@@ -67,11 +70,14 @@ After the action is taken, the system provides a reward $r_t$ and transitions to
         r_T = \min_i \mathbb{E}\left[\sum_{t=0}^{T-1} r_i^t\right].
     \end{align*}
     By finding a policy that maximizes the objective in \eqref{obj}, we ensure both the maximal profits for the EV fleet and fairness among all EVs.
-
-\item[6)] \textit{Global constraints}: The total number of EVs that are either charging or requesting to charge should not exceed the charging station capacity:
+    \item[6)] \textit{Constraints}: First, each EV's battery capacity must remain between 0 and the maximum capacity $C_i$, i.e.,
+    \begin{align*}
+        0 \leq \theta_t^i \leq 1,~\forall i, t
+    \end{align*}
+    Second, 
+    the total number of EVs that are either charging or requesting to charge should not exceed the charging station capacity:
     \begin{align*}
         \sum_{i=1}^N \beta_t^i + \sum_{i=1}^N a_t^i \leq M,
     \end{align*}
     where the first term represents the EVs that are charging, and the second term represents the EVs that are requesting to charge.
-
 \end{itemize}
