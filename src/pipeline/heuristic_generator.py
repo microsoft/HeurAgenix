@@ -257,7 +257,7 @@ class HeuristicGenerator:
             prompt_dict["smoke_state_data"] = filter_dict_to_str(env.state_data)
             try:
                 # Load heuristic and run once
-                heuristic = load_heuristic(heuristic_code, function_name)
+                heuristic = load_heuristic(heuristic_code, function_name=function_name)
                 operator = env.run_heuristic(heuristic)
             except Exception as e:
                 operator = traceback.format_exc()

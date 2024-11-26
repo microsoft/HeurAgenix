@@ -18,6 +18,7 @@ def parse_arguments():
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Path for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
     parser.add_argument("-r", "--dump_trajectory", action='store_true', help="Whether to dump trajectory.")
+    parser.add_argument("-o", "--output_dir", type=str, default=None, help="Output experiment name.")
 
     return parser.parse_args()
 
@@ -27,17 +28,10 @@ def main():
     heuristic = args.heuristic
     heuristic_dir = args.heuristic_dir
     test_case = args.test_case
-    test_dir = args.test_dir
+    test_dir = args.test_dir if test_case is None else [test_case] 
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{datetime_str}"
 
-    if test_case:
-        if os.path.exists(test_case):
-            test_dir = [test_case]
-        else:
-            test_dir = [os.path.join("src", "problems", problem, "data", "test_data", test_case)]
-    else:
-        if test_dir is None:
-            test_dir = os.listdir(os.path.join("src", "problems", problem, "data", "test_data"))
     if heuristic_dir is None:
         heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
 
@@ -46,7 +40,7 @@ def main():
 
     for test_case in test_dir:
         env = Env(data_name=test_case)
-        env.reset(f"{heuristic}.{datetime_str}")
+        env.reset(output_dir)
 
         if heuristic == "gpt_hh":
             gpt_helper = GPTHelper(

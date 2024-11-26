@@ -233,9 +233,9 @@ class HeuristicEvolver:
 
             # Verify the proposed operation
             env.run_operator(eval(proposed_operation))
-            heuristic_works = True
-            while not env.is_complete_solution or heuristic_works is not False:
-                heuristic_works = env.run_heuristic(heuristic)
+            heuristic_work = True
+            while not env.is_complete_solution or heuristic_work:
+                heuristic_work = env.run_heuristic(heuristic)
             env.dump_result(dump_trajectory=True)
             proposed_result = parse_text_to_dict(proposed_result)
             prompt_dict["proposed_solution"] = proposed_result["current_solution"]

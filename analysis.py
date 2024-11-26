@@ -57,7 +57,7 @@ def dump_single_to_latex():
         for experiment in problem_dict["experiments"]:
             gap_strs = []
             for data_name, upper_bound in problem_dict["data"]:
-                result_file = os.path.join("output", problem, "test_result", data_name, experiment, "result.txt")
+                result_file = os.path.join("output", problem, "result", data_name, experiment, "result.txt")
                 value = found_key(result_file, key_item)
                 gap = int(value) if upper_bound == 0 else round((abs(value - upper_bound) / upper_bound) * 100, 2)
                 gap_strs.append(str(gap))
@@ -74,9 +74,9 @@ def dump_hh_to_latex():
             gap_strs = []
             for data_name, upper_bound in problem_dict["data"]:
                 gaps = []
-                for single_experiment in os.listdir(os.path.join("output", problem, "test_result", data_name)):
+                for single_experiment in os.listdir(os.path.join("output", problem, "result", data_name)):
                     if single_experiment.split(".")[0] == experiment:
-                        result_file = os.path.join("output", problem, "test_result", data_name, single_experiment, "result.txt")
+                        result_file = os.path.join("output", problem, "result", data_name, single_experiment, "result.txt")
                         if os.path.exists(result_file):
                             value = found_key(result_file, key_item)
                             gap = int(value) if upper_bound == 0 else (abs(value - upper_bound) / upper_bound) * 100
@@ -105,7 +105,7 @@ def dump_single_to_image():
         results = np.zeros((data_num, experiment_num))
         for exp_index, experiment in enumerate(experiments):
             for data_index, (data_name, upper_bound) in enumerate(problem_dict["data"]):
-                result_file = os.path.join("output", problem, "test_result", data_name, experiment, "result.txt")
+                result_file = os.path.join("output", problem, "result", data_name, experiment, "result.txt")
                 value = found_key(result_file, key_item)
                 gap = int(value) if upper_bound == 0 else round((abs(value - upper_bound) / upper_bound) * 100, 2)
                 results[data_index, exp_index] = gap
@@ -147,9 +147,9 @@ def dump_hh_to_image():
         for exp_index, experiment in experiments:
             for data_index, (data_name, upper_bound) in enumerate(problem_dict["data"]):
                 gaps = []
-                for single_experiment in os.listdir(os.path.join("output", problem, "test_result", data_name)):
+                for single_experiment in os.listdir(os.path.join("output", problem, "result", data_name)):
                     if single_experiment.split(".")[0] == experiment:
-                        result_file = os.path.join("output", problem, "test_result", data_name, single_experiment, "result.txt")
+                        result_file = os.path.join("output", problem, "result", data_name, single_experiment, "result.txt")
                         if os.path.exists(result_file):
                             value = found_key(result_file, key_item)
                             gap = int(value) if upper_bound == 0 else (abs(value - upper_bound) / upper_bound) * 100
@@ -198,9 +198,9 @@ def dump_all_result():
     for problem_dict in total_experiments:
         problem = problem_dict["problem"]
         key_item = problem_dict["key_item"]
-        for data in os.listdir(os.path.join("output", problem, "test_result")):
-            for experiment in os.listdir(os.path.join("output", problem, "test_result", data)):
-                result_file = os.path.join("output", problem, "test_result", data, experiment, "result.txt")
+        for data in os.listdir(os.path.join("output", problem, "result")):
+            for experiment in os.listdir(os.path.join("output", problem, "result", data)):
+                result_file = os.path.join("output", problem, "result", data, experiment, "result.txt")
                 if os.path.exists(result_file):
                     value = found_key(result_file, key_item)
                     if value:
