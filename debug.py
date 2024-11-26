@@ -4,6 +4,8 @@ from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 
 
 heuristic = "random_dc6e"
+print(f"Running heuristic algorithm {heuristic}...")
+
 env = Env(data_name="mock.txt")
 env.reset("debug")
 
