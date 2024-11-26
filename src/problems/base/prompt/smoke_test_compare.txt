@@ -2,9 +2,9 @@ In fact we run the {function_name} once, and now we got the output operation fro
 {output_result}
 
 The updated solution are
-{update_smoke_solution}
+{updated_smoke_solution}
 with detailed data
-{update_smoke_state_data}
+{updated_smoke_state_data}
 
 Please compare with your expected result: {expected_result}
 1. If the result is aligned with your target output, respond to me ***python_code:correct*** and we will save the code and finish this generation.

@@ -1,4 +1,5 @@
 from src.problems.base.mdp_env import MDPEnv
+from src.problems.base.mdp_components import Solution
 # from src.problems.road_charging.gym_env import ConstrainAction, RoadCharging
 from src.problems.road_charging.gym_env import RoadCharging
 
@@ -40,5 +41,5 @@ class Env(MDPEnv):
             "current_solution": self.current_solution
         }
 
-    def is_valid_solution(self):
+    def validation_solution(self, solution: Solution=None) -> bool:
         return True
