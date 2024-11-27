@@ -122,10 +122,12 @@ class HeuristicGenerator:
         self.gpt_helper.load("reference_problem", prompt_dict)
         response = self.gpt_helper.chat()
         related_problems = extract(response, "referenced_problem", ";")
+        self.gpt_helper.dump("reference_problem")
 
         for referenced_problem in related_problems:
             if referenced_problem not in description_dict:
                 continue
+            self.gpt_helper.load_chat("reference_problem")
 
             # Find the similarities between referenced problem and new problem
             component_code = open(os.path.join("src", "problems", referenced_problem, "components.py")).read()
@@ -151,11 +153,12 @@ class HeuristicGenerator:
             prompt_dict["candidate_heuristic_pool"] = referenced_heuristic_docs
             self.gpt_helper.load("reference_heuristic", prompt_dict)
             response = self.gpt_helper.chat()
-            self.gpt_helper.dump(f"reference_heuristics_in_{referenced_problem}")
             reference_heuristics = extract(response, "referenced_heuristics", "\n")
+            self.gpt_helper.dump(f"reference_heuristics_in_{referenced_problem}")
 
             # Find the similarities between referenced heuristic and new problem
             for reference_heuristic_item in reference_heuristics:
+                self.gpt_helper.load_chat(f"reference_heuristics_in_{referenced_problem}")
                 reference_heuristic = reference_heuristic_item.split(";")[0]
                 reference_heuristic_file = os.path.join("src", "problems", referenced_problem, "heuristics", "basic_heuristics", reference_heuristic + ".py")
                 reference_heuristic_code = open(reference_heuristic_file).read()
