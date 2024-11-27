@@ -167,7 +167,7 @@ def data_collection(
             if not best_score or env.compare(score, best_score) > 0:
                 best_score = score
                 best_heuristics = heuristic_name
-                next_operator = next((operator for operator in operators if operator is not False), None)
+                next_operator = next((operator for operator in operators if operator), None)
                 best_operators_str = [str(operator) for operator in operators]
                 best_results = results
         selected_previous_heuristics.append(best_heuristics)
@@ -201,7 +201,7 @@ def main():
     base_data_dir = os.getenv("AMLT_DATA_DIR") if os.getenv("AMLT_DATA_DIR") else "output"
     data_path = os.path.join(base_data_dir, data_path)
 
-    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     os.makedirs(base_output_dir, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     data_name = data_path.split(os.sep)[-1]
