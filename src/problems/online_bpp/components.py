@@ -39,9 +39,9 @@ class NewBinOperator(BaseOperator):
         pass
 
     def run(self, solution: Solution) -> Solution:
-        assert self.bin < len(solution.sequences)
         new_sequences = solution.sequences[:]
         for sequence in new_sequences:
             if sequence == []:
                 sequence.append(solution.current_item)
+                break
         return Solution(new_sequences, solution.current_item + 1)

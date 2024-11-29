@@ -13,7 +13,7 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        return self.state_data["num_items_in_box"] == self.item_num
+        return self.current_solution.current_item == self.item_num
 
     def load_data(self, data_path: str) -> None:
         with open(data_path, "r") as file:
@@ -60,7 +60,7 @@ class Env(BaseEnv):
         if solution is None:
             solution = self.current_solution
 
-        current_item_size = self.item_sizes[solution.current_item]
+        current_item_size = None if solution.current_item >= len(self.item_sizes) else self.item_sizes[solution.current_item]
         used_bin_num = sum([1 for bin_index in range(self.item_num) if self.current_solution.sequences[bin_index] != []])
         used_capacity = [sum([self.item_sizes[item] for item in solution.sequences[bin_index]]) for bin_index in range(used_bin_num)]
         remaining_capacity = [self.capacity - used_capacity[bin_index] for bin_index in range(used_bin_num)]
