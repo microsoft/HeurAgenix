@@ -209,7 +209,7 @@ class HeuristicGenerator:
         prompt_dict = {"problem": self.problem, "heuristic_name": heuristic_name, "description": description, "function_name": function_name, "special_remind": special_remind}
 
         # Implement code
-        if os.path.exists(os.path.join("src", "problems", self.problem, "components")):
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
             prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
         else:
             prompt_dict["components_file"] = f"src.problems.base.mdp_components"
@@ -243,7 +243,7 @@ class HeuristicGenerator:
         # Prepare env
         module = importlib.import_module(f"src.problems.{self.problem}.env")
         globals()["Env"] = getattr(module, "Env")
-        if os.path.exists(os.path.join("src", "problems", self.problem, "components")):
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
             module = importlib.import_module(f"src.problems.{self.problem}.components")
         else:
             module = importlib.import_module(f"src.problems.base.mdp_components")
