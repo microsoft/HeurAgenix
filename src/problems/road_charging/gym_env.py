@@ -222,7 +222,7 @@ class RoadCharging(Env):
                              'actions': np.zeros((self.n, self.k), dtype=int),
                              'rewards': []} # ride time, charging status, state of charge, action
 
-        self.p = self.get_sample_price('Q2')
+        # self.p = self.get_sample_price('Q2')
 
         # return the observation
         return self.obs
