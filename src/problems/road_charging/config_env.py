@@ -14,9 +14,9 @@ def config_env(data_path:str, save_path:str):
         "connection_fee": 1.5, # fee for connecting to the charging station ($)
         "time_SoCfrom0to100": 60, # Time in minutes to charge the battery fully
         "time_SoCfrom100to0": 480, # Time in minutes to fully discharge the battery
+        "ride_time_distribution_name": "log-normal",
         # "assign_prob": 0.5, # probability of getting assigned an order if remaining idle
         "prob_fpath": data_path+"assign_prob.csv", # probability of getting assigned an order if remaining idle
-        "ride_time_distribution_name": "log-normal",
         "trip_time_fpath": [data_path+'RT_mean_24hrs.csv', data_path+'RT_std_24hrs.csv'], # data to randomly generated passenger trip time
         "trip_fare_fpath" : data_path+'trip_fare_24hrs.csv', # unit fare is calculated per minute, multiply by step length to get fare for a step
         "charging_price_fpath": data_path+"LMP_24hrs.csv", # $
