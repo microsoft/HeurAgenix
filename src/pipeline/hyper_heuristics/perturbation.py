@@ -1,5 +1,6 @@
 import os
 import random
+from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic
 
@@ -17,11 +18,11 @@ class PerturbationHyperHeuristic:
 
     def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
         max_steps = max_steps if max_steps is not None else env.construction_steps * 2
-        heuristic_works = True
-        while heuristic_works:
+        heuristic_work = BaseOperator()
+        while isinstance(heuristic_work, BaseOperator):
             if random.random() < self.perturbation_ratio:
                 heuristic = self.perturbation_heuristic
             else:
                 heuristic = self.main_heuristic
-            heuristic_works = env.run_heuristic(heuristic)
+            heuristic_work = env.run_heuristic(heuristic)
         return env.is_complete_solution and env.is_valid_solution

@@ -3,6 +3,7 @@ import json
 import importlib
 import traceback
 from copy import deepcopy
+from src.problems.base.components import BaseOperator
 from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description
 from src.util.gpt_helper import GPTHelper
 
@@ -18,11 +19,11 @@ class HeuristicGenerator:
         self.output_dir = self.gpt_helper.output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def generate_from_gpt(self, smoke_test: bool=False) -> list[str]:
+    def generate_from_gpt(self, reference_data: str=None, smoke_test: bool=False) -> list[str]:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
 
         # Generate available heuristic description
         self.gpt_helper.load("generate_from_gpt", prompt_dict)
@@ -38,10 +39,10 @@ class HeuristicGenerator:
 
         return heuristic_files
 
-    def generate_from_paper(self, paper_path: str, smoke_test: bool=False) -> str:
+    def generate_from_paper(self, paper_path: str,  reference_data: str=None, smoke_test: bool=False) -> str:
         heuristic_file = None
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
 
         # Load whole paper
         if os.path.isdir(paper_path):
@@ -103,11 +104,11 @@ class HeuristicGenerator:
             return None
 
 
-    def generate_from_reference(self, related_problems: list[str], smoke_test: bool=False) -> list[str]:
+    def generate_from_reference(self, related_problems: list[str], reference_data: str=None, smoke_test: bool=False) -> list[str]:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
 
         # Find similar problem
         description_dict = {
@@ -122,10 +123,12 @@ class HeuristicGenerator:
         self.gpt_helper.load("reference_problem", prompt_dict)
         response = self.gpt_helper.chat()
         related_problems = extract(response, "referenced_problem", ";")
+        self.gpt_helper.dump("reference_problem")
 
         for referenced_problem in related_problems:
             if referenced_problem not in description_dict:
                 continue
+            self.gpt_helper.load_chat("reference_problem")
 
             # Find the similarities between referenced problem and new problem
             component_code = open(os.path.join("src", "problems", referenced_problem, "components.py")).read()
@@ -151,11 +154,12 @@ class HeuristicGenerator:
             prompt_dict["candidate_heuristic_pool"] = referenced_heuristic_docs
             self.gpt_helper.load("reference_heuristic", prompt_dict)
             response = self.gpt_helper.chat()
-            self.gpt_helper.dump(f"reference_heuristics_in_{referenced_problem}")
             reference_heuristics = extract(response, "referenced_heuristics", "\n")
+            self.gpt_helper.dump(f"reference_heuristics_in_{referenced_problem}")
 
             # Find the similarities between referenced heuristic and new problem
             for reference_heuristic_item in reference_heuristics:
+                self.gpt_helper.load_chat(f"reference_heuristics_in_{referenced_problem}")
                 reference_heuristic = reference_heuristic_item.split(";")[0]
                 reference_heuristic_file = os.path.join("src", "problems", referenced_problem, "heuristics", "basic_heuristics", reference_heuristic + ".py")
                 reference_heuristic_code = open(reference_heuristic_file).read()
@@ -215,9 +219,11 @@ class HeuristicGenerator:
         code = extract(response, "python_code")
 
         # Verify and revision code
-        if smoke_test and not self.smoke_test(code, function_name):
-            self.gpt_helper.dump(f"{function_name}_abandoned")
-            return None
+        if smoke_test:
+            code = self.smoke_test(code, function_name)
+            if not code:
+                self.gpt_helper.dump(f"{function_name}_abandoned")
+                return None
 
         self.gpt_helper.dump(f"{function_name}")
 
@@ -257,11 +263,11 @@ class HeuristicGenerator:
             prompt_dict["smoke_state_data"] = filter_dict_to_str(env.state_data)
             try:
                 # Load heuristic and run once
-                heuristic = load_heuristic(heuristic_code, function_name)
+                heuristic = load_heuristic(heuristic_code, function_name=function_name)
                 operator = env.run_heuristic(heuristic)
             except Exception as e:
                 operator = traceback.format_exc()
-            if operator and not isinstance(operator, str):
+            if operator is None or isinstance(operator, BaseOperator):
                 # Expected result
                 self.gpt_helper.load("smoke_test_expected_result.txt", prompt_dict)
                 response = self.gpt_helper.chat()
@@ -276,17 +282,17 @@ class HeuristicGenerator:
                 prompt_dict["expected_result"] = expected_result
                 self.gpt_helper.load("smoke_test_compare.txt", prompt_dict)
                 response = self.gpt_helper.chat()
-                heuristic_code = extract(response, "python_code")
+                response = extract(response, "python_code")
                 # Actual result
-                if heuristic_code is None:
+                if response is None:
                     # Give up
                     return None
-                elif "correct" in heuristic_code:
+                elif "correct" in response:
                     # Correct
                     return heuristic_code
                 else:
                     # Update code
-                    continue
+                    heuristic_code = response
             else:
                 # Crashed during running the heuristic
                 prompt_dict["error_message"] = operator

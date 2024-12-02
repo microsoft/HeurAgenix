@@ -19,6 +19,9 @@ To implement this heuristic function in python, please note:
 For {problem} problem, take about following:
 {special_remind}
 
+The problem will work on following data.
+Please try to understand the data and generate based on them, especially setting the default value for hyper-parameters:
+{env_summarize}
 
 The response format is very important. For better communication, please respond to me in this format:
 ***python_code:
