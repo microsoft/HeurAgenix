@@ -249,7 +249,7 @@ class RoadCharging(Env):
 
             ride_time = np.minimum(ride_time, int(bLevel/self.consume_rate[agent]))
 
-            ride_times.append(ride_time)
+            ride_times.append(int(ride_time))
 
         return ride_times
 
