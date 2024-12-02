@@ -41,8 +41,8 @@ class RoadCharging(Env):
         self.order_price = pd.read_csv(config["trip_fare_fpath"]).iloc[:, 0].tolist()
         self.charging_price = pd.read_csv(config["charging_price_fpath"]).iloc[:, 0].tolist()
 
-        plt.plot(self.charging_price)
-        plt.show()
+        # plt.plot(self.charging_price)
+        # plt.show()
         # Assign values to class attributes
         self.n = self.fleet_size  # Number of agents (EVs)
         self.m = self.total_chargers  # Number of chargers
