@@ -7,6 +7,7 @@
     "connection_fee": 1.5,
     "time_SoCfrom0to100": 60,
     "time_SoCfrom100to0": 480,
+    "ride_time_distribution_name": "log-normal",
     "prob_fpath": "src\\problems\\road_charging\\data\\csv_data\\assign_prob.csv",
     "trip_time_fpath": [
         "src\\problems\\road_charging\\data\\csv_data\\RT_mean_24hrs.csv",
