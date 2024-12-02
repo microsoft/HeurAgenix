@@ -1,8 +1,8 @@
 {
-    "fleet_size": 10,
-    "total_chargers": 3,
+    "fleet_size": 5,
+    "total_chargers": 2,
     "step_length": 15,
-    "time_horizon": 60,
+    "time_horizon": 1440,
     "max_cap": 72,
     "connection_fee": 1.5,
     "time_SoCfrom0to100": 60,
