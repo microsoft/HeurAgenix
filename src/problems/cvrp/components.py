@@ -14,7 +14,7 @@ class Solution(BaseSolution):
         route_string = ""
         for index, route in enumerate(self.routes):
             route = [self.depot] + route + [self.depot]
-            route_string += f"vehicle_{index}: " + "->".join(map(str, route))
+            route_string += f"vehicle_{index}: " + "->".join(map(str, route)) + "\n"
         return route_string
 
 

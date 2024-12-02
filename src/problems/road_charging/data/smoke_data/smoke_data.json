@@ -1,13 +1,14 @@
 {
-    "fleet_size": 10,
-    "total_chargers": 3,
+    "fleet_size": 5,
+    "total_chargers": 2,
     "step_length": 15,
-    "time_horizon": 60,
+    "time_horizon": 1440,
     "max_cap": 72,
     "connection_fee": 1.5,
     "time_SoCfrom0to100": 60,
     "time_SoCfrom100to0": 480,
-    "assign_prob": 0.5,
+    "ride_time_distribution_name": "log-normal",
+    "prob_fpath": "src\\problems\\road_charging\\data\\csv_data\\assign_prob.csv",
     "trip_time_fpath": [
         "src\\problems\\road_charging\\data\\csv_data\\RT_mean_24hrs.csv",
         "src\\problems\\road_charging\\data\\csv_data\\RT_std_24hrs.csv"

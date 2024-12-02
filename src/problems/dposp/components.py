@@ -9,10 +9,10 @@ class Solution(BaseSolution):
         self.production_schedule = production_schedule
 
     def __str__(self) -> str:
-        production_schedules_str = []
+        production_schedules_str = ""
         for index, production_schedule in enumerate(self.production_schedule):
-            production_schedules_str.append(f"production_line_{index}: " + "->".join(map(str, production_schedule)))
-        return "\n".join(production_schedules_str)
+            production_schedules_str += f"production_line_{index}: " + "->".join(map(str, production_schedule)) + "\n"
+        return production_schedules_str
 
 
 class AppendOperator(BaseOperator):

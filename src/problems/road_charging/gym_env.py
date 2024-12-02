@@ -173,6 +173,8 @@ class RoadCharging(Env):
         # Save the summary to a text file
         with open(self.save_path + "environment_summary.txt", "w") as file:
             file.write(summary_str)
+        
+        return summary_str
 
 
     def get_action_meanings(self):

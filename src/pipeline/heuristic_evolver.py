@@ -150,7 +150,7 @@ class HeuristicEvolver:
         prompt_dict = self.gpt_helper.load_background(self.problem)
 
         # Load components
-        if os.path.exists(os.path.join("src", "problems", self.problem, "components")):
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
             module = importlib.import_module(f"src.problems.{self.problem}.components")
         else:
             module = importlib.import_module(f"src.problems.base.mdp_components")

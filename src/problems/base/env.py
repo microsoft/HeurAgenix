@@ -108,7 +108,7 @@ class BaseEnv:
         except Exception as e:
             trace_string = traceback.format_exc()
             print(trace_string)
-            return None
+            return trace_string
 
     def run_operator(self, operator: BaseOperator, inplace: bool=True, heuristic_name: str=None) -> bool:
         if isinstance(operator, BaseOperator):
@@ -121,6 +121,9 @@ class BaseEnv:
         return None
 
     def get_observation(self) -> dict:
+        pass
+
+    def summarize_env(self) -> str:
         pass
 
     def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True) -> str:
