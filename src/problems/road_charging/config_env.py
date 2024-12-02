@@ -41,6 +41,6 @@ if __name__ == "__main__":
 
     # data_path = "/content/gdrive/MyDrive/RoadCharge/data/"
     data_path = r"data/"
-    save_path = r"results/"
+    save_path = r""
     config_env(data_path, save_path)
 
