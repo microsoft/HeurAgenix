@@ -63,8 +63,6 @@ def load_heuristic(heuristic_file:str, heuristic_dir: str=None, function_name: s
     else:
         # Heuristic code
         heuristic_code = heuristic_file
-    if os.path.exists(heuristic_file):
-        heuristic_code = open(os.path.join(heuristic_file), "r").read()
 
     if function_name is None:
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
