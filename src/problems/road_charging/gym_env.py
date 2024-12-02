@@ -55,7 +55,7 @@ class RoadCharging(Env):
         self.mu = np.repeat(self.RT_mean, int(60 / self.delta_t))  # Ride time mean
         self.sigma = np.repeat(self.RT_std, int(60 / self.delta_t))  # Ride time standard deviation
         self.w = np.repeat(self.order_price, int(60 / self.delta_t)) * self.delta_t  # Order price per time step
-        self.r = self.charger_speed * self.max_cap  # Charger rate (kWh per time step)
+        self.r =  [x * self.max_cap for x in self.charger_speed]  # Charger rate (kWh per time step)
         self.p = np.repeat(self.charging_price, int(60 / self.delta_t))  # Charging price per time step
         self.rng = np.random.default_rng()  # Random number generator
         self.low_battery = 0.1  # Low battery threshold
