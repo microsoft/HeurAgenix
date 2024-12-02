@@ -168,7 +168,7 @@ class RoadCharging(Env):
             summary_str += "\n"
 
         # Print the summary to the console
-        print(summary_str)
+        # print(summary_str)
 
         # Save the summary to a text file
         with open(self.save_path + "environment_summary.txt", "w") as file:
