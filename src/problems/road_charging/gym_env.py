@@ -8,14 +8,9 @@ from matplotlib.ticker import MaxNLocator
 import pickle
 import pandas as pd
 import json
+import os
 
 from gym import Env, spaces
-
-
-import json
-import pandas as pd
-import numpy as np
-from gym import spaces
 
 
 class RoadCharging(Env):
@@ -31,40 +26,50 @@ class RoadCharging(Env):
         self.delta_t = config["step_length"]
 
         # Extract relevant configuration parameters
-        fleet_size = config['fleet_size']  # Number of EVs in the fleet
-        total_chargers = config['total_chargers']  # Total number of chargers
-        max_time_steps = int(config["time_horizon"] / self.delta_t)
-        connection_fee = config['connection_fee']  # $ per connection session
-        assign_prob = config['assign_prob']  # Probability of receiving a ride order when idle
-        max_cap = config['max_cap']  # Max battery capacity (kWh)
-        consume_rate = round(1 / config["time_SoCfrom100to0"] * self.delta_t, 3)  # Battery consumption rate per time step
-        charger_speed = round(1 / config["time_SoCfrom0to100"] * self.delta_t, 3)  # Charger speed per time step
+        self.fleet_size = config['fleet_size']  # Number of EVs in the fleet
+        self.total_chargers = config['total_chargers']  # Total number of chargers
+        self.max_time_steps = int(config["time_horizon"] / self.delta_t)
+        self.connection_fee = config['connection_fee']  # $ per connection session
+        self.assign_prob = pd.read_csv(config['prob_fpath']).iloc[:, 0].tolist()  # Probability of receiving a ride order when idle
+        self.max_cap = config['max_cap']  # Max battery capacity (kWh)
+        self.consume_rate = round(1 / config["time_SoCfrom100to0"] * self.delta_t, 3)  # Battery consumption rate per time step
+        self.charger_speed = round(1 / config["time_SoCfrom0to100"] * self.delta_t, 3)  # Charger speed per time step
 
         # Load data files for various parameters
-        RT_mean = pd.read_csv(config["trip_time_fpath"][0]).iloc[:, 0].tolist()
-        RT_std = pd.read_csv(config["trip_time_fpath"][1]).iloc[:, 0].tolist()
-        order_price = pd.read_csv(config["trip_fare_fpath"]).iloc[:, 0].tolist()
-        charging_price = pd.read_csv(config["charging_price_fpath"]).iloc[:, 0].tolist()
+        self.RT_mean = pd.read_csv(config["trip_time_fpath"][0]).iloc[:, 0].tolist()
+        self.RT_std = pd.read_csv(config["trip_time_fpath"][1]).iloc[:, 0].tolist()
+        self.order_price = pd.read_csv(config["trip_fare_fpath"]).iloc[:, 0].tolist()
+        self.charging_price = pd.read_csv(config["charging_price_fpath"]).iloc[:, 0].tolist()
 
+        plt.plot(self.charging_price)
+        plt.show()
         # Assign values to class attributes
-        self.n = fleet_size  # Number of agents (EVs)
-        self.m = total_chargers  # Number of chargers
-        self.k = max_time_steps  # Maximum number of time steps
-        self.h = connection_fee  # Connection fee
-        self.assign_prob = assign_prob  # Ride order assignment probability
-        self.max_cap = max_cap  # Max capacity of EVs
-        self.consume_rate = [consume_rate] * self.n  # Battery consumption rate per time step
-        self.charger_speed = [charger_speed] * self.n  # Charger speed per time step
-        self.mu = np.repeat(RT_mean, int(60 / self.delta_t))  # Ride time mean
-        self.sigma = np.repeat(RT_std, int(60 / self.delta_t))  # Ride time standard deviation
-        self.w = np.repeat(order_price, int(60 / self.delta_t)) * self.delta_t  # Order price per time step
-        self.r = self.charger_speed * max_cap  # Charger rate (kWh per time step)
-        self.p = np.repeat(charging_price, int(60 / self.delta_t))  # Charging price per time step
+        self.n = self.fleet_size  # Number of agents (EVs)
+        self.m = self.total_chargers  # Number of chargers
+        self.k = self.max_time_steps  # Maximum number of time steps
+        self.h = self.connection_fee  # Connection fee
+        self.rho = np.repeat(self.assign_prob, int(60 / self.delta_t)) # Ride order assignment probability
+        self.max_cap = self.max_cap  # Max capacity of EVs
+        self.consume_rate = [self.consume_rate] * self.n  # Battery consumption rate per time step
+        self.charger_speed = [self.charger_speed] * self.n  # Charger speed per time step
+        self.mu = np.repeat(self.RT_mean, int(60 / self.delta_t))  # Ride time mean
+        self.sigma = np.repeat(self.RT_std, int(60 / self.delta_t))  # Ride time standard deviation
+        self.w = np.repeat(self.order_price, int(60 / self.delta_t)) * self.delta_t  # Order price per time step
+        self.r = self.charger_speed * self.max_cap  # Charger rate (kWh per time step)
+        self.p = np.repeat(self.charging_price, int(60 / self.delta_t))  # Charging price per time step
         self.rng = np.random.default_rng()  # Random number generator
         self.low_battery = 0.1  # Low battery threshold
+        self.ride_time_distribution_name = config["ride_time_distribution_name"]
 
         # Save path for results
         self.save_path = config['save_path']
+
+        # Check if the path exists, and create it if it doesn't
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
+            print(f"Directory '{self.save_path}' created.")
+        else:
+            print(f"Directory '{self.save_path}' already exists.")
 
         # Observation space: n agents, each with 4 state variables
         self.observation_shape = (self.n, 4)
@@ -112,10 +117,86 @@ class RoadCharging(Env):
         p_t = df[df['Local Date']==random_date]['SP-15 LMP'].to_numpy()
 
         return np.repeat(p_t, int(60/self.delta_t))
+    
+
+    def summarize_env(self):
+        summary = {
+            "Environment Info": {
+            "Number of EVs in the Fleet": self.fleet_size,
+            "Total Number of Chargers": self.total_chargers,
+            "Total Time Horizon (Steps)": self.max_time_steps,
+            "Connection Fee (USD)": self.connection_fee,
+            "Battery Capacity of Each EV (kWh)": self.max_cap,
+            "Energy Consumed Per Step (kWh)": self.max_cap * self.consume_rate[0],
+            "Energy Charged Per Step (kWh)": self.max_cap * self.charger_speed[0],
+            "Low Battery Threshold (SoC)": self.low_battery,
+            "Probability of Receiving Ride Orders at Each Hour": self.assign_prob,
+            "Hours Sorted by Probability of Receiving Ride Orders": np.argsort(self.assign_prob)[::-1] 
+        },
+        }
+
+        if self.ride_time_distribution_name == "log-normal":
+            summary["Ride Info"] = {
+                "Ride Time Distribution Type": "Log-normal",
+                "Mean of Logged Ride Times at Each Hour (in time steps)": self.RT_mean,
+                "Std Dev of Logged Ride Times at Each Hour (in time steps)": self.RT_std,
+                "Hour of Maximum Ride Time Mean": np.argmax(self.RT_mean),  # Index of max value
+                "Hour of Minimum Ride Time Mean": np.argmin(self.RT_mean),  # Index of min value
+                "Hours Sorted by Ride Time Mean (Max to Min)": np.argsort(self.RT_mean)[::-1],
+                "Hour of Maximum Ride Time Std Dev": np.argmax(self.RT_std),  # Index of max value
+                "Hour of Minimum Ride Time Std Dev": np.argmin(self.RT_std),  # Index of min value
+                "Hours Sorted by Ride Time Std Dev (Max to Min)": np.argsort(self.RT_std)[::-1],
+                "Ride Order Payment per Step at Each Hour (USD)":self.order_price,
+                "Hour of Maximum Payment": np.argmax(self.order_price),  # Index of max value
+                "Hour of Minimum Payment": np.argmin(self.order_price),  # Index of min value
+                "Hours Sorted by Payment per Step (Max to Min)": np.argsort(self.order_price)[::-1],
+            }
+
+        summary["Charging Price Info"] = {
+            "Charging Price at Each Hour (USD)": self.charging_price,
+            "Hour of Maximum Charging Price (USD)": np.argmax(self.charging_price),  # Index of max price
+            "Hour of Minimum Charging Price (USD)": np.argmin(self.charging_price),  # Index of min price
+            "Hours Sorted by Charging Price (Max to Min)": np.argsort(self.charging_price)[::-1],
+        }
+
+        # Convert the summary into a readable text format
+        summary_str = ""
+        for category, data in summary.items():
+            summary_str += f"{category}:\n"
+            for key, value in data.items():
+                summary_str += f"  - {key}: {value}\n"
+            summary_str += "\n"
+
+        # Print the summary to the console
+        print(summary_str)
+
+        # Save the summary to a text file
+        with open("environment_summary.txt", "w") as file:
+            file.write(summary_str)
 
 
     def get_action_meanings(self):
         return {0: "Available for taking ride orders", 1: "Go to charge"}
+    
+    def get_operational_status(self):
+        # Determine operational status for all agents
+        operational_status = []  # List to store the status of each vehicle
+
+        for i in range(self.n): 
+            if self.obs["RideTime"][i] == 0 and self.obs["ChargingStatus"][i] == 0:
+                status = "Idle"
+            elif self.obs["RideTime"][i] > 0 and self.obs["ChargingStatus"][i] == 0:
+                status = "Ride"
+            elif self.obs["RideTime"][i] == 0 and self.obs["ChargingStatus"][i] == 1:
+                status = "Charge"
+            else:
+                raise ValueError(f"Unexpected state for agent {i}: "
+                         f"RideTime={self.obs['RideTime'][i]}, "
+                         f"ChargingStatus={self.obs['ChargingStatus'][i]}")  # Raise an error
+    
+            operational_status.append((i, status))  # Append (agent_id, status) to the list
+
+        return operational_status
 
 
     def reset(self):
@@ -163,7 +244,8 @@ class RoadCharging(Env):
             if bLevel <= self.low_battery:
                 ride_time = 0
             else:
-                ride_time = int(self.rng.lognormal(self.mu[t], self.sigma[t])/self.delta_t) # convert to time steps
+                if self.ride_time_distribution_name == "log-normal":
+                    ride_time = int(self.rng.lognormal(self.mu[t], self.sigma[t])/self.delta_t) # convert to time steps
 
             ride_time = np.minimum(ride_time, int(bLevel/self.consume_rate[agent]))
 
@@ -184,7 +266,7 @@ class RoadCharging(Env):
                 alpha = 0
             elif state["RideTime"] == 0 and state["ChargingStatus"] == 0:
                 # next_state is zero with prob 0.01
-                if np.random.random() < self.assign_prob:
+                if np.random.random() < self.rho[state["TimeStep"]]:
                     alpha = 0
                 else:
                 # next_state is a random number drawn from get_ride_time() with prob 1-0.01
@@ -208,9 +290,6 @@ class RoadCharging(Env):
 
         # Assert that it is a valid action
         assert self.action_space.contains(action), "Invalid Action"
-
-        # print('Current SoC:', self.obs['SoC'])
-        # print('Current action:', action)
 
         current_step = self.obs["TimeStep"][0]
         self.trajectories['actions'][:,current_step] = action
@@ -292,80 +371,3 @@ class RoadCharging(Env):
 
         plt.tight_layout()
         plt.show()
-
-
-
-# class ConstrainAction(gym.ActionWrapper):
-#     def __init__(self, config_fname: str):
-#         env = RoadCharging(config_fname)
-#         super()._init_(env)
-#     # def __init__(self, env):
-#     #     super().__init__(env)
-
-#     def action(self, action):
-#         for i in range(self.n):
-#             if self.obs["RideTime"][i] >= 1: # if on a ride, not charge
-#                 action[i] = 0
-#             elif self.obs["SoC"][i] > 1-self.charger_speed[i]: # if full capacity, not charge
-#                 action[i] = 0
-#             elif self.obs["SoC"][i] <= self.low_battery: # if low capacity has to charge
-#                 action[i] = 1
-
-#         if sum(action) + sum(self.obs["ChargingStatus"]) >= self.m: # limit charging requests to available charging capacity
-#             print('Exceed charger capacity!')
-#             charging_requests = sum(action)
-#             available_capacity = self.m - sum(self.obs["ChargingStatus"])
-#             charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
-
-#             if available_capacity <= 0:
-#                 print('No charger is available now.')
-#                 # flip all, including those with low capacity. which will not be assigned any
-#                 # order. they will wait until a charger becomes available
-#                 # If their battery level drops to 0, it will remain at zero, and they will continue to make requests to charge at 
-#                 # each decision epoch until a charger becomes available
-#                 # This policy may lead to low overall returns, which GPT should learn to avoid.
-#                 # Alternatively, we can use a sorting strategy. this can guarantee no EV will drop to zero battery. but
-#                 # this may not be very fair for vehicles that planned to charge earlier well before
-#                 # their battery levels reached a low point.
-
-#                 to_flip = charging_agents
-#                 action[to_flip] = 0
-
-#             elif available_capacity > 0:
-
-#                 if np.any(action == 1):
-#                     # Scheme #1:
-#                     # Randomly select from the set of agents requesting charging and set their charging actions to 0
-#                     to_flip = random.sample(list(charging_agents), charging_requests-available_capacity)
-#                     # Scheme #2:
-#                     # sort charging agents based on their SoC from low to high
-#                     # battery_level = dict()
-#                     # for i in charging_agents:
-#                     #     battery_level[i] = self.obs['SoC'][i]
-
-#                     # sorted_battery_level = dict(sorted(battery_level.items(), key=lambda item: item[1]))
-#                     # print('sorted_battery_level:', sorted_battery_level)
-#                     # to_flip = list(sorted_battery_level.keys())[self.m:]
-
-#                     print('Agents requesting charging:', charging_agents)
-#                     print('Agents in charging:', self.obs["ChargingStatus"])
-#                     print('Flip agents:', to_flip)
-
-#                     action[to_flip] = 0
-
-#         # for i in range(self.n): # if SoC is too low, must charge | Q: What if you swap it with a vehicle that has a low SoC as well?
-#         #     if self.obs["SoC"][i] <= 0.1 and action[i]==0:
-#         #         print('checkpoint 3')
-#         #         # Swap the action of agent i with a randomly selected agent that takes action 1
-#         #         # charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
-#         #         # if np.any(action == 1):
-#         #         #     j = np.random.choice(charging_agents)
-
-#         #         #     action[j] = 0
-#         #         #     action[i] = 1
-
-#         #         # assuming a backup charger is available, but at an extremely high charging price
-#         #         action[i] = 1
-
-#         return action
-
