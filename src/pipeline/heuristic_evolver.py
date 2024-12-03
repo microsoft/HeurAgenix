@@ -52,7 +52,7 @@ class HeuristicEvolver:
             for basic_heuristic_file, _ in filtered_heuristic_files:
                 basic_heuristic = basic_heuristic_file.split(os.sep)[-1].split('.')[0]
                 for data_name in os.listdir(self.train_dir):
-                    env = Env(data_name=data_name, mode="train")
+                    env = Env(data_name=data_name)
                     # Perturbation
                     print(f"Perturb {basic_heuristic} on {data_name}")
                     negative_result_file, positive_result_file = self.perturbation(
@@ -136,7 +136,7 @@ class HeuristicEvolver:
             output_dir: str,
             smoke_test: bool=True,
         ) -> str:
-        env.reset(mode="train")
+        env.reset()
         self.gpt_helper.reset(output_dir)
         
         shutil.copyfile(positive_result_file, os.path.join(output_dir, "positive_solution.txt"))
@@ -150,7 +150,10 @@ class HeuristicEvolver:
         prompt_dict = self.gpt_helper.load_background(self.problem)
 
         # Load components
-        module = importlib.import_module(f"src.problems.{self.problem}.components")
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
+            module = importlib.import_module(f"src.problems.{self.problem}.components")
+        else:
+            module = importlib.import_module(f"src.problems.base.mdp_components")
         names_to_import = (name for name in dir(module) if not name.startswith('_'))
         for name in names_to_import:
             globals()[name] = getattr(module, name)
@@ -230,9 +233,9 @@ class HeuristicEvolver:
 
             # Verify the proposed operation
             env.run_operator(eval(proposed_operation))
-            heuristic_works = True
-            while not env.is_complete_solution or heuristic_works is not False:
-                heuristic_works = env.run_heuristic(heuristic)
+            heuristic_work = True
+            while not env.is_complete_solution or heuristic_work:
+                heuristic_work = env.run_heuristic(heuristic)
             env.dump_result(dump_trajectory=True)
             proposed_result = parse_text_to_dict(proposed_result)
             prompt_dict["proposed_solution"] = proposed_result["current_solution"]
@@ -267,7 +270,7 @@ class HeuristicEvolver:
         validation_results = []
         heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
         for data_name in os.listdir(validation_dir):
-            env = Env(data_name=os.path.join(validation_dir, data_name), mode="validation")
+            env = Env(data_name=os.path.join(validation_dir, data_name))
             env.reset(heuristic_name)
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
             is_complete_solution = hyper_heuristic.run(env, time_limitation, validation=validation)

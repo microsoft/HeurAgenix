@@ -79,11 +79,14 @@ class EvaluationFunctionGenerator:
         # Prepare env
         module = importlib.import_module(f"src.problems.{self.problem}.env")
         globals()["Env"] = getattr(module, "Env")
-        module = importlib.import_module(f"src.problems.{self.problem}.components")
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
+            module = importlib.import_module(f"src.problems.{self.problem}.components")
+        else:
+            module = importlib.import_module(f"src.problems.base.mdp_components")
         names_to_import = (name for name in dir(module) if not name.startswith('_'))
         for name in names_to_import:
             globals()[name] = getattr(module, name)
-        env = Env(data_name=smoke_data, mode="smoke")
+        env = Env(data_name=smoke_data)
         env.reset()
         for previous_operation in previous_operations:
             env.run_operator(eval(previous_operation.strip()))

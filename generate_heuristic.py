@@ -31,7 +31,10 @@ def main():
     elif source == "paper":
         heuristic_generator.generate_from_paper(paper_path=args.paper_path, smoke_test=smoke_test)
     elif source == "related_problem":
-        related_problems = args.related_problems.split(",")
+        if args.related_problems == "all":
+            related_problems = [ref_problem for ref_problem in os.listdir(os.path.join("src", "problems")) if ref_problem not in ["base", problem]]
+        else:
+            related_problems = args.related_problems.split(",")
         heuristic_generator.generate_from_reference(related_problems=related_problems, smoke_test=smoke_test)
 
 if __name__ == "__main__":

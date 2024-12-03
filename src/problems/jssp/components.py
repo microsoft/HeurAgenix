@@ -14,11 +14,10 @@ class Solution(BaseSolution):
         self.job_operation_index = job_operation_index
 
     def __str__(self) -> str:
-        job_sequences_str = []
+        job_sequences_str = ""
         for machine_index, jobs in enumerate(self.job_sequences):
-            job_sequence_str = f"machine_{machine_index}: " + "->".join(map(str, jobs))
-            job_sequences_str.append(job_sequence_str)
-        return "\n".join(job_sequences_str)
+            job_sequences_str += f"machine_{machine_index}: " + "->".join(map(str, jobs)) + "\n"
+        return job_sequences_str
 
 
 class AdvanceOperator(BaseOperator):

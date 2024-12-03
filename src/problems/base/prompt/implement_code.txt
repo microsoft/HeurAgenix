@@ -4,7 +4,7 @@ Based on previous discuss, we get the heuristic {heuristic_name}:
 Now please implement it in python function {function_name}.
 
 To implement this heuristic function in python, please note:
-1. We can assume that Solution and all Operators are imported in "src.problems.{problem}.components".
+1. We can assume that Solution and all Operators are imported.
 2. The operator type must be defined previously, do not create a new one in your code.
 3. Never modify the data in global, state and algorithm data.
 4. All hyper parameters in kwargs should be set a default value.
@@ -22,7 +22,7 @@ For {problem} problem, take about following:
 
 The response format is very important. For better communication, please respond to me in this format:
 ***python_code:
-from src.problems.tsp.components import *
+from {components_file} import *
 import other_library (if necessary)
 def {function_name}(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[TargetOperatorType, dict]:
     """ Description for this heuristic algorithm.
