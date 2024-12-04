@@ -14,24 +14,6 @@ generated_heuristics = queue.Queue()
 def load_text(file_path: str) -> str:
     return open(file_path).read().replace("\n", "<br>")
 
-def get_binary_file_downloader_html(bin_file, file_label='File'):  
-    with open(bin_file, 'rb') as f:
-        data = f.read()  
-        bin_str = base64.b64encode(data).decode()  
-        href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">下载 {file_label}</a>'  
-    return href
-
-def heuristic_generator(generate_from_llm, paper_list, reference_problems, checkbox_smoke_test, checkbox_deduplication):
-    # Mock generations
-    for i in range(10):
-        time.sleep(0)
-        index = int(i / 2)
-        if i % 2 == 0:
-            generated_heuristics.put([None, None, f"Generating heu {index} ..."])
-        else:
-            generated_heuristics.put([f"Heu {index}", f"Heu {index} des", f"Heu {index} generated."])
-    generated_heuristics.put([None, None, None])
-
 def sidebar():
     if "scenario" not in state:
         state.scenario = None
@@ -40,14 +22,14 @@ def sidebar():
         theme = theme.get("base", "light")
     css = f"""
 <style>
-    a[href="#_framework"], a[href="#_heuristic_generation_agent"], a[href="#_heuristic_evolution_agent"], a[href="#_heuristic_generation_agent"], a[href="#_heuristic_evolution_agent"],{{
+    a[href="#_heuristic_generation_agent"], a[href="#_heuristic_evolution_agent"], a[href="#_heuristic_generation_agent"], a[href="#_heuristic_evolution_agent"],{{
         color: {"black" if theme == "light" else "white"};
     }}
 </style>
 """
     st.markdown(css, unsafe_allow_html=True)
     toc = """
-## [Framework](#_framework)
+## Framework
 ### Heuristic Generation Phase
 - [**Heuristic Generation Agent**](#_heuristic_generation_agent)
 - [**Heuristic Evolution Agent**](#_heuristic_evolution_agent)
@@ -65,19 +47,26 @@ def sidebar():
             st.rerun()
 
         if st.button('Generate Heuristics', use_container_width=True, disabled=('selected_problem' not in st.session_state)):
-            st.write("Performing Action 2...")
+            st.session_state.page = "Generate Heuristics"
+            st.rerun()
 
         if st.button('Evolution Heuristics', use_container_width=True, disabled=('selected_problem' not in st.session_state)):
-            st.write("Performing Action 3...")
+            st.session_state.page = "Evolve Heuristics"
+            st.rerun()
 
-        if st.button('Run Heuristics', use_container_width=True, disabled=('selected_problem' not in st.session_state)):
-            st.write("Performing Action 4...")
-
+        if st.button('Benchmark Heuristics', use_container_width=True, disabled=('selected_problem' not in st.session_state)):
+            st.session_state.page = "Benchmark Heuristics"
+            st.rerun()
+        
+        st.subheader(":green[Navigation]", divider="green")
+        if st.button("Back to Introduce", use_container_width=True):
+            st.session_state.page = "Introduction"
+            st.rerun()
 
 def introduction():
-    st.title("HeurAgenix Experience")
+    st.title("HeurAgenix")
     st.write("""
-Welcome to the HeurAgenix project experience page!
+Welcome to the HeurAgenix project demo page!
         
 HeurAgenix is a multi-agent framework that utilizes large language models (LLMs) to generate, evolve, evaluate, and select heuristic strategies for solving combinatorial optimization problems.
 
@@ -177,7 +166,7 @@ Follow these simple steps to get started:
 
 - **Evolve Heuristic(Optional)**: Enhance the generated heuristics by heuristic evolution agent wih training data.
 
-- **Run Heuristic or Heuristics Selectors**: Apply the selected heuristic, or heuristic selection agent to solve the problem. This step executes the heuristic strategy, optimizing the solution based on the defined problem parameters.
+- **Run Heuristic or Heuristics Selectors**: Apply the selected heuristic, or heuristic selection agent to find better solution for given data.
 
 Try to use HeurAgenix and explore its capabilities from selection/creating a problem.""")
 
@@ -186,69 +175,73 @@ Try to use HeurAgenix and explore its capabilities from selection/creating a pro
         st.rerun()
 
 def select_problem():
-    st.header("Select a Problem")
-
     existing_problems = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
     options = existing_problems + ["create new problem"]
 
-    if 'selected_problem' not in st.session_state:
-        st.session_state.selected_problem = options[0]
-    col1, col2 = st.columns([1, 5])
+    st.write(":red[This is a demo to introduce how heuristics works in heuristics generation, evolution and selection.]")
+    st.write(":red[We will not running the actual system and the all data are cached before.]")
+    col1, col2 = st.columns([1, 3])
     with col1:
+        st.header("Select a Problem")
+        if 'selected_problem' not in st.session_state:
+            st.session_state.selected_problem = options[0]
         problem_choice = st.radio("Choose a problem to work with:", options, index=None)
-    st.markdown("---")
 
     if problem_choice == "create new problem":
         with col2:
-            st.header(f"Create a new problem")
-            st.write("For new problem, we need to provide problem description text to introduce the problem, global data text to introduce the static instance data, state data text to introduce the dynamic state data")
-            st.image(r"doc/component.png", caption="Component", use_column_width=True)
-            st.write("For new problem, we need to provide problem description text to introduce the problem, global data text to introduce the static instance data, state data text to introduce the dynamic state data")
-            problem_description = st.text_area("Problem description", "Input the problem description here. Example: \nTraveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.", height=200)
-
-            global_data = st.text_area("Global data", "global_data (dict): The global data dict containing the global instance data. Example:\n    - \"node_num\" (int): The total number of nodes in the problem.\n    - \"distance_matrix\" (numpy.ndarray): A 2D array representing the distances between nodes.", height=200)
-
-            state_data = st.text_area("State data", "state_data (dict): The state data dict containing the solution state data. Example:\n    - \"current_solution\" (Solution): An instance of the Solution class representing the current solution.\n    - \"visited_nodes\" (list[int]): A list of integers representing the IDs of nodes that have been visited.\n    - \"current_cost\" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.\n    - \"last_visited\" (int): The last visited node.\n    - \"validation_solution\" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.", height=200)
-
-        # st.markdown(get_binary_file_downloader_html('template.py', 'template'), unsafe_allow_html=True)
-  
+            st.header(f"Components to build a problem")
+            st.image(r"doc/component.png", use_column_width=True)
         st.markdown("---")
-        template_file_path = os.path.join("src", "problems", "base", "env.template.py")
-        with open(template_file_path, 'rb') as file:  
-            env_btn = st.download_button(
-                label="Down the env.py template",
-                data=file,  
-                file_name="env.py",
-                mime="text/plain"  
-            )
-        env_uploaded_file = st.file_uploader("Upload the env.py", type=["py"])  
-        if env_uploaded_file is not None:  
-            env_content = env_uploaded_file.getvalue()  
-            st.text_area("env.py", env_content.decode("utf-8"), height=300)
+        st.write("""
+To apply HeurAgenix to a new problem, several essential files are required:
+        """)
+        problem_choice = st.text_input("Problem name (necessary)")
+        problem_description = st.text_area("Problem description.txt (necessary): This text facilitates communication with the LLM and is essential throughout all phases—heuristic generation, evolution, benchmark evaluation, and heuristic selection. It can include natural language explanations, optimization models, Markov decision processes, pseudocode, or specific problem instances.", "Example: \nTraveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.", height=200)
+
+        global_data = st.text_area("Global data (necessary): This text specifies the global instance data format that provided to heuristics.", "Example:\nglobal_data (dict): The global data dict containing the global instance data with:\n    - \"node_num\" (int): The total number of nodes in the problem.\n    - \"distance_matrix\" (numpy.ndarray): A 2D array representing the distances between nodes.", height=200)
+
+        state_data = st.text_area("State data (necessary): This text specifies the data format for solution state data that provided to heuristics.", "Example:\nstate_data (dict): The state data dict containing the solution state data with:\n    - \"current_solution\" (Solution): An instance of the Solution class representing the current solution.\n    - \"visited_nodes\" (list[int]): A list of integers representing the IDs of nodes that have been visited.\n    - \"current_cost\" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.\n    - \"last_visited\" (int): The last visited node.\n    - \"validation_solution\" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.", height=200)
 
         st.markdown("---")
-        template_file_path = os.path.join("src", "problems", "base", "components.template.py")
-        with open(template_file_path, 'rb') as file:  
+        st.write("components.py (necessary): This python file defines the solution class, which records the solution, and operator classes, which are used to modify the solution and apply heuristic algorithms. These operators are crucial during heuristic generation, evolution, and heuristic execution.")
+        st.write("To ensure the correct format, please download the template, modify it and then upload it.")
+        components_template_file_path = os.path.join("doc", "components.template.py")
+        with open(components_template_file_path, 'rb') as file:  
             components_btn = st.download_button(  
-                label="Down the components.py template",  
-                data=file,  
+                label="Down the components.py template",
+                key="components_btn",
+                data=file,
                 file_name="components.py",
                 mime="text/plain"  
             )  
         components_uploaded_file = st.file_uploader("Upload the components.py", type=["py"])  
         if components_uploaded_file is not None:  
             components_content = components_uploaded_file.getvalue()  
-            st.text_area("env.py", components_content.decode("utf-8"), height=300)
+            st.text_area("components.py", components_content.decode("utf-8"), height=300)
+
 
         st.markdown("---")
-        st.session_state.checkbox_smoke_test = st.checkbox("Smoke test")
-        if st.session_state.checkbox_smoke_test:
-            st.session_state.smoke_test_data = st.file_uploader("Upload the smoke data")
-        if st.button("Create the problem"):
-            if env_uploaded_file is not None and components_uploaded_file is not None:
-                st.write("Problem is saved")
-            else:
-                st.write("Missing file")
+        st.write("env.py (optional, only necessary when run the heuristics): This python file defines the environment class to support heuristics as the backend during execution. It includes functions like `load_data`, `init_solution`, `validate_solution`, and data wrapping functions such as `get_global_data` and `get_state_data`, primarily used during heuristic execution, whether for a single heuristic or during heuristic selection.")
+        st.write("To ensure the correct format, please download the template, modify it and then upload it.")
+        env_template_file_path = os.path.join("doc", "env.template.py")
+        with open(env_template_file_path, 'rb') as file:  
+            env_btn = st.download_button(  
+                label="Down the env.py template",
+                key="env_btn",
+                data=file,  
+                file_name="env.py",
+                mime="text/plain"  
+            )  
+        env_uploaded_file = st.file_uploader("Upload the env.py", type=["py"])  
+        if env_uploaded_file is not None:  
+            env_content = env_uploaded_file.getvalue()  
+            st.text_area("env.py", env_content.decode("utf-8"), height=300)
+
+        st.markdown("---")
+        if st.button("Save problem"):
+            st.session_state.page = "Select Problem"
+            st.rerun()
+
     elif problem_choice is not None:
         with col2:
             st.header(f"Problem description for {problem_choice}")
@@ -262,47 +255,42 @@ def select_problem():
 #### State data
 {state_data}
 """, unsafe_allow_html=True)
-        heuristic_list = ["Heu1", "Heu2", "Heu3", "Heu4", "Heu5", "Heu6", "Heu7", "Heu8"]
-        heuristic_descriptions = {
-            "Heu1": "Description for Heu1",
-            "Heu2": "Description for Heu2",
-            "Heu3": "Description for Heu3",
-            "Heu4": "Description for Heu4",
-            "Heu5": "Description for Heu5",
-            "Heu6": "Description for Heu6",
-            "Heu7": "Description for Heu7",
-            "Heu8": "Description for Heu8",
-        }
+
+        st.markdown("---")
+        st.header(f"Existing Heuristics for {problem_choice}")
+        heuristic_list = os.listdir(os.path.join("src", "problems", problem_choice, "heuristics", "basic_heuristics"))[:4]
         st.session_state.selected_heuristic = heuristic_list[0]
 
-        col1, col2 = st.columns([1, 5])
-        st.subheader(f"Heuristics for {problem_choice}")
+        col1, col2 = st.columns([1, 4])
         with col1:
             for heuristic in heuristic_list:
-                if st.button(heuristic, key=heuristic, use_container_width=True):
+                if st.button(heuristic[:-8], key=heuristic, use_container_width=True):
                     st.session_state.selected_heuristic = heuristic
 
         with col2:
             selected_heuristic = st.session_state.selected_heuristic
-            st.write(heuristic_descriptions[selected_heuristic])
-            st.write("..............")
-            st.write("..............")
-            st.write("..............")
-            st.write("..............")
+            heuristic_code = open(os.path.join("src", "problems", problem_choice, "heuristics", "basic_heuristics", selected_heuristic)).read()
+            st.code(heuristic_code, language="python")
 
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        if st.button("Generate Heuristics"):
-            st.session_state.page = "Generate Heuristics Optionals"
-            st.rerun()
-        if st.button("Evolve Heuristics"):
-            st.session_state.page = "Evolve Heuristics"
-            st.rerun()
-        if st.button("Run Heuristics"):
-            st.session_state.page = "Run Heuristics"
-            st.rerun()
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if st.button(f"Generate More Heuristics for {problem_choice}", use_container_width=True, disabled=('selected_problem' not in st.session_state)):
+                st.session_state.page = "Generate Heuristics"
+                st.rerun()
+        with col2:
+            if st.button(f"Evolve Current Heuristics for {problem_choice}", use_container_width=True, disabled=('selected_problem' not in st.session_state)):
+                st.session_state.page = "Evolve Heuristics"
+                st.rerun()
+        with col3:
+            if st.button("Benchmark Heuristics", disabled=('selected_problem' not in st.session_state)):
+                st.session_state.page = "Benchmark Heuristics"
+                st.rerun()
 
-def generate_heuristics_optionals():
-    st.title("Generate Heuristics")
+    st.session_state.problem_choice = problem_choice
+
+def generate_heuristic():
+    st.title(f"Generate Heuristics for {st.session_state.problem_choice}")
 
     # Generate from internal knowledge
     st.subheader("Generate from Internal Knowledge")
@@ -335,125 +323,66 @@ def generate_heuristics_optionals():
     st.subheader("More optionals")
 
     st.session_state.checkbox_smoke_test = st.checkbox("Smoke test")
-    st.session_state.checkbox_deduplication = st.checkbox("Deduplication")
-    
     if st.button("Upload smoke test data", disabled=not st.session_state.checkbox_smoke_test):  
         st.session_state.smoke_test_data = st.file_uploader("Update the smoke data")
+    st.session_state.checkbox_deduplication = st.checkbox("Deduplication")
 
     st.markdown("---")
-
-    # Start generate button
     if st.button("Start Generate"):
-        st.session_state.page = "Generate Heuristics"
-        st.rerun()
+        st.session_state.generated_heuristics = True
 
-def generate_heuristic():
-    st.title("Generate Heuristics")
-    generate_from_llm = st.session_state.generate_from_llm
-    paper_list = st.session_state.paper_list
-    reference_problems = st.session_state.reference_problems
-    checkbox_smoke_test = st.session_state.checkbox_smoke_test
-    checkbox_deduplication = st.session_state.checkbox_deduplication
-    generated_heuristics.queue.clear()
-
-    
-    thread = threading.Thread(target=heuristic_generator, args=(generate_from_llm, paper_list, reference_problems, checkbox_smoke_test, checkbox_deduplication))
-    thread.start()
-    st.session_state.stop = False
-    generated_heuristic_name = []
-    generated_heuristic_description = {}
-
-    if st.button("Stop", disabled=True):
-        st.session_state.generated_heuristic_name = generated_heuristic_name
-        st.session_state.generated_heuristic_description = generated_heuristic_description
-
-    while True:
-        heuristic_name, heuristic_description, message = generated_heuristics.get()
-        if message == None or st.session_state.stop:        
-            st.session_state.generated_heuristic_name = generated_heuristic_name
-            st.session_state.generated_heuristic_description = generated_heuristic_description
-            break
-        if heuristic_name is not None:
-            generated_heuristic_name.append(heuristic_name)
-            generated_heuristic_description[heuristic_name] = heuristic_description
-        st.write(message)
-
-    st.session_state.page = "Generate Heuristics Result"
-    st.rerun()
-
-def generate_heuristic_result():
-    st.title("Generate Heuristics")
-    heuristic_list = st.session_state.generated_heuristic_name
-    heuristic_descriptions = st.session_state.generated_heuristic_description
-
-    if len(heuristic_list) > 0:
-        col1, col2, col3 = st.columns([0.8, 1, 3])
+    if "generated_heuristics" in st.session_state and st.session_state.generated_heuristics:
+        st.write("Generated heuristics")
+        heuristic_list = os.listdir(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics"))[4:8]
         st.session_state.selected_heuristic = heuristic_list[0]
         if "selected_checkboxes" not in st.session_state:
-            st.session_state.selected_checkboxes = {heuristic: False for heuristic in heuristic_list}
-
-
+            st.session_state.selected_checkboxes = {}
+        col1, col2 = st.columns([1, 3])
         with col1:
-            st.subheader("Select")
             for heuristic in heuristic_list:
-                st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
-
+                col3, col4 = st.columns([1, 3])
+                with col3:
+                    st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
+                with col4:
+                    if st.button(heuristic[:-8], key=heuristic, use_container_width=True):
+                        st.session_state.selected_heuristic = heuristic
         with col2:
-            st.subheader("Heuristic")
-            for heuristic in heuristic_list:
-                if st.button(heuristic, key=heuristic):
-                    st.session_state.selected_heuristic = heuristic
-        with col3:
-            st.subheader("Heuristic Description")
             selected_heuristic = st.session_state.selected_heuristic
-            st.write(heuristic_descriptions[selected_heuristic])
-            st.write("..............")
-            st.write("..............")
-            st.write("..............")
-            st.write("..............")
-
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    
-    if st.button("Save"):
-        selected_heuristics = ",".join([heuristic for heuristic, checked in st.session_state.selected_checkboxes.items() if checked])
-        st.write("Saved heuristics: " + selected_heuristics)
-
-    if st.button("Back"):
-        st.session_state.page = "Select Problem"
-        st.rerun()
+            heuristic_code = open(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics", selected_heuristic)).read()
+            st.code(heuristic_code, language="python")
+        col5, col6 = st.columns([1, 1])
+        with col5:
+            if st.button("Save", use_container_width=True):
+                selected_heuristics = ",".join([heuristic for heuristic, checked in st.session_state.selected_checkboxes.items() if checked])
+                st.write("Saved heuristics: " + selected_heuristics)
+        with col6:
+            if st.button("Back", use_container_width=True):
+                st.session_state.page = "Select Problem"
+                st.rerun()
 
 def evolve_heuristic():
-    problem_description = "This is a description of the selected problem."
-    heuristic_list = ["Heu1", "Heu2", "Heu3", "Heu4", "Heu5", "Heu6", "Heu7", "Heu8"]
-    heuristic_descriptions = {
-        "Heu1": "Description for Heu1",
-        "Heu2": "Description for Heu2",
-        "Heu3": "Description for Heu3",
-        "Heu4": "Description for Heu4",
-        "Heu5": "Description for Heu5",
-        "Heu6": "Description for Heu6",
-        "Heu7": "Description for Heu7",
-        "Heu8": "Description for Heu8",
-    }
+    st.title(f"Evolve Heuristics for {st.session_state.problem_choice}")
+    st.write("Select the heuristics to evolve")
+    heuristic_list = os.listdir(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics"))[4:8]
     st.session_state.selected_heuristic = heuristic_list[0]
-
+    if "selected_checkboxes" not in st.session_state:
+        st.session_state.selected_checkboxes = {}
     col1, col2 = st.columns([1, 3])
-
     with col1:
-        st.subheader("Heuristics")
         for heuristic in heuristic_list:
-            if st.button(heuristic, key=heuristic):
-                st.session_state.selected_heuristic = heuristic
-
+            col3, col4 = st.columns([1, 3])
+            with col3:
+                st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
+            with col4:
+                if st.button(heuristic[:-8], key=heuristic, use_container_width=True):
+                    st.session_state.selected_heuristic = heuristic
     with col2:
-        st.subheader("Heuristic Description")
         selected_heuristic = st.session_state.selected_heuristic
-        st.write(heuristic_descriptions[selected_heuristic])
-        st.write("..............")
-        st.write("..............")
-        st.write("..............")
-        st.write("..............")
+        heuristic_code = open(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics", selected_heuristic)).read()
+        st.code(heuristic_code, language="python")
 
+    st.markdown("---")
+    st.write("Set datasets")
     train_data = []
     uploaded_file = st.file_uploader("Choose evolution data set")
     if uploaded_file is not None:
@@ -464,68 +393,88 @@ def evolve_heuristic():
     if uploaded_file is not None:
         validation_data.append(uploaded_file)
     
+    st.markdown("---")
+    st.write("Set parameters for evolution")
+    perturb_heuristic = st.radio("Choose a problem to work with:", heuristic_list, index=0)
+    perturb_ratio = st.selectbox("Perturb ratio", [i / 10 for i in range(1, 11)])
     evolution_rounds = st.selectbox("Evolution rounds", range(1, 8))
+    filter_num = st.selectbox("Filter num", range(1, 8))
+    st.session_state.checkbox_smoke_test = st.checkbox("Smoke test")
+    if st.button("Upload smoke test data", disabled=not st.session_state.checkbox_smoke_test):  
+        st.session_state.smoke_test_data = st.file_uploader("Update the smoke data")
+    st.session_state.checkbox_deduplication = st.checkbox("Deduplication")
 
-    if st.button("Evolve"):
+    st.markdown("---")
+    if st.button("Start Evolution"):
+        st.session_state.evolved_heuristics = True
+
+    if "evolved_heuristics" in st.session_state and st.session_state.evolved_heuristics:
         st.write("Evolved heuristics")
-        st.write("..............")
-        st.write("..............")
-        st.write("..............")
-        st.write("..............")
-
-    if st.button("Save"):
-        selected_heuristics = ",".join([heuristic for heuristic, checked in st.session_state.selected_checkboxes.items() if checked])
-        st.write("Saved heuristics: " + selected_heuristics)
-
-    if st.button("Back"):
-        st.session_state.page = "Select Problem"
-        st.rerun()
-
-def run_heuristic():
-    problem_description = "This is a description of the selected problem."
-    heuristic_list = ["Heu1", "Heu2", "Heu3", "Heu4", "Heu5", "Heu6", "LLM selection", "Random selection"]
-    heuristic_descriptions = {
-        "Heu1": "Description for Heu1",
-        "Heu2": "Description for Heu2",
-        "Heu3": "Description for Heu3",
-        "Heu4": "Description for Heu4",
-        "Heu5": "Description for Heu5",
-        "Heu6": "Description for Heu6",
-        "LLM selection": "Description for LLM selection",
-        "Random selection": "Random selection",
-    }
-    if len(heuristic_list) > 0:
-        col1, col2, col3 = st.columns([0.8, 1, 3])
+        heuristic_list = os.listdir(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics"))[8:]
         st.session_state.selected_heuristic = heuristic_list[0]
         if "selected_checkboxes" not in st.session_state:
-            st.session_state.selected_checkboxes = {heuristic: False for heuristic in heuristic_list}
-
-
+            st.session_state.selected_checkboxes = {}
+        col1, col2 = st.columns([1, 3])
         with col1:
-            st.subheader("Select")
             for heuristic in heuristic_list:
-                st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
-
+                col3, col4 = st.columns([1, 3])
+                with col3:
+                    st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
+                with col4:
+                    if st.button(heuristic[:-8], key=heuristic, use_container_width=True):
+                        st.session_state.selected_heuristic = heuristic
         with col2:
-            st.subheader("Heuristic")
-            for heuristic in heuristic_list:
-                if st.button(heuristic, key=heuristic):
-                    st.session_state.selected_heuristic = heuristic
-        with col3:
-            st.subheader("Heuristic Description")
             selected_heuristic = st.session_state.selected_heuristic
-            st.write(heuristic_descriptions[selected_heuristic])
-            st.write("..............")
-            st.write("..............")
-            st.write("..............")
-            st.write("..............")
+            heuristic_code = open(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics", selected_heuristic)).read()
+            st.code(heuristic_code, language="python")
+        col5, col6 = st.columns([1, 1])
+        with col5:
+            if st.button("Save", use_container_width=True):
+                selected_heuristics = ",".join([heuristic for heuristic, checked in st.session_state.selected_checkboxes.items() if checked])
+                st.write("Saved heuristics: " + selected_heuristics)
+        with col6:
+            if st.button("Back", use_container_width=True):
+                st.session_state.page = "Select Problem"
+                st.rerun()
 
+def run_heuristic():
+    st.title(f"Benchmark {st.session_state.problem_choice}")
+    heuristic_list = os.listdir(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics"))[:4]
+    st.session_state.selected_heuristic = heuristic_list[0]
+    if "selected_checkboxes" not in st.session_state:
+        st.session_state.selected_checkboxes = {}
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        for heuristic in heuristic_list + ["LLM Selection", "Random Selection"]:
+            col3, col4 = st.columns([1, 3])
+            with col3:
+                st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
+            with col4:
+                name = heuristic[:-8] if heuristic in heuristic_list else heuristic
+                if st.button(name, key=heuristic, use_container_width=True):
+                    st.session_state.selected_heuristic = heuristic
+    with col2:
+        selected_heuristic = st.session_state.selected_heuristic
+        if selected_heuristic in heuristic_list:
+            heuristic_code = open(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics", selected_heuristic)).read()
+        elif selected_heuristic == "LLM Selection":
+            heuristic_code = "Dynamic select heuristics from llm"
+        elif selected_heuristic == "Random Selection":
+            heuristic_code = "Dynamic random select heuristics"
+        st.code(heuristic_code, language="python")
+
+    st.markdown("---")
+    st.write("Set datasets")
     test_data = []
     uploaded_file = st.file_uploader("Choose test data set")
     if uploaded_file is not None:
         test_data.append(uploaded_file)
-    
-    if st.button("Run"):
+
+    st.markdown("---")
+    if st.button("Start Run"):
+        st.session_state.run_heuristics = True
+
+    if "run_heuristics" in st.session_state and st.session_state.run_heuristics:
         data = [[1,2], [4,5], [7,8]]
 
         group_data = list(zip(*data))
@@ -548,12 +497,15 @@ def run_heuristic():
         
         st.pyplot(fig)
 
-        if st.button("Clean"):
+    col5, col6 = st.columns([1, 1])
+    with col5:
+        if st.button("Clean", use_container_width=True):
+            st.session_state.run_heuristics = False
             st.rerun()
-
-    if st.button("Back"):
-        st.session_state.page = "Select Problem"
-        st.rerun()
+    with col6:
+        if st.button("Back", use_container_width=True):
+            st.session_state.page = "Select Problem"
+            st.rerun()
 
 # Main function
 def main():
@@ -569,15 +521,11 @@ def main():
         introduction()
     elif st.session_state.page == "Select Problem":
         select_problem()
-    elif st.session_state.page == "Generate Heuristics Optionals":
-        generate_heuristics_optionals()
     elif st.session_state.page == "Generate Heuristics":
         generate_heuristic()
-    elif st.session_state.page == "Generate Heuristics Result":
-        generate_heuristic_result()
     elif st.session_state.page == "Evolve Heuristics":
         evolve_heuristic()
-    elif st.session_state.page == "Run Heuristics":
+    elif st.session_state.page == "Benchmark Heuristics":
         run_heuristic()
 
 if __name__ == "__main__":
