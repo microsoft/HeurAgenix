@@ -12,8 +12,8 @@ class PerturbationHyperHeuristic:
         perturbation_ratio: float=0.1,
         problem: str="tsp"
     ) -> None:
-        self.main_heuristic = load_heuristic(main_heuristic_file, heuristic_dir=os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
-        self.perturbation_heuristic = load_heuristic(perturbation_heuristic_file, heuristic_dir=os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
+        self.main_heuristic = load_heuristic(main_heuristic_file, problem=problem)
+        self.perturbation_heuristic = load_heuristic(perturbation_heuristic_file, problem=problem)
         self.perturbation_ratio = perturbation_ratio
 
     def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:

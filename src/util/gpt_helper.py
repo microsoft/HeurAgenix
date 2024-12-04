@@ -90,7 +90,7 @@ class GPTHelper:
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)
 
-    def load_background(self, problem: str, reference_data: str) -> dict:
+    def load_background(self, problem: str, reference_data: str=None) -> dict:
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
         if os.path.exists(os.path.join("src", "problems", problem, "components.py")):

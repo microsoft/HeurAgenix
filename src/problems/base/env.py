@@ -2,26 +2,16 @@ import os
 import traceback
 import time
 from src.problems.base.components import BaseSolution, BaseOperator
+from src.util.util import search_file
 
 
 class BaseEnv:
     """Base env that stores the static global data, current solution, dynamic state and provide necessary to support algorithm."""
     def __init__(self, data_name: str, problem: str, **kwargs):
-        def find_file_in_folder(folder_path, file_name):
-            return next((os.path.join(root, file_name) for root, _, files in os.walk(folder_path) if file_name in files), None)
         self.data_name = data_name
         self.problem = problem
-        data_path1 = data_name
-        data_path2 = find_file_in_folder(os.path.join("src", "problems", problem, "data"), data_name)
-        data_path3 = find_file_in_folder(os.path.join("output", problem, "data"), data_name)
-        if os.path.exists(data_path1):
-            self.data_path = data_path1
-        elif data_path2:
-            self.data_path = data_path2
-        elif data_path3:
-            self.data_path = data_path3
-        else:
-            raise BaseException(f"No data {data_name} found.")
+        self.data_path = search_file(data_name, problem)
+        assert self.data_path is not None
         self.data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = None
         self.global_data: dict = None

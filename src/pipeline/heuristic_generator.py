@@ -4,7 +4,7 @@ import importlib
 import traceback
 from copy import deepcopy
 from src.problems.base.components import BaseOperator
-from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description
+from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
 from src.util.gpt_helper import GPTHelper
 
 
@@ -237,9 +237,9 @@ class HeuristicGenerator:
     def smoke_test(self, heuristic_code: str, function_name: str, max_try_times: int=5) -> str:
         prompt_dict = {}
         # Load smoke data
-        smoke_data_dir = os.path.join("src", "problems", self.problem, "data", "smoke_data")
+        smoke_data_dir = search_file("smoke_data", problem=self.problem)
         previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
-        smoke_data = [file for file in os.listdir(smoke_data_dir) if file[:10] == "smoke_data"][0]
+        smoke_data = [file for file in os.listdir(smoke_data_dir) if file != "previous_operations.txt"][0]
         prompt_dict["function_name"] = function_name
         prompt_dict["previous_operations"] = "".join(previous_operations)
 

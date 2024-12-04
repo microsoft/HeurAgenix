@@ -93,17 +93,17 @@ python generate_heuristic.py -p NewProblem -s related_problem -r "JobScheduling,
 Run the heuristic evolution process using:
 
 ```bash
-python evolution_heuristic.py -p <problem> -b <basic_heuristic> [-t <train_dir>] [-v <validation_dir>] [-ph <perturb_heuristic>] [-pr <perturb_ratio>] [-pt <perturb_time>] [-f <filter_num>] [-r <evolution_rounds>] [-l <time_limit>] [-m]
+python evolution_heuristic.py -p <problem> -be <basic_heuristic> [-t <train_dir>] [-v <validation_dir>] [-pe <perturbation_heuristic>] [-pr <perturbation_ratio>] [-pt <perturbation_time>] [-f <filter_num>] [-r <evolution_rounds>] [-l <time_limit>] [-m]
 ```
 
 Parameters:
 - `-p`, `--problem`: Specifies the CO problem type to solve (required).
-- `-b`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
+- `-be`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
 - `-t`, `--train_dir`: Directory for training data.
 - `-v`, `--validation_dir`: Directory for validation data.
-- `-ph`, `--perturb_heuristic`: Path or name of the heuristic used for perturbations.
-- `-pr`, `--perturb_ratio`: Ratio for perturbation adjustments (default: 0.1).
-- `-pt`, `--perturb_time`: Maximum perturbation count (default: 1000).
+- `-pe`, `--perturbation_heuristic`: Path or name of the heuristic used for perturbations.
+- `-pr`, `--perturbation_ratio`: Ratio for perturbation adjustments (default: 0.1).
+- `-pt`, `--perturbation_time`: Maximum perturbation count (default: 1000).
 - `-f`, `--filter_num`: Number of heuristics to retain after validation (default: 1).
 - `-r`, `--evolution_rounds`: Number of rounds for heuristic evolution (default: 3).
 - `-l`, `--time_limit`: Time limit for running the evolution (default: 10 seconds).

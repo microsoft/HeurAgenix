@@ -9,26 +9,19 @@ class GPTSelectionHyperHeuristic:
     def __init__(
         self,
         gpt_helper: GPTHelper,
-        heuristic_dir: str=None,
-        problem: str="tsp",
+        heuristic_dir: str,
+        problem: str,
     ) -> None:
         self.gpt_helper = gpt_helper
         self.problem = problem
-        heuristic_dir = heuristic_dir if heuristic_dir is not None else os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
         self.heuristic_docs = {
             heuristic_file.split(".")[0]: extract_function_with_short_docstring(open(os.path.join(heuristic_dir, heuristic_file)).read(), heuristic_file.split(".")[0]) 
             for heuristic_file in os.listdir(heuristic_dir)}
         self.heuristic_pools = {
-            heuristic_file.split(".")[0]: load_heuristic(heuristic_file, heuristic_dir)
+            heuristic_file.split(".")[0]: load_heuristic(heuristic_file, problem=self.problem)
             for heuristic_file in os.listdir(heuristic_dir)}
-        if os.path.exists(os.path.join("output", problem, "evaluation_function.py")):
-            evaluation_function_file = os.path.join("output", problem, "evaluation_function.py")
-        elif os.path.exists(os.path.join("output", problem, "generate_evaluation_function", "evaluation_function.py")):
-            evaluation_function_file = os.path.join("output", problem, "generate_evaluation_function", "evaluation_function.py")
-        elif os.path.exists(os.path.join("src", "problems", problem, "evaluation_function.py")):
-            evaluation_function_file = os.path.join("src", "problems", problem, "evaluation_function.py")
-        self.get_global_data_feature_function = load_heuristic(evaluation_function_file, function_name="get_global_data_feature")
-        self.get_state_data_feature_function = load_heuristic(evaluation_function_file, function_name="get_state_data_feature")
+        self.get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
+        self.get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
 
     def run(self, env:BaseEnv, max_steps: int=None, data_feature_content_threshold: int=1000, **kwargs) -> bool:
         # Load background

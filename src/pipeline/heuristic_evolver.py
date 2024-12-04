@@ -11,7 +11,7 @@ from src.problems.base.env import BaseEnv
 from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
-from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring
+from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
 from src.util.gpt_helper import GPTHelper
 
 class HeuristicEvolver:
@@ -78,8 +78,9 @@ class HeuristicEvolver:
                             )
                         except Exception as e:
                             trace_string = traceback.format_exc()
+                            self.gpt_helper.load(trace_string)
                             self.gpt_helper.dump("Error")
-                            print(trace_string)
+                            self.gpt_helper.messages.pop()
                             continue
                 
                     # validation
@@ -174,7 +175,8 @@ class HeuristicEvolver:
         negative_value = float(negative_result[env.key_item])
 
         # Load heuristic
-        heuristic = load_heuristic(heuristic_file)
+        heuristic_file = search_file(heuristic_file, problem=self.problem)
+        heuristic = load_heuristic(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
         function_code = open(heuristic_file).read()
         function_introduction = extract_function_with_short_docstring(function_code, function_name)
@@ -236,7 +238,7 @@ class HeuristicEvolver:
             heuristic_work = True
             while not env.is_complete_solution or heuristic_work:
                 heuristic_work = env.run_heuristic(heuristic)
-            env.dump_result(dump_trajectory=True)
+            proposed_result = env.dump_result(dump_trajectory=True)
             proposed_result = parse_text_to_dict(proposed_result)
             prompt_dict["proposed_solution"] = proposed_result["current_solution"]
             prompt_dict["proposed_result"] = proposed_result[env.key_item]
