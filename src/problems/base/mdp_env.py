@@ -53,3 +53,8 @@ class MDPEnv(BaseEnv):
         content_dict = self.get_state_data()
         content = super().dump_result(content_dict, dump_trajectory)
         return content
+    
+    def summarize_env(self) -> str:
+        if hasattr(self.gym_env, "summarize_env"):
+            return self.gym_env.summarize_env()
+        return None

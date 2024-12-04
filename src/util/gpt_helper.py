@@ -2,6 +2,7 @@ import os
 import json
 import re
 import base64
+import importlib
 from openai import AzureOpenAI
 from time import sleep
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
@@ -89,7 +90,7 @@ class GPTHelper:
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)
 
-    def load_background(self, problem: str) -> dict:
+    def load_background(self, problem: str, reference_data: str) -> dict:
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
         if os.path.exists(os.path.join("src", "problems", problem, "components.py")):
@@ -98,16 +99,25 @@ class GPTHelper:
             component_code = open(os.path.join("src", "problems", "base", "mdp_components.py")).read()
         solution_class_str, operator_class_str = load_framework_description(component_code)
 
+        env_summarize = "All data is possible"
+        if reference_data:
+            module = importlib.import_module(f"src.problems.{problem}.env")
+            globals()["Env"] = getattr(module, "Env")
+            env = Env(reference_data)
+            env_summarize = env.summarize_env()
+
         prompt_dict = {
             "problem": problem,
             "problem_description": open(os.path.join(problem_dir, "problem_description.txt")).read(),
             "global_data_introduction": open(os.path.join(problem_dir, "global_data.txt")).read(),
             "state_data_introduction": open(os.path.join(problem_dir, "state_data.txt")).read(),
             "solution_class": solution_class_str,
-            "operator_class": operator_class_str
+            "operator_class": operator_class_str,
+            "env_summarize": env_summarize
         }
 
         self.load("background", prompt_dict)
+
         self.chat()
         self.dump("background")
         return prompt_dict

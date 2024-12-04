@@ -12,6 +12,7 @@ def parse_arguments():
     parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
     parser.add_argument("-pp", "--paper_path", type=str, help="Path to Latex paper file or directory.")
     parser.add_argument("-r", "--related_problems", type=str, default="all", help="Comma-separated list of related problems to reference.")
+    parser.add_argument("-d", "--reference_data", type=str, default=None, help="Path for reference data.")
 
     return parser.parse_args()
 
@@ -27,15 +28,15 @@ def main():
     )
     heuristic_generator = HeuristicGenerator(gpt_helper=gpt_helper, problem=problem)
     if source == "gpt":
-        heuristic_generator.generate_from_gpt(smoke_test=smoke_test)
+        heuristic_generator.generate_from_gpt(reference_data=args.reference_data, smoke_test=smoke_test)
     elif source == "paper":
-        heuristic_generator.generate_from_paper(paper_path=args.paper_path, smoke_test=smoke_test)
+        heuristic_generator.generate_from_paper(paper_path=args.paper_path, reference_data=args.reference_data, smoke_test=smoke_test)
     elif source == "related_problem":
         if args.related_problems == "all":
             related_problems = [ref_problem for ref_problem in os.listdir(os.path.join("src", "problems")) if ref_problem not in ["base", problem]]
         else:
             related_problems = args.related_problems.split(",")
-        heuristic_generator.generate_from_reference(related_problems=related_problems, smoke_test=smoke_test)
+        heuristic_generator.generate_from_reference(related_problems=related_problems, reference_data=args.reference_data, smoke_test=smoke_test)
 
 if __name__ == "__main__":
     main()
