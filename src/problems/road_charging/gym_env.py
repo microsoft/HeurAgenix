@@ -25,7 +25,6 @@ class RoadCharging(Env):
         self.config = config
         self.delta_t = config["step_length"]
 
-        # Extract relevant configuration parameters
         self.fleet_size = config['fleet_size']  # Number of EVs in the fleet
         self.total_chargers = config['total_chargers']  # Total number of chargers
         self.max_time_steps = int(config["time_horizon"] / self.delta_t)
@@ -35,15 +34,11 @@ class RoadCharging(Env):
         self.consume_rate = round(1 / config["time_SoCfrom100to0"] * self.delta_t, 3)  # Battery consumption rate per time step
         self.charger_speed = round(1 / config["time_SoCfrom0to100"] * self.delta_t, 3)  # Charger speed per time step
 
-        # Load data files for various parameters
-        self.RT_mean = pd.read_csv(config["trip_time_fpath"][0]).iloc[:, 0].tolist()
-        self.RT_std = pd.read_csv(config["trip_time_fpath"][1]).iloc[:, 0].tolist()
+        self.ride_time_bins = config["ride_time_bins"]
+        self.ride_time_probs = config["ride_time_probs"]
         self.order_price = pd.read_csv(config["trip_fare_fpath"]).iloc[:, 0].tolist()
         self.charging_price = pd.read_csv(config["charging_price_fpath"]).iloc[:, 0].tolist()
 
-        # plt.plot(self.charging_price)
-        # plt.show()
-        # Assign values to class attributes
         self.n = self.fleet_size  # Number of agents (EVs)
         self.m = self.total_chargers  # Number of chargers
         self.k = self.max_time_steps  # Maximum number of time steps
@@ -52,14 +47,11 @@ class RoadCharging(Env):
         self.max_cap = self.max_cap  # Max capacity of EVs
         self.consume_rate = [self.consume_rate] * self.n  # Battery consumption rate per time step
         self.charger_speed = [self.charger_speed] * self.n  # Charger speed per time step
-        self.mu = np.repeat(self.RT_mean, int(60 / self.delta_t))  # Ride time mean
-        self.sigma = np.repeat(self.RT_std, int(60 / self.delta_t))  # Ride time standard deviation
         self.w = np.repeat(self.order_price, int(60 / self.delta_t)) * self.delta_t  # Order price per time step
-        self.r =  [x * self.max_cap for x in self.charger_speed]  # Charger rate (kWh per time step)
+        self.r =  [x * self.max_cap for x in self.charger_speed] # Charger rate (kWh per time step)
         self.p = np.repeat(self.charging_price, int(60 / self.delta_t))  # Charging price per time step
         self.rng = np.random.default_rng()  # Random number generator
         self.low_battery = 0.1  # Low battery threshold
-        self.ride_time_distribution_name = config["ride_time_distribution_name"]
 
         # Save path for results
         self.save_path = config['save_path']
@@ -85,10 +77,7 @@ class RoadCharging(Env):
         # Action space: n agents, each can take a binary action (0 or 1)
         self.action_space = spaces.MultiBinary(self.n)
 
-        # Debug prints to verify some of the key values
-        # print(f'Consume Rate: {self.consume_rate}')
-        # print(f'Charger Speed: {self.charger_speed}')
-        # print(f'Order Prices Length: {len(self.w)}')
+        # self.get_sample_price("Q2")
 
 
 
@@ -114,7 +103,12 @@ class RoadCharging(Env):
 
         random_date = np.random.choice(unique_dates)
 
+        # p_t = df[df['Local Date']==random_date]['SP-15 LMP'].to_numpy().tolist()
         p_t = df[df['Local Date']==random_date]['SP-15 LMP'].to_numpy()
+        print('debug get_sample_price:', len(p_t))
+        print('view p_t:', p_t)
+        plt.plot(p_t)
+        plt.show()
 
         return np.repeat(p_t, int(60/self.delta_t))
     
@@ -135,22 +129,13 @@ class RoadCharging(Env):
         },
         }
 
-        if self.ride_time_distribution_name == "log-normal":
-            summary["Ride Info"] = {
-                "Ride Time Distribution Type": "Log-normal",
-                "Mean of Logged Ride Times at Each Hour (in time steps)": self.RT_mean,
-                "Std Dev of Logged Ride Times at Each Hour (in time steps)": self.RT_std,
-                "Hour of Maximum Ride Time Mean": np.argmax(self.RT_mean),  # Index of max value
-                "Hour of Minimum Ride Time Mean": np.argmin(self.RT_mean),  # Index of min value
-                "Hours Sorted by Ride Time Mean (Max to Min)": np.argsort(self.RT_mean)[::-1],
-                "Hour of Maximum Ride Time Std Dev": np.argmax(self.RT_std),  # Index of max value
-                "Hour of Minimum Ride Time Std Dev": np.argmin(self.RT_std),  # Index of min value
-                "Hours Sorted by Ride Time Std Dev (Max to Min)": np.argsort(self.RT_std)[::-1],
-                "Ride Order Payment per Step at Each Hour (USD)":self.order_price,
-                "Hour of Maximum Payment": np.argmax(self.order_price),  # Index of max value
-                "Hour of Minimum Payment": np.argmin(self.order_price),  # Index of min value
-                "Hours Sorted by Payment per Step (Max to Min)": np.argsort(self.order_price)[::-1],
-            }
+        summary["Ride Info"] = {
+            "Discretized Ride Time Probability Distribution": dict(zip(self.ride_time_bins, self.ride_time_probs)),
+            "Ride Order Payment per Step at Each Hour (USD)":self.order_price,
+            "Hour of Maximum Payment": np.argmax(self.order_price),  # Index of max value
+            "Hour of Minimum Payment": np.argmin(self.order_price),  # Index of min value
+            "Hours Sorted by Payment per Step (Max to Min)": np.argsort(self.order_price)[::-1],
+        }
 
         summary["Charging Price Info"] = {
             "Charging Price at Each Hour (USD)": self.charging_price,
@@ -168,13 +153,11 @@ class RoadCharging(Env):
             summary_str += "\n"
 
         # Print the summary to the console
-        # print(summary_str)
+        print(summary_str)
 
         # Save the summary to a text file
-        with open(self.save_path + "environment_summary.txt", "w") as file:
+        with open("environment_summary.txt", "w") as file:
             file.write(summary_str)
-        
-        return summary_str
 
 
     def get_action_meanings(self):
@@ -239,19 +222,14 @@ class RoadCharging(Env):
 
         ride_times = []
 
-        for agent, bLevel in enumerate(self.obs["SoC"]):
+        for v, SoC in enumerate(self.obs["SoC"]):
 
-            t = self.obs["TimeStep"][agent]
+            random_ride_time = int(np.random.choice([rt for rt in self.ride_time_bins if rt > 0],
+                                                        p=[prob for prob in self.ride_time_probs if prob>0] ))
+            ride_time = np.minimum(random_ride_time, int(SoC/self.consume_rate[v])) # the second term has already been in steps
+            # as consume_rate is per time step
 
-            if bLevel <= self.low_battery:
-                ride_time = 0
-            else:
-                if self.ride_time_distribution_name == "log-normal":
-                    ride_time = int(self.rng.lognormal(self.mu[t], self.sigma[t])/self.delta_t) # convert to time steps
-
-            ride_time = np.minimum(ride_time, int(bLevel/self.consume_rate[agent]))
-
-            ride_times.append(int(ride_time))
+            ride_times.append(int(ride_time)) 
 
         return ride_times
 
@@ -267,19 +245,24 @@ class RoadCharging(Env):
             elif state["ChargingStatus"] > 0:
                 alpha = 0
             elif state["RideTime"] == 0 and state["ChargingStatus"] == 0:
-                # next_state is zero with prob 0.01
-                if np.random.random() < self.rho[state["TimeStep"]]:
-                    alpha = 0
+                
+                if state["SoC"] <= self.low_battery:
+                    assign_prob = 0
                 else:
-                # next_state is a random number drawn from get_ride_time() with prob 1-0.01
+                    assign_prob = self.rho[state["TimeStep"]]
+
+                if np.random.random() < assign_prob:
                     alpha = ride_time
+                else:
+                    alpha = 0
+
+        beta = state["ChargingStatus"] 
+        # get next state of charge
+        theta = (1-beta) * (state["SoC"]-self.consume_rate[agent_idx]) + beta * (state["SoC"]+self.charger_speed[agent_idx])
+        theta = round(np.minimum(np.maximum(theta, 0), 1.0), 3)
 
         # get next charging status
         beta = action
-
-        # get next state of charge
-        theta = (1-action) * (state["SoC"]-self.consume_rate[agent_idx]) + action * (state["SoC"]+self.charger_speed[agent_idx])
-        theta = round(np.minimum(np.maximum(theta, 0), 1.0), 3)
 
         self.obs["TimeStep"][agent_idx] = state["TimeStep"] + 1
         self.obs["RideTime"][agent_idx] = alpha
@@ -322,7 +305,6 @@ class RoadCharging(Env):
         self.ep_return += reward
 
         # save trajectories
-
         next_step = current_step+1
         self.trajectories['states'][:,0,next_step] = self.obs["RideTime"]
         self.trajectories['states'][:,1,next_step] = self.obs["ChargingStatus"]
@@ -373,3 +355,4 @@ class RoadCharging(Env):
 
         plt.tight_layout()
         plt.show()
+
