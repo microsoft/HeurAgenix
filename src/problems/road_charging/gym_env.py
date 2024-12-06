@@ -222,94 +222,103 @@ class RoadCharging(Env):
 
         ride_times = []
 
-        for v, SoC in enumerate(self.obs["SoC"]):
+        # for SoC in self.obs["SoC"]:
+        for i in range(self.n):
 
-            random_ride_time = int(np.random.choice([rt for rt in self.ride_time_bins if rt > 0],
+            if np.random.random() < self.rho[self.obs["TimeStep"][i]]:
+                ride_time = int(np.random.choice([rt for rt in self.ride_time_bins if rt > 0],
                                                         p=[prob for prob in self.ride_time_probs if prob>0] ))
-            ride_time = np.minimum(random_ride_time, int(SoC/self.consume_rate[v])) # the second term has already been in steps
-            # as consume_rate is per time step
+            else:
+                ride_time = 0
 
             ride_times.append(int(ride_time)) 
 
         return ride_times
+    
+    def get_agent_state(self, agent_index):
+
+        return (self.obs["TimeStep"][agent_index],
+                self.obs["RideTime"][agent_index],
+                self.obs["ChargingStatus"][agent_index],
+                self.obs["SoC"][agent_index])
 
 
-    def agent_step(self, agent_idx, ride_time, state, action):
-
-        # get next ride time
-        if action == 1:
-            alpha = 0
-        elif action == 0:
-            if state["RideTime"] > 0:
-                alpha = np.maximum(state["RideTime"]-1, 0)
-            elif state["ChargingStatus"] > 0:
-                alpha = 0
-            elif state["RideTime"] == 0 and state["ChargingStatus"] == 0:
-                
-                if state["SoC"] <= self.low_battery:
-                    assign_prob = 0
-                else:
-                    assign_prob = self.rho[state["TimeStep"]]
-
-                if np.random.random() < assign_prob:
-                    alpha = ride_time
-                else:
-                    alpha = 0
-
-        beta = state["ChargingStatus"] 
-        # get next state of charge
-        theta = (1-beta) * (state["SoC"]-self.consume_rate[agent_idx]) + beta * (state["SoC"]+self.charger_speed[agent_idx])
-        theta = round(np.minimum(np.maximum(theta, 0), 1.0), 3)
-
-        # get next charging status
-        beta = action
-
-        self.obs["TimeStep"][agent_idx] = state["TimeStep"] + 1
-        self.obs["RideTime"][agent_idx] = alpha
-        self.obs["ChargingStatus"][agent_idx] = beta
-        self.obs["SoC"][agent_idx] = theta
-
-
-
-    def step(self, action):
+    def step(self, actions):
 
         # Assert that it is a valid action
-        assert self.action_space.contains(action), "Invalid Action"
+        assert self.action_space.contains(actions), "Invalid Action"
 
         current_step = self.obs["TimeStep"][0]
-        self.trajectories['actions'][:,current_step] = action
+        random_ride_times = self.ride_time_generator()
 
-        # Reward for executing a step.
-        alpha = self.obs["RideTime"]
-        beta = self.obs["ChargingStatus"]
-        tau = self.ride_time_generator()
-
-        reward = sum(self.w[self.obs["TimeStep"][i]] * tau[i] * (1-action[i]) * self.is_zero(alpha[i]) * (1-beta[i])
-                     - self.h * action[i] * (1-beta[i])
-                     - self.p[self.obs["TimeStep"][i]] * self.r[i] * action[i]
-                     for i in range(self.n))
-
-        # apply the action: modify self.obs
+        sum_rewards = 0
         for i in range(self.n):
 
-            agent_state = {"TimeStep": self.obs["TimeStep"][i],
-                           "RideTime": self.obs["RideTime"][i],
-                           "ChargingStatus": self.obs["ChargingStatus"][i],
-                           "SoC": self.obs["SoC"][i]}
+            t, ride_time, charging_status, SoC = self.get_agent_state(i)
+            action = actions[i]
+           
+            next_SoC = SoC + charging_status * self.charger_speed[i] + (1-charging_status) * (-self.consume_rate[i])
 
-            agent_action = action[i]
+            if ride_time >= 2 and charging_status == 0:
+                # Active ride scenario
+                # (ride_time, charg_time) transitions to (ride_time-1,0)
+                # Payment handled at trip start, so reward is 0
+                next_state = (ride_time - 1, 0, SoC-self.consume_rate[i])
+                reward = 0
 
-            self.agent_step(i, tau[i], agent_state, agent_action)
+            elif ride_time == 1 and charging_status == 0:
+                # Active ride scenario
+                # (ride_time, charg_time) transitions to (ride_time-1,0)
+                # Payment handled at trip start, so reward is 0
+                next_state = (0, action, SoC-self.consume_rate[i])
+                reward = action * (-self.h - self.p[t] * self.r[i])
+
+            elif ride_time == 0 and charging_status > 0:
+                # Charging scenario
+                # (ride_time, charg_time) transitions from (0, >0) to (0, a) dependent on a
+                next_state = (0, action, next_SoC)
+                reward = action * (- self.p[t] * self.r[i])
+
+            elif ride_time == 0 and charging_status== 0: # Idle state
+                
+                if action == 0:
+                    if SoC <= self.low_battery:
+                        ride_time = 0
+                    else:
+                        ride_time = np.minimum(random_ride_times[i], int(SoC/self.consume_rate[i]))
+
+                    next_state = (ride_time, 0, next_SoC)
+                    reward = self.w[t] * ride_time
+
+                elif action == 1:
+                    # Start charging from the next step; hence, SoC still drops in the current step due to consumption.
+                    # With this logic, if the vehicle is charging at time t, the SoC will increase in the next step,
+                    # regardless of whether it decides to continue charging or not at t+1.
+                    next_state = (0, 1, next_SoC)
+                    reward = action * (-self.h - self.p[t] * self.r[i])
+
+    
+            self.obs["TimeStep"][i] = t + 1
+            self.obs["RideTime"][i] = next_state[0]
+            self.obs["ChargingStatus"][i] = next_state[1]
+            self.obs["SoC"][i] = np.maximum(np.minimum(next_state[2], 1.0), 0.)
+            sum_rewards += reward
+
+            print(f'next state {next_state}')
+
+            print(f"agent {i} has reward {reward}.")
+
 
         # Increment the episodic return: no discount factor for now
-        self.ep_return += reward
+        self.ep_return += sum_rewards
 
         # save trajectories
-        next_step = current_step+1
-        self.trajectories['states'][:,0,next_step] = self.obs["RideTime"]
-        self.trajectories['states'][:,1,next_step] = self.obs["ChargingStatus"]
-        self.trajectories['states'][:,2,next_step] =self.obs["SoC"]
-        self.trajectories['rewards'].append(reward)
+        # next_step = current_step+1
+        self.trajectories['actions'][:,current_step] = actions
+        self.trajectories['states'][:,0,current_step+1] = self.obs["RideTime"]
+        self.trajectories['states'][:,1,current_step+1] = self.obs["ChargingStatus"]
+        self.trajectories['states'][:,2,current_step+1] =self.obs["SoC"]
+        self.trajectories['rewards'].append(sum_rewards)
 
         # If all values in the first column are equal to k, terminate the episode
         done = np.all(self.obs["TimeStep"] == self.k)
