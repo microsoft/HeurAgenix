@@ -11,7 +11,7 @@ def config_env(data_path:str, save_path:str):
         "step_length": 15, # how many minutes in one time step
         "time_horizon": 1440, # how many minutes we are scheduling for
         "max_cap": 72, # EV's battery capacity in kWh
-        "connection_fee": 5, # fee for connecting to the charging station ($)
+        "connection_fee": 1.5, # fee for connecting to the charging station ($)
         "time_SoCfrom0to100": 60, # Time in minutes to charge the battery fully
         "time_SoCfrom100to0": 480, # Time in minutes to fully discharge the battery
         "prob_fpath": data_path+"assign_prob.csv", # probability of getting assigned an order if remaining idle
@@ -35,11 +35,11 @@ def config_env(data_path:str, save_path:str):
 
     return config
 
-
+    
 if __name__ == "__main__":
 
-    data_path = r"data/"
-    save_path = r""
+    data_path = "C:\\Users\\zhangling\\OneDrive - Microsoft\\3 Research projects\\2024EV\\codes\\csv_data\\"
+    save_path = "C:\\Users\\zhangling\\OneDrive - Microsoft\\3 Research projects\\2024EV\\codes\\results\\"
     config = config_env(data_path, save_path)
 
     time_bin_width = config["step_length"] # 10 minutes as a step
@@ -65,23 +65,27 @@ if __name__ == "__main__":
     config["ride_time_probs"] = ride_time_probs
 
     max_cases = 2
-    samples = []
+
     for case in range(max_cases):
-        sample = []
-        for step in time_steps:
+        case_samples = []
+        for i in range(config["fleet_size"]):
+            sample = []
+            for step in time_steps:
+                if np.random.random() < rho[step]:
+                    random_ride_time = random_ride_time = np.random.choice([rt for rt in ride_time_bins if rt > 0],
+                                                            p=[prob for prob in ride_time_probs if prob>0] )
+                    sample.append(int(random_ride_time))
+                else:
+                    sample.append(0)
 
-            if np.random.random() < rho[step]:
-                random_ride_time = random_ride_time = np.random.choice([rt for rt in ride_time_bins if rt > 0],
-                                                        p=[prob for prob in ride_time_probs if prob>0] )
-                sample.append(int(random_ride_time))
-            else:
-                sample.append(0)
+            case_samples.append(sample)
 
-        config["ride_time_samples"] = sample
+        print(len(case_samples), len(case_samples[0]))
+
+        config["ride_time_samples"] = case_samples
 
         # Save each case as a JSON file
         with open(data_path+f"case_{case + 1}.json", "w") as json_file:
             json.dump(config, json_file, indent=4)
 
-        samples.append(sample)
-
+        
