@@ -11,13 +11,10 @@ def config_env(data_path:str, save_path:str):
         "step_length": 15, # how many minutes in one time step
         "time_horizon": 1440, # how many minutes we are scheduling for
         "max_cap": 72, # EV's battery capacity in kWh
-        "connection_fee": 1.5, # fee for connecting to the charging station ($)
+        "connection_fee": 5, # fee for connecting to the charging station ($)
         "time_SoCfrom0to100": 60, # Time in minutes to charge the battery fully
         "time_SoCfrom100to0": 480, # Time in minutes to fully discharge the battery
-        "ride_time_distribution_name": "log-normal",
-        # "assign_prob": 0.5, # probability of getting assigned an order if remaining idle
         "prob_fpath": data_path+"assign_prob.csv", # probability of getting assigned an order if remaining idle
-        "trip_time_fpath": [data_path+'RT_mean_24hrs.csv', data_path+'RT_std_24hrs.csv'], # data to randomly generated passenger trip time
         "trip_fare_fpath" : data_path+'trip_fare_24hrs.csv', # unit fare is calculated per minute, multiply by step length to get fare for a step
         "charging_price_fpath": data_path+"LMP_24hrs.csv", # $
         "data_fpath": data_path,
@@ -36,11 +33,55 @@ def config_env(data_path:str, save_path:str):
     
     print("JSON configuration file created: config.json")
 
-    
+    return config
+
+
 if __name__ == "__main__":
 
-    # data_path = "/content/gdrive/MyDrive/RoadCharge/data/"
     data_path = r"data/"
     save_path = r""
-    config_env(data_path, save_path)
+    config = config_env(data_path, save_path)
+
+    time_bin_width = config["step_length"] # 10 minutes as a step
+    max_time_steps = int(24 * 60 / time_bin_width)
+    time_steps = list(range(0, max_time_steps))
+
+    assign_prob = pd.read_csv(config['prob_fpath']).iloc[:, 0].tolist()
+    rho = np.repeat(assign_prob, int(60 / time_bin_width)) 
+
+    if time_bin_width == 10:
+        ride_time_buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+        with open(data_path+"ride_time_pmf_10min.json", "r") as f:
+            ride_time_probs = json.load(f)
+
+    elif time_bin_width == 15:
+        ride_time_buckets = [15, 30, 45, 60, 75, 90]
+        with open(data_path+"ride_time_pmf_15min.json", "r") as f:
+            ride_time_probs = json.load(f)
+
+    ride_time_bins = [int(item/time_bin_width) for item in ride_time_buckets]  # Discretized ride times
+
+    config["ride_time_bins"] = ride_time_bins
+    config["ride_time_probs"] = ride_time_probs
+
+    max_cases = 2
+    samples = []
+    for case in range(max_cases):
+        sample = []
+        for step in time_steps:
+
+            if np.random.random() < rho[step]:
+                random_ride_time = random_ride_time = np.random.choice([rt for rt in ride_time_bins if rt > 0],
+                                                        p=[prob for prob in ride_time_probs if prob>0] )
+                sample.append(int(random_ride_time))
+            else:
+                sample.append(0)
+
+        config["ride_time_samples"] = sample
+
+        # Save each case as a JSON file
+        with open(data_path+f"case_{case + 1}.json", "w") as json_file:
+            json.dump(config, json_file, indent=4)
+
+        samples.append(sample)
 
