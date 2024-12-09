@@ -37,7 +37,7 @@ class HeuristicEvolver:
             perturbation_time: int=100,
             filtered_num: int=3,
             evolution_round: int=3,
-            time_limitation: float=10,
+            time_limitation: float=None,
             smoke_test: bool=True,
             validation: bool=True,
         ) -> None:
@@ -95,7 +95,7 @@ class HeuristicEvolver:
                             print(f"Evolved heuristic:{evolved_heuristic_file}; average_advantage: {average_advantage}")
                             total_heuristic_files.append((evolved_heuristic_file, average_advantage))
                         else:
-                            print("Time cost exceeds.")
+                            print("Get error.")
         return filtered_heuristic_files
  
     def perturbation(
@@ -118,15 +118,102 @@ class HeuristicEvolver:
 
         # Generate positive result by perturbation heuristic
         positive_result_file = None
+        best = negative_value
         for _ in range(perturbation_time):
             env.reset(f"{basic_heuristic}.positive")
             hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, perturbation_ratio, problem=self.problem)
             hyper_heuristic.run(env)
-            if env.compare(env.key_value, negative_value) > 0:
+            if env.compare(env.key_value, best) > 0:
+                best = env.key_value
                 env.dump_result(dump_trajectory=True)
                 positive_result_file = os.path.join(env.output_dir, "result.txt")
-                break
         return negative_result_file, positive_result_file
+
+    def generate_suggestion(
+            self,
+            env: BaseEnv,
+            negative_trajectory_df: pd.DataFrame,
+            negative_value: float,
+            heuristic: callable,
+            prompt_dict: dict
+    ) -> str:
+        # Analysis solution difference 
+        self.gpt_helper.load("compare_solution", prompt_dict)
+        response = self.gpt_helper.chat()
+        solution_difference = extract(response, key="solution_difference", sep="\n")
+        prompt_dict["solution_difference"] = solution_difference
+
+        # Decompose solution
+        self.gpt_helper.load("decompose_solution", prompt_dict)
+        response = self.gpt_helper.chat()
+        operation_analysis = extract(response, key="operation_analysis", sep="\n")
+        prompt_dict["operation_analysis"] = "\n".join(operation_analysis)
+
+        # Identify bottleneck operations
+        self.gpt_helper.load("identify_bottleneck", prompt_dict)
+        response = self.gpt_helper.chat()
+        bottleneck_operations = extract(response, key="bottleneck_operations", sep="\n")
+        self.gpt_helper.dump("bottleneck_operations")
+
+        suggestions = ""
+        for index, bottleneck_operation_analysis in enumerate(bottleneck_operations):
+            bottleneck_operation_id = int(re.search(r'\d+', bottleneck_operation_analysis.split(";")[0]).group())
+            bottleneck_operation = list(negative_trajectory_df[negative_trajectory_df["operation_id"] == bottleneck_operation_id]["operator(parameter)"])[0]
+            prompt_dict["bottleneck_operation_id"] = bottleneck_operation_id
+            prompt_dict["bottleneck_operation"] = bottleneck_operation
+
+            # Reproduce the environment before bottleneck operation
+            env.reset()
+            for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator(parameter)"]:
+                env.run_operator(eval(previous_operation))
+            prompt_dict["state_data"] = filter_dict_to_str(env.state_data)
+
+            # Propose another operation
+            self.gpt_helper.load_chat("bottleneck_operations")
+            self.gpt_helper.load("propose_operation", prompt_dict)
+            response = self.gpt_helper.chat()
+            propose_analysis = extract(response, key="propose")
+            if propose_analysis is None:
+                continue
+            proposed_operation = propose_analysis.split("proposed_operation:")[-1].split(":")[0].strip().split('\n')[0].split('.')[0]
+            calculation_process = propose_analysis.split(":")[-1].split("mathematical_analysis:")[0].strip()
+            mathematical_analysis = propose_analysis.split("mathematical_analysis:")[-1].split("application_scope:")[0].strip()
+            application_scope = propose_analysis.split("application_scope:")[-1].strip()
+            prompt_dict["proposed_operation"] = proposed_operation
+            prompt_dict["calculation_process"] = calculation_process
+            prompt_dict["other_introduction"] = f"mathematical_analysis: {mathematical_analysis}"
+            prompt_dict["application_scope"] = application_scope
+
+            # Verify the proposed operation
+            env.run_operator(eval(proposed_operation))
+            heuristic_work = True
+            while not env.is_complete_solution or heuristic_work:
+                heuristic_work = env.run_heuristic(heuristic)
+            proposed_result = env.dump_result(dump_trajectory=True)
+            proposed_result = parse_text_to_dict(proposed_result)
+            prompt_dict["proposed_solution"] = proposed_result["current_solution"]
+            prompt_dict["proposed_result"] = proposed_result[env.key_item]
+            prompt_dict["proposed_trajectory"] = proposed_result["trajectory"]
+
+            # Extract rule if proposed result is better than negative result
+            if env.compare(env.key_value, negative_value) > 0:
+                self.gpt_helper.load("extract_suggestion", prompt_dict)
+                response = self.gpt_helper.chat()
+                suggestion = extract(response, "suggestion")
+                suggestions += f"suggestion {index}:\n" + suggestion.strip() + "\n"
+            else:
+                self.gpt_helper.load("Your suggestion does not work well and we skip.\n")
+                self.gpt_helper.chat()
+
+            self.gpt_helper.dump(f"suggestion_{index}")
+
+        if suggestions != "":
+            # Sort suggestion
+            self.gpt_helper.load("sort_suggestion", prompt_dict)
+            response = self.gpt_helper.chat()
+            suggestions = extract(response, "code_suggestion")
+            return suggestions
+        return None
 
     def comparison(
             self,
@@ -187,93 +274,21 @@ class HeuristicEvolver:
         prompt_dict["heuristic_name"] = heuristic_name
         prompt_dict["global_data"] = filter_dict_to_str(env.global_data)
 
-        # Analysis solution difference 
-        self.gpt_helper.load("compare_solution", prompt_dict)
-        response = self.gpt_helper.chat()
-        solution_difference = extract(response, key="solution_difference", sep="\n")
-        prompt_dict["solution_difference"] = solution_difference
+        # Generate suggestion
+        suggestion = self.generate_suggestion(env, negative_trajectory_df, negative_value, heuristic, prompt_dict)
 
-        # Decompose solution
-        self.gpt_helper.load("decompose_solution", prompt_dict)
-        response = self.gpt_helper.chat()
-        operation_analysis = extract(response, key="operation_analysis", sep="\n")
-        prompt_dict["operation_analysis"] = "\n".join(operation_analysis)
-
-        # Identify bottleneck operations
-        self.gpt_helper.load("identify_bottleneck", prompt_dict)
-        response = self.gpt_helper.chat()
-        bottleneck_operations = extract(response, key="bottleneck_operations", sep="\n")
-        self.gpt_helper.dump("bottleneck_operations")
-
-        prompt_dict["suggestions"] = ""
-        for index, bottleneck_operation_analysis in enumerate(bottleneck_operations):
-            bottleneck_operation_id = int(re.search(r'\d+', bottleneck_operation_analysis.split(";")[0]).group())
-            bottleneck_operation = list(negative_trajectory_df[negative_trajectory_df["operation_id"] == bottleneck_operation_id]["operator(parameter)"])[0]
-            prompt_dict["bottleneck_operation_id"] = bottleneck_operation_id
-            prompt_dict["bottleneck_operation"] = bottleneck_operation
-
-            # Reproduce the environment before bottleneck operation
-            env.reset()
-            for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator(parameter)"]:
-                env.run_operator(eval(previous_operation))
-            prompt_dict["state_data"] = filter_dict_to_str(env.state_data)
-
-            # Propose another operation
-            self.gpt_helper.load("propose_operation", prompt_dict)
-            response = self.gpt_helper.chat()
-            propose_analysis = extract(response, key="propose")
-            if propose_analysis is None:
-                continue
-            proposed_operation = propose_analysis.split("proposed_operation:")[-1].split(":")[0].strip().split('\n')[0].split('.')[0]
-            calculation_process = propose_analysis.split(":")[-1].split("mathematical_analysis:")[0].strip()
-            mathematical_analysis = propose_analysis.split("mathematical_analysis:")[-1].split("application_scope:")[0].strip()
-            application_scope = propose_analysis.split("application_scope:")[-1].strip()
-            prompt_dict["proposed_operation"] = proposed_operation
-            prompt_dict["calculation_process"] = calculation_process
-            prompt_dict["other_introduction"] = f"mathematical_analysis: {mathematical_analysis}"
-            prompt_dict["application_scope"] = application_scope
-
-            # Verify the proposed operation
-            env.run_operator(eval(proposed_operation))
-            heuristic_work = True
-            while not env.is_complete_solution or heuristic_work:
-                heuristic_work = env.run_heuristic(heuristic)
-            proposed_result = env.dump_result(dump_trajectory=True)
-            proposed_result = parse_text_to_dict(proposed_result)
-            prompt_dict["proposed_solution"] = proposed_result["current_solution"]
-            prompt_dict["proposed_result"] = proposed_result[env.key_item]
-            prompt_dict["proposed_trajectory"] = proposed_result["trajectory"]
-
-            # Extract rule if proposed result is better than negative result
-            if env.compare(env.key_value, negative_value) > 0:
-                self.gpt_helper.load("extract_suggestion", prompt_dict)
-                response = self.gpt_helper.chat()
-                suggestion = extract(response, "suggestion")
-                prompt_dict["suggestions"] += f"suggestion {index}:\n" + suggestion.strip() + "\n"
-            else:
-                self.gpt_helper.load("Your suggestion does not work well and we skip.\n")
-                self.gpt_helper.chat()
-
-            self.gpt_helper.dump(f"suggestion_{index}")
-
-        if prompt_dict["suggestions"] != "":
-            # Sort suggestion
-            self.gpt_helper.load("sort_suggestion", prompt_dict)
-            response = self.gpt_helper.chat()
-            code_suggestion = extract(response, "code_suggestion")
-
+        if suggestion:
             # Implement the new code
-            description = f"Now, based on these suggestions:\n{code_suggestion}\nUpdate the nearest_neighbor_f91d."
+            description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the nearest_neighbor_f91d."
             output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, smoke_test)
             return output_heuristic_file
         return None
 
-    def validation(self, validation_dir: str, heuristic_file: str, time_limitation: float=10, validation: bool=True) -> list[float, float]:
+    def validation(self, validation_dir: str, heuristic_file: str, time_limitation: float=None, validation: bool=True) -> list[float, float]:
         validation_results = []
-        heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
         for data_name in os.listdir(validation_dir):
             env = Env(data_name=os.path.join(validation_dir, data_name))
-            env.reset(heuristic_name)
+            env.reset()
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
             is_complete_solution = hyper_heuristic.run(env, time_limitation, validation=validation)
             if is_complete_solution:

@@ -195,15 +195,12 @@ class HeuristicGenerator:
         # Review heuristic and describe the intermediate mathematical processes
         self.gpt_helper.load("detailed_heuristic_design", {"heuristic_name": heuristic_name, "description": description})
         response = self.gpt_helper.chat()
-        review_result = extract(response, "mathematical_analysis", "\n")
-        assert review_result[0].split(":")[0] == "mathematical_description"
+        detailed_design = extract(response, "detailed_design")
 
-        # Check feasible and add mathematical description
-        mathematical_description = review_result[0].split(":")[1].strip()
-        if mathematical_description == "None":
+        if not detailed_design:
             self.gpt_helper.dump(f"{function_name}_abandoned")
             return
-        description += f"\nmathematical_description: {mathematical_description}"
+        description += f"\ndetailed_design: {detailed_design}"
 
         # Generate function name
         function_name = sanitize_function_name(heuristic_name, description)

@@ -11,10 +11,7 @@ Now let's consider the logic for {heuristic_name}: {description}
 This involves evaluating whether the algorithm's intrinsic logic can be expressed within our Solution, and Operator constructs without necessitating further data or operator types.
 
 The response format is very important. For better communication, please respond to me in this format:
-***mathematical_analysis:
-mathematical_description: xxx (Replace "xxx" with a formal mathematical representation of the algorithm. If the heuristic is deemed infeasible for implementation, assign "None")
-reasonable_input: yes/we need xxx inputs(provide the new inputs description and reason here)
-reasonable_output: yes/we need xxx operator(provide the new operator description and reason here)
+***detailed_design: describe in a formal mathematical representation of the algorithm. If the heuristic is deemed infeasible for implementation, assign "None".
 ***
 Ensure there is no other content inside the ***, and analysis outside *** are welcome.
 If you have no information to provide, simply respond with ***None***.

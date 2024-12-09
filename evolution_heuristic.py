@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 from src.pipeline.heuristic_evolver import HeuristicEvolver
 from src.util.gpt_helper import GPTHelper
 from src.util.util import search_file
@@ -17,7 +18,7 @@ def parse_arguments():
     parser.add_argument("-pt", "--perturbation_time", type=float, default=1000, help="Maximum number of perturbation times.")
     parser.add_argument("-f", "--filter_num", type=int, default=1, help="Number of heuristics to keep after each validation.")
     parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Number of evolution rounds.")
-    parser.add_argument("-l", "--time_limit", type=int, default=10, help="Time limit for running.")
+    parser.add_argument("-l", "--time_limit", type=int, default=None, help="Time limit for running.")
     parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
 
     return parser.parse_args()
@@ -40,8 +41,16 @@ def main():
         validation_dir = args.train_dir
     if not basic_heuristic_file.endswith(".py"):
         basic_heuristic_file += ".py"
-    if not perturbation_heuristic_file.endswith(".py"):
-        perturbation_heuristic_file += ".py"
+    basic_heuristic_file = search_file(basic_heuristic_file, problem)
+    if perturbation_heuristic_file is None:
+        perturbation_heuristic_file = [file_name for file_name in os.listdir(os.path.dirname(basic_heuristic_file)) if re.match( r"random_....\.py", file_name)]
+        if perturbation_heuristic_file == []:
+            raise Exception("No perturbation heuristics")
+        perturbation_heuristic_file = os.path.join(os.path.dirname(basic_heuristic_file), perturbation_heuristic_file[0])
+    else:
+        if not perturbation_heuristic_file.endswith(".py"):
+            perturbation_heuristic_file += ".py"
+        perturbation_heuristic_file = search_file(perturbation_heuristic_file, problem)
 
     gpt_helper = GPTHelper(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
     gpt_evolver = HeuristicEvolver(gpt_helper, problem, train_dir, validation_dir)
