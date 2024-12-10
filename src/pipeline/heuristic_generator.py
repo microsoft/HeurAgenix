@@ -192,16 +192,6 @@ class HeuristicGenerator:
         if os.path.exists(special_remind_file):
             special_remind = open(special_remind_file).read()
 
-        # Review heuristic and describe the intermediate mathematical processes
-        self.gpt_helper.load("detailed_heuristic_design", {"heuristic_name": heuristic_name, "description": description})
-        response = self.gpt_helper.chat()
-        detailed_design = extract(response, "detailed_design")
-
-        if not detailed_design:
-            self.gpt_helper.dump(f"{function_name}_abandoned")
-            return
-        description += f"\ndetailed_design: {detailed_design}"
-
         # Generate function name
         function_name = sanitize_function_name(heuristic_name, description)
         prompt_dict = {"problem": self.problem, "heuristic_name": heuristic_name, "description": description, "function_name": function_name, "special_remind": special_remind}
