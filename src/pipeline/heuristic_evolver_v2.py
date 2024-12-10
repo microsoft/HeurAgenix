@@ -11,7 +11,7 @@ from src.problems.base.env import BaseEnv
 from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
-from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
+from src.util.util import extract, filter_dict_to_str, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
 from src.util.gpt_helper import GPTHelper
 
 class HeuristicEvolver:
@@ -41,6 +41,13 @@ class HeuristicEvolver:
             smoke_test: bool=True,
             validation: bool=True,
         ) -> None:
+
+        # Prepare other heuristics' description for this evolution
+        heuristic_dir = os.path.dirname(basic_heuristic_file)
+        all_heuristic_docs = "\n".join([
+            extract_function_with_short_docstring(open(os.path.join(heuristic_dir, heuristic_file)).read(), heuristic_file.split(".")[0])
+            for heuristic_file in os.listdir(heuristic_dir)
+        ])
         # Getting baseline for basic heuristic
         print(f"Getting baselines for {basic_heuristic_file}")
         baselines = self.validation(self.validation_dir, basic_heuristic_file, validation=validation)
@@ -64,15 +71,16 @@ class HeuristicEvolver:
                     )
 
                     # Evolution
-                    evolved_heuristic_file = None
+                    evolved_heuristic_files = []
                     if positive_result_file:
                         print(f"Evolution {basic_heuristic} on {data_name}")
                         try:
-                            evolved_heuristic_file = self.comparison(
+                            evolved_heuristic_files = self.comparison(
                                 env,
                                 positive_result_file,
                                 negative_result_file,
                                 basic_heuristic_file,
+                                all_heuristic_docs,
                                 os.path.join("output", self.problem, "train_result", data_name, f"{basic_heuristic}.evolution"),
                                 smoke_test
                             )
@@ -84,18 +92,19 @@ class HeuristicEvolver:
                             continue
                 
                     # validation
-                    if evolved_heuristic_file:
-                        print(f"Validation on {evolved_heuristic_file}")
-                        validation_values = self.validation(self.validation_dir, evolved_heuristic_file, time_limitation, True)
-                        if validation_values:
-                            average_advantage = 0
-                            for index in range(len(validation_values)):
-                                average_advantage += env.compare(validation_values[index], baselines[index]) / baselines[index]
-                            average_advantage /= len(validation_values)
-                            print(f"Evolved heuristic:{evolved_heuristic_file}; average_advantage: {average_advantage}")
-                            total_heuristic_files.append((evolved_heuristic_file, average_advantage))
-                        else:
-                            print("Time cost exceeds.")
+                    if len(evolved_heuristic_files) > 0:
+                        for evolved_heuristic_file in evolved_heuristic_files:
+                            print(f"Validation on {evolved_heuristic_file}")
+                            validation_values = self.validation(self.validation_dir, evolved_heuristic_file, time_limitation, True)
+                            if validation_values:
+                                average_advantage = 0
+                                for index in range(len(validation_values)):
+                                    average_advantage += env.compare(validation_values[index], baselines[index]) / baselines[index]
+                                average_advantage /= len(validation_values)
+                                print(f"Evolved heuristic:{evolved_heuristic_file}; average_advantage: {average_advantage}")
+                                total_heuristic_files.append((evolved_heuristic_file, average_advantage))
+                            else:
+                                print(f"Abandon {evolved_heuristic_file}")
         return filtered_heuristic_files
  
     def perturbation(
@@ -134,11 +143,13 @@ class HeuristicEvolver:
             positive_result_file: str,
             negative_result_file: str,
             heuristic_file: str,
+            all_heuristic_docs: str,
             output_dir: str,
             smoke_test: bool=True,
-        ) -> str:
+        ) -> list[str]:
         env.reset()
         self.gpt_helper.reset(output_dir)
+        output_heuristic_files = []
         
         shutil.copyfile(positive_result_file, os.path.join(output_dir, "positive_solution.txt"))
         shutil.copyfile(negative_result_file, os.path.join(output_dir, "negative_solution.txt"))
@@ -149,6 +160,7 @@ class HeuristicEvolver:
 
         # Load background
         prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict["all_heuristic_docs"] = all_heuristic_docs
 
         # Load components
         if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
@@ -159,8 +171,11 @@ class HeuristicEvolver:
         for name in names_to_import:
             globals()[name] = getattr(module, name)
 
-        # Load env data
-        prompt_dict.update(env.global_data)
+        # Load data feature
+        get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
+        get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
+        prompt_dict["global_data"] = filter_dict_to_str(env.global_data)
+        prompt_dict["global_data_feature"] = filter_dict_to_str(get_global_data_feature_function(env.global_data))
 
         # Load solution
         positive_result = parse_text_to_dict(open(positive_result_file).read())
@@ -172,101 +187,49 @@ class HeuristicEvolver:
         prompt_dict["positive_trajectory"] = positive_result["trajectory"]
         prompt_dict["negative_trajectory"] = negative_result["trajectory"]
         negative_trajectory_df = pd.read_csv(StringIO(negative_result["trajectory"]), sep="\t")
-        negative_value = float(negative_result[env.key_item])
 
-        # Load heuristic
+        # Load heuristic code
         heuristic_file = search_file(heuristic_file, problem=self.problem)
-        heuristic = load_heuristic(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
         function_code = open(heuristic_file).read()
-        function_introduction = extract_function_with_short_docstring(function_code, function_name)
         heuristic_name = function_name[:-5]
         prompt_dict["function_name"] = function_name
         prompt_dict["function_code"] = function_code
-        prompt_dict["function_introduction"] = function_introduction
         prompt_dict["heuristic_name"] = heuristic_name
-        prompt_dict["global_data"] = filter_dict_to_str(env.global_data)
-
-        # Analysis solution difference 
-        self.gpt_helper.load("compare_solution", prompt_dict)
-        response = self.gpt_helper.chat()
-        solution_difference = extract(response, key="solution_difference", sep="\n")
-        prompt_dict["solution_difference"] = solution_difference
-
-        # Decompose solution
-        self.gpt_helper.load("decompose_solution", prompt_dict)
-        response = self.gpt_helper.chat()
-        operation_analysis = extract(response, key="operation_analysis", sep="\n")
-        prompt_dict["operation_analysis"] = "\n".join(operation_analysis)
 
         # Identify bottleneck operations
-        self.gpt_helper.load("identify_bottleneck", prompt_dict)
+        self.gpt_helper.load("identify_bottleneck_v2", prompt_dict)
         response = self.gpt_helper.chat()
         bottleneck_operations = extract(response, key="bottleneck_operations", sep="\n")
         self.gpt_helper.dump("bottleneck_operations")
 
-        prompt_dict["suggestions"] = ""
         for index, bottleneck_operation_analysis in enumerate(bottleneck_operations):
-            bottleneck_operation_id = int(re.search(r'\d+', bottleneck_operation_analysis.split(";")[0]).group())
+            self.gpt_helper.load_chat("bottleneck_operations")
+            # Reproduce the state before bottleneck
+            bottleneck_operation_id, proposed_operation, reason = bottleneck_operation_analysis.split(";")
+            bottleneck_operation_id = int(re.search(r'\d+', bottleneck_operation_id).group())
             bottleneck_operation = list(negative_trajectory_df[negative_trajectory_df["operation_id"] == bottleneck_operation_id]["operator(parameter)"])[0]
             prompt_dict["bottleneck_operation_id"] = bottleneck_operation_id
             prompt_dict["bottleneck_operation"] = bottleneck_operation
-
-            # Reproduce the environment before bottleneck operation
+            prompt_dict["proposed_operation"] = proposed_operation
             env.reset()
             for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator(parameter)"]:
                 env.run_operator(eval(previous_operation))
             prompt_dict["state_data"] = filter_dict_to_str(env.state_data)
+            prompt_dict["state_data_feature"] = filter_dict_to_str(get_state_data_feature_function(env.global_data, env.state_data))
 
-            # Propose another operation
-            self.gpt_helper.load("propose_operation", prompt_dict)
+            # Try to provide suggestion
+            self.gpt_helper.load("extract_suggestion_v2", prompt_dict)
             response = self.gpt_helper.chat()
-            propose_analysis = extract(response, key="propose")
-            if propose_analysis is None:
+            suggestion = extract(response, key="suggestion")
+            if suggestion is None:
                 continue
-            proposed_operation = propose_analysis.split("proposed_operation:")[-1].split(":")[0].strip().split('\n')[0].split('.')[0]
-            calculation_process = propose_analysis.split(":")[-1].split("mathematical_analysis:")[0].strip()
-            mathematical_analysis = propose_analysis.split("mathematical_analysis:")[-1].split("application_scope:")[0].strip()
-            application_scope = propose_analysis.split("application_scope:")[-1].strip()
-            prompt_dict["proposed_operation"] = proposed_operation
-            prompt_dict["calculation_process"] = calculation_process
-            prompt_dict["other_introduction"] = f"mathematical_analysis: {mathematical_analysis}"
-            prompt_dict["application_scope"] = application_scope
-
-            # Verify the proposed operation
-            env.run_operator(eval(proposed_operation))
-            heuristic_work = True
-            while not env.is_complete_solution or heuristic_work:
-                heuristic_work = env.run_heuristic(heuristic)
-            proposed_result = env.dump_result(dump_trajectory=True)
-            proposed_result = parse_text_to_dict(proposed_result)
-            prompt_dict["proposed_solution"] = proposed_result["current_solution"]
-            prompt_dict["proposed_result"] = proposed_result[env.key_item]
-            prompt_dict["proposed_trajectory"] = proposed_result["trajectory"]
-
-            # Extract rule if proposed result is better than negative result
-            if env.compare(env.key_value, negative_value) > 0:
-                self.gpt_helper.load("extract_suggestion", prompt_dict)
-                response = self.gpt_helper.chat()
-                suggestion = extract(response, "suggestion")
-                prompt_dict["suggestions"] += f"suggestion {index}:\n" + suggestion.strip() + "\n"
-            else:
-                self.gpt_helper.load("Your suggestion does not work well and we skip.\n")
-                self.gpt_helper.chat()
-
             self.gpt_helper.dump(f"suggestion_{index}")
-
-        if prompt_dict["suggestions"] != "":
-            # Sort suggestion
-            self.gpt_helper.load("sort_suggestion", prompt_dict)
-            response = self.gpt_helper.chat()
-            code_suggestion = extract(response, "code_suggestion")
-
             # Implement the new code
-            description = f"Now, based on these suggestions:\n{code_suggestion}\nUpdate the nearest_neighbor_f91d."
+            description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the nearest_neighbor_f91d."
             output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, smoke_test)
-            return output_heuristic_file
-        return None
+            output_heuristic_files.append(output_heuristic_file)
+        return output_heuristic_files
 
     def validation(self, validation_dir: str, heuristic_file: str, time_limitation: float=10, validation: bool=True) -> list[float, float]:
         validation_results = []

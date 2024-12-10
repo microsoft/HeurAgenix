@@ -1,7 +1,7 @@
 import argparse
 import os
 import re
-from src.pipeline.heuristic_evolver import HeuristicEvolver
+from src.pipeline.heuristic_evolver_v2 import HeuristicEvolver
 from src.util.gpt_helper import GPTHelper
 from src.util.util import search_file
 
