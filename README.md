@@ -98,7 +98,7 @@ python evolution_heuristic.py -p <problem> -be <basic_heuristic> [-t <train_dir>
 
 Parameters:
 - `-p`, `--problem`: Specifies the CO problem type to solve (required).
-- `-be`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
+- `-e`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
 - `-t`, `--train_dir`: Directory for training data.
 - `-v`, `--validation_dir`: Directory for validation data.
 - `-pe`, `--perturbation_heuristic`: Path or name of the heuristic used for perturbations.
@@ -114,7 +114,7 @@ The evolved heuristics are saved in the `output/{problem}/train_result` folder.
 ####  Example
 To evolve heuristics for a Traveling Salesman Problem (TSP) using a basic heuristic with smoke test:
 ```bash
-python evolution_heuristic.py -p TSP -b nearest_neighbor -m
+python evolution_heuristic.py -p TSP -e nearest_neighbor_f91d -m
 ```
 
 ### Generate Feature Extractors

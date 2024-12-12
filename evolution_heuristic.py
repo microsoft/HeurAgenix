@@ -10,7 +10,7 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Evolve heuristic")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
-    parser.add_argument("-be", "--basic_heuristic", type=str, required=True, help="Name or path of the basic heuristic.")
+    parser.add_argument("-e", "--basic_heuristic", type=str, required=True, help="Name or path of the basic heuristic.")
     parser.add_argument("-t", "--train_dir", type=str, default="train_data", help="Directory for the training dataset.")
     parser.add_argument("-v", "--validation_dir", type=str, default="validation_data", help="Directory for the validation dataset.")
     parser.add_argument("-pe", "--perturbation_heuristic", type=str, default=None, help="Name or path of the perturbation heuristic.")
