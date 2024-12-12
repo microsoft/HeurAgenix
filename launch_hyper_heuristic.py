@@ -28,7 +28,7 @@ def main():
     heuristic = args.heuristic
     heuristic_dir = args.heuristic_dir
     test_case = args.test_case
-    test_dir = args.test_dir if test_case is None else [test_case] 
+    test_cases = os.listdir(args.test_dir) if test_case is None else [test_case] 
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{datetime_str}"
 
@@ -38,7 +38,7 @@ def main():
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
 
-    for test_case in test_dir:
+    for test_case in test_cases:
         env = Env(data_name=test_case)
         env.reset(output_dir)
 
