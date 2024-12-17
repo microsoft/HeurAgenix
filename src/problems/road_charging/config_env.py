@@ -226,7 +226,7 @@ def change_initial_SoC(config, n_instances, save_path,
 
 if __name__ == "__main__":
 
-    data_path = "C://Users//zhangling//OneDrive - Microsoft//6 GitHub//on-road-charging//raw_data//"
+    data_path = "C://Users//zhangling//OneDrive - Microsoft//6 GitHub//on-road-charging//env_data//"
     save_path = "C://Users//zhangling//OneDrive - Microsoft//6 GitHub//on-road-charging//configuration//"
     
     # Stage 1: Focus on default scenario
