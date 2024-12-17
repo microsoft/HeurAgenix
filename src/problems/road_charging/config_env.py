@@ -155,11 +155,11 @@ def generate_rt_data(config, n_instances, rt_scenario):
         with open(save_path + f"config_{rt_scenario}_instance_{i+1}.json", "w") as json_file:
             json.dump(config, json_file, indent=4)
         
-        plt.figure()
-        for i, vehicle_data in enumerate(random_data_instance):
-            plt.plot(range(max_time_steps), vehicle_data, marker='o', label=f"Vehicle {i+1}")
+        # plt.figure()
+        # for i, vehicle_data in enumerate(random_data_instance):
+        #     plt.plot(range(max_time_steps), vehicle_data, marker='o', label=f"Vehicle {i+1}")
             
-        plt.show()
+        # plt.show()
         
     return config
 
