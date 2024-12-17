@@ -23,9 +23,9 @@ class Env(MDPEnv):
             "max_time_steps": self.gym_env.k,
             "total_chargers": self.gym_env.m,
             "max_cap": self.gym_env.max_cap,
-            "consume_rate": self.gym_env.consume_rate,
-            "charging_rate": self.gym_env.charger_speed,
-            "assign_prob": self.gym_env.assign_prob,
+            "consume_rate": self.gym_env.d_rate,
+            "charging_rate": self.gym_env.c_rate,
+            "assign_prob": self.gym_env.rho,
             "order_price": self.gym_env.w,
             "charging_price": self.gym_env.p,
             "initial_charging_cost": self.gym_env.h
