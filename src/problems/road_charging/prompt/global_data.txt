@@ -6,6 +6,6 @@ global_data (dict): The global data dict containing the global instance data wit
     - "consume_rate" (list[float]): Battery consumption rate (as a percentage) per time step for each vehicle in the fleet. Length is fleet_size.
     - "charging_rate" (list[float]): Battery charging rate (as a percentage) per time step for each vehicle in the fleet. Length is fleet_size.
     - "assign_prob" (float): Probability of receiving a ride order when the vehicle is in idle status.
-    - "order_price" （list[float]: Payments (in dollars) received per time step when a vehicle is on a ride. The payment is assumed to be the same for all vehicles. The length of the list is max_time_steps.
+    - "order_price" (list[float]): Payments (in dollars) received per time step when a vehicle is on a ride. The payment is assumed to be the same for all vehicles. The length of the list is max_time_steps.
     - "charging_price" (list[float]): Charging price in dollars per kilowatt-hour ($/kWh) at each time step. The price is assumed to be the same for all vehicles. The length of the list is max_time_steps.
     - "initial_charging_cost" (float): Cost (in dollars) incurred for the first connection to a charger.

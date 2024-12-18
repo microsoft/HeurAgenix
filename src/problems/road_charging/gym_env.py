@@ -124,6 +124,7 @@ class RoadCharging(Env):
         # Save the summary to a text file
         with open(self.save_path+"environment_summary.txt", "w") as file:
             file.write(summary_str)
+        return summary_str
 
 
     def get_action_meanings(self):
@@ -432,7 +433,7 @@ class ConstrainAction(gym.ActionWrapper):
 
 def main():
 
-    data_file = "C://Users//zhangling//OneDrive - Microsoft//6 GitHub//on-road-charging//configuration//"
+    data_file = "D://ORLLM//repo//road_charging//output//road_charging//data//test_data//configuration//"
 
     env = ConstrainAction(RoadCharging(data_file+"config_default_instance_1.json"))
 
