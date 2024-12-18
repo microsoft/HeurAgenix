@@ -8,9 +8,9 @@ class SingleHyperHeuristic:
     def __init__(
         self,
         heuristic_file: str,
-        problem: str="tsp",
+        problem: str,
     ) -> None:
-        self.heuristic = load_heuristic(heuristic_file, heuristic_dir=os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
+        self.heuristic = load_heuristic(heuristic_file, problem=problem)
 
     def run(self, env:BaseEnv, time_limitation: float=10, **kwargs) -> bool:
         heuristic_work = BaseOperator()

@@ -11,8 +11,8 @@ class SingleConstructiveSingleImproveHyperHeuristic:
         improve_heuristic_file: str,
         problem: str="tsp"
     ) -> None:
-        self.constructive_heuristic = load_heuristic(constructive_heuristic_file, heuristic_dir=os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
-        self.improve_heuristic = load_heuristic(improve_heuristic_file, heuristic_dir=os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
+        self.constructive_heuristic = load_heuristic(constructive_heuristic_file, problem=problem)
+        self.improve_heuristic = load_heuristic(improve_heuristic_file, problem=problem)
 
     def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
         max_steps = max_steps if max_steps is not None else env.construction_steps * 2

@@ -1,7 +1,7 @@
 import os
 import importlib
 import traceback
-from src.util.util import extract, load_heuristic
+from src.util.util import extract, load_heuristic, search_file
 from src.util.gpt_helper import GPTHelper
 
 
@@ -69,7 +69,7 @@ class EvaluationFunctionGenerator:
 
     def smoke_test(self, global_data_feature_code: str, state_data_feature_code: str) -> str:
         # Load smoke data
-        smoke_data_dir = os.path.join("src", "problems", self.problem, "data", "smoke_data")
+        smoke_data_dir = search_file("smoke_data", problem=self.problem)
         previous_operations = []
         if os.path.exists(os.path.join(smoke_data_dir, "previous_operations.txt")):
             previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
@@ -92,7 +92,7 @@ class EvaluationFunctionGenerator:
             env.run_operator(eval(previous_operation.strip()))
         try:
             # Load global data feature extractor and run
-            global_data_feature_extractor = load_heuristic(global_data_feature_code, "get_global_data_feature")
+            global_data_feature_extractor = load_heuristic(global_data_feature_code, function_name="get_global_data_feature")
             global_data_feature = global_data_feature_extractor(env.global_data)
             assert global_data_feature is not None
         except Exception as e:
@@ -100,7 +100,7 @@ class EvaluationFunctionGenerator:
             return f"We got error when run get_global_data_feature:\n{error_message}. Please fix up the get_global_data_feature function in same format.", None
         try:
             # Load state data feature extractor and run
-            state_data_feature_extractor = load_heuristic(state_data_feature_code, "get_state_data_feature")
+            state_data_feature_extractor = load_heuristic(state_data_feature_code, function_name="get_state_data_feature")
             state_data_feature = state_data_feature_extractor(env.global_data, env.state_data)
             assert state_data_feature is not None
         except Exception as e:

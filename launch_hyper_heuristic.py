@@ -55,7 +55,7 @@ def main():
             globals()["ORSolver"] = getattr(module, "ORSolver")
             hyper_heuristic = ORSolver(problem=problem)
         else:
-            hyper_heuristic = SingleHyperHeuristic(os.path.join(heuristic_dir, heuristic), problem=problem)
+            hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
 
         validation_result = hyper_heuristic.run(env)
         if validation_result:

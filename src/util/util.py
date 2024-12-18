@@ -49,17 +49,14 @@ def parse_text_to_dict(text):
         result[current_key] = "\n".join(current_content).strip()
     return result
 
-def load_heuristic(heuristic_file:str, heuristic_dir: str=None, function_name: str=None) -> callable:
+def load_heuristic(heuristic_file:str, problem: str="base", function_name: str=None) -> callable:
     if not "\n" in heuristic_file:
-        if heuristic_file[-3:] != ".py":
+        if not heuristic_file.endswith(".py"):
             # Heuristic name
             heuristic_file += ".py"
-        if os.path.exists(heuristic_file):
-            # Heuristic path
-            heuristic_code = open(heuristic_file, "r").read()
-        else:
-            # Heuristic file
-            heuristic_code = open(os.path.join(heuristic_dir, heuristic_file), "r").read()
+        heuristic_path = search_file(heuristic_file, problem)
+        assert heuristic_path is not None
+        heuristic_code = open(heuristic_path, "r").read()
     else:
         # Heuristic code
         heuristic_code = heuristic_file
@@ -189,6 +186,22 @@ def replace_strings_in_dict(source_dict: dict, replace_value: str="...") -> dict
         elif isinstance(source_dict[key], dict):
             source_dict[key] = replace_strings_in_dict(source_dict[key])
     return source_dict
+
+def search_file(file_name: str, problem: str="base") -> str:
+    def find_file_in_folder(folder_path, file_name):
+        return next((os.path.join(root, file_name) for root, dirs, files in os.walk(folder_path) if file_name in files or file_name in dirs), None)
+
+    if os.path.exists(file_name):
+        return file_name
+
+    file_path = find_file_in_folder(os.path.join("src", "problems", problem), file_name)
+    if file_path:
+        return file_path
+
+    file_path = find_file_in_folder(os.path.join("output", problem), file_name)
+    if file_path:
+        return file_path
+    return None
 
 def df_to_str(df: pd.DataFrame) -> str:
     return df.to_csv(sep="\t", index=False).replace("\r\n", "\n").strip()

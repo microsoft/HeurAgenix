@@ -9,7 +9,9 @@ class Solution(BaseSolution):
         self.tour = tour
 
     def __str__(self) -> str:
-        return "tour: " + "->".join(map(str, self.tour + [self.tour[0]]))
+        if len(self.tour) > 0:
+            return "tour: " + "->".join(map(str, self.tour + [self.tour[0]]))
+        return "tour: "
 
 
 class AppendOperator(BaseOperator):
