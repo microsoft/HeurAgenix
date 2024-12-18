@@ -37,7 +37,6 @@ class RoadCharging(Env):
         self.rho = config["rho"]
         self.p = config["p"]
         self.data_path = config["data_path"]
-        self.save_path = config["save_path"]
         self.ride_time_instance = np.array(config["ride_time_instance"])
         
         self.rt_scenario = config["rt_scenario"]
@@ -48,13 +47,6 @@ class RoadCharging(Env):
         self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.rt_scenario]
         self.charging_price_24hrs = config["charging_price($/kWh)"]
         self.config = config
-        
-        # Check if the path exists, and create it if it doesn't
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
-            print(f"Directory '{self.save_path}' created.")
-        else:
-            print(f"Directory '{self.save_path}' already exists.")
 
         # Observation space: n agents, each with 4 state variables
         self.observation_shape = (self.n, 4)
@@ -117,13 +109,6 @@ class RoadCharging(Env):
             for key, value in data.items():
                 summary_str += f"  - {key}: {value}\n"
             summary_str += "\n"
-
-        # Print the summary to the console
-        print(summary_str)
-
-        # Save the summary to a text file
-        with open(self.save_path+"environment_summary.txt", "w") as file:
-            file.write(summary_str)
         return summary_str
 
 
@@ -216,10 +201,21 @@ class RoadCharging(Env):
                 self.obs["SoC"][agent_index])
     
 
+    def feasible_action(self, actions: list[int]) -> bool:
+        # If actions in feasible return True, else return str to explain why action is infeasible.
+        # if xxxxx:
+            # return f"actions[{i}] if feasible because fleet is on ride"
+        # if xxx:
+            # return f"The number of charging fleets exceed xxx"
+        return True
+
     def step(self, actions):
 
         # Assert that it is a valid action
         assert self.action_space.contains(actions), "Invalid Action"
+        feasible = self.feasible_action(actions)
+        if isinstance(feasible, str):
+            raise BaseException(feasible)
 
         current_step = self.obs["TimeStep"][0]
         # random_ride_times = self.ride_time_generator()
@@ -359,11 +355,11 @@ class RoadCharging(Env):
 
 
 class ConstrainAction(gym.ActionWrapper):
-    # def __init__(self, config_fname: str):
-    #     env = RoadCharging(config_fname)
-    #     super()._init_(env)
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, config_fname: str):
+        self.env = RoadCharging(config_fname)
+        super().__init__(self.env)
+    # def __init__(self, env):
+        # super().__init__(env)
 
     def action(self, action):
         for i in range(self.n):
@@ -391,7 +387,8 @@ class ConstrainAction(gym.ActionWrapper):
                 print('No charger available now.')
 
                 to_flip = requesting_agents
-                action[to_flip] = 0
+                for i in to_flip:
+                    action[i] = 0
 
             elif available_capacity > 0:
 

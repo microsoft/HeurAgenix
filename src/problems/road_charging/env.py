@@ -1,6 +1,8 @@
+import os
+import json
+import numpy as np
 from src.problems.base.mdp_env import MDPEnv
 from src.problems.base.mdp_components import Solution
-# from src.problems.road_charging.gym_env import ConstrainAction, RoadCharging
 from src.problems.road_charging.gym_env import RoadCharging
 
 
@@ -33,6 +35,7 @@ class Env(MDPEnv):
     
     def get_state_data(self):
         return {
+            "current_step": self.gym_env.obs["TimeStep"][0],
             "ride_lead_time": self.gym_env.obs["RideTime"],
             "charging_lead_time": self.gym_env.obs["ChargingStatus"],
             "battery_soc": self.gym_env.obs["SoC"],
@@ -43,3 +46,9 @@ class Env(MDPEnv):
 
     def validation_solution(self, solution: Solution=None) -> bool:
         return True
+
+    def dump_result(self, dump_trajectory = True):
+        output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")
+        data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.trajectories.items()}  
+        json.dump(data_converted, output_file)
+        return super().dump_result(dump_trajectory)
