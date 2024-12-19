@@ -85,9 +85,7 @@ def config(data_path, save_path, rt_instances, rt_scenario="default"):
         "rt_bin_edges": rt_bin_edges,
         "w": w.tolist(),
         "rho": rho.tolist(),
-        "p": p.tolist(),
-        "data_path": data_path,
-        "save_path": save_path,
+        "p": p.tolist()
         }
     
     # save config file
