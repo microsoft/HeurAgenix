@@ -211,12 +211,12 @@ class RoadCharging(Env):
 			state_t = self.get_agent_state(i)
 			action_t = actions[i]
 			
-			if state_t[0] >= 2:
+			if state_t[1] >= 2:
 				assert action_t == 0, (
 				f"Agent {i}: Action must be 0 if ride leading time >= 2."
 			)
 			
-			if state_t[2] >= 1.:
+			if state_t[3] >= 1.:
 				assert action_t == 0, (
 					f"Agent {i}: Continuing to charge would exceed battery capacity."
 				)
