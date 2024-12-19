@@ -36,7 +36,6 @@ class RoadCharging(Env):
 		self.w = config["w"]
 		self.rho = config["rho"]
 		self.p = config["p"]
-		self.data_path = config["data_path"]
 		self.ride_time_instance = np.array(config["ride_time_instance"])
 		
 		self.rt_scenario = config["rt_scenario"]
