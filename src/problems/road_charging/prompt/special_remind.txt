@@ -1,4 +1,6 @@
 1. For the circumstances that algorithm return empty operator, please return Action with all 0, not None.
-2. For the fleet that on ride, it means for fleet i, if ride_lead_time[i] == 1, actions[i] can not be 1.
-3. The number of charges cannot exceed the number of total chargers, it means, sum(action) <= global["total_chargers"].
-4. Please do not modify the past actions since it is already happened.
+2. Please do not modify the past actions since it is already happened.
+3. For any fleet that on ride where `ride_lead_time[i] >= 2`, the action `actions[i]` must be 0, meaning the vehicle cannot charge while completing a ride.       
+4. The sum of actions must not exceed the total number of chargers available, i.e., `sum(actions) <= global_data["total_chargers"]`.
+5. Vehicles that are fully charged (`battery_soc[i] >= 1`) should not be scheduled for charging again, so `actions[i]` must be 0 for such vehicles.
+These are hard constraints and please double check when generation heuristic.
