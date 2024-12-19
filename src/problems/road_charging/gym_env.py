@@ -245,7 +245,7 @@ class RoadCharging(Env):
 			action = actions[i]
 			random_ride_times = self.ride_time_instance[i, t]
 
-			next_SoC = SoC + ct * self.c_rate[i] + (1-ct) * (-self.d_rate[i])
+			next_SoC = SoC + action * self.c_rate[i] + (1-action) * (-self.d_rate[i])
 
 			if action == 0:
 				if SoC <= self.low_SoC:
@@ -270,7 +270,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("about to finish ride, start charging.")
 					next_state = (0, 1, next_SoC)
-					reward = -self.h - self.p[t] * min(self.c_r[i], 1-SoC)
+					reward = -self.h - self.p[t] * np.minimum(self.c_r[i], (1-SoC)*self.max_cap)
 			   
 
 			elif rt == 0 and ct > 0:
@@ -285,7 +285,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("continue charging.")
 					next_state = (0, 1, next_SoC)
-					reward = - self.p[t] * min(self.c_r[i], 1-SoC)
+					reward = - self.p[t] * np.minimum(self.c_r[i], (1-SoC)*self.max_cap)
 
 			elif rt == 0 and ct== 0: # Idle state
 				
@@ -297,7 +297,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("start charging.")
 					next_state = (0, 1, next_SoC)
-					reward = -self.h - self.p[t] * min(self.c_r[i], 1-SoC)
+					reward = -self.h - self.p[t] * np.minimum(self.c_r[i], (1-SoC)*self.max_cap)
 
 			else:
 				raise ValueError("This condition should never occur.")
