@@ -271,7 +271,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("about to finish ride, start charging.")
 					next_state = (0, 1, next_SoC)
-					reward = -self.h - self.p[t] * self.c_r[i]
+					reward = -self.h - self.p[t] * min(self.c_r[i], 1-SoC)
 			   
 
 			elif rt == 0 and ct > 0:
@@ -286,7 +286,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("continue charging.")
 					next_state = (0, 1, next_SoC)
-					reward = - self.p[t] * self.c_r[i]
+					reward = - self.p[t] * min(self.c_r[i], 1-SoC)
 
 			elif rt == 0 and ct== 0: # Idle state
 				
@@ -298,7 +298,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("start charging.")
 					next_state = (0, 1, next_SoC)
-					reward = -self.h - self.p[t] * self.c_r[i]
+					reward = -self.h - self.p[t] * min(self.c_r[i], 1-SoC)
 
 			else:
 				raise ValueError("This condition should never occur.")
