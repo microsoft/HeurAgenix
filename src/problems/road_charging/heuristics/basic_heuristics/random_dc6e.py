@@ -1,7 +1,7 @@
 from src.problems.base.mdp_components import Solution, ActionOperator
 import random
 
-def random_f609(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
+def random_dc6e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
     """ Randomly select EVs to charge while respecting constraints.
 
     Args:
