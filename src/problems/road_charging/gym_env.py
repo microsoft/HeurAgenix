@@ -69,7 +69,9 @@ class RoadCharging(Env):
 
 
 	def save_trajectories(self, save_dir):
-		converted_dict = {key: value.tolist() for key, value in self.save_trajectories.items()}
+		converted_dict = {
+				key: value.tolist() if not isinstance(value, list) else value
+				for key, value in self.trajectories.items()}
 		with open(save_dir, 'w') as json_file:
 			json.dump(converted_dict, json_file)
 
