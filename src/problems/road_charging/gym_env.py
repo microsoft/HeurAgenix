@@ -45,13 +45,6 @@ class RoadCharging(Env):
 		self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.ride_data_type]
 		self.rt_bins = config["ride_time_probs_data"]['bin_edges']
 		self.config = config
-		
-		# Check if the path exists, and create it if it doesn't
-		if not os.path.exists(self.save_path):
-			os.makedirs(self.save_path)
-			print(f"Directory '{self.save_path}' created.")
-		else:
-			print(f"Directory '{self.save_path}' already exists.")
 
 		# Observation space: n agents, each with 4 state variables
 		self.observation_shape = (self.n, 4)
