@@ -68,10 +68,10 @@ class RoadCharging(Env):
 		return [seed_value]
 
 
-	def save_trajectories(self, save_dir):
+	def save_trajectory(self, save_dir):
 		converted_dict = {
 				key: value.tolist() if not isinstance(value, list) else value
-				for key, value in self.trajectories.items()}
+				for key, value in self.trajectory.items()}
 		with open(save_dir, 'w') as json_file:
 			json.dump(converted_dict, json_file)
 
@@ -152,8 +152,8 @@ class RoadCharging(Env):
 
 		self.obs = state  # Store it as the environment's state
 
-		# Empty trajectories
-		self.trajectories = {'RideTime': np.zeros((self.n, self.k+1)),
+		# Empty trajectory
+		self.trajectory = {'RideTime': np.zeros((self.n, self.k+1)),
 							 'ChargingStatus': np.zeros((self.n, self.k+1)),
 							 'SoC': np.zeros((self.n, self.k+1)),
 							 'actions': np.zeros((self.n, self.k), dtype=int),
@@ -310,13 +310,13 @@ class RoadCharging(Env):
 		# Increment the episodic return: no discount factor for now
 		self.ep_return += sum_rewards
 
-		# save trajectories
+		# save trajectory
 		# next_step = current_step+1
-		self.trajectories['actions'][:,current_step] = actions
-		self.trajectories['RideTime'][:,current_step+1] = self.obs["RideTime"]
-		self.trajectories['ChargingStatus'][:,current_step+1] = self.obs["ChargingStatus"]
-		self.trajectories['SoC'][:,current_step+1] =self.obs["SoC"]
-		self.trajectories['rewards'].append(sum_rewards)
+		self.trajectory['actions'][:,current_step] = actions
+		self.trajectory['RideTime'][:,current_step+1] = self.obs["RideTime"]
+		self.trajectory['ChargingStatus'][:,current_step+1] = self.obs["ChargingStatus"]
+		self.trajectory['SoC'][:,current_step+1] =self.obs["SoC"]
+		self.trajectory['rewards'].append(sum_rewards)
 
 		# If all values in the first column are equal to k, terminate the episode
 		done = np.all(self.obs["TimeStep"] == self.k)
@@ -331,9 +331,9 @@ class RoadCharging(Env):
 			print('Show trajectory of agent %d ......' % i)
 			# agents = random.sample(range(self.n), 3)
 
-			ride_times = self.trajectories['RideTime'][i,1:]
-			fractions_of_cap = self.trajectories['SoC'][i,1:] # to range [0,1]
-			actions = self.trajectories['actions'][i,:]
+			ride_times = self.trajectory['RideTime'][i,1:]
+			fractions_of_cap = self.trajectory['SoC'][i,1:] # to range [0,1]
+			actions = self.trajectory['actions'][i,:]
 
 
 			_, (ax1, ax2) = plt.subplots(nrows=2, sharex=True, figsize=(6, 5))
@@ -460,8 +460,8 @@ def main():
 
 
 	# save results
-	# with open(env.save_path+'saved_trajectories.pkl', 'wb') as f:
-	#     pickle.dump(env.trajectories, f)
+	# with open(env.save_path+'saved_trajectory.pkl', 'wb') as f:
+	#     pickle.dump(env.trajectory, f)
 
 	# Close the env
 	env.close()
