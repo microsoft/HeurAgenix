@@ -27,7 +27,7 @@ class RoadCharging(Env):
 		self.h = config["connection_fee($)"]  # Connection fee
 		self.max_cap = config["max_cap"]
 		self.low_SoC = config["low_SoC"]
-		self.initial_SoC = config["initial_SoC"]
+		self.initial_SoCs = config["initial_SoCs"]
 		self.d_rate = config["d_rate(%)"]
 		self.c_rate = config["c_rate(%)"]
 		self.c_r = config["charging_powers(kWh)"]
@@ -153,7 +153,7 @@ class RoadCharging(Env):
 
 		# Initialize battery SoC randomly
 		# state["SoC"] = np.random.uniform(0, 1, size=self.n).round(3)
-		state["SoC"] = self.initial_SoC
+		state["SoC"] = self.initial_SoCs
 
 		self.obs = state  # Store it as the environment's state
 
