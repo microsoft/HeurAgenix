@@ -5,7 +5,7 @@ The state before {bottleneck_operation} is:
 To aid your analysis, I extracted the following features from this state:
 {global_data_feature}
 
-You believe that {proposed_operation} is better, so we hope to update {function_name} to output {proposed_operation} in this state.
+You believe that {proposed_operation} is better with reason {reason}. So we hope to update {function_name} to output {proposed_operation} in this state.
 Try to provide suggestion to update the code using mathematical analysis.
 
 Please provide suggestion in following one or more aspects:
