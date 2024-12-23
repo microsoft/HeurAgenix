@@ -28,12 +28,12 @@ class HeuristicGenerator:
         # Generate available heuristic description
         self.gpt_helper.load("generate_from_gpt", prompt_dict)
         response = self.gpt_helper.chat()
-        self.gpt_helper.dump("heuristic_from_gpt")
         heuristics = extract(response, "heuristic", sep="\n")
+        self.gpt_helper.dump("heuristic_from_gpt")
 
         for heuristic in heuristics:
             # Generate description for single heuristic
-            self.gpt_helper.load_chat(os.path.join(self.gpt_helper.output_dir, "heuristic_from_gpt"))
+            self.gpt_helper.load_chat("heuristic_from_gpt")
             heuristic_name, description = heuristic.split(":")
             heuristic_files.append(self.generate(heuristic_name, description, smoke_test))
 

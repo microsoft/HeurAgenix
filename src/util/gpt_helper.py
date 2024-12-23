@@ -6,7 +6,7 @@ import importlib
 from openai import AzureOpenAI
 from time import sleep
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from src.util.util import load_framework_description
+from src.util.util import extract, load_framework_description
 
 
 class GPTHelper:
@@ -117,9 +117,11 @@ class GPTHelper:
         }
 
         self.load("background", prompt_dict)
-
-        self.chat()
+        response = self.chat()
+        is_cop = extract(response, "is_cop", "\n")
         self.dump("background")
+        if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
+            raise BaseException("Not combination optimization problem")
         return prompt_dict
 
     def load(self, message: str, replace: dict={}) -> None:
