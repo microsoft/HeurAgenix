@@ -28,8 +28,8 @@ class RoadCharging(Env):
 		self.max_cap = config["max_cap"]
 		self.low_SoC = config["low_SoC"]
 		self.initial_SoCs = config["initial_SoCs"]
-		self.d_rate = config["d_rate(%)"]
-		self.c_rate = config["c_rate(%)"]
+		self.d_rates = config["d_rates(%)"]
+		self.c_rates = config["c_rates(%)"]
 		self.c_r = config["charging_powers(kWh)"]
 		self.w = config["w"]
 		self.rho = config["rho"]
@@ -91,8 +91,8 @@ class RoadCharging(Env):
 					"Time Range": f"{self.config['t_0']} to {self.config['t_T']}",
 					"Fee for Connecting to Charger (USD)": self.h,
 					"Battery Capacity of Each EV (kWh)": self.max_cap,
-					"SoC Consumed Per Step (%)": self.d_rate,
-					"SoC Charged Per Step (%)": self.c_rate,
+					"SoC Consumed Per Step (%)": self.d_rates,
+					"SoC Charged Per Step (%)": self.c_rates,
 					"Low Battery Threshold (SoC)": self.low_SoC,
 					f"Probability of Receiving Ride Orders within {self.delta_t} Minutes": self.assign_probs_24hrs,
 					"Hours Sorted by Probability of Receiving Ride Orders": np.argsort(self.assign_probs_24hrs)[::-1].tolist(),
@@ -244,13 +244,13 @@ class RoadCharging(Env):
 			action = actions[i]
 			random_ride_times = self.ride_time_instance[i, t]
 
-			next_SoC = SoC + action * self.c_rate[i] + (1-action) * (-self.d_rate[i])
+			next_SoC = SoC + action * self.c_rates[i] + (1-action) * (-self.d_rates[i])
 
 			if action == 0:
 				if SoC <= self.low_SoC:
 					order_time = 0
 				else:
-					order_time = np.minimum(random_ride_times, int(SoC/self.d_rate[i]))
+					order_time = np.minimum(random_ride_times, int(SoC/self.d_rates[i]))
 		
 			
 			if rt >= 2 and ct == 0:
@@ -381,7 +381,7 @@ class ConstrainAction(gym.ActionWrapper):
 		for i in range(self.n):
 			if self.obs["RideTime"][i] >= 1: # if on a ride, not charge
 				action[i] = 0
-			elif self.obs["SoC"][i] > 1-self.c_rate[i]: # if full capacity, not charge
+			elif self.obs["SoC"][i] > 1-self.c_rates[i]: # if full capacity, not charge
 				action[i] = 0
 			elif self.obs["SoC"][i] <= self.low_SoC: # if low capacity has to charge
 				action[i] = 1
