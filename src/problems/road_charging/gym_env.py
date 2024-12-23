@@ -12,7 +12,6 @@ import os
 
 from gym import Env, spaces
 
-
 class RoadCharging(Env):
 	def __init__(self, config_fname: str):
 		super(RoadCharging, self).__init__()
@@ -23,7 +22,7 @@ class RoadCharging(Env):
 			
 		self.n = config["fleet_size"]  # Number of agents (EVs)
 		self.m = config["n_chargers"]  # Number of chargers
-		self.k = config["max_time_steps"]  # Maximum number of time steps
+		self.k = config["max_time_step"]  # Maximum number of time steps
 		self.delta_t = config["time_step_size"]
 		self.h = config["connection_fee($)"]  # Connection fee
 		self.max_cap = config["max_cap"]
@@ -31,21 +30,28 @@ class RoadCharging(Env):
 		self.initial_SoC = config["initial_SoC"]
 		self.d_rate = config["d_rate(%)"]
 		self.c_rate = config["c_rate(%)"]
-		self.c_r = config["c_r(kWh)"]
-		self.rt_bin_edges = config["rt_bin_edges"]
+		self.c_r = config["charging_powers(kWh)"]
 		self.w = config["w"]
 		self.rho = config["rho"]
 		self.p = config["p"]
-		self.ride_time_instance = np.array(config["ride_time_instance"])
+		self.ride_time_instance = np.array(config["ride_data_instance"])
 		
-		self.rt_scenario = config["rt_scenario"]
-		self.charging_scenario = config["charging_scenario"]
-		self.initial_SoC_scenario = config["initial_SoC_scenario"]
-		self.payment_rates_24hrs = config["payment_rates_data($)"][self.rt_scenario]
-		self.assign_probs_24hrs = config["order_assign_data"][self.rt_scenario+f"_{self.delta_t}"]
-		self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.rt_scenario]
-		self.charging_price_24hrs = config["charging_price($/kWh)"]
+		self.ride_data_type = config["ride_data_type"]
+		self.charging_data_type = config["charging_data_type"]
+		self.charging_data_type = config["charging_data_type"]
+		self.payment_rates_24hrs = config["payment_rates_data($)"][self.ride_data_type]
+		self.assign_probs_24hrs = config["order_assign_probs_data"][self.ride_data_type+f"_{self.delta_t}"]
+		self.charging_prices_24hrs = config["charging_prices($/kWh)"]
+		self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.ride_data_type]
+		self.rt_bins = config["ride_time_probs_data"]['bin_edges']
 		self.config = config
+		
+		# Check if the path exists, and create it if it doesn't
+		if not os.path.exists(self.save_path):
+			os.makedirs(self.save_path)
+			print(f"Directory '{self.save_path}' created.")
+		else:
+			print(f"Directory '{self.save_path}' already exists.")
 
 		# Observation space: n agents, each with 4 state variables
 		self.observation_shape = (self.n, 4)
@@ -69,6 +75,12 @@ class RoadCharging(Env):
 		return [seed_value]
 
 
+	def save_trajectories(self, save_dir):
+		converted_dict = {key: value.tolist() for key, value in self.save_trajectories.items()}
+		with open(save_dir, 'w') as json_file:
+			json.dump(converted_dict, json_file)
+
+
 	def summarize_env(self):
 		
 		summary = {
@@ -86,29 +98,19 @@ class RoadCharging(Env):
 					"Hours Sorted by Probability of Receiving Ride Orders": np.argsort(self.assign_probs_24hrs)[::-1].tolist(),
 				},
 				"Ride Info": {
-					"Discretized Ride Time Probability Distribution": dict(zip(self.rt_bin_edges, self.rt_probs)),
+					"Discretized Ride Time Probability Distribution": dict(zip(self.rt_bins, self.rt_probs)),
 					"Unit Step Ride Order Payment Rate (USD)": self.payment_rates_24hrs,
 					"Hour of Maximum Payment Rate": np.argmax(self.payment_rates_24hrs),
 					"Hour of Minimum Payment Rate": np.argmin(self.payment_rates_24hrs),
 					"Hours Sorted by Payment per Step (Max to Min)": np.argsort(self.payment_rates_24hrs)[::-1].tolist(),
 				},
 				"Charging Price Info": {
-					"Charging Price (USD/kWh)": self.charging_price_24hrs,
-					"Hour of Maximum Charging Price (USD)": np.argmax(self.charging_price_24hrs),
-					"Hour of Minimum Charging Price (USD)": np.argmin(self.charging_price_24hrs),
-					"Hours Sorted by Charging Price (Max to Min)": np.argsort(self.charging_price_24hrs)[::-1].tolist(),
+					"Charging Price (USD/kWh)": self.charging_prices_24hrs,
+					"Hour of Maximum Charging Price (USD)": np.argmax(self.charging_prices_24hrs),
+					"Hour of Minimum Charging Price (USD)": np.argmin(self.charging_prices_24hrs),
+					"Hours Sorted by Charging Price (Max to Min)": np.argsort(self.charging_prices_24hrs)[::-1].tolist(),
 				}
 			}
-
-
-		# Convert the summary into a readable text format
-		summary_str = ""
-		for category, data in summary.items():
-			summary_str += f"{category}:\n"
-			for key, value in data.items():
-				summary_str += f"  - {key}: {value}\n"
-			summary_str += "\n"
-		return summary_str
 
 
 	def get_action_meanings(self):
@@ -172,19 +174,16 @@ class RoadCharging(Env):
 		return 1 if x == 0 else 0
 
 
-	def ride_time_generator(self):
+	def generate_random_ride_times(self):
 
-		bin_centers = [(self.rt_bin_edges[i] + self.rt_bin_edges[i + 1]) / 2 for i in range(len(rt_bin_edges) - 1)]
+		bin_centers = [(self.rt_bins[i] + self.rt_bins[i + 1]) / 2 for i in range(len(self.rt_bins) - 1)]
 
 		ride_times = []
 		for i in range(self.n):
 			if np.random.random() < self.rho[self.obs["TimeStep"][i]]:
-				bin_index = np.random.choice(len(bin_centers), size=1, p=self.rt_probs)  # Choose a bin index
-				bin_index = bin_index[0]  # np.random.choice returns an array
-				rt_in_minutes = np.random.uniform(low=self.rt_bin_edges[bin_index], high=self.rt_bin_edges[bin_index + 1])  # Generate random ride time
-				
-				# Exponentiate and discretize the ride time to steps
-				ride_time = int(np.exp(rt_in_minutes) / self.delta_t)  
+				bin_index = np.random.choice(len(bin_centers), size=1, p=self.rt_probs)[0]  
+				x = np.exp(np.random.uniform(low=self.bins[bin_index], high=self.bins[bin_index + 1]) ) 
+				ride_time = math.ceil(x / self.delta)
 			else:
 				ride_time = 0
 
@@ -235,7 +234,7 @@ class RoadCharging(Env):
 			raise BaseException(feasible)
 
 		current_step = self.obs["TimeStep"][0]
-		# random_ride_times = self.ride_time_generator()
+		# random_ride_times = self.generate_random_ride_times()
 		
 
 		sum_rewards = 0
@@ -427,20 +426,6 @@ class ConstrainAction(gym.ActionWrapper):
 					# print('Flip agents:', to_flip)
 
 					action[to_flip] = 0
-
-		# for i in range(self.n): # if SoC is too low, must charge | Q: What if you swap it with a vehicle that has a low SoC as well?
-		#     if self.obs["SoC"][i] <= 0.1 and action[i]==0:
-		#         print('checkpoint 3')
-		#         # Swap the action of agent i with a randomly selected agent that takes action 1
-		#         # charging_agents = np.where(action == 1)[0] if np.any(action == 1) else []
-		#         # if np.any(action == 1):
-		#         #     j = np.random.choice(charging_agents)
-
-		#         #     action[j] = 0
-		#         #     action[i] = 1
-
-		#         # assuming a backup charger is available, but at an extremely high charging price
-		#         action[i] = 1
 
 		return action
 
