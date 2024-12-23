@@ -6,18 +6,19 @@ import matplotlib.pyplot as plt
 import pprint
 import math
 
+
 def config(fleet_size, num_chargers, connection_fee_scaling, data_paths, instance_count, data_type):
     
-    common_data_path = data_paths["common"]
-    specific_scenario_path = data_paths["scenario"]
+    env_data_path = data_paths["env"]
+    specific_scenario_path = data_paths["scenarios"]
     
-    with open(os.path.join(common_data_path, "payment_rates_data.json"), 'r') as json_file:
+    with open(os.path.join(env_data_path, "payment_rates_data.json"), 'r') as json_file:
         payment_rates_data = json.load(json_file) # per minute payment
     
-    with open(os.path.join(common_data_path, 'ride_time_distribution_data.json'), 'r') as json_file:
+    with open(os.path.join(env_data_path, 'ride_time_distribution_data_rounded.json'), 'r') as json_file:
         ride_time_probs_data = json.load(json_file)
     
-    with open(os.path.join(common_data_path, 'order_assign_probs_data.json'), 'r') as json_file:
+    with open(os.path.join(env_data_path, 'order_assign_probs_data.json'), 'r') as json_file:
         order_assign_probs_data = json.load(json_file)
         
     fleet_size = fleet_size          # Number of vehicles in the fleet
@@ -45,11 +46,11 @@ def config(fleet_size, num_chargers, connection_fee_scaling, data_paths, instanc
     # payment rates are per minute, convert to per time step
     payment_rates = payment_rates_data[ride_data_type]
     assign_probs = order_assign_probs_data[ride_data_type+f"_{time_step_size}"]
-    # charging_prices = pd.read_csv(os.path.join(common_data_path, f"charging_prices_{charging_data_type}.csv"))
-    charging_prices = pd.read_csv(os.path.join(common_data_path, f"charging_prices_negative.csv"))["Charging Prices"].tolist()
-    initial_SoCs = pd.read_csv(os.path.join(common_data_path, f"{SoC_data_type}_initial_SoCs_{fleet_size}EVs.csv"))["SoCs"].tolist()
+    # charging_prices = pd.read_csv(os.path.join(env_data_path, f"charging_prices_{charging_data_type}.csv"))
+    charging_prices = pd.read_csv(os.path.join(env_data_path, f"{charging_data_type}_charging_prices.csv"))["Charging Prices"].tolist()
+    initial_SoCs = pd.read_csv(os.path.join(env_data_path, f"{SoC_data_type}_initial_SoCs_{fleet_size}EVs.csv"))["SoCs"].tolist()
     connection_fee = np.max(charging_prices) * max_cap * connection_fee_scaling
-    # print("charging_prices:", charging_prices)
+    print("charging_prices:", charging_prices)
     # print("initial_SoCs:", initial_SoCs)
     
     # time window adjusted vectors
@@ -97,7 +98,7 @@ def config(fleet_size, num_chargers, connection_fee_scaling, data_paths, instanc
         
         scenario_dir = os.path.join(
         specific_scenario_path,
-        f'ride_{ride_data_type}_charging_{charging_data_type}_SoC_{SoC_data_type}'
+        f'{ride_data_type}_{charging_data_type}Prices_{SoC_data_type}InitSoC_{n_chargers}for{fleet_size}'
         )
         os.makedirs(scenario_dir, exist_ok=True)
         
@@ -140,17 +141,17 @@ if __name__ == "__main__":
     fleet_size = 5
     num_chargers = 1
     data_paths = {}
-    instance_count = 1
+    instance_count = 20
     connection_fee_scaling = 5
 
     data_paths = {
-    "common": os.path.join("data", "common"),
-    "scenario": os.path.join("data", "scenarios")}
+    "env": os.path.join("env_data"),
+    "scenarios": os.path.join("test_cases")}
     
     data_type = {
-    "ride": "general",
+    "ride": "all_days",
     "charging": "negative",
-    "SoC": "uneven"}
+    "SoC": "polarized"}
     
     config = config(fleet_size, num_chargers, connection_fee_scaling,
                     data_paths, instance_count, data_type)
@@ -179,4 +180,20 @@ if __name__ == "__main__":
     
     
    
+    """
+    negative_prices: Charging data includes negative prices
+    high_prices: high positive prices
+    low_prices: low positive prices
     
+    polarized: The SoC is unevenly initialized, with some values very low (close to 0) and others very high (close to 1).
+    high_range: SoC values differ slightly but are all within the high range, between 0.8 and 1.
+    low_range: SoC values differ slightly but are all within the low range, between 0 and 0.2.
+    mid_range: SoC initialized within the middle range, between 0.2 and 0.8.
+    same: initial SoC value is the same for all EVs.
+    
+    all_days: includes rides from all days without differentiating weekdays, weekends, or holidays.
+    weekdays:
+    weekends:
+    holidays:
+    nonholidays:
+    """
