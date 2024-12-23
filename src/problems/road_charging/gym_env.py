@@ -230,7 +230,7 @@ class RoadCharging(Env):
 			action = actions[i]
 			random_ride_times = self.ride_time_instance[i, t]
 
-			next_SoC = SoC + action * self.c_rates[i] + (1-action) * (-self.d_rates[i])
+			next_SoC = np.maximum(np.minimum(SoC + ct * self.c_rates[i] + (1-ct) * (-self.d_rates[i]), 1.0), 0.)
 
 			if action == 0:
 				if SoC <= self.low_SoC:
@@ -290,7 +290,7 @@ class RoadCharging(Env):
 			self.obs["TimeStep"][i] = t + 1
 			self.obs["RideTime"][i] = next_state[0]
 			self.obs["ChargingStatus"][i] = next_state[1]
-			self.obs["SoC"][i] = np.maximum(np.minimum(next_state[2], 1.0), 0.)
+			self.obs["SoC"][i] = next_state[2]
 			sum_rewards += reward
 
 			# print(f'state, action {(rt, ct, SoC), action}')
