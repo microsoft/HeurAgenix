@@ -57,15 +57,15 @@ class HeuristicEvolver:
             perturbation_time: int=100,
             filtered_num: int=3,
             evolution_round: int=3,
+            max_finetune_round: int=5,
             time_limitation: float=10,
-            finetune: bool=True,
             smoke_test: bool=True,
         ) -> None:
 
         # Prepare other heuristics' description for this evolution
         heuristic_dir = os.path.dirname(basic_heuristic_file)
         all_heuristic_docs = "\n".join([
-            extract_function_with_short_docstring(open(os.path.join(heuristic_dir, heuristic_file)).read(), heuristic_file.split(".")[0])
+            open(os.path.join(heuristic_dir, heuristic_file)).read()
             for heuristic_file in os.listdir(heuristic_dir)
         ])
         # Getting baseline for basic heuristic
@@ -83,11 +83,10 @@ class HeuristicEvolver:
                         basic_heuristic_file=basic_heuristic_file,
                         perturbation_heuristic_file=perturbation_heuristic_file,
                         all_heuristic_docs=all_heuristic_docs,
-                        validation_cases=self.validation_cases + self.train_cases,
                         perturbation_ratio=perturbation_ratio,
                         perturbation_time=perturbation_time,
+                        max_finetune_round=max_finetune_round,
                         time_limitation=time_limitation,
-                        finetune=finetune,
                         smoke_test=smoke_test
                     )
                     total_heuristic_benchmarks.extend(evolved_heuristic_with_improvements)
