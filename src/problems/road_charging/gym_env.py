@@ -67,15 +67,6 @@ class RoadCharging(Env):
 		random.seed(seed_value)  # Seed Python's built-in random
 		return [seed_value]
 
-
-	def save_trajectory(self, save_dir):
-		converted_dict = {
-				key: value.tolist() if not isinstance(value, list) else value
-				for key, value in self.trajectory.items()}
-		with open(save_dir, 'w') as json_file:
-			json.dump(converted_dict, json_file)
-
-
 	def summarize_env(self):
 		
 		summary = {
