@@ -46,7 +46,8 @@ class EvaluationFunctionGenerator:
         self.gpt_helper.dump(f"state_data_feature")
 
         # Verify and revision code
-        global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
+        if smoke_test:
+            global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
         while smoke_test and global_error_message is not None:
             self.gpt_helper.load(global_error_message)
             self.gpt_helper.chat()

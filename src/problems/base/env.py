@@ -48,7 +48,10 @@ class BaseEnv:
         self.recording = []
         self.time_cost = 0
         if experiment_name:
-            self.output_dir = os.path.join("output", self.problem, "result", self.data_name.split(os.sep)[-1], experiment_name)
+            if os.sep in experiment_name:
+                self.output_dir = experiment_name
+            else:
+                self.output_dir = os.path.join("output", self.problem, "result", self.data_name.split(os.sep)[-1], experiment_name)
             os.makedirs(self.output_dir, exist_ok=True)
 
     def load_data(self, data_path: str) -> None:

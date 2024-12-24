@@ -240,6 +240,7 @@ class HeuristicGenerator:
         smoke_data_dir = search_file("smoke_data", problem=self.problem)
         previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
         smoke_data = [file for file in os.listdir(smoke_data_dir) if file != "previous_operations.txt"][0]
+        smoke_data = os.path.join(smoke_data_dir, smoke_data)
         prompt_dict["function_name"] = function_name
         prompt_dict["previous_operations"] = "".join(previous_operations)
 
