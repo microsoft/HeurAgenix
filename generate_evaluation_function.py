@@ -18,7 +18,7 @@ def main():
     smoke_test = args.smoke_test
     gpt_helper = GPTHelper(
         prompt_dir=os.path.join("src", "problems", "base", "prompt"),
-        output_dir=os.path.join("output", problem, "generate_heuristic")
+        output_dir=os.path.join("output", problem, "generate_evaluation_function")
     )
     evaluation_function_generator = EvaluationFunctionGenerator(gpt_helper=gpt_helper, problem=problem)
     evaluation_function_generator.generate_evaluation_function(smoke_test=smoke_test)
