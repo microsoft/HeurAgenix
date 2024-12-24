@@ -75,7 +75,7 @@ class EvaluationFunctionGenerator:
         if os.path.exists(os.path.join(smoke_data_dir, "previous_operations.txt")):
             previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
         smoke_data = [file for file in os.listdir(smoke_data_dir) if file != "previous_operations"][0]
-        smoke_data = [file for file in os.listdir(smoke_data_dir) if file[:10] == "smoke_data"][0]
+        smoke_data = os.path.join(smoke_data_dir, smoke_data)
 
         # Prepare env
         module = importlib.import_module(f"src.problems.{self.problem}.env")
