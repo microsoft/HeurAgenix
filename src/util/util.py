@@ -144,7 +144,8 @@ def extract_function_with_short_docstring(code_str, function_name):
         parameters = string.split("get_state_data_function: callable")[1].split(", **kwargs")[0].strip()
         if parameters[:2] == ", ":
             parameters = parameters[2:]
-        introduction = string.split("\"\"\"")[1].split("Args")[0].strip().replace("\n", " ")
+        introduction = string.split("\"\"\"")[1].split("Args")[0].strip()
+        introduction = re.sub(r'\s+', ' ', introduction)
         return f"{function_name}({parameters}): {introduction}"
     else:
         return None
