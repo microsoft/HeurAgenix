@@ -299,5 +299,7 @@ class HeuristicGenerator:
                     self.gpt_helper.messages = store_message
                     self.gpt_helper.load("We can not implement and give up.")
                     return None
+        self.gpt_helper.messages = store_message
+        self.gpt_helper.load("We can not implement and give up.")
         # Give up due to the try limitation
         return None

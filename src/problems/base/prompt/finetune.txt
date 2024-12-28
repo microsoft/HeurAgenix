@@ -20,7 +20,6 @@ To make sure the code adjustment suggestion is executable, here are some aspects
 3. This includes aspects such as operation type, subject, location, and timing.
 4. Should we continue to deepen origin suggestion or weaken this suggestion: {last_suggestion}.
 5. Explore insights and strategies from other successful heuristics.
-{all_heuristic_docs}
 
 The response format is very important. For better communication, please respond to me in this format:
 1. If you believe the code still need to be updated, please respond to me in this format:
