@@ -68,9 +68,6 @@ class HeuristicEvolver:
             open(os.path.join(heuristic_dir, heuristic_file)).read()
             for heuristic_file in os.listdir(heuristic_dir)
         ])
-        # Getting baseline for basic heuristic
-        print(f"Getting baselines for {basic_heuristic_file}")
-        baselines = self.validation(validation_cases=self.validation_cases,heuristic_file=basic_heuristic_file)
 
         total_heuristic_benchmarks = [(basic_heuristic_file, 0)]
         for _ in range(evolution_round):
