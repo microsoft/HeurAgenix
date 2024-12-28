@@ -28,7 +28,9 @@ def main():
     heuristic = args.heuristic
     heuristic_dir = args.heuristic_dir
     test_case = args.test_case
-    test_cases = os.listdir(args.test_dir) if test_case is None else [test_case] 
+    if test_case is None:
+        test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
+    test_cases = os.listdir(test_dir) if test_case is None else [test_case]
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{datetime_str}"
 
@@ -58,6 +60,7 @@ def main():
             hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
 
         validation_result = hyper_heuristic.run(env)
+        print(validation_result)
         if validation_result:
             env.dump_result(args.dump_trajectory)
             print(os.path.join(env.output_dir, "result.txt"), env.key_item, env.key_value)
