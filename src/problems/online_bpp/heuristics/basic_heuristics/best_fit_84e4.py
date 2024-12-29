@@ -19,6 +19,10 @@ def best_fit_84e4(global_data: dict, state_data: dict, algorithm_data: dict, get
     remaining_capacity = state_data["remaining_capacity"]
     capacity = global_data["capacity"]
 
+    # If there is no current item to pack, return None
+    if current_item_size is None:
+        return None, {}
+
     # Initialize the index and minimum remaining capacity for the best-fit bin
     best_fit_index = None
     min_remaining_capacity = float('inf')

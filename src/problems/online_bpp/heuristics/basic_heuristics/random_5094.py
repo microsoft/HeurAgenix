@@ -21,7 +21,11 @@ def random_5094(global_data: dict, state_data: dict, algorithm_data: dict, get_s
     current_item_size = state_data["current_item_size"]
     remaining_capacity = state_data["remaining_capacity"]
     current_solution = state_data["current_solution"]
-    
+
+    # If there is no current item to pack, return None
+    if current_item_size is None:
+        return None, {}
+
     feasible_bins = [i for i, capacity in enumerate(remaining_capacity) if capacity >= current_item_size]
     
     # If no feasible bins exist, create a new bin

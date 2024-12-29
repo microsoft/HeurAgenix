@@ -23,6 +23,10 @@ def next_fit_58fd(global_data: dict, state_data: dict, algorithm_data: dict, get
     used_capacity = state_data["used_capacity"]
     used_bin_num = state_data["used_bin_num"]
 
+    # If there is no current item to pack, return None
+    if current_item_size is None:
+        return None, {}
+
     # Check if the current item can fit in the current bin
     if used_bin_num > 0 and current_item_size <= capacity - used_capacity[used_bin_num - 1]:
         # If it fits, use the AssignBinOperator for the current bin

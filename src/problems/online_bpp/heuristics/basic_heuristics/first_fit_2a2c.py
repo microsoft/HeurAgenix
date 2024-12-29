@@ -21,6 +21,10 @@ def first_fit_2a2c(global_data: dict, state_data: dict, algorithm_data: dict, ge
     current_item_size = state_data["current_item_size"]
     remaining_capacity = state_data["remaining_capacity"]
 
+    # If there is no current item to pack, return None
+    if current_item_size is None:
+        return None, {}
+
     # Iterate over the list of bins to find the first bin with enough capacity
     for bin_index, capacity in enumerate(remaining_capacity):
         if capacity >= current_item_size:

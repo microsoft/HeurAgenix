@@ -21,7 +21,11 @@ def worst_fit_325f(global_data: dict, state_data: dict, algorithm_data: dict, ge
     current_item_size = state_data["current_item_size"]
     remaining_capacity = state_data["remaining_capacity"]
     current_solution = state_data["current_solution"]
-    
+
+    # If there is no current item to pack, return None
+    if current_item_size is None:
+        return None, {}
+
     # Initialize variables to track the best bin and maximum remaining capacity
     best_bin = -1
     max_remaining_capacity = -1
