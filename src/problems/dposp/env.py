@@ -16,7 +16,7 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        return True
+        return len(self.state_data["feasible_orders_to_fulfill"]) == 0
 
     def load_data(self, data_name: str) -> tuple:
         production_df = pd.read_csv(os.path.join(data_name, "production.tsv"), sep="\t")

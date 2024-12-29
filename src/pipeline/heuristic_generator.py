@@ -188,7 +188,7 @@ class HeuristicGenerator:
                 heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
         return heuristic_files
 
-    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False) -> str:
+    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None) -> str:
         # Special remind
         special_remind_file = os.path.join("src", "problems", self.problem, "prompt", "special_remind.txt")
         special_remind = "None"
@@ -198,6 +198,8 @@ class HeuristicGenerator:
         # Generate function name
         function_name = sanitize_function_name(heuristic_name, description)
         prompt_dict = {"problem": self.problem, "heuristic_name": heuristic_name, "description": description, "function_name": function_name, "special_remind": special_remind, "env_summarize": env_summarize}
+        if more_prompt_dict:
+            prompt_dict.update(more_prompt_dict)
 
         # Implement code
         if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
@@ -279,7 +281,6 @@ class HeuristicGenerator:
                 if response is None:
                     # Give up
                     self.gpt_helper.messages = store_message
-                    self.gpt_helper.load("We can not implement and give up.")
                     return None
                 elif "correct" in response:
                     # Correct
@@ -300,5 +301,7 @@ class HeuristicGenerator:
                     self.gpt_helper.messages = store_message
                     self.gpt_helper.load("We can not implement and give up.")
                     return None
+        self.gpt_helper.messages = store_message
+        self.gpt_helper.load("We can not implement and give up.")
         # Give up due to the try limitation
         return None
