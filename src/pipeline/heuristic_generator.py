@@ -279,8 +279,6 @@ class HeuristicGenerator:
                 # Actual result
                 if response is None:
                     # Give up
-                    self.gpt_helper.load("We can not implement and give_up.")
-                    self.gpt_helper.dump("give_up")
                     self.gpt_helper.messages = store_message
                     return None
                 elif "correct" in response:
@@ -299,13 +297,9 @@ class HeuristicGenerator:
                 heuristic_code = extract(response, "python_code")
                 if heuristic_code is None:
                     # Give up
-                    self.gpt_helper.load("We can not implement and give up.")
-                    self.gpt_helper.dump("give_up")
                     self.gpt_helper.messages = store_message
                     self.gpt_helper.load("We can not implement and give up.")
                     return None
-        self.gpt_helper.load("We can not implement and give up.")
-        self.gpt_helper.dump("give_up")
         self.gpt_helper.messages = store_message
         self.gpt_helper.load("We can not implement and give up.")
         # Give up due to the try limitation
