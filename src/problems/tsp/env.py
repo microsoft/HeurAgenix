@@ -34,11 +34,13 @@ class Env(BaseEnv):
             dict: A dictionary containing the global static information data with:
                 - "node_num" (int): The total number of nodes in the problem.
                 - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+                - "std_dev_distance" (float): The standard deviation of the distances.
         """
 
         global_data_dict = {
             "distance_matrix": self.distance_matrix,
-            "node_num": self.node_num
+            "node_num": self.node_num,
+            "std_dev_distance": np.std(self.distance_matrix)
         }
         return global_data_dict
 
