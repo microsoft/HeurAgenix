@@ -59,6 +59,7 @@ def main():
             hyper_heuristic = ORSolver(problem=problem)
         else:
             hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
+
         env.reset(output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
