@@ -37,7 +37,7 @@ total_experiments = [
     {
         "problem": "dposp",
         "key_item": "fulfilled_order_num",
-        "data": [("test_case_1", 0), ("test_case_2", 0), ("test_case_3", 0), ("test_case_4", 0), ("test_case_5", 0), ("test_case_6", 0), ("test_case_7", 0)],
+        "data": [("test_case_0", 0), ("test_case_1", 0), ("test_case_2", 0), ("test_case_3", 0), ("test_case_4", 0), ("test_case_5", 0), ("test_case_6", 0)],
         "experiments": ["nearest_order_scheduling_1a5e", "greedy_deadline_proximity_ac6e", "greedy_by_order_density_c702"]
     }
 ]

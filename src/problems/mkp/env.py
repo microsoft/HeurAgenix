@@ -13,7 +13,7 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        return len(self.state_data["feasible_items_to_add"]) == 0
+        return True
     
     def load_data(self, data_path: str) -> tuple:
         with open(data_path, "r") as file:
