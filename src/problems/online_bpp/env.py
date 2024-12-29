@@ -113,7 +113,11 @@ class Env(BaseEnv):
         return True
 
     def get_observation(self) -> dict:
-        pass
+        return {
+            "Used Bin Num": self.state_data["used_bin_num"],
+            "Num Items In Box": self.state_data["num_items_in_box"],
+            "Num Items Not In Box": self.state_data["num_items_not_in_box"]
+        }
 
     def dump_result(self, dump_trajectory: bool=True) -> str:
         content_dict = {

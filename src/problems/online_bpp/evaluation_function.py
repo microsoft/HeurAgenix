@@ -83,21 +83,36 @@ def get_state_data_feature(global_data: dict, state_data: dict) -> dict:
     # Feature: Size of the current item to be packed
     features['current_item_size'] = state_data['current_item_size']
 
-    # Feature: Average used capacity in bins
-    features['average_used_capacity'] = sum(state_data['used_capacity']) / len(state_data['used_capacity'])
+    # Feature: Average used capacity in bins (handle division by zero)
+    if len(state_data['used_capacity']) > 0:
+        features['average_used_capacity'] = sum(state_data['used_capacity']) / len(state_data['used_capacity'])
+    else:
+        features['average_used_capacity'] = 0.0
 
-    # Feature: Average remaining capacity in bins
-    features['average_remaining_capacity'] = sum(state_data['remaining_capacity']) / len(state_data['remaining_capacity'])
+    # Feature: Average remaining capacity in bins (handle division by zero)
+    if len(state_data['remaining_capacity']) > 0:
+        features['average_remaining_capacity'] = sum(state_data['remaining_capacity']) / len(state_data['remaining_capacity'])
+    else:
+        features['average_remaining_capacity'] = 0.0
 
-    # Feature: Ratio of packed items to total items
+    # Feature: Ratio of packed items to total items (handle division by zero)
     total_items = state_data['num_items_in_box'] + state_data['num_items_not_in_box']
-    features['packed_item_ratio'] = state_data['num_items_in_box'] / total_items if total_items > 0 else 0
+    if total_items > 0:
+        features['packed_item_ratio'] = state_data['num_items_in_box'] / total_items
+    else:
+        features['packed_item_ratio'] = 0.0
 
-    # Feature: Maximum remaining capacity in any bin
-    features['max_remaining_capacity'] = max(state_data['remaining_capacity'])
+    # Feature: Maximum remaining capacity in any bin (handle empty list)
+    if len(state_data['remaining_capacity']) > 0:
+        features['max_remaining_capacity'] = max(state_data['remaining_capacity'])
+    else:
+        features['max_remaining_capacity'] = 0
 
-    # Feature: Minimum remaining capacity in any bin
-    features['min_remaining_capacity'] = min(state_data['remaining_capacity'])
+    # Feature: Minimum remaining capacity in any bin (handle empty list)
+    if len(state_data['remaining_capacity']) > 0:
+        features['min_remaining_capacity'] = min(state_data['remaining_capacity'])
+    else:
+        features['min_remaining_capacity'] = 0
 
     # Feature: Check if the current solution is valid
     features['solution_validity'] = state_data['validation_solution'](state_data['current_solution'])
