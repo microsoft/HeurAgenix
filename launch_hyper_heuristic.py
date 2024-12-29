@@ -32,7 +32,8 @@ def main():
         test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
     test_cases = os.listdir(test_dir) if test_case is None else [test_case]
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = args.output_dir if args.output_dir is not None else f"{output_dir}.{datetime_str}"
+    heuristic_name = heuristic.split(os.sep)[-1].split(".")[0]
+    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic_name}.{datetime_str}"
 
     if heuristic_dir is None:
         heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
