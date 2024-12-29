@@ -13,6 +13,7 @@ def greedy_by_density_4c11(global_data: dict, state_data: dict, algorithm_data: 
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
         state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.
+            - "feasible_items_to_add" (list[int]): A list of item indices that can be added without violating any constraints.
             - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
             - "current_solution" (Solution): The current solution instance.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
@@ -40,7 +41,7 @@ def greedy_by_density_4c11(global_data: dict, state_data: dict, algorithm_data: 
     weights = global_data["weights"]
     capacities = global_data["capacities"]
     remaining_capacity = state_data["remaining_capacity"]
-    items_not_in_knapsack = state_data["items_not_in_knapsack"]
+    feasible_items_to_add = state_data["feasible_items_to_add"]
     current_solution = state_data["current_solution"]
     step_count = algorithm_data.get("step_count", 0)
 
@@ -49,8 +50,8 @@ def greedy_by_density_4c11(global_data: dict, state_data: dict, algorithm_data: 
     best_operator = None
     best_profit = float("-inf")
 
-    # Calculate weighted density for each item not in the knapsack
-    for item_index in items_not_in_knapsack:
+    # Calculate weighted density for each feasible item
+    for item_index in feasible_items_to_add:
         item_profit = profits[item_index]
         item_weight_sum = sum(weights[resource_index][item_index] for resource_index in range(len(capacities)))
         item_density = (item_profit / item_weight_sum) + beta * (item_profit / profits.sum())
@@ -65,7 +66,7 @@ def greedy_by_density_4c11(global_data: dict, state_data: dict, algorithm_data: 
         simulated_remaining_capacity = remaining_capacity - weights[:, item_index]
         if all(simulated_remaining_capacity >= 0):
             # Check if adding this item blocks high-profit items
-            high_profit_items = [i for i in items_not_in_knapsack if profits[i] > profits[item_index]]
+            high_profit_items = [i for i in feasible_items_to_add if profits[i] > profits[item_index]]
             if any(all(weights[resource_index][hp_item] <= simulated_remaining_capacity[resource_index] for resource_index in range(len(capacities))) for hp_item in high_profit_items):
                 continue  # Skip adding this item if it blocks high-profit items
 
@@ -73,8 +74,8 @@ def greedy_by_density_4c11(global_data: dict, state_data: dict, algorithm_data: 
             return AddOperator(item_index), {"step_count": step_count + 1}
 
     # Periodic k-flip optimization
-    if step_count % flip_frequency == 0 and len(items_not_in_knapsack) >= k_flip:
-        for indices_to_flip in combinations(items_not_in_knapsack, k_flip):
+    if step_count % flip_frequency == 0 and len(feasible_items_to_add) >= k_flip:
+        for indices_to_flip in combinations(feasible_items_to_add, k_flip):
             new_solution = current_solution.item_inclusion[:]
             for index in indices_to_flip:
                 new_solution[index] = not new_solution[index]
@@ -84,7 +85,7 @@ def greedy_by_density_4c11(global_data: dict, state_data: dict, algorithm_data: 
 
     # Swap-based lookahead
     for item_in in state_data.get("items_in_knapsack", []):
-        for item_out in items_not_in_knapsack:
+        for item_out in feasible_items_to_add:
             new_solution = current_solution.item_inclusion[:]
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
             new_state_data = get_state_data_function(Solution(new_solution))
