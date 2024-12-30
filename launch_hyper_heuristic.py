@@ -32,8 +32,8 @@ def main():
         test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
     test_cases = os.listdir(test_dir) if test_case is None else [test_case]
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    heuristic_name = heuristic.split(os.sep)[-1].split(".")[0]
-    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic_name}.{datetime_str}"
+    heuristic_name = heuristic.split(".")[0]
+    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic_name}"
 
     if heuristic_dir is None:
         heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
@@ -51,8 +51,10 @@ def main():
                 output_dir=env.output_dir,
             )
             hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_dir=heuristic_dir, problem=problem)
+            output_dir = f"{heuristic}.{datetime_str}"
         elif heuristic == "random_hh":
             hyper_heuristic = RandomHyperHeuristic(heuristic_dir=heuristic_dir, problem=problem)
+            output_dir = f"{heuristic}.{datetime_str}"
         elif heuristic == "or_solver":
             module = importlib.import_module(f"src.problems.{problem}.or_solver")
             globals()["ORSolver"] = getattr(module, "ORSolver")
@@ -63,7 +65,9 @@ def main():
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result(args.dump_trajectory)
-            print(os.path.join(env.output_dir, "result.txt"), env.key_item, env.key_value)
+            print(os.path.join(env.output_dir, "result.txt"), heuristic, test_case, env.key_item, env.key_value)
+        else:
+            print("Invalid solution", heuristic, test_case)
 
 
 if __name__ == "__main__":

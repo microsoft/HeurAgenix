@@ -199,9 +199,18 @@ def search_file(file_name: str, problem: str="base") -> str:
     if file_path:
         return file_path
 
+    file_path = find_file_in_folder(os.path.join("output", problem, "data"), file_name)
+    if file_path:
+        return file_path
+
+    file_path = find_file_in_folder(os.path.join("output", problem, "heuristics"), file_name)
+    if file_path:
+        return file_path
     file_path = find_file_in_folder(os.path.join("output", problem), file_name)
     if file_path:
         return file_path
+
+
     return None
 
 def df_to_str(df: pd.DataFrame) -> str:

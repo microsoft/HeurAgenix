@@ -15,6 +15,7 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension.
             - "items_in_knapsack" (list[int]): A list of item indices that are currently included in the knapsack.
             - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
+            - "feasible_items_to_add" (list[int]): A list of item indices that can be added without violating constraints.
             - "current_solution" (Solution): The current solution object.
             - "current_profit" (float): The current total profit of the solution.
         algorithm_data (dict, optional): The algorithm dictionary for current algorithm only. In this algorithm, no specific data is necessary.
@@ -34,7 +35,7 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
     # Extract necessary data from state_data
     remaining_capacity = state_data["remaining_capacity"]
     items_in_knapsack = state_data["items_in_knapsack"]
-    items_not_in_knapsack = state_data["items_not_in_knapsack"]
+    feasible_items_to_add = state_data["feasible_items_to_add"]
     current_solution = state_data["current_solution"]
     current_profit = state_data["current_profit"]
 
@@ -43,25 +44,23 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
     best_score = float('-inf')
 
     # Opportunity Cost Scoring
-    for item in items_not_in_knapsack:
-        # Check if the item can be added without violating constraints
-        if all(remaining_capacity[res] >= weights[res][item] for res in range(resource_num)):
-            profit_to_weight_ratio = profits[item] / (sum(weights[res][item] for res in range(resource_num)) + epsilon)
-            capacity_adjustment = np.min(
-                [remaining_capacity[res] / (weights[res][item] + epsilon) for res in range(resource_num) if weights[res][item] > 0],
-                initial=float('inf')
-            )
-            opportunity_cost = max(
-                [profits[other_item] / (sum(weights[res][other_item] for res in range(resource_num)) + epsilon)
-                 for other_item in items_not_in_knapsack if other_item != item and 
-                 all(remaining_capacity[res] >= weights[res][other_item] for res in range(resource_num))],
-                default=0
-            )
-            score = profit_to_weight_ratio * capacity_adjustment - opportunity_cost
+    for item in feasible_items_to_add:  # Ensure we only consider feasible items
+        # Calculate the profit-to-weight ratio
+        profit_to_weight_ratio = profits[item] / (sum(weights[res][item] for res in range(resource_num)) + epsilon)
+        capacity_adjustment = np.min(
+            [remaining_capacity[res] / (weights[res][item] + epsilon) for res in range(resource_num) if weights[res][item] > 0],
+            initial=float('inf')
+        )
+        opportunity_cost = max(
+            [profits[other_item] / (sum(weights[res][other_item] for res in range(resource_num)) + epsilon)
+             for other_item in feasible_items_to_add if other_item != item],
+            default=0
+        )
+        score = profit_to_weight_ratio * capacity_adjustment - opportunity_cost
 
-            if score > best_score:
-                best_operator = AddOperator(item)
-                best_score = score
+        if score > best_score:
+            best_operator = AddOperator(item)
+            best_score = score
 
     # If a valid AddOperator is found, return it
     if best_operator is not None:
@@ -82,7 +81,7 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
 
     # Swap Optimization
     for item_in in items_in_knapsack:
-        for item_out in items_not_in_knapsack:
+        for item_out in feasible_items_to_add:  # Ensure we only swap with feasible items
             new_solution = current_solution.item_inclusion[:]
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
 

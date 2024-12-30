@@ -107,12 +107,6 @@ class HeuristicEvolver:
         output_dir = os.path.join("output", self.problem, "evolution_result", data_name, f"{basic_heuristic_name}.evolution")
         self.gpt_helper.reset(output_dir)
 
-        basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
-
-        prompt_dict = self.gpt_helper.load_background(self.problem)
-        prompt_dict["all_heuristic_docs"] = all_heuristic_docs
-        self.load_heuristic_code(basic_heuristic_file, prompt_dict)
-
         # Perturb for better solution
         negative_result_file, positive_result_file = self.perturbation(
             env,
@@ -126,6 +120,13 @@ class HeuristicEvolver:
         finetuned_heuristic_benchmarks = []
         if positive_result_file:
             print(f"Evolution {basic_heuristic_name} on {data_name}")
+            # Get bassline 
+            basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
+
+            prompt_dict = self.gpt_helper.load_background(self.problem)
+            prompt_dict["all_heuristic_docs"] = all_heuristic_docs
+            self.load_heuristic_code(basic_heuristic_file, prompt_dict)
+
             # Identity bottlenecks
             bottlenecks = self.identity_bottlenecks(
                 prompt_dict=prompt_dict,
@@ -218,7 +219,7 @@ class HeuristicEvolver:
                 break
         return negative_result_file, positive_result_file
 
-    def load_heuristic_code(self, heuristic_file: str, prompt_dict: dict) -> None:
+    def load_heuristic_code(self, heuristic_file: str, prompt_dict: dict) -> str:
         heuristic_file = search_file(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
         function_code = open(heuristic_file).read()
@@ -226,6 +227,7 @@ class HeuristicEvolver:
         prompt_dict["function_name"] = function_name
         prompt_dict["function_code"] = function_code
         prompt_dict["heuristic_name"] = heuristic_name
+        return function_code
 
     def identity_bottlenecks(
             self,
