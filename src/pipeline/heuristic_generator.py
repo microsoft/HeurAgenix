@@ -35,7 +35,8 @@ class HeuristicGenerator:
             # Generate description for single heuristic
             self.gpt_helper.load_chat("heuristic_from_gpt")
             heuristic_name, description = heuristic.split(":")
-            heuristic_files.append(self.generate(heuristic_name, description, smoke_test))
+            env_summarize = prompt_dict["env_summarize"]
+            heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
 
         return heuristic_files
 
@@ -95,7 +96,8 @@ class HeuristicGenerator:
                 if interested_content is None:
                     self.gpt_helper.dump(f"generate_from_paper")
                     heuristic_name = interested_section
-                    heuristic_file = self.generate(heuristic_name, f"Generate from paper {title}. Please add the notes in code to show the source paper.", smoke_test)
+                    env_summarize = prompt_dict["env_summarize"]
+                    heuristic_file = self.generate(heuristic_name, f"Generate from paper {title}. Please add the notes in code to show the source paper.", env_summarize, smoke_test)
                     return heuristic_file
                 last_interested_section = interested_section
                 last_interested_content = interested_content
@@ -180,34 +182,24 @@ class HeuristicGenerator:
                 description += f"We hope to transfer {reference_heuristic} in {referenced_problem} into new {heuristic_name} in {self.problem}.\n" \
                     + "Following are some similarities(source_component;target_component;introduction):\n" \
                     + "\n".join(similarities)
+                env_summarize = prompt_dict["env_summarize"]
 
                 # Generate description for single heuristic
-                heuristic_files.append(self.generate(heuristic_name, description, smoke_test))
+                heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
         return heuristic_files
 
-    def generate(self, heuristic_name: str, description: str, smoke_test: bool=False) -> str:
+    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None) -> str:
         # Special remind
         special_remind_file = os.path.join("src", "problems", self.problem, "prompt", "special_remind.txt")
         special_remind = "None"
         if os.path.exists(special_remind_file):
             special_remind = open(special_remind_file).read()
 
-        # Review heuristic and describe the intermediate mathematical processes
-        self.gpt_helper.load("detailed_heuristic_design", {"heuristic_name": heuristic_name, "description": description})
-        response = self.gpt_helper.chat()
-        review_result = extract(response, "mathematical_analysis", "\n")
-        assert review_result[0].split(":")[0] == "mathematical_description"
-
-        # Check feasible and add mathematical description
-        mathematical_description = review_result[0].split(":")[1].strip()
-        if mathematical_description == "None":
-            self.gpt_helper.dump(f"{function_name}_abandoned")
-            return
-        description += f"\nmathematical_description: {mathematical_description}"
-
         # Generate function name
         function_name = sanitize_function_name(heuristic_name, description)
-        prompt_dict = {"problem": self.problem, "heuristic_name": heuristic_name, "description": description, "function_name": function_name, "special_remind": special_remind}
+        prompt_dict = {"problem": self.problem, "heuristic_name": heuristic_name, "description": description, "function_name": function_name, "special_remind": special_remind, "env_summarize": env_summarize}
+        if more_prompt_dict:
+            prompt_dict.update(more_prompt_dict)
 
         # Implement code
         if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
@@ -235,6 +227,7 @@ class HeuristicGenerator:
         return output_heuristic_file
 
     def smoke_test(self, heuristic_code: str, function_name: str, max_try_times: int=5) -> str:
+        store_message = self.gpt_helper.messages.copy()
         prompt_dict = {}
         # Load smoke data
         smoke_data_dir = search_file("smoke_data", problem=self.problem)
@@ -287,9 +280,12 @@ class HeuristicGenerator:
                 # Actual result
                 if response is None:
                     # Give up
+                    self.gpt_helper.messages = store_message
                     return None
                 elif "correct" in response:
                     # Correct
+                    self.gpt_helper.messages = store_message
+                    self.gpt_helper.load(f"To ensure the stable of heuristics, we adjust the code to:\n{heuristic_code}")
                     return heuristic_code
                 else:
                     # Update code
@@ -302,6 +298,10 @@ class HeuristicGenerator:
                 heuristic_code = extract(response, "python_code")
                 if heuristic_code is None:
                     # Give up
+                    self.gpt_helper.messages = store_message
+                    self.gpt_helper.load("We can not implement and give up.")
                     return None
+        self.gpt_helper.messages = store_message
+        self.gpt_helper.load("We can not implement and give up.")
         # Give up due to the try limitation
         return None

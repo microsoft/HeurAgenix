@@ -65,7 +65,9 @@ def main():
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result(args.dump_trajectory)
-            print(os.path.join(env.output_dir, "result.txt"), env.key_item, env.key_value)
+            print(os.path.join(env.output_dir, "result.txt"), heuristic, test_case, env.key_item, env.key_value)
+        else:
+            print("Invalid solution", heuristic, test_case)
 
 
 if __name__ == "__main__":

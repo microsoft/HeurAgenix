@@ -7,6 +7,7 @@ import shutil
 import pandas as pd
 import traceback
 from io import StringIO
+from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
 from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
@@ -235,8 +236,8 @@ class HeuristicEvolver:
 
             # Verify the proposed operation
             env.run_operator(eval(proposed_operation))
-            heuristic_work = True
-            while not env.is_complete_solution or heuristic_work:
+            heuristic_work = BaseOperator()
+            while isinstance(heuristic_work, BaseOperator):
                 heuristic_work = env.run_heuristic(heuristic)
             proposed_result = env.dump_result(dump_trajectory=True)
             proposed_result = parse_text_to_dict(proposed_result)

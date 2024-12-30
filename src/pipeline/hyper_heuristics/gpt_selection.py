@@ -91,17 +91,18 @@ class GPTSelectionHyperHeuristic:
                     selected_heuristic = self.heuristic_pools[selected_heuristic_name]
 
                     pre_status = env.get_observation()
-                    for _ in range(running_step):
-                        env.run_heuristic(selected_heuristic, parameters=parameters)
-                    cur_status = env.get_observation()
-                    heuristic_dict = {
-                        "Heuristic": selected_heuristic_name,
-                        "Parameters": parameters,
-                        "Running Steps": running_step,
-                        "Explain": explain
-                    }
-                    for key in pre_status.keys():
-                        heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
+                    if pre_status:
+                        for _ in range(running_step):
+                            env.run_heuristic(selected_heuristic, parameters=parameters)
+                        cur_status = env.get_observation()
+                        heuristic_dict = {
+                            "Heuristic": selected_heuristic_name,
+                            "Parameters": parameters,
+                            "Running Steps": running_step,
+                            "Explain": explain
+                        }
+                        for key in pre_status.keys():
+                            heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
                     heuristic_traject.append(heuristic_dict)
                     current_steps += running_step
                 elif "Stop" in response or "None" in response:
