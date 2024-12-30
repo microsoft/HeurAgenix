@@ -45,23 +45,24 @@ def main():
         env = Env(data_name=test_case)
 
         if heuristic == "gpt_hh":
+            env.reset(f"{output_dir}.{datetime_str}")
             gpt_helper = GPTHelper(
                 prompt_dir=os.path.join("src", "problems", "base", "prompt"),
                 output_dir=env.output_dir,
             )
             hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_dir=heuristic_dir, problem=problem)
-            output_dir = f"{heuristic_name}.{datetime_str}"
         elif heuristic == "random_hh":
+            env.reset(f"{output_dir}.{datetime_str}")
             hyper_heuristic = RandomHyperHeuristic(heuristic_dir=heuristic_dir, problem=problem)
-            output_dir = f"{heuristic_name}.{datetime_str}"
         elif heuristic == "or_solver":
             module = importlib.import_module(f"src.problems.{problem}.or_solver")
             globals()["ORSolver"] = getattr(module, "ORSolver")
             hyper_heuristic = ORSolver(problem=problem)
+            env.reset(output_dir)
         else:
             hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
+            env.reset(output_dir)
 
-        env.reset(output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result(args.dump_trajectory)
