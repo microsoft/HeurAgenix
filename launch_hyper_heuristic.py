@@ -43,6 +43,7 @@ def main():
 
     for test_case in test_cases:
         env = Env(data_name=test_case)
+        env.reset(output_dir)
 
         if heuristic == "gpt_hh":
             gpt_helper = GPTHelper(
@@ -60,7 +61,7 @@ def main():
             hyper_heuristic = ORSolver(problem=problem)
         else:
             hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
-        env.reset(output_dir)
+
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result(args.dump_trajectory)
