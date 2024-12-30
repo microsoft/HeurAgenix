@@ -43,16 +43,12 @@ class GPTHelper:
         self.reset(output_dir)
 
     def reset(self, output_dir:str=None) -> None:
-        self.current_message = []
         self.messages = []
         if output_dir is not None:
             self.output_dir = output_dir
             os.makedirs(output_dir, exist_ok=True)
 
     def chat(self) -> str:
-        if self.current_message != []:
-            self.messages.append({"role": "user", "content": self.current_message})
-            self.current_message = []
 
         for index in range(self.max_attempts):
             try:
@@ -142,24 +138,24 @@ class GPTHelper:
         image_key = r"\[image: (.*?)\]"
         texts = re.split(image_key, message)
         images = re.compile(image_key).findall(message)
+        current_message = []
         for i in range(len(texts)):
             if i % 2 == 1:
                 encoded_image = base64.b64encode(open(images[int((i - 1)/ 2)], 'rb').read()).decode('ascii')
-                self.current_message.append({
+                current_message.append({
                     "type": "image_url",
                     "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
                     "image_path": images[int((i - 1)/ 2)]
                 })
             else:
-                self.current_message.append({
+                current_message.append({
                     "type": "text",
                     "text": texts[i]
                 })
+        self.messages.append({"role": "user", "content": current_message})
 
     def dump(self, output_name: str=None) -> str:
         if self.output_dir != None and output_name != None:
-            if self.current_message != []:
-                self.messages.append({"role": "user", "content": self.current_message})
             json_output_file = os.path.join(self.output_dir, f"{output_name}.json")
             text_output_file = os.path.join(self.output_dir, f"{output_name}.txt")
             print(f"Chat dumped to {text_output_file}")

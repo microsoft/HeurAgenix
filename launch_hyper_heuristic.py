@@ -28,9 +28,12 @@ def main():
     heuristic = args.heuristic
     heuristic_dir = args.heuristic_dir
     test_case = args.test_case
-    test_dir = args.test_dir if test_case is None else [test_case] 
+    if test_case is None:
+        test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
+    test_cases = os.listdir(test_dir) if test_case is None else [test_case]
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{datetime_str}"
+    heuristic_name = heuristic.split(".")[0]
+    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic_name}"
 
     if heuristic_dir is None:
         heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
@@ -38,9 +41,8 @@ def main():
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
 
-    for test_case in test_dir:
+    for test_case in test_cases:
         env = Env(data_name=test_case)
-        env.reset(output_dir)
 
         if heuristic == "gpt_hh":
             gpt_helper = GPTHelper(
@@ -48,19 +50,23 @@ def main():
                 output_dir=env.output_dir,
             )
             hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_dir=heuristic_dir, problem=problem)
+            output_dir = f"{heuristic}.{datetime_str}"
         elif heuristic == "random_hh":
             hyper_heuristic = RandomHyperHeuristic(heuristic_dir=heuristic_dir, problem=problem)
+            output_dir = f"{heuristic}.{datetime_str}"
         elif heuristic == "or_solver":
             module = importlib.import_module(f"src.problems.{problem}.or_solver")
             globals()["ORSolver"] = getattr(module, "ORSolver")
             hyper_heuristic = ORSolver(problem=problem)
         else:
             hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
-
+        env.reset(output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result(args.dump_trajectory)
-            print(os.path.join(env.output_dir, "result.txt"), env.key_item, env.key_value)
+            print(os.path.join(env.output_dir, "result.txt"), heuristic, test_case, env.key_item, env.key_value)
+        else:
+            print("Invalid solution", heuristic, test_case)
 
 
 if __name__ == "__main__":
