@@ -235,8 +235,12 @@ class RoadCharging(Env):
 			if action == 0:
 				if SoC <= self.low_SoC:
 					order_time = 0
+				# else:
+				# 	order_time = np.minimum(random_ride_time, int(round(SoC/self.d_rates[i])))
+				elif SoC < self.d_rates[i] * random_ride_time:
+					order_time = 0
 				else:
-					order_time = np.minimum(random_ride_times, int(SoC/self.d_rates[i]))
+					order_time = random_ride_time
 		
 			
 			if rt >= 2 and ct == 0:
