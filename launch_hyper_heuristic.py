@@ -44,8 +44,8 @@ def main():
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
 
+    gpt_helper = GPTHelper(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
     if heuristic == "gpt_hh":
-        gpt_helper = GPTHelper(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
         output_dir = f"{heuristic_name}.{datetime_str}"
         if heuristic_type == "evolved":
             output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"

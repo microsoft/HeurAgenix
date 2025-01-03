@@ -15,7 +15,7 @@ total_experiments = [
         "problem": "cvrp",
         "key_item": "total_current_cost",
         "data": ["A-n80-k10.vrp", "B-n78-k10.vrp", "E-n101-k14.vrp", "F-n135-k7.vrp", "M-n200-k17.vrp", "P-n101-k4.vrp", "X-n1001-k43.vrp"],
-        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_ce2b", "farthest_insertion_6308",],
+        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_ce2b", "farthest_insertion_6308"],
         "upper_bound": [1762, 1221, 1067, 1162, 1275, 681, 72355]
     },
     {
@@ -44,7 +44,7 @@ total_experiments = [
         "key_item": "fulfilled_order_num",
         "data": ["test_case_0", "test_case_1", "test_case_2", "test_case_3", "test_case_4", "test_case_5", "test_case_6"],
         "heuristics": ["least_order_remaining_9c3c", "least_order_remaining_27ca", "shortest_operation_ff40", "shortest_operation_ae31", "greedy_by_order_density_c702", "greedy_by_order_density_de77"],
-        "upper_bound": [None, None, None, None, None, None, None]
+        "upper_bound": [10, 46, 85, 52, 152, None, None]
     }
 ]
 
@@ -210,14 +210,36 @@ def dump_all_result():
         upper_bounds = problem_dict["upper_bound"]
         for data_index, data in enumerate(data):
             upper_bound = upper_bounds[data_index]
+            test_dir = os.path.join("output", problem, "result", data)
             for heuristic in heuristics:
-                result_file = os.path.join("output", problem, "result", data, heuristic, "result.txt")
+                result_file = os.path.join(test_dir, heuristic, "result.txt")
                 if os.path.exists(result_file):
                     value = found_key(result_file, key_item)
                     if value:
-                        gap = "None" if upper_bound is None else f"{round(abs(value - upper_bound) / upper_bound * 100, 2)}%"
-                        print(problem, data, heuristic, key_item, value, gap)
+                        gap = "None" if upper_bound is None else round(abs(value - upper_bound) / upper_bound * 100, 2)
+                        print(f"{problem}, {data}, {heuristic}, {value}({gap}%)")
                 else:
                     print(F"Missing {result_file}")
-                    
+            gpt_hhs = [found_key(os.path.join(test_dir, file, "result.txt"), key_item) for file in os.listdir(test_dir) if file.startswith("gpt_hh.20")]
+            if upper_bound:
+                gpt_gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in gpt_hhs]
+                mean_gap = np.mean(gpt_gap)
+            else:
+                gpt_gap = ["None" for value in gpt_hhs]
+                mean_gap = "None"
+            gpt_hh_value_gap = [f"{gpt_hhs[index]}({gpt_gap[index]}%)" for index in range(len(gpt_hhs))]
+            print(f"{problem}, {data}, gpt_hh, {gpt_hh_value_gap}, {np.mean(gpt_hhs)}({mean_gap}%)")
+
+            gpt_evo_hhs = [found_key(os.path.join(test_dir, file, "result.txt"), key_item) for file in os.listdir(test_dir) if file.startswith("gpt_hh.evolved.20")]
+            if upper_bound:
+                gpt_evo_gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in gpt_evo_hhs if upper_bound]
+                mean_evo_gap = np.mean(gpt_evo_gap)
+            else:
+                gpt_evo_gap = ["None" for value in gpt_hhs]
+                mean_evo_gap = "None"
+            gpt_evo_hh_value_gap = [f"{gpt_evo_hhs[index]}({gpt_evo_gap[index]}%)" for index in range(len(gpt_evo_hhs))]
+            print(f"{problem}, {data}, gpt_hh, {gpt_evo_hh_value_gap}, {np.mean(gpt_evo_hhs)}({mean_evo_gap}%)")
+
+            print()
+
 dump_all_result()
