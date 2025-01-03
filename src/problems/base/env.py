@@ -37,6 +37,10 @@ class BaseEnv:
         return self.validation_solution(self.current_solution)
 
     @property
+    def continue_run(self) -> bool:
+        return True
+
+    @property
     def key_value(self) -> float:
         return self.state_data[self.key_item]
 

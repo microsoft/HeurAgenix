@@ -14,6 +14,10 @@ class MDPEnv(BaseEnv):
     def is_complete_solution(self) -> bool:
         return self.done
 
+    @property
+    def continue_run(self) -> bool:
+        return not self.done
+
     def reset(self, experiment_name: str=None):
         self.gym_env.reset()
         super().reset(experiment_name)
