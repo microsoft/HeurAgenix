@@ -38,8 +38,8 @@ def main():
         heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
     elif heuristic_type == "evolved":
         heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", "evolved_heuristics"))
-        evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
-        heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
+        # evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
+        # heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
 
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
