@@ -43,6 +43,8 @@ class GPTSelectionHyperHeuristic:
         current_steps = 0
         while current_steps <= max_steps and env.continue_run:
             try:
+                if env.is_complete_solution:
+                    env.dump_result()
                 self.gpt_helper.load_chat("heuristic_pool")
 
                 # Generate state heuristic value
