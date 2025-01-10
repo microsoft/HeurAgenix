@@ -208,19 +208,19 @@ def rh_solver(config, start_time, lookahead_steps,
 	}
 
 	next_initial_state = {
-            # Ensure RideTime values are integers
-            "RideTime": [int(round(rt[i, solution_steps].X)) for i in range(n_EVs)],  
-            
-            # Ensure ChargingStatus values are binary
-            "ChargingStatus": [
-                int(round(ct[i, solution_steps].X)) for i in range(n_EVs)
-            ],  
-            
-            # Ensure SoC values are within [0, 1]
-            "SoC": [
-                max(0.0, min(1.0, SoC[i, solution_steps].X)) for i in range(n_EVs)
-            ],  
-    }
+			# Ensure RideTime values are integers
+			"RideTime": [int(round(rt[i, solution_steps].X)) for i in range(n_EVs)],  
+			
+			# Ensure ChargingStatus values are binary
+			"ChargingStatus": [
+				int(round(ct[i, solution_steps].X)) for i in range(n_EVs)
+			],  
+			
+			# Ensure SoC values are within [0, 1]
+			"SoC": [
+				max(0.0, min(1.0, SoC[i, solution_steps].X)) for i in range(n_EVs)
+			],  
+	}
 
 	recovered_obj_val = 0
 	for i in range(n_EVs):
@@ -238,13 +238,13 @@ if __name__ == "__main__":
 
 	n_EVs = 10
 	test_case = f"all_days_negativePrices_polarizedInitSoC_1for{n_EVs}"
-  lookahead_steps = 16
+	lookahead_steps = 16
 	solution_steps = 1
 	
 	avg_runtime = 0
 	avg_return = 0
 	instance_count = 1
-  data_folder = "test_cases_adjusted"
+	data_folder = "test_cases_adjusted"
 	results_folder = "results_updated"
 	policy_name = f"rh_lookahead_{lookahead_steps}steps"
 	
