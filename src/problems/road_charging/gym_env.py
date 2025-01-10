@@ -287,7 +287,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("start charging.")
 					next_state = (0, 1, next_SoC)
-					reward = -self.h - self.p[t] * np.minimum(self.c_r[i], (1-SoC)*self.max_cap)
+					reward = -self.h - self.p[t] * np.minimum(self.c_r[i], (1-next_SoC)*self.max_cap)
 
 			else:
 				raise ValueError("This condition should never occur.")
