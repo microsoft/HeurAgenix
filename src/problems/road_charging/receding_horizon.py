@@ -271,11 +271,7 @@ if __name__ == "__main__":
 		start_runtime = time.time()  # Record the start time
 		while start_time < max_time_step:
 			try:
-				current_solution, next_initial_state, obj_val, penalty_val = rh_solver(config, 
-																		start_time,
-																			lookahead_steps,
-																			solution_steps,
-																			initial_states)
+				current_solution, next_initial_state, obj_val, penalty_val = rh_solver(config, start_time,lookahead_steps,initial_states)
 			except Exception as e:
 				print(f"Solver failed at step {start_time}: {str(e)}")
 				break
