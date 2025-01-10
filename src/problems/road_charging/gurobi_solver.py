@@ -15,7 +15,7 @@ def main():
 	n_chargers = 1
 	SoC_data_type = "high"
 	test_case = f"all_days_negativePrices_{SoC_data_type}InitSoC_{n_chargers}for{n_EVs}"
-  data_folder = "test_cases_adjusted"
+	data_folder = "test_cases_adjusted"
 	results_folder = "results_updated"
 	policy_name = "milp_solver_5min"
 	
@@ -305,7 +305,5 @@ def main():
 	print(f"Average Final Violations: {avg_violation:.2f}")
 
 
-
 if __name__ == "__main__":
 	main()
-
