@@ -1,0 +1,3 @@
+global_data (dict): The global data dict containing the global instance data with:
+    - "capacity" (int): The capacity for each bin.
+    - "item_num" (int): Total item number.

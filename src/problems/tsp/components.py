@@ -5,12 +5,13 @@ class Solution(BaseSolution):
     A list of integers where each integer represents a node (city) in the TSP tour.
     The order of the nodes in the list defines the order in which the cities are visited in the tour.
     """
-    def __init__(self, tour: list[int], node_num: int=None):
+    def __init__(self, tour: list[int]):
         self.tour = tour
-        self.node_num = node_num
 
     def __str__(self) -> str:
-        return "tour: " + "->".join(map(str, self.tour))
+        if len(self.tour) > 0:
+            return "tour: " + "->".join(map(str, self.tour + [self.tour[0]]))
+        return "tour: "
 
 
 class AppendOperator(BaseOperator):
@@ -20,7 +21,7 @@ class AppendOperator(BaseOperator):
 
     def run(self, solution: Solution) -> Solution:
         new_tour = solution.tour + [self.node]
-        return Solution(new_tour, solution.node_num)
+        return Solution(new_tour)
 
 
 class InsertOperator(BaseOperator):
@@ -31,7 +32,7 @@ class InsertOperator(BaseOperator):
 
     def run(self, solution: Solution) -> Solution:
         new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
-        return Solution(new_tour, solution.node_num)
+        return Solution(new_tour)
 
 
 class SwapOperator(BaseOperator):
@@ -48,7 +49,7 @@ class SwapOperator(BaseOperator):
             assert index_a is not None 
             assert index_b is not None
             new_tour[index_a], new_tour[index_b] = new_tour[index_b], new_tour[index_a]
-        return Solution(new_tour, solution.node_num)
+        return Solution(new_tour)
 
 
 class ReplaceOperator(BaseOperator):
@@ -60,7 +61,7 @@ class ReplaceOperator(BaseOperator):
     def run(self, solution: Solution) -> Solution:
         index = solution.tour.index(self.node)
         new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
-        return Solution(new_tour, solution.node_num)
+        return Solution(new_tour)
 
 
 class ReverseSegmentOperator(BaseOperator):
@@ -83,7 +84,6 @@ class ReverseSegmentOperator(BaseOperator):
                 new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
             else:
                 # Reverse the segment outside start_index and end_index (inclusive)
-                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index ] + list(reversed(new_tour[:end_index + 1]))
+                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index] + list(reversed(new_tour[:end_index + 1]))
 
-
-        return Solution(new_tour, solution.node_num)  
+        return Solution(new_tour)  

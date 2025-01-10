@@ -1,7 +1,7 @@
 import os
 import importlib
 import traceback
-from src.util.util import extract, load_heuristic
+from src.util.util import extract, load_heuristic, search_file
 from src.util.gpt_helper import GPTHelper
 
 
@@ -46,7 +46,8 @@ class EvaluationFunctionGenerator:
         self.gpt_helper.dump(f"state_data_feature")
 
         # Verify and revision code
-        global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
+        if smoke_test:
+            global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
         while smoke_test and global_error_message is not None:
             self.gpt_helper.load(global_error_message)
             self.gpt_helper.chat()
@@ -69,17 +70,17 @@ class EvaluationFunctionGenerator:
 
     def smoke_test(self, global_data_feature_code: str, state_data_feature_code: str) -> str:
         # Load smoke data
-        smoke_data_dir = os.path.join("src", "problems", self.problem, "data", "smoke_data")
+        smoke_data_dir = search_file("smoke_data", problem=self.problem)
         previous_operations = []
         if os.path.exists(os.path.join(smoke_data_dir, "previous_operations.txt")):
             previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
-        smoke_data = [file for file in os.listdir(smoke_data_dir) if file != "previous_operations"][0]
-        smoke_data = [file for file in os.listdir(smoke_data_dir) if file[:10] == "smoke_data"][0]
+        smoke_data = [file for file in os.listdir(smoke_data_dir) if file != "previous_operations.txt"][0]
+        smoke_data = os.path.join(smoke_data_dir, smoke_data)
 
         # Prepare env
         module = importlib.import_module(f"src.problems.{self.problem}.env")
         globals()["Env"] = getattr(module, "Env")
-        if os.path.exists(os.path.join("src", "problems", self.problem, "components")):
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
             module = importlib.import_module(f"src.problems.{self.problem}.components")
         else:
             module = importlib.import_module(f"src.problems.base.mdp_components")
@@ -92,7 +93,7 @@ class EvaluationFunctionGenerator:
             env.run_operator(eval(previous_operation.strip()))
         try:
             # Load global data feature extractor and run
-            global_data_feature_extractor = load_heuristic(global_data_feature_code, "get_global_data_feature")
+            global_data_feature_extractor = load_heuristic(global_data_feature_code, function_name="get_global_data_feature")
             global_data_feature = global_data_feature_extractor(env.global_data)
             assert global_data_feature is not None
         except Exception as e:
@@ -100,7 +101,7 @@ class EvaluationFunctionGenerator:
             return f"We got error when run get_global_data_feature:\n{error_message}. Please fix up the get_global_data_feature function in same format.", None
         try:
             # Load state data feature extractor and run
-            state_data_feature_extractor = load_heuristic(state_data_feature_code, "get_state_data_feature")
+            state_data_feature_extractor = load_heuristic(state_data_feature_code, function_name="get_state_data_feature")
             state_data_feature = state_data_feature_extractor(env.global_data, env.state_data)
             assert state_data_feature is not None
         except Exception as e:

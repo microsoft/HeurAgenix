@@ -2,10 +2,11 @@ import os
 import json
 import re
 import base64
+import importlib
 from openai import AzureOpenAI
 from time import sleep
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from src.util.util import load_framework_description
+from src.util.util import extract, load_framework_description
 
 
 class GPTHelper:
@@ -42,16 +43,12 @@ class GPTHelper:
         self.reset(output_dir)
 
     def reset(self, output_dir:str=None) -> None:
-        self.current_message = []
         self.messages = []
         if output_dir is not None:
             self.output_dir = output_dir
             os.makedirs(output_dir, exist_ok=True)
 
     def chat(self) -> str:
-        if self.current_message != []:
-            self.messages.append({"role": "user", "content": self.current_message})
-            self.current_message = []
 
         for index in range(self.max_attempts):
             try:
@@ -89,7 +86,7 @@ class GPTHelper:
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)
 
-    def load_background(self, problem: str) -> dict:
+    def load_background(self, problem: str, reference_data: str=None) -> dict:
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
         if os.path.exists(os.path.join("src", "problems", problem, "components.py")):
@@ -98,18 +95,29 @@ class GPTHelper:
             component_code = open(os.path.join("src", "problems", "base", "mdp_components.py")).read()
         solution_class_str, operator_class_str = load_framework_description(component_code)
 
+        env_summarize = "All data is possible"
+        if reference_data:
+            module = importlib.import_module(f"src.problems.{problem}.env")
+            globals()["Env"] = getattr(module, "Env")
+            env = Env(reference_data)
+            env_summarize = env.summarize_env()
+
         prompt_dict = {
             "problem": problem,
             "problem_description": open(os.path.join(problem_dir, "problem_description.txt")).read(),
             "global_data_introduction": open(os.path.join(problem_dir, "global_data.txt")).read(),
             "state_data_introduction": open(os.path.join(problem_dir, "state_data.txt")).read(),
             "solution_class": solution_class_str,
-            "operator_class": operator_class_str
+            "operator_class": operator_class_str,
+            "env_summarize": env_summarize
         }
 
         self.load("background", prompt_dict)
-        self.chat()
+        response = self.chat()
+        is_cop = extract(response, "is_cop", "\n")
         self.dump("background")
+        if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
+            raise BaseException("Not combination optimization problem")
         return prompt_dict
 
     def load(self, message: str, replace: dict={}) -> None:
@@ -130,24 +138,24 @@ class GPTHelper:
         image_key = r"\[image: (.*?)\]"
         texts = re.split(image_key, message)
         images = re.compile(image_key).findall(message)
+        current_message = []
         for i in range(len(texts)):
             if i % 2 == 1:
                 encoded_image = base64.b64encode(open(images[int((i - 1)/ 2)], 'rb').read()).decode('ascii')
-                self.current_message.append({
+                current_message.append({
                     "type": "image_url",
                     "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
                     "image_path": images[int((i - 1)/ 2)]
                 })
             else:
-                self.current_message.append({
+                current_message.append({
                     "type": "text",
                     "text": texts[i]
                 })
+        self.messages.append({"role": "user", "content": current_message})
 
     def dump(self, output_name: str=None) -> str:
         if self.output_dir != None and output_name != None:
-            if self.current_message != []:
-                self.messages.append({"role": "user", "content": self.current_message})
             json_output_file = os.path.join(self.output_dir, f"{output_name}.json")
             text_output_file = os.path.join(self.output_dir, f"{output_name}.txt")
             print(f"Chat dumped to {text_output_file}")
