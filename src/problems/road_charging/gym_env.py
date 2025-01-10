@@ -42,8 +42,10 @@ class RoadCharging(Env):
 		self.payment_rates_24hrs = config["payment_rates_data($)"][self.ride_data_type]
 		self.assign_probs_24hrs = config["order_assign_probs_data"][self.ride_data_type+f"_{self.delta_t}"]
 		self.charging_prices_24hrs = config["charging_prices($/kWh)"]
-		self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.ride_data_type]
-		self.rt_bins = config["ride_time_probs_data"]['bin_edges']
+		# self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.ride_data_type]
+		# self.rt_bins = config["ride_time_probs_data"]['bin_edges']
+		self.probs_df = pd.DataFrame(config["ride_time_probs_data"])
+		self.scenario_probs = self.probs_df[self.ride_data_type].values
 		self.config = config
 
 		# Observation space: n agents, each with 4 state variables
@@ -84,7 +86,7 @@ class RoadCharging(Env):
 					"Hours Sorted by Probability of Receiving Ride Orders": np.argsort(self.assign_probs_24hrs)[::-1].tolist(),
 				},
 				"Ride Info": {
-					"Discretized Ride Time Probability Distribution": dict(zip(self.rt_bins, self.rt_probs)),
+					"Discretized Ride Time Probability Distribution": dict(zip(self.probs_df["Ride Time Range (Minutes)"].values, self.scenario_probs)),
 					"Unit Step Ride Order Payment Rate (USD)": self.payment_rates_24hrs,
 					"Hour of Maximum Payment Rate": np.argmax(self.payment_rates_24hrs),
 					"Hour of Minimum Payment Rate": np.argmin(self.payment_rates_24hrs),
@@ -161,20 +163,26 @@ class RoadCharging(Env):
 
 
 	def generate_random_ride_times(self):
-
-		bin_centers = [(self.rt_bins[i] + self.rt_bins[i + 1]) / 2 for i in range(len(self.rt_bins) - 1)]
-
+     
 		ride_times = []
 		for i in range(self.n):
-			if np.random.random() < self.rho[self.obs["TimeStep"][i]]:
-				bin_index = np.random.choice(len(bin_centers), size=1, p=self.rt_probs)[0]  
-				x = np.exp(np.random.uniform(low=self.bins[bin_index], high=self.bins[bin_index + 1]) ) 
-				ride_time = math.ceil(x / self.delta)
+			order_prob = self.rho[self.obs["TimeStep"][i]] 
+			
+			if np.random.random() < order_prob:  
+				row_index = np.random.choice(self.probs_df.index, size=1, p=self.scenario_probs)
+				
+				bin_range = self.probs_df.loc[row_index, 'Ride Time Range (Minutes)'].iloc[0]  # Get the range as a string
+				
+				lower_bound, upper_bound = map(int, bin_range.split(' - '))  # Split and convert to integers
+			
+				x = np.random.uniform(lower_bound, upper_bound)
+		
+				ride_time = int(math.ceil(x / self.delta))
 			else:
-				ride_time = 0
-
+				ride_time = 0  # No order in this time step
+	
 			ride_times.append(int(ride_time)) 
-
+		
 		return ride_times
 	
 	def get_agent_state(self, agent_index):
@@ -254,7 +262,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("about to finish ride, start charging.")
 					next_state = (0, 1, next_SoC)
-					reward = -self.h - self.p[t] * np.minimum(self.c_r[i], (1-SoC)*self.max_cap)
+					reward = -self.h - self.p[t] * np.minimum(self.c_r[i], (1-next_SoC)*self.max_cap)
 			   
 
 			elif rt == 0 and ct > 0:
@@ -269,7 +277,7 @@ class RoadCharging(Env):
 				elif action == 1:
 					# print("continue charging.")
 					next_state = (0, 1, next_SoC)
-					reward = - self.p[t] * np.minimum(self.c_r[i], (1-SoC)*self.max_cap)
+					reward = - self.p[t] * np.minimum(self.c_r[i], (1-next_SoC)*self.max_cap)
 
 			elif rt == 0 and ct== 0: # Idle state
 				
