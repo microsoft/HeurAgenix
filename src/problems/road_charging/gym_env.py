@@ -20,21 +20,21 @@ class RoadCharging(Env):
 		with open(config_fname, "r") as file:
 			config = json.load(file)
 			
-		self.n = config["fleet_size"]  # Number of agents (EVs)
-		self.m = config["n_chargers"]  # Number of chargers
+		self.n = config["fleet_size"]  # Number of EVs (agents) in the fleet
+		self.m = config["n_chargers"]  # Number of available chargers
 		self.k = config["max_time_step"]  # Maximum number of time steps
-		self.delta_t = config["time_step_size"]
-		self.h = config["connection_fee($)"]  # Connection fee
-		self.max_cap = config["max_cap"]
-		self.low_SoC = config["low_SoC"]
-		self.initial_SoCs = config["initial_SoCs"]
-		self.d_rates = config["d_rates(%)"]
-		self.c_rates = config["c_rates(%)"]
-		self.c_r = config["charging_powers(kWh)"]
-		self.w = config["w"]
-		self.rho = config["rho"]
-		self.p = config["p"]
-		self.ride_time_instance = np.array(config["ride_data_instance"])
+		self.delta_t = config["time_step_size"]  # Duration of one time step (in minutes)
+		self.h = config["connection_fee($)"]  # First-time connection fee
+		self.max_cap = config["max_cap"]  # Maximum battery capacity (kWh)
+		self.low_SoC = config["low_SoC"]  # Threshold for low battery SoC (e.g., 10%)
+		self.initial_SoCs = config["initial_SoCs"]  # Initial SoC values for each EV
+		self.d_rates = config["d_rates(%)"]  # Discharging rates (as percentages)
+		self.c_rates = config["c_rates(%)"]  # Charging rates (as percentages)
+		self.c_r = config["charging_powers(kWh)"]  # Charging power in kWh
+		self.w = config["w"]  # Payment per unit of ride time
+		self.rho = config["rho"]  # Probability of order assignment
+		self.p = config["p"]  # Charging prices
+		self.ride_time_instance = np.array(config["ride_data_instance"])  # Ride time data sampled from distribution
 		
 		self.ride_data_type = config["ride_data_type"]
 		self.charging_data_type = config["charging_data_type"]
@@ -42,10 +42,8 @@ class RoadCharging(Env):
 		self.payment_rates_24hrs = config["payment_rates_data($)"][self.ride_data_type]
 		self.assign_probs_24hrs = config["order_assign_probs_data"][self.ride_data_type+f"_{self.delta_t}"]
 		self.charging_prices_24hrs = config["charging_prices($/kWh)"]
-		# self.rt_probs = config["ride_time_probs_data"]['probabilities'][self.ride_data_type]
-		# self.rt_bins = config["ride_time_probs_data"]['bin_edges']
-		self.probs_df = pd.DataFrame(config["ride_time_probs_data"])
-		self.scenario_probs = self.probs_df[self.ride_data_type].values
+		self.ride_time_probs_data = pd.DataFrame(config["ride_time_probs_data"])
+		self.ride_scenario_probs = self.ride_time_probs_data[self.ride_data_type].values
 		self.config = config
 
 		# Observation space: n agents, each with 4 state variables
@@ -86,7 +84,7 @@ class RoadCharging(Env):
 					"Hours Sorted by Probability of Receiving Ride Orders": np.argsort(self.assign_probs_24hrs)[::-1].tolist(),
 				},
 				"Ride Info": {
-					"Discretized Ride Time Probability Distribution": dict(zip(self.probs_df["Ride Time Range (Minutes)"].values, self.scenario_probs)),
+					"Discretized Ride Time Probability Distribution": dict(zip(self.ride_time_probs_data["Ride Time Range (Minutes)"].values, self.ride_scenario_probs)),
 					"Unit Step Ride Order Payment Rate (USD)": self.payment_rates_24hrs,
 					"Hour of Maximum Payment Rate": np.argmax(self.payment_rates_24hrs),
 					"Hour of Minimum Payment Rate": np.argmin(self.payment_rates_24hrs),
@@ -169,9 +167,9 @@ class RoadCharging(Env):
 			order_prob = self.rho[self.obs["TimeStep"][i]] 
 			
 			if np.random.random() < order_prob:  
-				row_index = np.random.choice(self.probs_df.index, size=1, p=self.scenario_probs)
+				row_index = np.random.choice(self.ride_time_probs_data.index, size=1, p=self.ride_scenario_probs)
 				
-				bin_range = self.probs_df.loc[row_index, 'Ride Time Range (Minutes)'].iloc[0]  # Get the range as a string
+				bin_range = self.ride_time_probs_data.loc[row_index, 'Ride Time Range (Minutes)'].iloc[0]  # Get the range as a string
 				
 				lower_bound, upper_bound = map(int, bin_range.split(' - '))  # Split and convert to integers
 			
