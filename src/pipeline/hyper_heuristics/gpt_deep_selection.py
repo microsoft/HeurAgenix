@@ -5,7 +5,7 @@ from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
-from src.util.gpt_helper_debug import GPTHelper
+from src.util.gpt_helper import GPTHelper
 
 
 class GPTDeepSelectionHyperHeuristic:
@@ -30,7 +30,7 @@ class GPTDeepSelectionHyperHeuristic:
         search_time = search_time if search_time is not None else math.floor(env.construction_steps / 10)
 
         search_interval = 5
-        search_time = 40
+        search_time = 20
 
         # Load background
         prompt_dict = self.gpt_helper.load_background(self.problem)
@@ -131,6 +131,7 @@ class GPTDeepSelectionHyperHeuristic:
                                 if best_result is None or env.compare(random_mcts_env.key_value, best_result) >= 0:
                                     random_mcts_env.dump_result(dump_trajectory=True)
                                     best_result = random_mcts_env.key_value
+                                    best_result_env = copy.deepcopy(random_mcts_env)
                         # Compare result
                         if len(results) > 0:
                             average_score = sum(results) / len(results)
@@ -166,5 +167,5 @@ class GPTDeepSelectionHyperHeuristic:
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)
-        
+        env = copy.deepcopy(best_result_env)
         return env.is_complete_solution and env.is_valid_solution
