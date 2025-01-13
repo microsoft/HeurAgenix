@@ -71,12 +71,13 @@ class GPTDeepSelectionHyperHeuristic:
         current_steps = 0
         chat_index = 0
         best_result = None
+        pre_step_env = copy.deepcopy(env)
         while current_steps <= max_steps and env.continue_run:
             try:
                 # Select heuristic category
                 self.gpt_helper.load_chat("make_plan")
-                state_data_feature = self.get_state_data_feature_function(env.global_data, env.state_data)
-                prompt_dict["state_data_feature"] = filter_dict_to_str([env.state_data, state_data_feature], data_feature_content_threshold)
+                state_data_feature = self.get_state_data_feature_function(pre_step_env.global_data, pre_step_env.state_data)
+                prompt_dict["state_data_feature"] = filter_dict_to_str([pre_step_env.state_data, state_data_feature], data_feature_content_threshold)
                 if heuristic_traject == []:
                     heuristic_trajectory_str = "None"
                     last_heuristic = "None"
@@ -90,12 +91,12 @@ class GPTDeepSelectionHyperHeuristic:
                 prompt_dict["heuristic_traject"] = heuristic_trajectory_str
                 prompt_dict["last_heuristic"] = last_heuristic
                 prompt_dict["last_heuristic_category"] = last_heuristic_category
-                state_data_feature = self.get_state_data_feature_function(env.global_data, env.state_data)
-                state_data_feature.update(env.state_data)
+                state_data_feature = self.get_state_data_feature_function(pre_step_env.global_data, pre_step_env.state_data)
+                state_data_feature.update(pre_step_env.state_data)
                 for key, value in global_data_feature.items():  
                     if len(str(key) + str(value)) <= data_feature_content_threshold:  
                         prompt_dict[key] = value
-                        prompt_dict.update(env.global_data)
+                        prompt_dict.update(pre_step_env.global_data)
 
                 self.gpt_helper.load("heuristic_category_selection", prompt_dict)
                 response = self.gpt_helper.chat()
@@ -111,19 +112,18 @@ class GPTDeepSelectionHyperHeuristic:
                     candidate_heuristics = classified_heuristic[selected_heuristic_category]
                     
                     # MCTS for best heuristic in target heuristic category
-                    pre_status = env.get_observation()
-                    last_step_env = copy.deepcopy(env)
+                    pre_status = pre_step_env.get_observation()
                     best_average_score = None
                     best_heuristic = None
                     for heuristic in candidate_heuristics:
                         # Run current heuristic for search interval times
-                        last_step_after_heuristic_env = copy.deepcopy(last_step_env)
+                        after_heuristic_env = copy.deepcopy(pre_step_env)
                         for _ in range(search_interval):
-                            last_step_after_heuristic_env.run_heuristic(heuristic)
+                            after_heuristic_env.run_heuristic(heuristic)
                         results = []
                         # MCTS to evaluate heuristic performance
                         for _ in range(search_time):
-                            random_mcts_env = copy.deepcopy(last_step_after_heuristic_env)
+                            random_mcts_env = copy.deepcopy(after_heuristic_env)
                             complete_and_valid_solution = random_hh.run(random_mcts_env, max_steps=int(env.construction_steps*2))
                             if complete_and_valid_solution:
                                 results.append(random_mcts_env.key_value)
@@ -139,16 +139,14 @@ class GPTDeepSelectionHyperHeuristic:
                             if not best_average_score or env.compare(average_score, best_average_score) > 0:
                                 best_average_score = average_score
                                 best_heuristic = heuristic
-                                best_heuristic_env = copy.deepcopy(last_step_after_heuristic_env)
+                                best_heuristic_env = copy.deepcopy(after_heuristic_env)
 
                     # Restore best heuristic
-                    if not best_heuristic:
-                        env = copy.deepcopy(last_step_env)
-                    else:
-                        env = copy.deepcopy(best_heuristic_env)
+                    if best_heuristic:
+                        pre_step_env = copy.deepcopy(best_heuristic_env)
 
                     # Record
-                    cur_status = env.get_observation()
+                    cur_status = pre_step_env.get_observation()
                     heuristic_dict = {
                         "Heuristic": best_heuristic.__name__,
                         "Heuristic Category": selected_heuristic_category,
@@ -161,11 +159,12 @@ class GPTDeepSelectionHyperHeuristic:
                     current_steps += search_interval
                 elif "Stop" in response or "None" in response:
                     # Check to stop
-                    if env.is_complete_solution:
+                    if pre_step_env.is_complete_solution:
                         break
                 chat_index += 1
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)
-        env = copy.deepcopy(best_result_env)
+        for attr in vars(env):
+            setattr(env, attr, getattr(best_result_env, attr))
         return env.is_complete_solution and env.is_valid_solution
