@@ -1,8 +1,12 @@
-import copy
+import concurrent
+from copy import deepcopy
+import dill
 import math
+import multiprocessing
+import multiprocessing.managers
 import traceback
+import os
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
-from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
 from src.util.gpt_helper import GPTHelper
@@ -17,48 +21,47 @@ class GPTDeepSelectionHyperHeuristic:
     ) -> None:
         self.gpt_helper = gpt_helper
         self.problem = problem
-        self.heuristic_pool = heuristic_pool
-        self.heuristic_pools = {
-            heuristic_file.split(".")[0]: load_heuristic(heuristic_file, problem=self.problem)
-            for heuristic_file in heuristic_pool}
-        self.get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
-        self.get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
+        self.heuristic_pool = [heuristic_name.split(os.sep)[-1].split(".")[0] for heuristic_name in heuristic_pool]
 
     def run(self, env:BaseEnv, max_steps: int=None, data_feature_content_threshold: int=1000, search_interval: int=None, search_time: int=None, **kwargs) -> bool:
+        # Init parameters
         max_steps = max_steps if max_steps is not None else env.construction_steps * 3
+        running_max_steps = env.construction_steps * 2
         search_interval = search_interval if search_interval is not None else math.floor(env.construction_steps / 20)
         search_time = search_time if search_time is not None else math.floor(env.construction_steps / 10)
 
-        search_interval = 5
-        search_time = 20
+        # Init feature function
+        get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
+        get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
+        
 
         # Load background
         prompt_dict = self.gpt_helper.load_background(self.problem)
 
         # Classify heuristic pool
-        prompt_dict["heuristic_pool_introduction"] = "\n".join([open(search_file(heuristic_file, self.problem)).read() for heuristic_file in self.heuristic_pool])
+        prompt_dict["heuristic_pool_introduction"] = "\n".join([open(search_file(heuristic_file + ".py", self.problem)).read() for heuristic_file in self.heuristic_pool])
         self.gpt_helper.load("heuristic_classification", prompt_dict)
         response = self.gpt_helper.chat()
         heuristic_classification = extract(response, "heuristic_classification", sep="\n")
         classified_heuristic = {}
         classified_heuristic_introduction = ""
-        heuristic_pool_names = []
+        all_useful_heuristics = []
         for classification in heuristic_classification:
             classification_name = classification.split(":")[0]
             heuristic_names = classification.split(":")[1].split(";")[0].split(",")
-            heuristic_pool_names.extend(heuristic_names)
+            all_useful_heuristics.extend(heuristic_names)
             reason = classification.split(":")[1].split(";")[-1]
             classified_heuristic[classification_name] = []
             classified_heuristic_introduction += f"\n{classification_name}: {reason}\n"
             for heuristic_name in heuristic_names:
-                classified_heuristic[classification_name].append(self.heuristic_pools[heuristic_name])
+                assert heuristic_name in self.heuristic_pool
+                classified_heuristic[classification_name].append(heuristic_name)
                 classified_heuristic_introduction += extract_function_with_short_docstring(open(search_file(heuristic_name + ".py", self.problem)).read(), heuristic_name) + "\n"
         self.gpt_helper.dump("heuristic_classification")
-        random_hh = RandomHyperHeuristic(heuristic_pool=heuristic_pool_names, problem=self.problem)
 
         # Make plan
         self.gpt_helper.load_chat("background")
-        global_data_feature = self.get_global_data_feature_function(env.global_data)
+        global_data_feature = get_global_data_feature_function(env.global_data)
         prompt_dict["global_data_feature"] = filter_dict_to_str([env.global_data, global_data_feature], data_feature_content_threshold)
         prompt_dict["category_names"] = ",".join(classified_heuristic.keys())
         prompt_dict["classified_heuristic_introduction"] = classified_heuristic_introduction
@@ -70,14 +73,15 @@ class GPTDeepSelectionHyperHeuristic:
         heuristic_traject = []
         current_steps = 0
         chat_index = 0
-        best_result = None
-        pre_step_env = copy.deepcopy(env)
-        while current_steps <= max_steps and env.continue_run:
+        manager = multiprocessing.Manager()
+        best_result_proxy = manager.Value('d', float('-inf'))
+        env_work = deepcopy(env)
+        while current_steps <= max_steps and env_work.continue_run:
             try:
                 # Select heuristic category
                 self.gpt_helper.load_chat("make_plan")
-                state_data_feature = self.get_state_data_feature_function(pre_step_env.global_data, pre_step_env.state_data)
-                prompt_dict["state_data_feature"] = filter_dict_to_str([pre_step_env.state_data, state_data_feature], data_feature_content_threshold)
+                state_data_feature = get_state_data_feature_function(env_work.global_data, env_work.state_data)
+                prompt_dict["state_data_feature"] = filter_dict_to_str([env_work.state_data, state_data_feature], data_feature_content_threshold)
                 if heuristic_traject == []:
                     heuristic_trajectory_str = "None"
                     last_heuristic = "None"
@@ -91,12 +95,12 @@ class GPTDeepSelectionHyperHeuristic:
                 prompt_dict["heuristic_traject"] = heuristic_trajectory_str
                 prompt_dict["last_heuristic"] = last_heuristic
                 prompt_dict["last_heuristic_category"] = last_heuristic_category
-                state_data_feature = self.get_state_data_feature_function(pre_step_env.global_data, pre_step_env.state_data)
-                state_data_feature.update(pre_step_env.state_data)
+                state_data_feature = get_state_data_feature_function(env_work.global_data, env_work.state_data)
+                state_data_feature.update(env_work.state_data)
                 for key, value in global_data_feature.items():  
                     if len(str(key) + str(value)) <= data_feature_content_threshold:  
                         prompt_dict[key] = value
-                        prompt_dict.update(pre_step_env.global_data)
+                        prompt_dict.update(env_work.global_data)
 
                 self.gpt_helper.load("heuristic_category_selection", prompt_dict)
                 response = self.gpt_helper.chat()
@@ -112,43 +116,22 @@ class GPTDeepSelectionHyperHeuristic:
                     candidate_heuristics = classified_heuristic[selected_heuristic_category]
                     
                     # MCTS for best heuristic in target heuristic category
-                    pre_status = pre_step_env.get_observation()
-                    best_average_score = None
-                    best_heuristic = None
-                    for heuristic in candidate_heuristics:
-                        # Run current heuristic for search interval times
-                        after_heuristic_env = copy.deepcopy(pre_step_env)
-                        for _ in range(search_interval):
-                            after_heuristic_env.run_heuristic(heuristic)
-                        results = []
-                        # MCTS to evaluate heuristic performance
-                        for _ in range(search_time):
-                            random_mcts_env = copy.deepcopy(after_heuristic_env)
-                            complete_and_valid_solution = random_hh.run(random_mcts_env, max_steps=int(env.construction_steps*2))
-                            if complete_and_valid_solution:
-                                results.append(random_mcts_env.key_value)
-                                # Save best
-                                if best_result is None or env.compare(random_mcts_env.key_value, best_result) >= 0:
-                                    random_mcts_env.dump_result(dump_trajectory=True)
-                                    best_result = random_mcts_env.key_value
-                                    best_result_env = copy.deepcopy(random_mcts_env)
-                        # Compare result
-                        if len(results) > 0:
-                            average_score = sum(results) / len(results)
-                            # Select best heuristic
-                            if not best_average_score or env.compare(average_score, best_average_score) > 0:
-                                best_average_score = average_score
-                                best_heuristic = heuristic
-                                best_heuristic_env = copy.deepcopy(after_heuristic_env)
-
-                    # Restore best heuristic
-                    if best_heuristic:
-                        pre_step_env = copy.deepcopy(best_heuristic_env)
+                    pre_status = env_work.get_observation()
+                    best_heuristic_name, env_work = compare_heuristics(
+                        env_work,
+                        candidate_heuristics,
+                        all_useful_heuristics,
+                        running_max_steps,
+                        search_interval,
+                        search_time,
+                        best_result_proxy,
+                        self.problem
+                    )
 
                     # Record
-                    cur_status = pre_step_env.get_observation()
+                    cur_status = env_work.get_observation()
                     heuristic_dict = {
-                        "Heuristic": best_heuristic.__name__,
+                        "Heuristic": best_heuristic_name,
                         "Heuristic Category": selected_heuristic_category,
                         "Running Steps": search_interval,
                         "Explain": explain
@@ -159,12 +142,93 @@ class GPTDeepSelectionHyperHeuristic:
                     current_steps += search_interval
                 elif "Stop" in response or "None" in response:
                     # Check to stop
-                    if pre_step_env.is_complete_solution:
+                    if env_work.is_complete_solution:
                         break
+                    else:
+                        chat_index -= 1
                 chat_index += 1
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)
         for attr in vars(env):
-            setattr(env, attr, getattr(best_result_env, attr))
+            setattr(env, attr, getattr(env_work, attr))
         return env.is_complete_solution and env.is_valid_solution
+
+
+def simulate(
+        env_serialized: bytes,
+        useful_heuristic_names: list[str],
+        max_steps: int,
+        best_result_proxy: multiprocessing.managers.ValueProxy,
+        problem: str
+) -> float:
+    
+    random_hh = RandomHyperHeuristic(useful_heuristic_names, problem)
+    env = dill.loads(env_serialized)
+    complete_and_valid_solution = random_hh.run(env, max_steps=max_steps)
+
+    if complete_and_valid_solution:
+        # If found best, save it
+        if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) > 0:
+            best_result_proxy.value = env.key_value
+            env.dump_result(True, "best_result.txt")
+        return env.key_value
+    else:
+        return None
+
+def evaluate_heuristic(
+        env_serialized: bytes,
+        heuristic_name: str,
+        useful_heuristic_names: list[str],
+        max_steps: int,
+        search_interval: int,
+        search_time: int,
+        best_result_proxy: multiprocessing.managers.ValueProxy,
+        problem: str,
+) -> tuple[float, str, bytes]:
+    env = dill.loads(env_serialized)
+    heuristic = load_heuristic(heuristic_name, problem)
+    for _ in range(search_interval):
+        env.run_heuristic(heuristic)
+    after_step_env_serialized = dill.dumps(env)
+    # MCTS to evaluate heuristic performance
+    results = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_results = [executor.submit(simulate, after_step_env_serialized, useful_heuristic_names, max_steps, best_result_proxy, problem) for _ in range(search_time)]
+        for future in concurrent.futures.as_completed(future_results):
+            result = future.result()
+            if result:
+                results.append(result)
+    if len(results) > 0:
+        average_score = sum(results) / len(results)
+    else:
+        average_score = None
+    return average_score, after_step_env_serialized
+
+def compare_heuristics(
+        env: BaseEnv,
+        candidate_heuristics: list[str],
+        all_useful_heuristics: list[str],
+        max_steps: int,
+        search_interval: int,
+        search_time: int,
+        best_result_proxy: multiprocessing.managers.ValueProxy,
+        problem: str
+) -> tuple[str, bytes]:
+    best_average_score = None
+    best_after_heuristic_env = None
+    best_heuristic = None
+    env_serialized = dill.dumps(env)
+    futures = []
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for heuristic in candidate_heuristics:
+            future = executor.submit(evaluate_heuristic, env_serialized, heuristic, all_useful_heuristics, max_steps, search_interval, search_time, best_result_proxy, problem)
+            futures.append(future)
+
+    for heuristic_index, future in enumerate(concurrent.futures.as_completed(futures)):
+        average_score, after_step_env_serialized = future.result()
+        if best_average_score is None or env.compare(average_score, best_average_score) > 0:
+            best_average_score = average_score
+            best_after_heuristic_env = after_step_env_serialized
+            best_heuristic = candidate_heuristics[heuristic_index]
+    return best_heuristic, dill.loads(best_after_heuristic_env)
