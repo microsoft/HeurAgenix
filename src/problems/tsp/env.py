@@ -125,10 +125,10 @@ class Env(BaseEnv):
             "Current Cost": self.state_data["current_cost"]
         }
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
             "visited_num": self.state_data["visited_num"]
         }
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content

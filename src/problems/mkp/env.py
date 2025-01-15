@@ -134,11 +134,11 @@ class Env(BaseEnv):
             "Profit": self.state_data["current_profit"],
         }
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "item_num": self.item_num,
             "resource_num": self.resource_num,
             "selected_item_num": self.state_data["items_in_knapsack"]
         }
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content
