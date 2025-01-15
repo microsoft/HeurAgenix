@@ -184,7 +184,7 @@ def evaluate_heuristic(
         search_interval: int,
         search_time: int,
         best_result_proxy: multiprocessing.managers.ValueProxy,
-        problem: str,
+        problem: str
 ) -> tuple[float, str, bytes]:
     env = dill.loads(env_serialized)
     heuristic = load_heuristic(heuristic_name, problem)
@@ -195,10 +195,10 @@ def evaluate_heuristic(
     results = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_results = [executor.submit(simulate, after_step_env_serialized, useful_heuristic_names, max_steps, best_result_proxy, problem) for _ in range(search_time)]
-        for future in concurrent.futures.as_completed(future_results):
-            result = future.result()
-            if result:
-                results.append(result)
+    for future in concurrent.futures.as_completed(future_results):
+        result = future.result()
+        if result:
+            results.append(result)
     if len(results) > 0:
         average_score = sum(results) / len(results)
     else:
@@ -221,9 +221,7 @@ def compare_heuristics(
     env_serialized = dill.dumps(env)
     futures = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        for heuristic in candidate_heuristics:
-            future = executor.submit(evaluate_heuristic, env_serialized, heuristic, all_useful_heuristics, max_steps, search_interval, search_time, best_result_proxy, problem)
-            futures.append(future)
+        futures = [executor.submit(evaluate_heuristic, env_serialized, heuristic, all_useful_heuristics, max_steps, search_interval, search_time, best_result_proxy, problem) for heuristic in candidate_heuristics]
 
     for heuristic_index, future in enumerate(concurrent.futures.as_completed(futures)):
         average_score, after_step_env_serialized = future.result()
