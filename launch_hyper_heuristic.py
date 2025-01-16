@@ -5,6 +5,7 @@ from datetime import datetime
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.gpt_selection import GPTSelectionHyperHeuristic
+from src.pipeline.hyper_heuristics.gpt_deep_selection import GPTDeepSelectionHyperHeuristic
 from src.util.gpt_helper import GPTHelper
 
 def parse_arguments():
@@ -12,7 +13,7 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Generate heuristic")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
-    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'gpt_hh'/'random_hh' for GPT/random selection from the heuristic directory, and 'or_solver' for OR result.")
+    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'gpt_hh' / 'gpt_deep_hh' /'random_hh' for GPT/random selection from the heuristic directory, and 'or_solver' for OR result.")
     parser.add_argument("-d", "--heuristic_type", type=str, default="basic", choices=["basic", "evolved"], help="Directory containing heuristic functions.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Path for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
@@ -50,6 +51,11 @@ def main():
         if heuristic_type == "evolved":
             output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_pool=heuristic_pool, problem=problem)
+    elif heuristic == "gpt_deep_hh":
+        output_dir = f"{heuristic_name}.{datetime_str}"
+        if heuristic_type == "evolved":
+            output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"
+        hyper_heuristic = GPTDeepSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "random_hh":
         output_dir = f"{heuristic_name}.{datetime_str}"
         if heuristic_type == "evolved":

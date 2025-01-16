@@ -211,7 +211,7 @@ class HeuristicEvolver:
         positive_result_file = None
         for _ in range(perturbation_time):
             env.reset(os.path.join(output_dir, "positive_solution"))
-            hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, perturbation_ratio, problem=self.problem)
+            hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, self.problem, perturbation_ratio)
             hyper_heuristic.run(env)
             if env.compare(env.key_value, negative_value) > 0:
                 env.dump_result(dump_trajectory=True)

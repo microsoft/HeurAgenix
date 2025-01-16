@@ -49,10 +49,11 @@ def two_opt_0554(global_data: dict, state_data: dict, algorithm_data: dict, get_
 def two_opt_cost_change(distance_matrix, route, i, j, depot):
     """Calculate the cost difference for a 2-opt move."""
     # Assuming the route is a circular tour
-    A = depot if i == 0 else route[i - 1]
-    B = depot if i == len(route) else route[i]
-    C = depot if j == 0 else route[j - 1]
-    D = depot if j == len(route) else route[j]
+    n = len(route)
+    A = route[(i - 1) % n]
+    B = route[i % n]
+    C = route[(j - 1) % n]
+    D = route[j % n]
     d0 = distance_matrix[A][B] + distance_matrix[C][D]
     d1 = distance_matrix[A][C] + distance_matrix[B][D]
 

@@ -38,6 +38,8 @@ def single_swap_heuristic_b3d6(global_data: dict, state_data: dict, algorithm_da
     current_profit = state_data["current_profit"]
     items_in_knapsack = state_data["items_in_knapsack"]
     items_not_in_knapsack = state_data["items_not_in_knapsack"]
+    validation_solution = state_data["validation_solution"]
+
 
     # Iterate over all pairs of items (one in the knapsack and one not in the knapsack)
     for item_in in items_in_knapsack:
@@ -47,19 +49,17 @@ def single_swap_heuristic_b3d6(global_data: dict, state_data: dict, algorithm_da
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
             
             # Get the state data for the new solution
-            new_state_data = get_state_data_function(Solution(new_solution))
-            # If the new solution is invalid, continue to the next pair
-            if new_state_data is None:
-                continue
+            if validation_solution(Solution(new_solution)):
+                new_state_data = get_state_data_function(Solution(new_solution))
 
-            # Calculate the profit increase for this swap
-            new_profit = new_state_data["current_profit"]
-            profit_increase = new_profit - current_profit
+                # Calculate the profit increase for this swap
+                new_profit = new_state_data["current_profit"]
+                profit_increase = new_profit - current_profit
 
-            # Check if this swap is the best so far and update if necessary
-            if profit_increase > best_profit_increase and all(new <= cap for new, cap in zip(new_state_data["current_weights"], capacities)):
-                best_profit_increase = profit_increase
-                best_swap_operator = SwapOperator(item_in, item_out)
+                # Check if this swap is the best so far and update if necessary
+                if profit_increase > best_profit_increase and all(new <= cap for new, cap in zip(new_state_data["current_weights"], capacities)):
+                    best_profit_increase = profit_increase
+                    best_swap_operator = SwapOperator(item_in, item_out)
 
     # If a valid swap that improves the profit was found, return the corresponding SwapOperator
     if best_swap_operator is not None:

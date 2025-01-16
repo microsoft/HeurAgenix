@@ -35,7 +35,7 @@ def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorith
     for source_vehicle_id, source_route in enumerate(current_solution.routes):
         for source_position, node in enumerate(source_route):
             # Skip if no nodes to shift
-            if not source_route:
+            if not source_route or node == depot:
                 continue
             
             # Calculate the load after removing the node
@@ -54,29 +54,30 @@ def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorith
                 if new_load_target > capacity:
                     continue  # Skip if moving the node violates target vehicle's capacity
                 for target_position in range(len(target_route) + 1):
-                    # Calculate the cost difference if the node is inserted at the target position
-                    source_previous_node = depot if source_position == 0 else source_route[source_position - 1]
-                    source_next_node = depot if source_position + 1 == len(source_route) else source_route[source_position + 1]
-                    target_previous_node = depot if target_position == 0 else target_route[target_position - 1]
-                    target_next_node = depot if target_position == len(target_route) else target_route[target_position]
+                        # Calculate the cost difference if the node is inserted at the target position
+                        source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                        source_next_node = source_route[(source_position + 1) % len(source_route)]
+                        target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                        target_next_node = target_route[target_position % len(target_route)]
 
-                    cost_increase = (
-                        - distance_matrix[source_previous_node][node]
-                        - distance_matrix[node][source_next_node]
-                        + distance_matrix[source_previous_node][source_next_node]
-                        + distance_matrix[target_previous_node][node]
-                        + distance_matrix[node][target_next_node]
-                        - distance_matrix[target_previous_node][target_next_node]
-                    )
-                    cost_reduction = -cost_increase
-                    
-                    # Update best position if this position is better
-                    if cost_reduction > best_cost_reduction:
-                        best_source_vehicle_id = source_vehicle_id
-                        best_source_position = source_position
-                        best_target_vehicle_id = target_vehicle_id
-                        best_target_position = target_position
-                        best_cost_reduction = cost_reduction
+                        cost_increase = (
+                            -distance_matrix[source_previous_node][node]
+                            -distance_matrix[node][source_next_node]
+                            +distance_matrix[source_previous_node][source_next_node]
+                            +distance_matrix[target_previous_node][node]
+                            +distance_matrix[node][target_next_node]
+                            -distance_matrix[target_previous_node][target_next_node]
+                        )
+                        cost_reduction = -cost_increase
+
+                        # Update best shift if this shift is better
+                        if cost_reduction > best_cost_reduction:
+                            best_source_vehicle_id = source_vehicle_id
+                            best_source_position = source_position
+                            best_target_vehicle_id = target_vehicle_id
+                            best_target_position = target_position
+                            best_cost_reduction = cost_reduction
+                        
                 
     # If a beneficial shift is found, return the corresponding operator
     if best_cost_reduction > 0:

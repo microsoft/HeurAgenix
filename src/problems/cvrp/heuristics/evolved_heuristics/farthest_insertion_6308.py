@@ -41,10 +41,10 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
     vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
 
     # Hyper-parameters
-    spread_penalty_weight = kwargs.get("spread_penalty_weight", 1.0)
-    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 1.0)
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.2)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.5)
     apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
-    apply_swap_frequency = kwargs.get("apply_swap_frequency", 3)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
 
     # Check if there are no unvisited nodes
     if not unvisited_nodes:
@@ -55,6 +55,7 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
     best_node = None
     best_vehicle = None
     best_position = None
+    operator = None
 
     for node in unvisited_nodes:
         for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
@@ -93,7 +94,7 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
                     best_position = position
     if best_node is not None and best_vehicle is not None and best_position is not None:
         # Perform the insertion
-        return InsertOperator(best_vehicle, best_node, best_position), {}
+        operator = InsertOperator(best_vehicle, best_node, best_position)
 
     # Step 2: Periodic greedy improvement
     if len(unvisited_nodes) % apply_greedy_frequency == 0:
@@ -111,10 +112,10 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
                     if j == len(route) - 1 and i == 0:
                         continue
 
-                    before = distance_matrix[depot if i == 0 else route[i - 1]][route[i]]
-                    after = distance_matrix[depot if j == len(route) - 1 else route[j]][route[j - 1]]
-                    new_before = distance_matrix[depot if i == 0 else route[i - 1]][route[j - 1]]
-                    new_after = distance_matrix[depot if j == len(route) - 1 else route[j]][route[i]]
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
                     delta = (new_before + new_after) - (before + after)
 
                     if delta < best_delta:
@@ -124,7 +125,7 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
 
         if best_vehicle is not None and best_segment is not None:
             i, j = best_segment
-            return ReverseSegmentOperator(best_vehicle, [(i, j - 1)]), {}
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
 
     # Step 3: Periodic inter-vehicle swapping
     if len(unvisited_nodes) % apply_swap_frequency == 0:
@@ -136,8 +137,8 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
 
         for source_vehicle_id, source_route in enumerate(current_solution.routes):
             for source_position, node in enumerate(source_route):
-                # Skip if no nodes to shift
-                if not source_route:
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
                     continue
 
                 # Calculate the load after removing the node
@@ -156,10 +157,10 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
 
                     for target_position in range(len(target_route) + 1):
                             # Calculate the cost difference if the node is inserted at the target position
-                            source_previous_node = depot if source_position == 0 else source_route[source_position - 1]
-                            source_next_node = depot if source_position + 1 == len(source_route) else source_route[source_position + 1]
-                            target_previous_node = depot if target_position == 0 else target_route[target_position - 1]
-                            target_next_node = depot if target_position == len(target_route) else target_route[target_position]
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
 
                             cost_increase = (
                                 -distance_matrix[source_previous_node][node]
@@ -188,5 +189,7 @@ def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data:
                 target_position=best_target_position
             ), {}
 
+    if operator:
+        return operator, {}
     # If no valid insertion was found
     return None, {}
