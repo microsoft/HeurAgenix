@@ -169,7 +169,7 @@ def simulate(
 
     if complete_and_valid_solution:
         # If found best, save it
-        if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) > 0:
+        if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) >= 0:
             best_result_proxy.value = env.key_value
             env.dump_result(True, "best_result.txt")
         return env.key_value
