@@ -13,8 +13,10 @@ class Solution(BaseSolution):
     def __str__(self) -> str:
         route_string = ""
         for index, route in enumerate(self.routes):
+            depot_index = route.index(self.depot)
+            rotated_route = route[depot_index:] + route[:depot_index] + [self.depot]
             route = [self.depot] + route + [self.depot]
-            route_string += f"vehicle_{index}: " + "->".join(map(str, route)) + "\n"
+            route_string += f"vehicle_{index}: " + "->".join(map(str, rotated_route)) + "\n"
         return route_string
 
 

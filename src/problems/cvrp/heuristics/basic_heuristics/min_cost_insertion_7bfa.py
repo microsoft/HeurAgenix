@@ -36,8 +36,8 @@ def min_cost_insertion_7bfa(global_data: dict, state_data: dict, algorithm_data:
             if vehicle_remaining_capacity[vehicle_id] >= node_demand:
                 for insert_pos in range(len(current_solution.routes[vehicle_id]) + 1):
                     # Calculate the cost increase if we insert the node at this position
-                    before_node = current_solution.routes[vehicle_id][insert_pos - 1] if insert_pos > 0 else depot
-                    after_node = current_solution.routes[vehicle_id][insert_pos] if insert_pos < len(current_solution.routes[vehicle_id]) else depot
+                    before_node = current_solution.routes[vehicle_id][insert_pos - 1] if insert_pos > 0 else current_solution.routes[vehicle_id][-1]
+                    after_node = current_solution.routes[vehicle_id][insert_pos] if insert_pos < len(current_solution.routes[vehicle_id]) else current_solution.routes[vehicle_id][0]
                     cost_increase = (distance_matrix[before_node][node] +
                                      distance_matrix[node][after_node] -
                                      distance_matrix[before_node][after_node])
