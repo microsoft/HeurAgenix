@@ -12,15 +12,15 @@ import os
 from gym import Env, spaces
 from scipy.stats import lognorm
 from gym_env import RoadCharging, ConstrainAction
-from show_trajectory import show_trajectory
+# from show_trajectory import show_trajectory
 
 
 def base_policy(env, state):
-  alpha = state["RideTime"]
-  beta = state["ChargingStatus"]
-  theta = state["SoC"]
+	alpha = state["RideTime"]
+	beta = state["ChargingStatus"]
+	theta = state["SoC"]
   
-  action = np.zeros(env.n, dtype=int)
+	action = np.zeros(env.n, dtype=int)
 	for i in range(env.n):
 		if state["RideTime"][i] >= 2: # if on a ride, must not charge
 			action[i] = 0
@@ -48,19 +48,8 @@ def base_policy(env, state):
 		elif available_capacity > 0:
 
 			if np.any(action == 1):
-				# Scheme #1:
-				# Randomly select from the set of agents requesting charging and set their charging actions to 0
 				to_flip = random.sample(requesting_agents, total_start-available_capacity)
-				# Scheme #2:
-				# sort charging agents based on their SoC from low to high
-				# battery_level = dict()
-				# for i in charging_agents:
-				#     battery_level[i] = env.obs['SoC'][i]
-
-				# sorted_battery_level = dict(sorted(battery_level.items(), key=lambda item: item[1]))
-				# print('sorted_battery_level:', sorted_battery_level)
-				# to_flip = list(sorted_battery_level.keys())[env.m:]
-
+    
 				print('Agents requesting charging:', requesting_agents)
 				print('Flip agents:', to_flip)
 
@@ -76,11 +65,11 @@ def main():
 	n_chargers = 1
 	avg_return = 0
 	SoC_data_type = "high"
-	data_folder = "test_cases_adjusted"
-	results_folder = "results_updated"
+	data_folder = "test_cases"
+	results_folder = "results"
 	policy_name = "base_policy"
 
-  instance_count = 20
+	instance_count = 20
 	for instance_num in range(1, 1+instance_count):
 		test_case = f"all_days_negativePrices_{SoC_data_type}InitSoC_{n_chargers}for{n_EVs}"
 		test_cases_dir = os.path.join(data_folder, test_case)  
@@ -128,7 +117,7 @@ def main():
 		with open(os.path.join(save_dir, f"instance{instance_num}_solutoin.json"), "w") as f:
 			json.dump(solution, f, indent=4)  # Use indent for readability
 			
-		show_trajectory(env.n, env.k, env.trajectory, save_dir)
+		# show_trajectory(env.n, env.k, env.trajectory, save_dir)
   
 		avg_return+=env.ep_return
 
