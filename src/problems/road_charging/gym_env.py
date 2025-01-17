@@ -242,7 +242,7 @@ class RoadCharging(Env):
 				if SoC <= self.low_SoC:
 					order_time = 0
 				else:
-					order_time = np.minimum(random_ride_time, int(round(SoC/self.d_rates[i])))
+					order_time = np.minimum(random_ride_times, int(round(SoC/self.d_rates[i])))
 			
 			if rt >= 2 and ct == 0:
 				# Active ride scenario
@@ -366,7 +366,7 @@ class ConstrainAction(gym.ActionWrapper):
 		self.env = RoadCharging(config_fname)
 		super().__init__(self.env)
 	# def __init__(self, env):
-		# super().__init__(env)
+	# 	super().__init__(env)
 
 	def action(self, action):
 		for i in range(self.n):
@@ -379,12 +379,9 @@ class ConstrainAction(gym.ActionWrapper):
 
 		total_charging_requests = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 0 and a == 1)
 		total_continue_charging = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 1 and a == 1)
-		# released_charger = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 1 and a == 0)
 
 		if total_charging_requests + total_continue_charging > self.m: # limit charging requests to available charging capacity
 			print('Exceed charger capacity!')
-			# charging_requests = sum(action)
-			# available_capacity = self.m - sum(self.obs["ChargingStatus"])
 			continue_agents = [i for i, (a, s) in enumerate(zip(action, self.obs["ChargingStatus"])) if s == 1 and a == 1]
 			requesting_agents = [i for i, (a, s) in enumerate(zip(action, self.obs["ChargingStatus"])) if s == 0 and a == 1]
 
@@ -400,32 +397,24 @@ class ConstrainAction(gym.ActionWrapper):
 			elif available_capacity > 0:
 
 				if np.any(action == 1):
-					# Scheme #1:
-					# Randomly select from the set of agents requesting charging and set their charging actions to 0
 					to_flip = random.sample(requesting_agents, total_charging_requests-available_capacity)
-					# Scheme #2:
-					# sort charging agents based on their SoC from low to high
-					# battery_level = dict()
-					# for i in charging_agents:
-					#     battery_level[i] = self.obs['SoC'][i]
-
-					# sorted_battery_level = dict(sorted(battery_level.items(), key=lambda item: item[1]))
-					# print('sorted_battery_level:', sorted_battery_level)
-					# to_flip = list(sorted_battery_level.keys())[self.m:]
-
-					# print('Agents requesting charging:', requesting_agents)
-					# print('Flip agents:', to_flip)
-
+					
 					action[to_flip] = 0
 
 		return action
 
 
 def main():
+	SoC_data_type = "high"
+	n_EVs = 10
+	instance_num = 1
 
-	data_file = "D://ORLLM//repo//road_charging//output//road_charging//data//test_data//configuration//"
-
-	env = ConstrainAction(RoadCharging(data_file+"config_default_instance_1.json"))
+	# data_file = "D://ORLLM//repo//road_charging//output//road_charging//data//test_data//configuration//"
+	test_case = f"all_days_negativePrices_{SoC_data_type}InitSoC_1for{n_EVs}"
+	test_cases_dir = os.path.join("test_cases", test_case)  
+	data_file = os.path.join(test_cases_dir, f"config{instance_num}_{n_EVs}EVs_1chargers.json")
+ 
+	env = ConstrainAction(RoadCharging(data_file))
 
 	env.summarize_env()
 	env.seed(42)
