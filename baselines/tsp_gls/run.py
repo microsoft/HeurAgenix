@@ -49,7 +49,7 @@ if __name__ == "__main__":
     from heuristic_reevo import heuristic_reevo
     heuristic = heuristic_base # [heuristic_base, heuristic_eoh, heuristic_reevo]:
 
-    time_limit = 60 # maximum 10 seconds for each instance
+    time_limit = 60 # maximum seconds for each instance
     ite_max = 1000 # maximum number of local search in GLS for each instance
     perturbation_moves = 1 # movers of each edge in each perturbation
 

@@ -35,7 +35,7 @@ if __name__ == "__main__":
     heuristic = heuristic_base # [heuristic_base, heuristic_reevo]:
 
     n_ants = 30
-    n_iterations = 1000
+    n_iterations = 100
 
     data_dir = os.path.join("..", "..", "output", "tsp", "data", "test_data")
     data_name = "kroA100.tsp"
@@ -43,8 +43,6 @@ if __name__ == "__main__":
     distance_matrix, scale = load_data(data_path)
 
     if distance_matrix is not None:
-        best_cost = solve(
-            distance_matrix, n_ants, n_iterations, heuristic
-        )
+        best_cost = solve(distance_matrix, n_ants, n_iterations, heuristic)
         best_cost = round(best_cost * scale)
         print(data_name, heuristic, best_cost)

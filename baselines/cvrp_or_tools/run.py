@@ -75,8 +75,7 @@ def solve(data_path):
   
 if __name__ == "__main__":
     data_dir = os.path.join("..", "..", "output", "cvrp", "data", "test_data")
-    # data_name = "A-n80-k10.vrp"
-    data_name = "X-n1001-k43.vrp"
+    data_name = "A-n80-k10.vrp"
     data_path = os.path.join(data_dir, data_name)
     cost = solve(data_path)
     print(data_name, cost)
