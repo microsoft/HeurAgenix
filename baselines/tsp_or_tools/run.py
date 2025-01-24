@@ -6,12 +6,19 @@ from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2  
 
 
-def solve(data_file):  
-    problem = tsplib95.load(data_file)  
-    graph = problem.get_graph()  
-  
-    distance_matrix = nx.to_numpy_array(graph, nodelist=sorted(graph.nodes))  
-  
+def load_data(data_path):
+    try:
+        problem = tsplib95.load(data_path)  
+        graph = problem.get_graph()  
+        distance_matrix = nx.to_numpy_array(graph, nodelist=sorted(graph.nodes))  
+        return distance_matrix
+    except Exception as e:
+        return None
+
+def solve(data_path):  
+    distance_matrix = load_data(data_path)
+    if distance_matrix is None:
+        return None
     data = {  
         'distance_matrix': distance_matrix,  
         'num_vehicles': 1,
@@ -55,5 +62,6 @@ if __name__ == "__main__":
     data_dir = os.path.join("..", "..", "output", "tsp", "data", "test_data")
     data_name = "kroA100.tsp"
     data_path = os.path.join(data_dir, data_name)
-    cost = solve(data_path)
-    print(data_name, cost)
+
+    result = solve(data_path)
+    print(data_name, result)

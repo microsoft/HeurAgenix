@@ -22,12 +22,15 @@ def load_data(data_path: str) -> None:
         return None, None
 
 def solve(distance_matrix, n_ants, n_iterations, heuristic):
+    distance_matrix, scale = load_data(data_path)
+    if distance_matrix is None:
+        return None
     distance_matrix[np.diag_indices_from(distance_matrix)] = 1 # set diagonal to a large number
     heu = heuristic(distance_matrix.copy()) + 1e-9
     heu[heu < 1e-9] = 1e-9
     aco = ACO(distance_matrix, heu, n_ants=n_ants)
     obj = aco.run(n_iterations)
-    return obj.item()
+    return obj.item() * scale
 
 if __name__ == "__main__":
     from heuristic_base import heuristic_base
@@ -40,9 +43,6 @@ if __name__ == "__main__":
     data_dir = os.path.join("..", "..", "output", "tsp", "data", "test_data")
     data_name = "kroA100.tsp"
     data_path = os.path.join(data_dir, data_name)
-    distance_matrix, scale = load_data(data_path)
-
-    if distance_matrix is not None:
-        best_cost = solve(distance_matrix, n_ants, n_iterations, heuristic)
-        best_cost = round(best_cost * scale)
-        print(data_name, heuristic, best_cost)
+    
+    result = solve(data_path, n_ants, n_iterations, heuristic)
+    print(data_name, heuristic, result)

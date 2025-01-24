@@ -23,24 +23,22 @@ def load_data(data_path: str) -> None:
     except Exception as e:
         return None, None
 
-def solve(dis_matrix,time_limit, ite_max, perturbation_moves, heuristic):
+def solve(data_path,time_limit, ite_max, perturbation_moves, heuristic):
 
-    # time_limit = 60 # maximum 10 seconds for each instance
-    # ite_max = 1000 # maximum number of local searchs in GLS for each instance
-    # perturbation_moves = 1 # movers of each edge in each perturbation
-
-   
+    distance_matrix, scale = load_data(data_path)
+    if distance_matrix is None:
+        return None
     time.sleep(1)
     t = time.time()
-    init_tour = nearest_neighbor_2End(dis_matrix, 0).astype(int)
-    init_cost = tour_cost_2End(dis_matrix, init_tour)
+    init_tour = nearest_neighbor_2End(distance_matrix, 0).astype(int)
+    init_cost = tour_cost_2End(distance_matrix, init_tour)
     nb = 100
-    nearest_indices = np.argsort(dis_matrix, axis=1)[:, 1:nb+1].astype(int)
+    nearest_indices = np.argsort(distance_matrix, axis=1)[:, 1:nb+1].astype(int)
 
-    best_tour, best_cost, iter_i = guided_local_search(dis_matrix, nearest_indices, init_tour, init_cost,
+    best_tour, best_cost, iter_i = guided_local_search(distance_matrix, nearest_indices, init_tour, init_cost,
                                                     t + time_limit, ite_max, perturbation_moves,
                                                     first_improvement=False, guide_algorithm=heuristic)
-    return best_cost, best_tour
+    return best_cost * scale
 
 
 if __name__ == "__main__":
@@ -58,9 +56,5 @@ if __name__ == "__main__":
     data_path = os.path.join(data_dir, data_name)
     distance_matrix, scale = load_data(data_path)
 
-    if distance_matrix is not None:
-        best_cost, best_tour = solve(
-            distance_matrix, time_limit, ite_max, perturbation_moves, heuristic
-        )
-        best_cost = round(best_cost * scale)
-        print(data_name, heuristic, best_cost)
+    result = solve(data_path, time_limit, ite_max, perturbation_moves, heuristic)
+    print(data_name, heuristic.__name__, result * scale)

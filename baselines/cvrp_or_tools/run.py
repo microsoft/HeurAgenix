@@ -6,19 +6,24 @@ from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
   
 def load_data(data_path: str):  
-    problem = tsplib95.load(data_path)   
-    depot = problem.depots[0] - 1  
-    distance_matrix = nx.to_numpy_array(problem.get_graph())  
-    node_num = len(distance_matrix)  
-    vehicle_num = int(open(data_path).readlines()[-1].strip().split(" : ")[-1])  
-    capacity = problem.capacity  
-    demands = np.array(list(problem.demands.values()))  
-    return node_num, distance_matrix, depot, vehicle_num, capacity, demands  
+    try:
+        problem = tsplib95.load(data_path)   
+        depot = problem.depots[0] - 1  
+        distance_matrix = nx.to_numpy_array(problem.get_graph())  
+        node_num = len(distance_matrix)  
+        vehicle_num = int(open(data_path).readlines()[-1].strip().split(" : ")[-1])  
+        capacity = problem.capacity  
+        demands = np.array(list(problem.demands.values()))  
+        return distance_matrix, depot, vehicle_num, capacity, demands  
+    except Exception as e:
+        return None, None, None, None, None
   
 def create_data_model(data_path):  
     """Stores the data for the problem."""  
     data = {}  
-    node_num, distance_matrix, depot, vehicle_num, capacity, demands = load_data(data_path)  
+    distance_matrix, depot, vehicle_num, capacity, demands = load_data(data_path)  
+    if distance_matrix is None:
+        return None
     data['distance_matrix'] = distance_matrix  
     data['num_vehicles'] = vehicle_num  
     data['depot'] = depot  
@@ -28,7 +33,9 @@ def create_data_model(data_path):
   
 def solve(data_path):  
     # Instantiate the data problem.  
-    data = create_data_model(data_path)  
+    data = create_data_model(data_path)
+    if data is None:
+        return None
   
     # Create the routing index manager.  
     manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), data['num_vehicles'], data['depot'])  
@@ -77,5 +84,6 @@ if __name__ == "__main__":
     data_dir = os.path.join("..", "..", "output", "cvrp", "data", "test_data")
     data_name = "A-n80-k10.vrp"
     data_path = os.path.join(data_dir, data_name)
+
     cost = solve(data_path)
     print(data_name, cost)

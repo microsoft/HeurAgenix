@@ -13,12 +13,15 @@ def load_data(data_path: str) -> None:
         return None
 
 
-def solve(dist_matrix, heuristic) -> float:
+def solve(data_path, heuristic) -> float:
+    distance_matrix = load_data(data_path)
+    if distance_matrix is None:
+        return None
     # set the starting node
     start_node = 0
     solution = [start_node]
     # init unvisited nodes
-    problem_size = dist_matrix.shape[0]
+    problem_size = distance_matrix.shape[0]
     unvisited = set(range(problem_size))
     # remove the starting node
     unvisited.remove(start_node)
@@ -28,7 +31,7 @@ def solve(dist_matrix, heuristic) -> float:
             current_node=solution[-1],
             destination_node=start_node,
             unvisited_nodes=copy(unvisited),
-            distance_matrix=dist_matrix.copy(),
+            distance_matrix=distance_matrix.copy(),
         )
         solution.append(next_node)
         if next_node in unvisited:
@@ -39,7 +42,7 @@ def solve(dist_matrix, heuristic) -> float:
     # calculate the length of the tour
     cost = 0
     for i in range(problem_size):
-        cost += dist_matrix[solution[i], solution[(i + 1) % problem_size]]
+        cost += distance_matrix[solution[i], solution[(i + 1) % problem_size]]
     return cost
     
 
@@ -54,6 +57,5 @@ if __name__ == '__main__':
     data_path = os.path.join(data_dir, data_name)
     distance_matrix = load_data(data_path)
 
-    if distance_matrix is not None:
-        cost = solve(distance_matrix, heuristic)
-        print(data_name, heuristic, cost)
+    result = solve(data_path, heuristic)
+    print(data_name, heuristic.__name__, result)
