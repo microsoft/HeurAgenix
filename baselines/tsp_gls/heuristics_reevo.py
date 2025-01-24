@@ -3,18 +3,28 @@
 
 import numpy as np
 
+import numpy as np
+
 def heuristics_reevo(distance_matrix, local_opt_tour, edge_n_used):
-    # Calculate the average distance for each node
+    # Calculate the average distance of each row
     average_distance = np.mean(distance_matrix, axis=1)
-    # Calculate the distance ranking for each node
+    
+    # Calculate the distance ranking for each city
     distance_ranking = np.argsort(distance_matrix, axis=1)
-    # Calculate the mean of the closest distances for each node
-    closest_mean_distance = np.mean(distance_matrix[np.arange(distance_matrix.shape[0])[:, None], distance_ranking[:, 1:5]],
-    axis=1)
-    # Initialize the indicator matrix and calculate ratio of distance to average distance
+    
+    # Calculate the mean of the closest four cities, excluding the city itself
+    closest_mean_distance = np.mean(
+        distance_matrix[np.arange(distance_matrix.shape[0])[:, None], distance_ranking[:, 1:5]],
+        axis=1
+    )
+    
+    # Normalize the distance matrix by average distance
     indicators = distance_matrix / average_distance[:, np.newaxis]
-    # Set diagonal elements to np.inf
+    
+    # Add weight to the closest mean distance
     np.fill_diagonal(indicators, np.inf)
-    # Adjust the indicator matrix using the statistical measure
-    indicators += closest_mean_distance[:, np.newaxis] / np.sum(distance_matrix, axis=1)[:, np.newaxis]
+    total_distance_sum = np.sum(distance_matrix, axis=1)
+    weight_closest_mean = 0.5
+    indicators += (weight_closest_mean * closest_mean_distance[:, np.newaxis]) / total_distance_sum[:, np.newaxis]
+    
     return indicators

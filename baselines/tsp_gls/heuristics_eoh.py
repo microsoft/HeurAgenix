@@ -6,22 +6,33 @@ import numpy as np
 def heuristic_eoh(edge_distance, local_opt_tour, edge_n_used):
     updated_edge_distance = np.copy(edge_distance)
     edge_count = np.zeros_like(edge_distance)
+    
+    # Count the usage of each edge in the local optimal tour
     for i in range(len(local_opt_tour) - 1):
         start = local_opt_tour[i]
         end = local_opt_tour[i + 1]
         edge_count[start][end] += 1
         edge_count[end][start] += 1
-    # penalize local optimal route
+    
     edge_n_used_max = np.max(edge_n_used)
-    # calculate the average edge used
-    decay_factor = 0.1 # decay fastor
     mean_distance = np.mean(edge_distance)
-    # calculate the average distance
+    
+    # Parameters for noise and decay
+    decay_factor = 0.05  # Adjusted decay factor
+    edge_use_weight = 0.3  # Weight for edge usage in penalty
+    
     for i in range(edge_distance.shape[0]):
         for j in range(edge_distance.shape[1]):
             if edge_count[i][j] > 0:
-                noise_factor = (np.random.uniform(0.7, 1.3) / edge_count[i][j]) + (edge_distance[i][j] / mean_distance) - (0.3 / edge_n_used_max) * edge_n_used[i][j]
-                # calculate a hybrid noise factor
-                updated_edge_distance[i][j] += noise_factor * (1 + edge_count[i][j]) - decay_factor * updated_edge_distance[i][j]
-                # The new guiding edge distance matrix is calculated based on both a noise term and a decayed original distance matrix
+                # Refined noise factor calculation
+                noise_factor = (np.random.normal(1.0, 0.1) / edge_count[i][j]) + (edge_distance[i][j] / mean_distance) - (edge_use_weight / edge_n_used_max) * edge_n_used[i][j]
+                
+                # Prevent over-penalty by capping the adjustment
+                adjustment = noise_factor * (1 + edge_count[i][j])
+                max_adjustment = edge_distance[i][j] * 0.5  # Allow up to 50% adjustment
+                adjustment = np.clip(adjustment, -max_adjustment, max_adjustment)
+                
+                # Update with decay
+                updated_edge_distance[i][j] += adjustment - decay_factor * updated_edge_distance[i][j]
+    
     return updated_edge_distance
