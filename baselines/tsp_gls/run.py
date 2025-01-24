@@ -60,13 +60,13 @@ if __name__ == "__main__":
     perturbation_moves = 1 # movers of each edge in each perturbation
 
     data_dir = os.path.join("..", "..", "output", "tsp", "data", "test_data")
-    for data_name in os.listdir(data_dir):
-        data_path = os.path.join(data_dir, data_name)
-        distance_matrix, scale = load_data(data_path)
+    data_name = "a280.tsp"
+    data_path = os.path.join(data_dir, data_name)
+    distance_matrix, scale = load_data(data_path)
 
-        if distance_matrix is not None:
-            best_cost, best_tour = solve_instance(
-                distance_matrix, time_limit, ite_max, perturbation_moves, heuristics
-            )
-            best_cost = round(best_cost * scale)
-            print(data_name, heuristics, best_cost)
+    if distance_matrix is not None:
+        best_cost, best_tour = solve_instance(
+            distance_matrix, time_limit, ite_max, perturbation_moves, heuristics
+        )
+        best_cost = round(best_cost * scale)
+        print(data_name, heuristics, best_cost)
