@@ -36,6 +36,8 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
     threshold_factor = kwargs.get("threshold_factor", 0.70)
     percentage_range = kwargs.get("percentage_range", 0.20)
     apply_2opt_frequency = kwargs.get("apply_2opt_frequency", 5)
+    balance_factor = kwargs.get("initial_balance_factor", 1.0) * (len(unvisited_nodes) / node_num)
+    nearest_neighbor_threshold = kwargs.get("nearest_neighbor_threshold", 0.1)
 
     # If the current solution is empty, start from the node with the second lowest average distance to all other nodes
     if not current_solution.tour:
@@ -86,7 +88,7 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
     # Evaluate multiple unvisited nodes with comparable distances
     comparable_nodes = [node for node in unvisited_nodes if distance_matrix[last_visited][node] <= (1 + percentage_range) * nearest_distance]
 
-    if len(current_solution.tour) == 3:
+    if len(current_solution.tour) <= node_num * nearest_neighbor_threshold:
         best_connectivity = float('inf')
         best_node = None
         best_position = None
@@ -96,8 +98,9 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
             for unvisited in unvisited_nodes:
                 if unvisited != node:
                     total_future_distance += distance_matrix[node][unvisited]
-            if total_future_distance < best_connectivity:
-                best_connectivity = total_future_distance
+            weighted_future_distance = balance_factor * total_future_distance + distance_matrix[last_visited][node]
+            if weighted_future_distance < best_connectivity:
+                best_connectivity = weighted_future_distance
                 best_node = node
                 best_position = len(current_solution.tour)
 
