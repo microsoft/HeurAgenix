@@ -36,10 +36,10 @@ def solve_tsp(data_file):
     solution = routing.SolveWithParameters(search_parameters)  
   
     if solution:
-        route_distance = print_solution(manager, routing, solution)  
-    return route_distance
+        cost = calculate_cost(routing, solution)  
+    return cost
   
-def print_solution(manager, routing, solution):  
+def calculate_cost(routing, solution):  
     index = routing.Start(0)  
     route_distance = 0  
     while not routing.IsEnd(index):  
@@ -51,7 +51,7 @@ def print_solution(manager, routing, solution):
 
 if __name__ == "__main__":
     data_dir = os.path.join("..", "..", "output", "tsp", "data", "test_data")
-    data_name = "a280.tsp"
+    data_name = "kroA100.tsp"
     data_path = os.path.join(data_dir, data_name)
     cost = solve_tsp(data_path)
     print(data_name, cost)
