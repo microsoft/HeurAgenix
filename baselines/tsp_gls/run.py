@@ -47,7 +47,7 @@ if __name__ == "__main__":
     from heuristic_base import heuristic_base
     from heuristic_eoh import heuristic_eoh
     from heuristic_reevo import heuristic_reevo
-    heuristics = heuristic_base # [heuristic_base, heuristic_eoh, heuristic_reevo]:
+    heuristic = heuristic_base # [heuristic_base, heuristic_eoh, heuristic_reevo]:
 
     time_limit = 60 # maximum 10 seconds for each instance
     ite_max = 1000 # maximum number of local search in GLS for each instance
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     if distance_matrix is not None:
         best_cost, best_tour = solve(
-            distance_matrix, time_limit, ite_max, perturbation_moves, heuristics
+            distance_matrix, time_limit, ite_max, perturbation_moves, heuristic
         )
         best_cost = round(best_cost * scale)
-        print(data_name, heuristics, best_cost)
+        print(data_name, heuristic, best_cost)

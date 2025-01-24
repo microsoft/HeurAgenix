@@ -4,7 +4,9 @@ import tsplib95
 import networkx as nx  
 from ortools.constraint_solver import pywrapcp  
 from ortools.constraint_solver import routing_enums_pb2  
-def solve_tsp(data_file):  
+
+
+def solve(data_file):  
     problem = tsplib95.load(data_file)  
     graph = problem.get_graph()  
   
@@ -53,5 +55,5 @@ if __name__ == "__main__":
     data_dir = os.path.join("..", "..", "output", "tsp", "data", "test_data")
     data_name = "kroA100.tsp"
     data_path = os.path.join(data_dir, data_name)
-    cost = solve_tsp(data_path)
+    cost = solve(data_path)
     print(data_name, cost)
