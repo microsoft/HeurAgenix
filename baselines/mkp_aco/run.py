@@ -29,7 +29,7 @@ def solve(profits: np.ndarray, weight: np.ndarray, n_ants, n_iterations, heurist
 if __name__ == "__main__":
     from heuristic_base import heuristic_base
     from heuristic_reevo import heuristic_reevo
-    heuristic = heuristic_reevo # [heuristic_base, heuristic_reevo]:
+    heuristic = heuristic_base # [heuristic_base, heuristic_reevo]:
 
     n_ants = 30
     n_iterations = 100
