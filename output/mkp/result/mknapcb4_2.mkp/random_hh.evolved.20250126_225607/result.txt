@@ -1,0 +1,9 @@
+-data: mknapcb4_2.mkp
+-current_solution:
+selected_items: 3,6,12,15,18,25,26,28,29,32,33,36,45,52,53,54,55,61,65,67,73,74,84,85
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 21540.0
+-item_num: 100
+-resource_num: 10
+-selected_item_num: [3, 6, 12, 15, 18, 25, 26, 28, 29, 32, 33, 36, 45, 52, 53, 54, 55, 61, 65, 67, 73, 74, 84, 85]

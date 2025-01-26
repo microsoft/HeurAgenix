@@ -245,9 +245,9 @@ def get_hh_results(problem_dict: dict, data_index: int, test_dir: str, hh_name: 
         mean_gap = "None"
     gap_str = [f"{results[index]}({gap[index]}%)" for index in range(len(results))]
     if results:
-        return(f"{problem}, {data}, random_hh, {gap_str}, {np.mean(results)}({mean_gap}%)")
+        return(f"{problem}, {data}, {hh_name}, {gap_str}, {np.mean(results)}({mean_gap}%)")
     else:
-        return(f"Missing {problem}, {data}, random_hh")
+        return(f"Missing {problem}, {data}, {hh_name}")
     
 
 def dump_all_result():
@@ -271,24 +271,19 @@ def dump_all_result():
                     print(F"Missing {problem}, {data}, {heuristic}")
             
             result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh")
-            if result_str:
-                print(result_str)
+            print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh.evolved")
-            if result_str:
-                print(result_str)
+            print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh")
-            if result_str:
-                print(result_str)
+            print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh.evolved")
-            if result_str:
-                print(result_str)
+            print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_deep_hh.evolved")
-            if result_str:
-                print(result_str)
+            print(result_str)
 
 
 

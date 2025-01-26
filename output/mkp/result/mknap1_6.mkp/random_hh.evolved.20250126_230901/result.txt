@@ -1,0 +1,9 @@
+-data: mknap1_6.mkp
+-current_solution:
+selected_items: 1,3,4,5,15,18,19,28,31
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 9151.0
+-item_num: 39
+-resource_num: 5
+-selected_item_num: [1, 3, 4, 5, 15, 18, 19, 28, 31]
