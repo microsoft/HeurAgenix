@@ -1,0 +1,720 @@
+tsp, kroA100.tsp, nearest_neighbor_f91d, 27807.0(30.66%)
+tsp, kroA100.tsp, nearest_neighbor_e8a4, 22239.0(4.5%)
+Missing tsp, kroA100.tsp, cheapest_insertion_605f
+Missing tsp, kroA100.tsp, cheapest_insertion_7a30
+Missing tsp, kroA100.tsp, farthest_insertion_b6d3
+Missing tsp, kroA100.tsp, farthest_insertion_54db
+Missing tsp, kroA100.tsp, random_hh
+Missing tsp, kroA100.tsp, random_hh
+Missing tsp, kroA100.tsp, random_hh
+tsp, kroA100.tsp, random_hh, ['21282.0(0.0%)'], 21282.0(0.0%)
+tsp, kroA150.tsp, nearest_neighbor_f91d, 33633.0(26.8%)
+tsp, kroA150.tsp, nearest_neighbor_e8a4, 29293.0(10.44%)
+Missing tsp, kroA150.tsp, cheapest_insertion_605f
+Missing tsp, kroA150.tsp, cheapest_insertion_7a30
+Missing tsp, kroA150.tsp, farthest_insertion_b6d3
+Missing tsp, kroA150.tsp, farthest_insertion_54db
+Missing tsp, kroA150.tsp, random_hh
+Missing tsp, kroA150.tsp, random_hh
+Missing tsp, kroA150.tsp, random_hh
+tsp, kroA150.tsp, random_hh, ['26524.0(0.0%)'], 26524.0(0.0%)
+tsp, kroB100.tsp, nearest_neighbor_f91d, 29158.0(31.69%)
+tsp, kroB100.tsp, nearest_neighbor_e8a4, 24993.0(12.88%)
+Missing tsp, kroB100.tsp, cheapest_insertion_605f
+Missing tsp, kroB100.tsp, cheapest_insertion_7a30
+Missing tsp, kroB100.tsp, farthest_insertion_b6d3
+Missing tsp, kroB100.tsp, farthest_insertion_54db
+Missing tsp, kroB100.tsp, random_hh
+Missing tsp, kroB100.tsp, random_hh
+Missing tsp, kroB100.tsp, random_hh
+tsp, kroB100.tsp, random_hh, ['22141.0(0.0%)'], 22141.0(0.0%)
+tsp, kroB200.tsp, nearest_neighbor_f91d, 36980.0(25.62%)
+tsp, kroB200.tsp, nearest_neighbor_e8a4, 32013.0(8.75%)
+Missing tsp, kroB200.tsp, cheapest_insertion_605f
+Missing tsp, kroB200.tsp, cheapest_insertion_7a30
+Missing tsp, kroB200.tsp, farthest_insertion_b6d3
+Missing tsp, kroB200.tsp, farthest_insertion_54db
+Missing tsp, kroB200.tsp, random_hh
+Missing tsp, kroB200.tsp, random_hh
+Missing tsp, kroB200.tsp, random_hh
+tsp, kroB200.tsp, random_hh, ['29817.0(1.29%)'], 29817.0(1.29%)
+tsp, kroC100.tsp, nearest_neighbor_f91d, 26227.0(26.4%)
+tsp, kroC100.tsp, nearest_neighbor_e8a4, 22718.0(9.49%)
+Missing tsp, kroC100.tsp, cheapest_insertion_605f
+Missing tsp, kroC100.tsp, cheapest_insertion_7a30
+Missing tsp, kroC100.tsp, farthest_insertion_b6d3
+Missing tsp, kroC100.tsp, farthest_insertion_54db
+Missing tsp, kroC100.tsp, random_hh
+Missing tsp, kroC100.tsp, random_hh
+Missing tsp, kroC100.tsp, random_hh
+tsp, kroC100.tsp, random_hh, ['20749.0(0.0%)'], 20749.0(0.0%)
+tsp, bier127.tsp, nearest_neighbor_f91d, 135737.0(14.76%)
+tsp, bier127.tsp, nearest_neighbor_e8a4, 130351.0(10.2%)
+Missing tsp, bier127.tsp, cheapest_insertion_605f
+Missing tsp, bier127.tsp, cheapest_insertion_7a30
+Missing tsp, bier127.tsp, farthest_insertion_b6d3
+Missing tsp, bier127.tsp, farthest_insertion_54db
+Missing tsp, bier127.tsp, random_hh
+Missing tsp, bier127.tsp, random_hh
+Missing tsp, bier127.tsp, random_hh
+tsp, bier127.tsp, random_hh, ['118410.0(0.11%)'], 118410.0(0.11%)
+tsp, tsp225.tsp, nearest_neighbor_f91d, 5030.0(28.35%)
+tsp, tsp225.tsp, nearest_neighbor_e8a4, 4127.0(5.31%)
+tsp, tsp225.tsp, cheapest_insertion_605f, 4629.0(18.12%)
+tsp, tsp225.tsp, cheapest_insertion_7a30, 4212.0(7.48%)
+tsp, tsp225.tsp, farthest_insertion_b6d3, 4487.0(14.49%)
+tsp, tsp225.tsp, farthest_insertion_54db, 4210.0(7.43%)
+tsp, tsp225.tsp, random_hh, ['5950.0(51.82%)', '5817.0(48.43%)', '5902.0(50.6%)'], 5889.666666666667(50.28333333333333%)
+tsp, tsp225.tsp, random_hh, ['4151.0(5.92%)', '4244.0(8.29%)', '4073.0(3.93%)'], 4156.0(6.046666666666667%)
+tsp, tsp225.tsp, random_hh, ['4080.0(4.11%)', '4022.0(2.63%)', '4060.0(3.6%)'], 4054.0(3.4466666666666668%)
+tsp, tsp225.tsp, random_hh, ['3928.0(0.23%)'], 3928.0(0.23%)
+tsp, a280.tsp, nearest_neighbor_f91d, 3157.0(22.41%)
+tsp, a280.tsp, nearest_neighbor_e8a4, 2837.0(10.0%)
+tsp, a280.tsp, cheapest_insertion_605f, 3194.0(23.85%)
+tsp, a280.tsp, cheapest_insertion_7a30, 2838.0(10.04%)
+tsp, a280.tsp, farthest_insertion_b6d3, 2916.0(13.07%)
+tsp, a280.tsp, farthest_insertion_54db, 2788.0(8.1%)
+tsp, a280.tsp, random_hh, ['4672.0(81.16%)', '5118.0(98.45%)', '4460.0(72.94%)'], 4750.0(84.18333333333334%)
+tsp, a280.tsp, random_hh, ['2795.0(8.38%)', '2785.0(7.99%)', '2786.0(8.03%)'], 2788.6666666666665(8.133333333333333%)
+tsp, a280.tsp, random_hh, ['2710.0(5.08%)', '2693.0(4.42%)', '2672.0(3.61%)'], 2691.6666666666665(4.37%)
+tsp, a280.tsp, random_hh, ['2580.0(0.04%)'], 2580.0(0.04%)
+tsp, pcb442.tsp, nearest_neighbor_f91d, 61979.0(22.03%)
+tsp, pcb442.tsp, nearest_neighbor_e8a4, 56876.0(11.99%)
+tsp, pcb442.tsp, cheapest_insertion_605f, 62121.0(22.31%)
+tsp, pcb442.tsp, cheapest_insertion_7a30, 56279.0(10.81%)
+tsp, pcb442.tsp, farthest_insertion_b6d3, 60367.0(18.86%)
+tsp, pcb442.tsp, farthest_insertion_54db, 54968.0(8.23%)
+tsp, pcb442.tsp, random_hh, ['97585.0(92.14%)', '80286.0(58.08%)', '65728.0(29.42%)'], 81199.66666666667(59.879999999999995%)
+tsp, pcb442.tsp, random_hh, ['55921.0(10.11%)', '52504.0(3.38%)', '54273.0(6.86%)'], 54232.666666666664(6.783333333333332%)
+tsp, pcb442.tsp, random_hh, ['53134.0(4.62%)', '53209.0(4.77%)', '53277.0(4.9%)'], 53206.666666666664(4.763333333333334%)
+tsp, pcb442.tsp, random_hh, ['51179.0(0.77%)'], 51179.0(0.77%)
+tsp, gr666.tsp, nearest_neighbor_f91d, 366962.0(24.67%)
+tsp, gr666.tsp, nearest_neighbor_e8a4, 334748.0(13.72%)
+tsp, gr666.tsp, cheapest_insertion_605f, 346447.0(17.7%)
+tsp, gr666.tsp, cheapest_insertion_7a30, 322062.0(9.41%)
+tsp, gr666.tsp, farthest_insertion_b6d3, 350834.0(19.19%)
+tsp, gr666.tsp, farthest_insertion_54db, 338455.0(14.98%)
+tsp, gr666.tsp, random_hh, ['612661.0(108.13%)', '613834.0(108.53%)', '546805.0(85.76%)'], 591100.0(100.80666666666667%)
+tsp, gr666.tsp, random_hh, ['321317.0(9.16%)', '327012.0(11.09%)', '325732.0(10.66%)'], 324687.0(10.303333333333333%)
+Missing tsp, gr666.tsp, random_hh
+Missing tsp, gr666.tsp, random_hh
+tsp, pr1002.tsp, nearest_neighbor_f91d, 331103.0(27.82%)
+tsp, pr1002.tsp, nearest_neighbor_e8a4, 284285.0(9.74%)
+tsp, pr1002.tsp, cheapest_insertion_605f, 309709.0(19.56%)
+tsp, pr1002.tsp, cheapest_insertion_7a30, 287735.0(11.08%)
+tsp, pr1002.tsp, farthest_insertion_b6d3, 323839.0(25.01%)
+tsp, pr1002.tsp, farthest_insertion_54db, 287947.0(11.16%)
+tsp, pr1002.tsp, random_hh, ['511432.0(97.43%)', '568869.0(119.6%)', '689580.0(166.2%)'], 589960.3333333334(127.74333333333334%)
+tsp, pr1002.tsp, random_hh, ['279749.0(7.99%)', '284012.0(9.64%)', '281460.0(8.65%)'], 281740.3333333333(8.76%)
+tsp, pr1002.tsp, random_hh, ['274125.0(5.82%)', '274087.0(5.81%)', '273045.0(5.4%)'], 273752.3333333333(5.676666666666667%)
+Missing tsp, pr1002.tsp, random_hh
+tsp, pr2392.tsp, nearest_neighbor_f91d, 461170.0(21.99%)
+tsp, pr2392.tsp, nearest_neighbor_e8a4, 426822.0(12.91%)
+tsp, pr2392.tsp, cheapest_insertion_605f, 460067.0(21.7%)
+tsp, pr2392.tsp, cheapest_insertion_7a30, 434814.0(15.02%)
+tsp, pr2392.tsp, farthest_insertion_b6d3, 486977.0(28.82%)
+tsp, pr2392.tsp, farthest_insertion_54db, 422412.0(11.74%)
+tsp, pr2392.tsp, random_hh, ['555149.0(46.85%)', '597355.0(58.02%)', '473324.0(25.21%)'], 541942.6666666666(43.36000000000001%)
+tsp, pr2392.tsp, random_hh, ['421985.0(11.63%)', '413714.0(9.44%)', '399104.0(5.57%)'], 411601.0(8.88%)
+tsp, pr2392.tsp, random_hh, ['412318.0(9.07%)'], 412318.0(9.07%)
+Missing tsp, pr2392.tsp, random_hh
+cvrp, A-n80-k10.vrp, nearest_neighbor_99ba, 2348.0(33.26%)
+cvrp, A-n80-k10.vrp, nearest_neighbor_54a9, 2125.0(20.6%)
+cvrp, A-n80-k10.vrp, min_cost_insertion_7bfa, 2125.0(20.6%)
+cvrp, A-n80-k10.vrp, min_cost_insertion_3b2b, 2091.0(18.67%)
+Missing cvrp, A-n80-k10.vrp, farthest_insertion_ce2b
+cvrp, A-n80-k10.vrp, farthest_insertion_6308, 2187.0(24.12%)
+cvrp, A-n80-k10.vrp, random_hh, ['2567.0(45.69%)', '2789.0(58.29%)', '2878.0(63.34%)'], 2744.6666666666665(55.77333333333333%)
+cvrp, A-n80-k10.vrp, random_hh, ['2228.0(26.45%)', '2142.0(21.57%)', '2237.0(26.96%)'], 2202.3333333333335(24.99333333333333%)
+cvrp, A-n80-k10.vrp, random_hh, ['2173.0(23.33%)', '2180.0(23.72%)', '2173.0(23.33%)'], 2175.3333333333335(23.459999999999997%)
+cvrp, A-n80-k10.vrp, random_hh, ['2148.0(21.91%)', '1857.0(5.39%)'], 2002.5(13.65%)
+cvrp, B-n78-k10.vrp, nearest_neighbor_99ba, 1758.0(43.98%)
+cvrp, B-n78-k10.vrp, nearest_neighbor_54a9, 1745.0(42.92%)
+cvrp, B-n78-k10.vrp, min_cost_insertion_7bfa, 1745.0(42.92%)
+cvrp, B-n78-k10.vrp, min_cost_insertion_3b2b, 1497.0(22.6%)
+Missing cvrp, B-n78-k10.vrp, farthest_insertion_ce2b
+cvrp, B-n78-k10.vrp, farthest_insertion_6308, 1501.0(22.93%)
+cvrp, B-n78-k10.vrp, random_hh, ['2316.0(89.68%)', '2085.0(70.76%)', '2164.0(77.23%)'], 2188.3333333333335(79.22333333333334%)
+cvrp, B-n78-k10.vrp, random_hh, ['1415.0(15.89%)', '1503.0(23.1%)', '1924.0(57.58%)'], 1614.0(32.19%)
+cvrp, B-n78-k10.vrp, random_hh, ['1434.0(17.44%)', '1412.0(15.64%)'], 1423.0(16.54%)
+cvrp, B-n78-k10.vrp, random_hh, ['1534.0(25.63%)'], 1534.0(25.63%)
+cvrp, E-n101-k14.vrp, nearest_neighbor_99ba, 1658.0(55.39%)
+cvrp, E-n101-k14.vrp, nearest_neighbor_54a9, 1493.0(39.93%)
+cvrp, E-n101-k14.vrp, min_cost_insertion_7bfa, 1493.0(39.93%)
+cvrp, E-n101-k14.vrp, min_cost_insertion_3b2b, 1336.0(25.21%)
+Missing cvrp, E-n101-k14.vrp, farthest_insertion_ce2b
+cvrp, E-n101-k14.vrp, farthest_insertion_6308, 1334.0(25.02%)
+cvrp, E-n101-k14.vrp, random_hh, ['2070.0(94.0%)', '1724.0(61.57%)', '1795.0(68.23%)', '1892.0(77.32%)', '2108.0(97.56%)'], 1917.8(79.736%)
+cvrp, E-n101-k14.vrp, random_hh, ['1417.0(32.8%)', '1535.0(43.86%)', '1487.0(39.36%)'], 1479.6666666666667(38.67333333333333%)
+cvrp, E-n101-k14.vrp, random_hh, ['1364.0(27.84%)', '1371.0(28.49%)'], 1367.5(28.165%)
+cvrp, E-n101-k14.vrp, random_hh, ['1202.0(12.65%)'], 1202.0(12.65%)
+cvrp, F-n135-k7.vrp, nearest_neighbor_99ba, 1792.0(54.22%)
+cvrp, F-n135-k7.vrp, nearest_neighbor_54a9, 1648.0(41.82%)
+cvrp, F-n135-k7.vrp, min_cost_insertion_7bfa, 1648.0(41.82%)
+cvrp, F-n135-k7.vrp, min_cost_insertion_3b2b, 1695.0(45.87%)
+Missing cvrp, F-n135-k7.vrp, farthest_insertion_ce2b
+cvrp, F-n135-k7.vrp, farthest_insertion_6308, 1747.0(50.34%)
+cvrp, F-n135-k7.vrp, random_hh, ['2504.0(115.49%)', '2377.0(104.56%)', '2347.0(101.98%)', '2384.0(105.16%)', '2335.0(100.95%)'], 2389.4(105.62800000000001%)
+cvrp, F-n135-k7.vrp, random_hh, ['1525.0(31.24%)', '1573.0(35.37%)', '1592.0(37.01%)'], 1563.3333333333333(34.54%)
+cvrp, F-n135-k7.vrp, random_hh, ['1500.0(29.09%)', '1501.0(29.17%)', '1257.0(8.18%)'], 1419.3333333333333(22.146666666666665%)
+cvrp, F-n135-k7.vrp, random_hh, ['1261.0(8.52%)'], 1261.0(8.52%)
+cvrp, M-n200-k17.vrp, nearest_neighbor_99ba, 1989.0(56.0%)
+cvrp, M-n200-k17.vrp, nearest_neighbor_54a9, 1734.0(36.0%)
+cvrp, M-n200-k17.vrp, min_cost_insertion_7bfa, 1734.0(36.0%)
+cvrp, M-n200-k17.vrp, min_cost_insertion_3b2b, 1593.0(24.94%)
+Missing cvrp, M-n200-k17.vrp, farthest_insertion_ce2b
+cvrp, M-n200-k17.vrp, farthest_insertion_6308, 1741.0(36.55%)
+cvrp, M-n200-k17.vrp, random_hh, ['2785.0(118.43%)', '3003.0(135.53%)', '2688.0(110.82%)', '3021.0(136.94%)', '3076.0(141.25%)'], 2914.6(128.594%)
+cvrp, M-n200-k17.vrp, random_hh, ['1794.0(40.71%)', '1789.0(40.31%)', '1782.0(39.76%)'], 1788.3333333333333(40.26%)
+cvrp, M-n200-k17.vrp, random_hh, ['1603.0(25.73%)', '1638.0(28.47%)', '1598.0(25.33%)'], 1613.0(26.51%)
+cvrp, M-n200-k17.vrp, random_hh, ['1805.0(41.57%)'], 1805.0(41.57%)
+cvrp, P-n101-k4.vrp, nearest_neighbor_99ba, 1021.0(49.93%)
+cvrp, P-n101-k4.vrp, nearest_neighbor_54a9, 940.0(38.03%)
+cvrp, P-n101-k4.vrp, min_cost_insertion_7bfa, 940.0(38.03%)
+cvrp, P-n101-k4.vrp, min_cost_insertion_3b2b, 796.0(16.89%)
+Missing cvrp, P-n101-k4.vrp, farthest_insertion_ce2b
+cvrp, P-n101-k4.vrp, farthest_insertion_6308, 847.0(24.38%)
+cvrp, P-n101-k4.vrp, random_hh, ['1345.0(97.5%)', '1407.0(106.61%)', '1210.0(77.68%)', '1403.0(106.02%)', '1254.0(84.14%)'], 1323.8(94.39%)
+cvrp, P-n101-k4.vrp, random_hh, ['957.0(40.53%)', '832.0(22.17%)', '973.0(42.88%)'], 920.6666666666666(35.193333333333335%)
+cvrp, P-n101-k4.vrp, random_hh, ['856.0(25.7%)', '863.0(26.73%)', '866.0(27.17%)'], 861.6666666666666(26.53333333333333%)
+cvrp, P-n101-k4.vrp, random_hh, ['702.0(3.08%)'], 702.0(3.08%)
+Missing jssp, LA01.jssp, most_work_remaining_930e
+Missing jssp, LA01.jssp, most_work_remaining_df20
+Missing jssp, LA01.jssp, first_come_first_served_6c4f
+Missing jssp, LA01.jssp, first_come_first_served_af26
+Missing jssp, LA01.jssp, shortest_processing_time_first_c374
+Missing jssp, LA01.jssp, shortest_processing_time_first_d471
+Missing jssp, LA01.jssp, random_hh
+Missing jssp, LA01.jssp, random_hh
+Missing jssp, LA01.jssp, random_hh
+jssp, LA01.jssp, random_hh, ['666.0(0.0%)'], 666.0(0.0%)
+Missing jssp, LA02.jssp, most_work_remaining_930e
+Missing jssp, LA02.jssp, most_work_remaining_df20
+Missing jssp, LA02.jssp, first_come_first_served_6c4f
+Missing jssp, LA02.jssp, first_come_first_served_af26
+Missing jssp, LA02.jssp, shortest_processing_time_first_c374
+Missing jssp, LA02.jssp, shortest_processing_time_first_d471
+Missing jssp, LA02.jssp, random_hh
+Missing jssp, LA02.jssp, random_hh
+Missing jssp, LA02.jssp, random_hh
+jssp, LA02.jssp, random_hh, ['655.0(0.0%)'], 655.0(0.0%)
+Missing jssp, LA03.jssp, most_work_remaining_930e
+Missing jssp, LA03.jssp, most_work_remaining_df20
+Missing jssp, LA03.jssp, first_come_first_served_6c4f
+Missing jssp, LA03.jssp, first_come_first_served_af26
+Missing jssp, LA03.jssp, shortest_processing_time_first_c374
+Missing jssp, LA03.jssp, shortest_processing_time_first_d471
+Missing jssp, LA03.jssp, random_hh
+Missing jssp, LA03.jssp, random_hh
+Missing jssp, LA03.jssp, random_hh
+jssp, LA03.jssp, random_hh, ['597.0(0.0%)'], 597.0(0.0%)
+Missing jssp, LA04.jssp, most_work_remaining_930e
+Missing jssp, LA04.jssp, most_work_remaining_df20
+Missing jssp, LA04.jssp, first_come_first_served_6c4f
+Missing jssp, LA04.jssp, first_come_first_served_af26
+Missing jssp, LA04.jssp, shortest_processing_time_first_c374
+Missing jssp, LA04.jssp, shortest_processing_time_first_d471
+Missing jssp, LA04.jssp, random_hh
+Missing jssp, LA04.jssp, random_hh
+Missing jssp, LA04.jssp, random_hh
+jssp, LA04.jssp, random_hh, ['590.0(0.0%)'], 590.0(0.0%)
+Missing jssp, LA05.jssp, most_work_remaining_930e
+Missing jssp, LA05.jssp, most_work_remaining_df20
+Missing jssp, LA05.jssp, first_come_first_served_6c4f
+Missing jssp, LA05.jssp, first_come_first_served_af26
+Missing jssp, LA05.jssp, shortest_processing_time_first_c374
+Missing jssp, LA05.jssp, shortest_processing_time_first_d471
+Missing jssp, LA05.jssp, random_hh
+Missing jssp, LA05.jssp, random_hh
+Missing jssp, LA05.jssp, random_hh
+jssp, LA05.jssp, random_hh, ['593.0(0.0%)'], 593.0(0.0%)
+Missing jssp, LA06.jssp, most_work_remaining_930e
+Missing jssp, LA06.jssp, most_work_remaining_df20
+Missing jssp, LA06.jssp, first_come_first_served_6c4f
+Missing jssp, LA06.jssp, first_come_first_served_af26
+Missing jssp, LA06.jssp, shortest_processing_time_first_c374
+Missing jssp, LA06.jssp, shortest_processing_time_first_d471
+Missing jssp, LA06.jssp, random_hh
+Missing jssp, LA06.jssp, random_hh
+Missing jssp, LA06.jssp, random_hh
+jssp, LA06.jssp, random_hh, ['926.0(0.0%)'], 926.0(0.0%)
+Missing jssp, LA07.jssp, most_work_remaining_930e
+Missing jssp, LA07.jssp, most_work_remaining_df20
+Missing jssp, LA07.jssp, first_come_first_served_6c4f
+Missing jssp, LA07.jssp, first_come_first_served_af26
+Missing jssp, LA07.jssp, shortest_processing_time_first_c374
+Missing jssp, LA07.jssp, shortest_processing_time_first_d471
+Missing jssp, LA07.jssp, random_hh
+Missing jssp, LA07.jssp, random_hh
+Missing jssp, LA07.jssp, random_hh
+jssp, LA07.jssp, random_hh, ['890.0(0.0%)'], 890.0(0.0%)
+Missing jssp, LA08.jssp, most_work_remaining_930e
+Missing jssp, LA08.jssp, most_work_remaining_df20
+Missing jssp, LA08.jssp, first_come_first_served_6c4f
+Missing jssp, LA08.jssp, first_come_first_served_af26
+Missing jssp, LA08.jssp, shortest_processing_time_first_c374
+Missing jssp, LA08.jssp, shortest_processing_time_first_d471
+Missing jssp, LA08.jssp, random_hh
+Missing jssp, LA08.jssp, random_hh
+Missing jssp, LA08.jssp, random_hh
+jssp, LA08.jssp, random_hh, ['863.0(0.0%)'], 863.0(0.0%)
+Missing jssp, LA09.jssp, most_work_remaining_930e
+Missing jssp, LA09.jssp, most_work_remaining_df20
+Missing jssp, LA09.jssp, first_come_first_served_6c4f
+Missing jssp, LA09.jssp, first_come_first_served_af26
+Missing jssp, LA09.jssp, shortest_processing_time_first_c374
+Missing jssp, LA09.jssp, shortest_processing_time_first_d471
+Missing jssp, LA09.jssp, random_hh
+Missing jssp, LA09.jssp, random_hh
+Missing jssp, LA09.jssp, random_hh
+jssp, LA09.jssp, random_hh, ['951.0(0.0%)'], 951.0(0.0%)
+Missing jssp, LA10.jssp, most_work_remaining_930e
+Missing jssp, LA10.jssp, most_work_remaining_df20
+Missing jssp, LA10.jssp, first_come_first_served_6c4f
+Missing jssp, LA10.jssp, first_come_first_served_af26
+Missing jssp, LA10.jssp, shortest_processing_time_first_c374
+Missing jssp, LA10.jssp, shortest_processing_time_first_d471
+Missing jssp, LA10.jssp, random_hh
+Missing jssp, LA10.jssp, random_hh
+Missing jssp, LA10.jssp, random_hh
+jssp, LA10.jssp, random_hh, ['958.0(0.0%)'], 958.0(0.0%)
+Missing jssp, LA11.jssp, most_work_remaining_930e
+Missing jssp, LA11.jssp, most_work_remaining_df20
+Missing jssp, LA11.jssp, first_come_first_served_6c4f
+Missing jssp, LA11.jssp, first_come_first_served_af26
+Missing jssp, LA11.jssp, shortest_processing_time_first_c374
+Missing jssp, LA11.jssp, shortest_processing_time_first_d471
+Missing jssp, LA11.jssp, random_hh
+Missing jssp, LA11.jssp, random_hh
+Missing jssp, LA11.jssp, random_hh
+jssp, LA11.jssp, random_hh, ['1222.0(901.64%)'], 1222.0(901.64%)
+Missing jssp, LA12.jssp, most_work_remaining_930e
+Missing jssp, LA12.jssp, most_work_remaining_df20
+Missing jssp, LA12.jssp, first_come_first_served_6c4f
+Missing jssp, LA12.jssp, first_come_first_served_af26
+Missing jssp, LA12.jssp, shortest_processing_time_first_c374
+Missing jssp, LA12.jssp, shortest_processing_time_first_d471
+Missing jssp, LA12.jssp, random_hh
+Missing jssp, LA12.jssp, random_hh
+Missing jssp, LA12.jssp, random_hh
+jssp, LA12.jssp, random_hh, ['1039.0(0.0%)'], 1039.0(0.0%)
+Missing jssp, LA13.jssp, most_work_remaining_930e
+Missing jssp, LA13.jssp, most_work_remaining_df20
+Missing jssp, LA13.jssp, first_come_first_served_6c4f
+Missing jssp, LA13.jssp, first_come_first_served_af26
+Missing jssp, LA13.jssp, shortest_processing_time_first_c374
+Missing jssp, LA13.jssp, shortest_processing_time_first_d471
+Missing jssp, LA13.jssp, random_hh
+Missing jssp, LA13.jssp, random_hh
+Missing jssp, LA13.jssp, random_hh
+jssp, LA13.jssp, random_hh, ['1150.0(0.0%)'], 1150.0(0.0%)
+Missing jssp, LA14.jssp, most_work_remaining_930e
+Missing jssp, LA14.jssp, most_work_remaining_df20
+Missing jssp, LA14.jssp, first_come_first_served_6c4f
+Missing jssp, LA14.jssp, first_come_first_served_af26
+Missing jssp, LA14.jssp, shortest_processing_time_first_c374
+Missing jssp, LA14.jssp, shortest_processing_time_first_d471
+Missing jssp, LA14.jssp, random_hh
+Missing jssp, LA14.jssp, random_hh
+Missing jssp, LA14.jssp, random_hh
+jssp, LA14.jssp, random_hh, ['1292.0(0.0%)'], 1292.0(0.0%)
+Missing jssp, LA15.jssp, most_work_remaining_930e
+Missing jssp, LA15.jssp, most_work_remaining_df20
+Missing jssp, LA15.jssp, first_come_first_served_6c4f
+Missing jssp, LA15.jssp, first_come_first_served_af26
+Missing jssp, LA15.jssp, shortest_processing_time_first_c374
+Missing jssp, LA15.jssp, shortest_processing_time_first_d471
+Missing jssp, LA15.jssp, random_hh
+Missing jssp, LA15.jssp, random_hh
+Missing jssp, LA15.jssp, random_hh
+jssp, LA15.jssp, random_hh, ['1207.0(0.0%)'], 1207.0(0.0%)
+Missing jssp, LA16.jssp, most_work_remaining_930e
+Missing jssp, LA16.jssp, most_work_remaining_df20
+Missing jssp, LA16.jssp, first_come_first_served_6c4f
+Missing jssp, LA16.jssp, first_come_first_served_af26
+Missing jssp, LA16.jssp, shortest_processing_time_first_c374
+Missing jssp, LA16.jssp, shortest_processing_time_first_d471
+Missing jssp, LA16.jssp, random_hh
+Missing jssp, LA16.jssp, random_hh
+Missing jssp, LA16.jssp, random_hh
+jssp, LA16.jssp, random_hh, ['961.0(1.69%)'], 961.0(1.69%)
+Missing jssp, LA17.jssp, most_work_remaining_930e
+Missing jssp, LA17.jssp, most_work_remaining_df20
+Missing jssp, LA17.jssp, first_come_first_served_6c4f
+Missing jssp, LA17.jssp, first_come_first_served_af26
+Missing jssp, LA17.jssp, shortest_processing_time_first_c374
+Missing jssp, LA17.jssp, shortest_processing_time_first_d471
+Missing jssp, LA17.jssp, random_hh
+Missing jssp, LA17.jssp, random_hh
+Missing jssp, LA17.jssp, random_hh
+jssp, LA17.jssp, random_hh, ['798.0(1.79%)'], 798.0(1.79%)
+Missing jssp, LA18.jssp, most_work_remaining_930e
+Missing jssp, LA18.jssp, most_work_remaining_df20
+Missing jssp, LA18.jssp, first_come_first_served_6c4f
+Missing jssp, LA18.jssp, first_come_first_served_af26
+Missing jssp, LA18.jssp, shortest_processing_time_first_c374
+Missing jssp, LA18.jssp, shortest_processing_time_first_d471
+Missing jssp, LA18.jssp, random_hh
+Missing jssp, LA18.jssp, random_hh
+Missing jssp, LA18.jssp, random_hh
+jssp, LA18.jssp, random_hh, ['850.0(0.24%)'], 850.0(0.24%)
+Missing jssp, LA19.jssp, most_work_remaining_930e
+Missing jssp, LA19.jssp, most_work_remaining_df20
+Missing jssp, LA19.jssp, first_come_first_served_6c4f
+Missing jssp, LA19.jssp, first_come_first_served_af26
+Missing jssp, LA19.jssp, shortest_processing_time_first_c374
+Missing jssp, LA19.jssp, shortest_processing_time_first_d471
+Missing jssp, LA19.jssp, random_hh
+Missing jssp, LA19.jssp, random_hh
+Missing jssp, LA19.jssp, random_hh
+jssp, LA19.jssp, random_hh, ['852.0(1.19%)'], 852.0(1.19%)
+jssp, LA20.jssp, most_work_remaining_930e, 1404.0(55.65%)
+jssp, LA20.jssp, most_work_remaining_df20, 1273.0(41.13%)
+jssp, LA20.jssp, first_come_first_served_6c4f, 3905.0(332.93%)
+jssp, LA20.jssp, first_come_first_served_af26, 1210.0(34.15%)
+jssp, LA20.jssp, shortest_processing_time_first_c374, 3029.0(235.81%)
+jssp, LA20.jssp, shortest_processing_time_first_d471, 1210.0(34.15%)
+Missing jssp, LA20.jssp, random_hh
+jssp, LA20.jssp, random_hh, ['1542.0(70.95%)', '1342.0(48.78%)', '1761.0(95.23%)'], 1548.3333333333333(71.65333333333334%)
+Missing jssp, LA20.jssp, random_hh
+jssp, LA20.jssp, random_hh, ['902.0(0.0%)'], 902.0(0.0%)
+Missing max_cut, g1.mc, most_weight_neighbors_320c
+Missing max_cut, g1.mc, most_weight_neighbors_d31b
+Missing max_cut, g1.mc, highest_weight_edge_eb0c
+Missing max_cut, g1.mc, highest_weight_edge_ca02
+Missing max_cut, g1.mc, balanced_cut_21d5
+Missing max_cut, g1.mc, balanced_cut_c0e6
+Missing max_cut, g1.mc, random_hh
+Missing max_cut, g1.mc, random_hh
+Missing max_cut, g1.mc, random_hh
+max_cut, g1.mc, random_hh, ['11624.0(0.0%)'], 11624.0(0.0%)
+Missing max_cut, g2.mc, most_weight_neighbors_320c
+Missing max_cut, g2.mc, most_weight_neighbors_d31b
+Missing max_cut, g2.mc, highest_weight_edge_eb0c
+Missing max_cut, g2.mc, highest_weight_edge_ca02
+Missing max_cut, g2.mc, balanced_cut_21d5
+Missing max_cut, g2.mc, balanced_cut_c0e6
+Missing max_cut, g2.mc, random_hh
+Missing max_cut, g2.mc, random_hh
+Missing max_cut, g2.mc, random_hh
+max_cut, g2.mc, random_hh, ['11612.0(0.07%)'], 11612.0(0.07%)
+Missing max_cut, g3.mc, most_weight_neighbors_320c
+Missing max_cut, g3.mc, most_weight_neighbors_d31b
+Missing max_cut, g3.mc, highest_weight_edge_eb0c
+Missing max_cut, g3.mc, highest_weight_edge_ca02
+Missing max_cut, g3.mc, balanced_cut_21d5
+Missing max_cut, g3.mc, balanced_cut_c0e6
+Missing max_cut, g3.mc, random_hh
+Missing max_cut, g3.mc, random_hh
+Missing max_cut, g3.mc, random_hh
+max_cut, g3.mc, random_hh, ['11611.0(0.09%)'], 11611.0(0.09%)
+Missing max_cut, g4.mc, most_weight_neighbors_320c
+Missing max_cut, g4.mc, most_weight_neighbors_d31b
+Missing max_cut, g4.mc, highest_weight_edge_eb0c
+Missing max_cut, g4.mc, highest_weight_edge_ca02
+Missing max_cut, g4.mc, balanced_cut_21d5
+Missing max_cut, g4.mc, balanced_cut_c0e6
+Missing max_cut, g4.mc, random_hh
+Missing max_cut, g4.mc, random_hh
+Missing max_cut, g4.mc, random_hh
+max_cut, g4.mc, random_hh, ['11595.0(0.44%)'], 11595.0(0.44%)
+Missing max_cut, g5.mc, most_weight_neighbors_320c
+Missing max_cut, g5.mc, most_weight_neighbors_d31b
+Missing max_cut, g5.mc, highest_weight_edge_eb0c
+Missing max_cut, g5.mc, highest_weight_edge_ca02
+Missing max_cut, g5.mc, balanced_cut_21d5
+Missing max_cut, g5.mc, balanced_cut_c0e6
+Missing max_cut, g5.mc, random_hh
+Missing max_cut, g5.mc, random_hh
+Missing max_cut, g5.mc, random_hh
+max_cut, g5.mc, random_hh, ['11605.0(0.22%)'], 11605.0(0.22%)
+Missing max_cut, g6.mc, most_weight_neighbors_320c
+Missing max_cut, g6.mc, most_weight_neighbors_d31b
+Missing max_cut, g6.mc, highest_weight_edge_eb0c
+Missing max_cut, g6.mc, highest_weight_edge_ca02
+Missing max_cut, g6.mc, balanced_cut_21d5
+Missing max_cut, g6.mc, balanced_cut_c0e6
+Missing max_cut, g6.mc, random_hh
+Missing max_cut, g6.mc, random_hh
+Missing max_cut, g6.mc, random_hh
+max_cut, g6.mc, random_hh, ['2165.0(0.6%)'], 2165.0(0.6%)
+Missing max_cut, g7.mc, most_weight_neighbors_320c
+Missing max_cut, g7.mc, most_weight_neighbors_d31b
+Missing max_cut, g7.mc, highest_weight_edge_eb0c
+Missing max_cut, g7.mc, highest_weight_edge_ca02
+Missing max_cut, g7.mc, balanced_cut_21d5
+Missing max_cut, g7.mc, balanced_cut_c0e6
+Missing max_cut, g7.mc, random_hh
+Missing max_cut, g7.mc, random_hh
+Missing max_cut, g7.mc, random_hh
+max_cut, g7.mc, random_hh, ['1980.0(1.3%)'], 1980.0(1.3%)
+Missing max_cut, g8.mc, most_weight_neighbors_320c
+Missing max_cut, g8.mc, most_weight_neighbors_d31b
+Missing max_cut, g8.mc, highest_weight_edge_eb0c
+Missing max_cut, g8.mc, highest_weight_edge_ca02
+Missing max_cut, g8.mc, balanced_cut_21d5
+Missing max_cut, g8.mc, balanced_cut_c0e6
+Missing max_cut, g8.mc, random_hh
+Missing max_cut, g8.mc, random_hh
+Missing max_cut, g8.mc, random_hh
+max_cut, g8.mc, random_hh, ['1970.0(1.75%)'], 1970.0(1.75%)
+Missing max_cut, g9.mc, most_weight_neighbors_320c
+Missing max_cut, g9.mc, most_weight_neighbors_d31b
+Missing max_cut, g9.mc, highest_weight_edge_eb0c
+Missing max_cut, g9.mc, highest_weight_edge_ca02
+Missing max_cut, g9.mc, balanced_cut_21d5
+Missing max_cut, g9.mc, balanced_cut_c0e6
+Missing max_cut, g9.mc, random_hh
+Missing max_cut, g9.mc, random_hh
+Missing max_cut, g9.mc, random_hh
+max_cut, g9.mc, random_hh, ['1998.0(2.73%)'], 1998.0(2.73%)
+max_cut, g10.mc, most_weight_neighbors_320c, 1477.0(26.15%)
+max_cut, g10.mc, most_weight_neighbors_d31b, 1714.0(14.3%)
+max_cut, g10.mc, highest_weight_edge_eb0c, 806.0(59.7%)
+max_cut, g10.mc, highest_weight_edge_ca02, 1817.0(9.15%)
+max_cut, g10.mc, balanced_cut_21d5, -74.0(103.7%)
+max_cut, g10.mc, balanced_cut_c0e6, 1714.0(14.3%)
+max_cut, g10.mc, random_hh, ['1685.0(15.75%)', '1734.0(13.3%)', '1736.0(13.2%)', '1734.0(13.3%)', '1714.0(14.3%)'], 1720.6(13.969999999999999%)
+max_cut, g10.mc, random_hh, ['1889.0(5.55%)', '1841.0(7.95%)', '1792.0(10.4%)'], 1840.6666666666667(7.966666666666666%)
+Missing max_cut, g10.mc, random_hh
+max_cut, g10.mc, random_hh, ['1993.0(0.35%)'], 1993.0(0.35%)
+mkp, mknap1_1.mkp, greedy_by_profit_8df3, 2400.0(36.84%)
+mkp, mknap1_1.mkp, greedy_by_profit_1597, 3800.0(0.0%)
+mkp, mknap1_1.mkp, greedy_by_weight_ece2, 2400.0(36.84%)
+mkp, mknap1_1.mkp, greedy_by_weight_e7f9, 3800.0(0.0%)
+mkp, mknap1_1.mkp, greedy_by_density_9e8d, 3800.0(0.0%)
+mkp, mknap1_1.mkp, greedy_by_density_bb0a, 3800.0(0.0%)
+mkp, mknap1_1.mkp, random_hh, ['5600.0(47.37%)', '6100.0(60.53%)'], 5850.0(53.95%)
+mkp, mknap1_1.mkp, random_hh, ['3800.0(0.0%)', '3800.0(0.0%)', '3800.0(0.0%)'], 3800.0(0.0%)
+mkp, mknap1_1.mkp, random_hh, ['3800.0(0.0%)', '3800.0(0.0%)', '3800.0(0.0%)'], 3800.0(0.0%)
+mkp, mknap1_1.mkp, random_hh, ['3800.0(0.0%)'], 3800.0(0.0%)
+Missing mkp, mknap1_2.mkp, greedy_by_profit_8df3
+Missing mkp, mknap1_2.mkp, greedy_by_profit_1597
+Missing mkp, mknap1_2.mkp, greedy_by_weight_ece2
+Missing mkp, mknap1_2.mkp, greedy_by_weight_e7f9
+Missing mkp, mknap1_2.mkp, greedy_by_density_9e8d
+Missing mkp, mknap1_2.mkp, greedy_by_density_bb0a
+Missing mkp, mknap1_2.mkp, random_hh
+Missing mkp, mknap1_2.mkp, random_hh
+Missing mkp, mknap1_2.mkp, random_hh
+mkp, mknap1_2.mkp, random_hh, ['8706.1(0.0%)'], 8706.1(0.0%)
+Missing mkp, mknap1_3.mkp, greedy_by_profit_8df3
+Missing mkp, mknap1_3.mkp, greedy_by_profit_1597
+Missing mkp, mknap1_3.mkp, greedy_by_weight_ece2
+Missing mkp, mknap1_3.mkp, greedy_by_weight_e7f9
+Missing mkp, mknap1_3.mkp, greedy_by_density_9e8d
+Missing mkp, mknap1_3.mkp, greedy_by_density_bb0a
+Missing mkp, mknap1_3.mkp, random_hh
+Missing mkp, mknap1_3.mkp, random_hh
+Missing mkp, mknap1_3.mkp, random_hh
+mkp, mknap1_3.mkp, random_hh, ['4015.0(0.0%)'], 4015.0(0.0%)
+Missing mkp, mknap1_4.mkp, greedy_by_profit_8df3
+Missing mkp, mknap1_4.mkp, greedy_by_profit_1597
+Missing mkp, mknap1_4.mkp, greedy_by_weight_ece2
+Missing mkp, mknap1_4.mkp, greedy_by_weight_e7f9
+Missing mkp, mknap1_4.mkp, greedy_by_density_9e8d
+Missing mkp, mknap1_4.mkp, greedy_by_density_bb0a
+Missing mkp, mknap1_4.mkp, random_hh
+Missing mkp, mknap1_4.mkp, random_hh
+Missing mkp, mknap1_4.mkp, random_hh
+mkp, mknap1_4.mkp, random_hh, ['6120.0(0.0%)'], 6120.0(0.0%)
+Missing mkp, mknap1_5.mkp, greedy_by_profit_8df3
+Missing mkp, mknap1_5.mkp, greedy_by_profit_1597
+Missing mkp, mknap1_5.mkp, greedy_by_weight_ece2
+Missing mkp, mknap1_5.mkp, greedy_by_weight_e7f9
+Missing mkp, mknap1_5.mkp, greedy_by_density_9e8d
+Missing mkp, mknap1_5.mkp, greedy_by_density_bb0a
+Missing mkp, mknap1_5.mkp, random_hh
+Missing mkp, mknap1_5.mkp, random_hh
+Missing mkp, mknap1_5.mkp, random_hh
+mkp, mknap1_5.mkp, random_hh, ['12400.0(0.0%)'], 12400.0(0.0%)
+Missing mkp, mknap1_6.mkp, greedy_by_profit_8df3
+Missing mkp, mknap1_6.mkp, greedy_by_profit_1597
+Missing mkp, mknap1_6.mkp, greedy_by_weight_ece2
+Missing mkp, mknap1_6.mkp, greedy_by_weight_e7f9
+Missing mkp, mknap1_6.mkp, greedy_by_density_9e8d
+Missing mkp, mknap1_6.mkp, greedy_by_density_bb0a
+Missing mkp, mknap1_6.mkp, random_hh
+Missing mkp, mknap1_6.mkp, random_hh
+Missing mkp, mknap1_6.mkp, random_hh
+mkp, mknap1_6.mkp, random_hh, ['10618.0(0.0%)'], 10618.0(0.0%)
+mkp, mknap1_7.mkp, greedy_by_profit_8df3, 13863.0(16.17%)
+mkp, mknap1_7.mkp, greedy_by_profit_1597, 14092.0(14.79%)
+mkp, mknap1_7.mkp, greedy_by_weight_ece2, 10141.0(38.68%)
+mkp, mknap1_7.mkp, greedy_by_weight_e7f9, 15832.0(4.26%)
+mkp, mknap1_7.mkp, greedy_by_density_9e8d, 15832.0(4.26%)
+mkp, mknap1_7.mkp, greedy_by_density_bb0a, 16299.0(1.44%)
+mkp, mknap1_7.mkp, random_hh, ['14617.0(11.61%)', '15992.0(3.3%)', '14217.0(14.03%)', '14333.0(13.33%)', '4260.0(74.24%)'], 12683.8(23.302%)
+mkp, mknap1_7.mkp, random_hh, ['14232.0(13.94%)', '15601.0(5.66%)', '13863.0(16.17%)'], 14565.333333333334(11.923333333333334%)
+mkp, mknap1_7.mkp, random_hh, ['16415.0(0.74%)'], 16415.0(0.74%)
+mkp, mknap1_7.mkp, random_hh, ['16537.0(0.0%)'], 16537.0(0.0%)
+Missing mkp, mknapcb1_1.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb1_1.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb1_1.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb1_1.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb1_1.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb1_1.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb1_1.mkp, random_hh
+Missing mkp, mknapcb1_1.mkp, random_hh
+Missing mkp, mknapcb1_1.mkp, random_hh
+mkp, mknapcb1_1.mkp, random_hh, ['24301.0(0.33%)'], 24301.0(0.33%)
+Missing mkp, mknapcb1_2.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb1_2.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb1_2.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb1_2.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb1_2.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb1_2.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb1_2.mkp, random_hh
+Missing mkp, mknapcb1_2.mkp, random_hh
+Missing mkp, mknapcb1_2.mkp, random_hh
+mkp, mknapcb1_2.mkp, random_hh, ['24225.0(0.2%)'], 24225.0(0.2%)
+Missing mkp, mknapcb1_3.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb1_3.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb1_3.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb1_3.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb1_3.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb1_3.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb1_3.mkp, random_hh
+Missing mkp, mknapcb1_3.mkp, random_hh
+Missing mkp, mknapcb1_3.mkp, random_hh
+mkp, mknapcb1_3.mkp, random_hh, ['23515.0(0.15%)'], 23515.0(0.15%)
+Missing mkp, mknapcb1_4.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb1_4.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb1_4.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb1_4.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb1_4.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb1_4.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb1_4.mkp, random_hh
+Missing mkp, mknapcb1_4.mkp, random_hh
+Missing mkp, mknapcb1_4.mkp, random_hh
+mkp, mknapcb1_4.mkp, random_hh, ['23245.0(1.23%)'], 23245.0(1.23%)
+Missing mkp, mknapcb1_5.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb1_5.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb1_5.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb1_5.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb1_5.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb1_5.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb1_5.mkp, random_hh
+Missing mkp, mknapcb1_5.mkp, random_hh
+Missing mkp, mknapcb1_5.mkp, random_hh
+mkp, mknapcb1_5.mkp, random_hh, ['23819.0(0.72%)'], 23819.0(0.72%)
+Missing mkp, mknapcb4_1.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb4_1.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb4_1.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb4_1.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb4_1.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb4_1.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb4_1.mkp, random_hh
+Missing mkp, mknapcb4_1.mkp, random_hh
+Missing mkp, mknapcb4_1.mkp, random_hh
+mkp, mknapcb4_1.mkp, random_hh, ['22938.0(0.55%)'], 22938.0(0.55%)
+Missing mkp, mknapcb4_2.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb4_2.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb4_2.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb4_2.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb4_2.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb4_2.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb4_2.mkp, random_hh
+Missing mkp, mknapcb4_2.mkp, random_hh
+Missing mkp, mknapcb4_2.mkp, random_hh
+mkp, mknapcb4_2.mkp, random_hh, ['22562.0(1.05%)'], 22562.0(1.05%)
+Missing mkp, mknapcb4_3.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb4_3.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb4_3.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb4_3.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb4_3.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb4_3.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb4_3.mkp, random_hh
+Missing mkp, mknapcb4_3.mkp, random_hh
+Missing mkp, mknapcb4_3.mkp, random_hh
+mkp, mknapcb4_3.mkp, random_hh, ['21993.0(0.62%)'], 21993.0(0.62%)
+Missing mkp, mknapcb4_4.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb4_4.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb4_4.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb4_4.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb4_4.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb4_4.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb4_4.mkp, random_hh
+Missing mkp, mknapcb4_4.mkp, random_hh
+Missing mkp, mknapcb4_4.mkp, random_hh
+mkp, mknapcb4_4.mkp, random_hh, ['22537.0(1.03%)'], 22537.0(1.03%)
+Missing mkp, mknapcb4_5.mkp, greedy_by_profit_8df3
+Missing mkp, mknapcb4_5.mkp, greedy_by_profit_1597
+Missing mkp, mknapcb4_5.mkp, greedy_by_weight_ece2
+Missing mkp, mknapcb4_5.mkp, greedy_by_weight_e7f9
+Missing mkp, mknapcb4_5.mkp, greedy_by_density_9e8d
+Missing mkp, mknapcb4_5.mkp, greedy_by_density_bb0a
+Missing mkp, mknapcb4_5.mkp, random_hh
+Missing mkp, mknapcb4_5.mkp, random_hh
+Missing mkp, mknapcb4_5.mkp, random_hh
+mkp, mknapcb4_5.mkp, random_hh, ['22366.0(0.91%)'], 22366.0(0.91%)
+dposp, test_case_1, least_order_remaining_9c3c, 5.0(None%)
+dposp, test_case_1, least_order_remaining_27ca, 8.0(None%)
+dposp, test_case_1, shortest_operation_ff40, 8.0(None%)
+dposp, test_case_1, shortest_operation_ae31, 9.0(None%)
+dposp, test_case_1, greedy_by_order_density_c702, 9.0(None%)
+dposp, test_case_1, greedy_by_order_density_de77, 10.0(None%)
+dposp, test_case_1, random_hh, ['9.0(None%)', '9.0(None%)', '9.0(None%)', '8.0(None%)', '9.0(None%)'], 8.8(None%)
+dposp, test_case_1, random_hh, ['9.0(None%)', '8.0(None%)', '9.0(None%)', '9.0(None%)', '10.0(None%)', '8.0(None%)'], 8.833333333333334(None%)
+dposp, test_case_1, random_hh, ['10.0(None%)', '10.0(None%)', '10.0(None%)'], 10.0(None%)
+dposp, test_case_1, random_hh, ['10.0(None%)'], 10.0(None%)
+dposp, test_case_2, least_order_remaining_9c3c, 40.0(None%)
+dposp, test_case_2, least_order_remaining_27ca, 43.0(None%)
+dposp, test_case_2, shortest_operation_ff40, 40.0(None%)
+dposp, test_case_2, shortest_operation_ae31, 46.0(None%)
+dposp, test_case_2, greedy_by_order_density_c702, 43.0(None%)
+dposp, test_case_2, greedy_by_order_density_de77, 43.0(None%)
+dposp, test_case_2, random_hh, ['43.0(None%)', '39.0(None%)', '36.0(None%)', '35.0(None%)', '39.0(None%)'], 38.4(None%)
+dposp, test_case_2, random_hh, ['44.0(None%)', '44.0(None%)', '44.0(None%)', '44.0(None%)'], 44.0(None%)
+dposp, test_case_2, random_hh, ['44.0(None%)', '46.0(None%)', '46.0(None%)', '46.0(None%)'], 45.5(None%)
+dposp, test_case_2, random_hh, ['46.0(None%)'], 46.0(None%)
+dposp, test_case_3, least_order_remaining_9c3c, 62.0(None%)
+dposp, test_case_3, least_order_remaining_27ca, 79.0(None%)
+dposp, test_case_3, shortest_operation_ff40, 76.0(None%)
+dposp, test_case_3, shortest_operation_ae31, 81.0(None%)
+dposp, test_case_3, greedy_by_order_density_c702, 69.0(None%)
+dposp, test_case_3, greedy_by_order_density_de77, 79.0(None%)
+dposp, test_case_3, random_hh, ['70.0(None%)', '64.0(None%)', '68.0(None%)', '67.0(None%)', '62.0(None%)'], 66.2(None%)
+dposp, test_case_3, random_hh, ['75.0(None%)', '56.0(None%)', '72.0(None%)'], 67.66666666666667(None%)
+dposp, test_case_3, random_hh, ['81.0(None%)', '81.0(None%)', '81.0(None%)', '81.0(None%)'], 81.0(None%)
+dposp, test_case_3, random_hh, ['86.0(None%)'], 86.0(None%)
+dposp, test_case_4, least_order_remaining_9c3c, 37.0(None%)
+dposp, test_case_4, least_order_remaining_27ca, 46.0(None%)
+dposp, test_case_4, shortest_operation_ff40, 43.0(None%)
+dposp, test_case_4, shortest_operation_ae31, 51.0(None%)
+dposp, test_case_4, greedy_by_order_density_c702, 45.0(None%)
+dposp, test_case_4, greedy_by_order_density_de77, 50.0(None%)
+dposp, test_case_4, random_hh, ['42.0(None%)', '41.0(None%)', '42.0(None%)', '41.0(None%)', '43.0(None%)'], 41.8(None%)
+dposp, test_case_4, random_hh, ['47.0(None%)', '46.0(None%)', '47.0(None%)', '45.0(None%)'], 46.25(None%)
+dposp, test_case_4, random_hh, ['50.0(None%)', '52.0(None%)', '51.0(None%)', '51.0(None%)'], 51.0(None%)
+dposp, test_case_4, random_hh, ['53.0(None%)'], 53.0(None%)
+dposp, test_case_5, least_order_remaining_9c3c, 118.0(None%)
+dposp, test_case_5, least_order_remaining_27ca, 143.0(None%)
+dposp, test_case_5, shortest_operation_ff40, 138.0(None%)
+dposp, test_case_5, shortest_operation_ae31, 142.0(None%)
+dposp, test_case_5, greedy_by_order_density_c702, 118.0(None%)
+dposp, test_case_5, greedy_by_order_density_de77, 139.0(None%)
+dposp, test_case_5, random_hh, ['122.0(None%)', '117.0(None%)', '120.0(None%)', '122.0(None%)', '121.0(None%)'], 120.4(None%)
+dposp, test_case_5, random_hh, ['100.0(None%)', '138.0(None%)', '113.0(None%)', '129.0(None%)'], 120.0(None%)
+dposp, test_case_5, random_hh, ['146.0(None%)', '143.0(None%)', '144.0(None%)'], 144.33333333333334(None%)
+dposp, test_case_5, random_hh, ['149.0(None%)'], 149.0(None%)
+dposp, test_case_6, least_order_remaining_9c3c, 300.0(None%)
+dposp, test_case_6, least_order_remaining_27ca, 340.0(None%)
+dposp, test_case_6, shortest_operation_ff40, 344.0(None%)
+dposp, test_case_6, shortest_operation_ae31, 365.0(None%)
+dposp, test_case_6, greedy_by_order_density_c702, 328.0(None%)
+dposp, test_case_6, greedy_by_order_density_de77, 351.0(None%)
+dposp, test_case_6, random_hh, ['320.0(None%)', '321.0(None%)', '325.0(None%)', '330.0(None%)', '330.0(None%)'], 325.2(None%)
+dposp, test_case_6, random_hh, ['359.0(None%)', '347.0(None%)', '332.0(None%)', '344.0(None%)'], 345.5(None%)
+dposp, test_case_6, random_hh, ['365.0(None%)', '371.0(None%)', '367.0(None%)'], 367.6666666666667(None%)
+Missing dposp, test_case_6, random_hh
+dposp, test_case_7, least_order_remaining_9c3c, 1130.0(None%)
+dposp, test_case_7, least_order_remaining_27ca, 1403.0(None%)
+dposp, test_case_7, shortest_operation_ff40, 1416.0(None%)
+dposp, test_case_7, shortest_operation_ae31, 1499.0(None%)
+dposp, test_case_7, greedy_by_order_density_c702, 1388.0(None%)
+dposp, test_case_7, greedy_by_order_density_de77, 1468.0(None%)
+dposp, test_case_7, random_hh, ['1203.0(None%)', '1220.0(None%)', '1184.0(None%)', '1210.0(None%)', '1173.0(None%)'], 1198.0(None%)
+dposp, test_case_7, random_hh, ['1515.0(None%)'], 1515.0(None%)
+Missing dposp, test_case_7, random_hh
+Missing dposp, test_case_7, random_hh
