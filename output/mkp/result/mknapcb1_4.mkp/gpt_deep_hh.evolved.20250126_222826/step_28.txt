@@ -1,0 +1,439 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on mkp problem:
+Multidimensional Knapsack Problem (MKP) is a combinatorial optimization problem where the objective is to maximize the total profit of selected items, each with a given profit value, subject to multiple constraints on the cumulative resource consumption of the items. The challenge lies in selecting the optimal combination of items that yields the highest profit without exceeding the available capacity for each resource dimension.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MKP.
+A list of boolean values where each boolean represents whether the corresponding item is included in the knapsack."""
+    def __init__(self, item_inclusion: list[bool]):
+        self.item_inclusion = item_inclusion
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class ToggleOperator(BaseOperator):
+    """Toggle the inclusion status of an item in the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = not new_item_inclusion[self.item_index]
+        return Solution(new_item_inclusion)
+class AddOperator(BaseOperator):
+    """Include an item in the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = True
+        return Solution(new_item_inclusion)
+class RemoveOperator(BaseOperator):
+    """Exclude an item from the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = False
+        return Solution(new_item_inclusion)
+class SwapOperator(BaseOperator):
+    """Swap the inclusion status of two items."""
+    def __init__(self, item_index1: int, item_index2: int):
+        self.item_index1 = item_index1
+        self.item_index2 = item_index2
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        (new_item_inclusion[self.item_index1], new_item_inclusion[self.item_index2]) = (new_item_inclusion[self.item_index2], new_item_inclusion[self.item_index1])
+        return Solution(new_item_inclusion)
+class FlipBlockOperator(BaseOperator):
+    """Flip the a list of items."""
+    def __init__(self, index_list: list[int]):
+        self.index_list = index_list
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        for i in self.index_list:
+            new_item_inclusion[i] = not new_item_inclusion[i]
+        return Solution(new_item_inclusion)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "item_num" (int): The total number of items available for selection.
+    - "resource_num" (int): The number of resource dimensions or constraints.
+    - "profits" (numpy.array): The profit value associated with each item.
+    - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions, so the shape is (resource_num, item_num)
+    - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "current_profit" (float): The total profit of the items included in the current solution.
+    - "current_weights" (numpy.array): The total resource consumption for each dimension in the current solution.
+    - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.
+    - "items_in_knapsack" (list[int]): A list of item indices that are currently included in the knapsack.
+    - "selected_item_num" (int): Number of items that have been selected.
+    - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
+    - "unselected_item_num" (int): Number of items that have not been selected.
+    - "feasible_items_to_add" (list[int]): A list of item indices that can be added to the knapsack without violating any resource constraints. 
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is mkp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Multidimensional Knapsack Problem (MKP) is indeed a combinatorial optimization problem. It involves making discrete decisions (selecting items) to maximize the objective function (total profit) while satisfying multiple constraints (resource capacities). Such problems are often solved using heuristic approaches due to their computational complexity and the infeasibility of finding exact solutions in a reasonable time for large instances. Your framework using solutions and operators to apply heuristic algorithms is appropriate for tackling this type of problem.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): density_based,profit_based,weight_based,swap_refinement,k_flip_exploration
+
+density_based: uses profit-to-weight density to select items.
+def greedy_by_density_bb0a(): Greedy by Density with Swapping heuristic for the Multidimensional Knapsack Problem. This heuristic first selects items based on their density (profit divided by total weight across all dimensions). After attempting to add high-density items, it considers swapping existing items in the knapsack with those outside to further improve the solution profitably.
+
+profit_based: prioritizes items based on profit and explores k-flip and swap optimizations.
+def greedy_by_profit_1597(max_k: int = 2, epsilon: float = 0.01): Greedy heuristic for the Multidimensional Knapsack Problem, enhanced with opportunity cost scoring, k-flip exploration, and swap optimization.
+
+weight_based: uses profit-to-weight ratio and explores k-flip and swap optimizations.
+def greedy_by_weight_e7f9(k_flip_range=(2, 3)): Greedy heuristic with profit-to-weight ratio, k-flip, and swap refinement for MKP.
+
+swap_refinement: all heuristics incorporate swap logic to optimize solutions.
+def greedy_by_density_bb0a(): Greedy by Density with Swapping heuristic for the Multidimensional Knapsack Problem. This heuristic first selects items based on their density (profit divided by total weight across all dimensions). After attempting to add high-density items, it considers swapping existing items in the knapsack with those outside to further improve the solution profitably.
+def greedy_by_profit_1597(max_k: int = 2, epsilon: float = 0.01): Greedy heuristic for the Multidimensional Knapsack Problem, enhanced with opportunity cost scoring, k-flip exploration, and swap optimization.
+def greedy_by_weight_e7f9(k_flip_range=(2, 3)): Greedy heuristic with profit-to-weight ratio, k-flip, and swap refinement for MKP.
+
+k_flip_exploration: both heuristics explore k-flip operations to enhance solution quality.
+def greedy_by_profit_1597(max_k: int = 2, epsilon: float = 0.01): Greedy heuristic for the Multidimensional Knapsack Problem, enhanced with opportunity cost scoring, k-flip exploration, and swap optimization.
+def greedy_by_weight_e7f9(k_flip_range=(2, 3)): Greedy heuristic with profit-to-weight ratio, k-flip, and swap refinement for MKP.
+
+
+We aim to solve this problem using the following data:
+item_num:100
+resource_num:5
+profits:[1068.0, 567.0, 704.0, 973.0, 1047.0, 874.0, 665.0, 580.0, 959.0, 618.0, 848.0, 1031.0, 944.0, 852.0, 436.0, 1096.0, 533.0, 767.0, 819.0, 856.0, 622.0, 848.0, 916.0, 535.0, 1045.0, 425.0, 1088.0, 702.0, 995.0, 574.0, 817.0, 960.0, 884.0, 661.0, 759.0, 753.0, 738.0, 538.0, 520.0, 934.0, 806.0, 807.0, 653.0, 555.0, 762.0, 554.0, 1039.0, 662.0, 1046.0, 645.0, 682.0, 599.0, 591.0, 642.0, 1006.0, 633.0, 1055.0, 631.0, 761.0, 430.0, 644.0, 1024.0, 933.0, 745.0, 578.0, 1067.0, 888.0, 680.0, 442.0, 946.0, 652.0, 689.0, 753.0, 913.0, 1197.0, 518.0, 517.0, 535.0, 619.0, 838.0, 576.0, 749.0, 946.0, 713.0, 482.0, 540.0, 966.0, 1074.0, 276.0, 653.0, 971.0, 968.0, 918.0, 915.0, 997.0, 437.0, 434.0, 643.0, 837.0, 789.0]
+capacities:[13164.0, 12033.0, 12184.0, 13178.0, 12688.0]
+average_profit:761.72
+profit_variance:39627.5216
+average_weight_per_resource:[593.2, 306.6, 536.4, 510.8, 684.8, 378.0, 452.0, 456.2, 610.6, 502.8, 558.2, 532.4, 480.8, 533.4, 426.2, 621.0, 523.4, 627.2, 509.4, 615.8, 396.6, 746.6, 460.0, 368.2, 672.0, 305.2, 668.8, 315.8, 535.8, 526.8, 335.0, 597.2, 600.2, 577.8, 331.2, 322.0, 450.2, 514.0, 432.0, 621.8, 562.4, 552.4, 344.8, 463.2, 539.8, 384.2, 763.8, 537.6, 842.0, 371.8, 605.0, 445.4, 520.4, 236.6, 631.0, 377.8, 587.4, 441.8, 412.8, 325.8, 614.8, 571.0, 571.0, 349.8, 385.4, 582.0, 655.2, 490.0, 245.2, 512.4, 324.2, 463.8, 660.4, 689.6, 708.4, 457.0, 307.2, 413.6, 321.2, 494.0, 482.4, 680.4, 643.8, 645.0, 452.8, 362.2, 483.8, 634.0, 238.2, 438.2, 627.8, 621.6, 702.0, 529.2, 533.8, 251.2, 325.0, 597.6, 614.4, 734.2]
+capacity_to_weight_ratio:[0.25000949595472327, 0.2500051941576115, 0.25, 0.2500094858660596, 0.25000985221674876]
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 1 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+To develop a strategic guide for selecting heuristic categories and defining execution steps for each phase in solving the Multidimensional Knapsack Problem (MKP), consider the following framework:
+
+### Phase 1: Initial Construction
+
+1. **Objective**: Quickly build an initial feasible solution with a reasonable profit.
+2. **Heuristic Selection**:
+   - Start with **density_based** heuristics like `greedy_by_density_bb0a` to prioritize items with high profit-to-weight ratios, which often provide a good starting point.
+   - Experiment with **profit_based** heuristics such as `greedy_by_profit_1597` to explore the impact of high-profit items in your initial solution.
+3. **Execution Steps**:
+   - Run each heuristic briefly to construct an initial solution.
+   - Evaluate the feasibility and quality of the solution based on profit and resource utilization.
+   - Select the solution with the best initial profit as the starting point for improvement.
+
+### Phase 2: Solution Refinement
+
+1. **Objective**: Improve the initial solution through exploration and optimization.
+2. **Heuristic Selection**:
+   - Utilize **swap_refinement** heuristics to explore swapping items for potential profit improvement.
+   - Incorporate **k_flip_exploration** to experiment with flipping multiple items at once, which can help escape local optima.
+   - Apply **weight_based** heuristics to balance the solution by considering weight distribution across resources.
+3. **Execution Steps**:
+   - Iteratively apply swap and k-flip operations to refine the solution.
+   - Monitor changes in profit and constraint satisfaction to guide further improvements.
+   - If a particular heuristic shows diminishing returns, switch to another category to continue exploration.
+
+### Phase 3: Iterative Improvement
+
+1. **Objective**: Continually enhance the solution by alternating between different heuristic strategies.
+2. **Heuristic Selection**:
+   - Cycle through the selected heuristics from previous phases, emphasizing those that showed promise.
+   - Consider combinations of heuristics or adaptively switching based on solution performance metrics.
+3. **Execution Steps**:
+   - Set predefined criteria or thresholds for switching heuristics, such as a lack of improvement after a certain number of iterations.
+   - Record the performance of each heuristic to identify patterns or preferences for future iterations.
+   - Focus on optimizing the most promising solutions through targeted refinement.
+
+### General Considerations
+
+- **Adaptability**: Be prepared to adjust the strategy based on real-time feedback and solution performance.
+- **Balance**: Aim for a balance between exploration (searching new areas of the solution space) and exploitation (refining known good solutions).
+- **Evaluation**: Regularly evaluate solution quality and feasibility to ensure progress toward the optimal solution.
+
+By following this strategic guide, you can systematically explore different heuristic categories and refine your approach to solving the MKP effectively. This iterative process allows for flexibility and adaptation, ultimately leading to improved solution quality.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+item_num:100
+resource_num:5
+profits:[1068.0, 567.0, 704.0, 973.0, 1047.0, 874.0, 665.0, 580.0, 959.0, 618.0, 848.0, 1031.0, 944.0, 852.0, 436.0, 1096.0, 533.0, 767.0, 819.0, 856.0, 622.0, 848.0, 916.0, 535.0, 1045.0, 425.0, 1088.0, 702.0, 995.0, 574.0, 817.0, 960.0, 884.0, 661.0, 759.0, 753.0, 738.0, 538.0, 520.0, 934.0, 806.0, 807.0, 653.0, 555.0, 762.0, 554.0, 1039.0, 662.0, 1046.0, 645.0, 682.0, 599.0, 591.0, 642.0, 1006.0, 633.0, 1055.0, 631.0, 761.0, 430.0, 644.0, 1024.0, 933.0, 745.0, 578.0, 1067.0, 888.0, 680.0, 442.0, 946.0, 652.0, 689.0, 753.0, 913.0, 1197.0, 518.0, 517.0, 535.0, 619.0, 838.0, 576.0, 749.0, 946.0, 713.0, 482.0, 540.0, 966.0, 1074.0, 276.0, 653.0, 971.0, 968.0, 918.0, 915.0, 997.0, 437.0, 434.0, 643.0, 837.0, 789.0]
+capacities:[13164.0, 12033.0, 12184.0, 13178.0, 12688.0]
+average_profit:761.72
+profit_variance:39627.5216
+average_weight_per_resource:[593.2, 306.6, 536.4, 510.8, 684.8, 378.0, 452.0, 456.2, 610.6, 502.8, 558.2, 532.4, 480.8, 533.4, 426.2, 621.0, 523.4, 627.2, 509.4, 615.8, 396.6, 746.6, 460.0, 368.2, 672.0, 305.2, 668.8, 315.8, 535.8, 526.8, 335.0, 597.2, 600.2, 577.8, 331.2, 322.0, 450.2, 514.0, 432.0, 621.8, 562.4, 552.4, 344.8, 463.2, 539.8, 384.2, 763.8, 537.6, 842.0, 371.8, 605.0, 445.4, 520.4, 236.6, 631.0, 377.8, 587.4, 441.8, 412.8, 325.8, 614.8, 571.0, 571.0, 349.8, 385.4, 582.0, 655.2, 490.0, 245.2, 512.4, 324.2, 463.8, 660.4, 689.6, 708.4, 457.0, 307.2, 413.6, 321.2, 494.0, 482.4, 680.4, 643.8, 645.0, 452.8, 362.2, 483.8, 634.0, 238.2, 438.2, 627.8, 621.6, 702.0, 529.2, 533.8, 251.2, 325.0, 597.6, 614.4, 734.2]
+capacity_to_weight_ratio:[0.25000949595472327, 0.2500051941576115, 0.25, 0.2500094858660596, 0.25000985221674876]
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 28 rounds discuss and the summary are:
+---Round 0---
+Heuristic: greedy_by_density_bb0a
+Heuristic Category: density_based
+Running Steps: 1
+Explain: Since the current solution is starting from scratch with no items selected, using a density-based heuristic like `greedy_by_density_bb0a` can quickly help build an initial solution by selecting high profit-to-weight ratio items. This approach is a good first step to create a base solution that can be further refined in later stages.
+Item Inclusion Count: 0->1
+Profit: 0->642.0
+---Round 1---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: profit_based
+Running Steps: 1
+Explain: Given that we have established an initial solution using a density-based approach, transitioning to a profit-based heuristic like `greedy_by_profit_1597` can help enhance the current solution by prioritizing high-profit items. This approach allows for the exploration of potential high-value additions to the knapsack, which could further improve the solution's profitability while maintaining feasibility within the resource constraints.
+Item Inclusion Count: 1->2
+Profit: 642.0->1459.0
+---Round 2---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain:  The current solution has made some progress with profit-based heuristics, but to further refine and potentially improve the profitability, a swap refinement strategy can be beneficial. By exploring swaps between items currently in the knapsack and those outside, we can potentially increase the profit while maintaining feasibility. This approach allows for fine-tuning the current solution and possibly escaping local optima, thereby enhancing the overall solution quality.
+Item Inclusion Count: 2->3
+Profit: 1459.0->2212.0
+---Round 3---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution has made progress with the swap_refinement category, improving the profit. To further enhance the solution and potentially break out of any local optima, switching to k_flip_exploration can be beneficial. This category allows exploring multiple item flips, which may lead to discovering a better solution configuration without being restricted by single-item swaps. With a high feasibility ratio and a substantial amount of remaining capacity, k_flip_exploration can capitalize on these conditions to find additional profitable combinations.
+Item Inclusion Count: 3->4
+Profit: 2212.0->2957.0
+---Round 4---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution has a good feasibility ratio and substantial remaining capacity, indicating room for improvement. After exploring k-flip operations, it might be beneficial to switch to swap refinement to optimize the configuration further. This approach allows for fine-tuning by swapping items in and out of the knapsack, potentially increasing the overall profit without significantly altering the current balance. By leveraging swap logic, we can explore new profitable combinations while maintaining solution feasibility.
+Item Inclusion Count: 4->5
+Profit: 2957.0->3831.0
+---Round 5---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution shows good progress with a high feasibility ratio and substantial remaining capacity across all dimensions. While swap refinement has been effective, switching to k_flip_exploration can help explore more diverse combinations by flipping multiple items simultaneously. This approach may uncover new profitable configurations that individual swaps might miss, potentially leading to further improvements in the solution's profitability.
+Item Inclusion Count: 5->6
+Profit: 3831.0->4483.0
+---Round 6---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain:  The current solution shows good progress with a high feasibility ratio and significant remaining capacity across all dimensions. After exploring k-flip operations, it might be beneficial to switch to swap refinement to optimize the configuration further. This approach allows for fine-tuning by swapping items in and out of the knapsack, potentially increasing the overall profit without significantly altering the current balance. By leveraging swap logic, we can explore new profitable combinations while maintaining solution feasibility. Given the high feasibility ratio and substantial remaining capacity, swap refinement can help capitalize on these conditions to find additional profitable combinations.
+Item Inclusion Count: 6->7
+Profit: 4483.0->5242.0
+---Round 7---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution is feasible with substantial remaining capacity and a high feasibility ratio, indicating potential for further improvement. After using swap_refinement, exploring k_flip_exploration can be advantageous as it allows for multiple item flips, potentially uncovering new profitable configurations that single swaps might miss. This approach could help escape local optima and further enhance the solution's profitability.
+Item Inclusion Count: 7->8
+Profit: 5242.0->6158.0
+---Round 8---
+Heuristic: greedy_by_density_bb0a
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain:  The current solution is feasible with a high feasibility ratio and substantial remaining capacity across all resource dimensions. After using k_flip_exploration, it would be beneficial to switch to swap_refinement to further fine-tune the solution. Swap refinement can help optimize the configuration by swapping items in and out of the knapsack, potentially increasing the overall profit without significantly altering the current balance. This approach allows for exploring new profitable combinations and can help further enhance the solution's profitability.
+Item Inclusion Count: 8->9
+Profit: 6158.0->6811.0
+---Round 9---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  Given the current solution's feasibility and substantial remaining capacity across all dimensions, it's advantageous to explore multiple item flips. This can help discover new profitable configurations that individual swaps might miss and potentially escape local optima, enhancing the overall solution quality.
+Item Inclusion Count: 9->10
+Profit: 6811.0->7253.0
+---Round 10---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution shows a high feasibility ratio with substantial remaining capacity across all resource dimensions. While k_flip_exploration has been effective in enhancing the solution, switching to swap_refinement can help optimize the configuration further. This approach allows for fine-tuning by swapping items in and out of the knapsack, potentially increasing overall profit without drastically altering the current balance. By leveraging swap logic, we can explore new profitable combinations while maintaining solution feasibility, which is crucial given the current solution's density and profitability metrics.
+Item Inclusion Count: 10->11
+Profit: 7253.0->7690.0
+---Round 11---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain: The current solution shows a strong feasibility ratio and substantial remaining capacity across all resource dimensions. After running a swap_refinement heuristic, it could be beneficial to switch to k_flip_exploration. This strategy allows for exploring multiple item flips at once, which can help uncover new profitable configurations that single swaps might miss. Given the current solution's profitability and density, k_flip_exploration may identify additional improvements by examining broader changes in item selection.
+Item Inclusion Count: 11->12
+Profit: 7690.0->8392.0
+---Round 12---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution has a high feasibility ratio and substantial remaining capacity across all dimensions, indicating room for further optimization. After using k_flip_exploration, switching to swap_refinement could allow for fine-tuning the solution by exploring profitable swaps. This approach can help maximize profit without drastically altering the existing configuration, leveraging the remaining capacity effectively to identify new opportunities for improvement.
+Item Inclusion Count: 12->13
+Profit: 8392.0->8909.0
+---Round 13---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution has a high feasibility ratio and substantial remaining capacity across all resource dimensions. Given the satisfactory results achieved with swap refinement, transitioning to k_flip_exploration can be beneficial. This approach allows for exploring multiple item flips simultaneously, which may uncover new profitable configurations that individual swaps might miss. It provides an opportunity to enhance the solution further by examining broader changes in item selection, potentially escaping local optima and improving the overall profitability of the solution.
+Item Inclusion Count: 13->14
+Profit: 8909.0->9528.0
+---Round 14---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution has a high feasibility ratio and substantial remaining capacity across all resource dimensions, indicating potential for further optimization. Given that we have recently explored k_flip_exploration, switching to swap_refinement could allow for fine-tuning the solution by exploring profitable swaps. This approach can help maximize profit without drastically altering the existing configuration, leveraging the remaining capacity effectively to identify new opportunities for improvement.
+Item Inclusion Count: 14->15
+Profit: 9528.0->10494.0
+---Round 15---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain: The current solution has a high feasibility ratio and substantial remaining capacity across all resource dimensions, indicating potential for further optimization. After using swap refinement, switching to k_flip_exploration can help explore broader changes in item selection by flipping multiple items simultaneously. This approach may uncover new profitable configurations that individual swaps might miss and potentially escape local optima, further enhancing the solution's profitability.
+Item Inclusion Count: 15->16
+Profit: 10494.0->11438.0
+---Round 16---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain:  The current solution has a high feasibility ratio and substantial remaining capacity across all resource dimensions, indicating room for further optimization. After using k_flip_exploration, switching to swap_refinement could allow for fine-tuning the solution by exploring profitable swaps. This approach can help maximize profit without drastically altering the existing configuration, leveraging the remaining capacity effectively to identify new opportunities for improvement.
+Item Inclusion Count: 16->17
+Profit: 11438.0->11714.0
+---Round 17---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution has a high feasibility ratio with significant remaining capacity across all resource dimensions. Given that we've been focusing on swap_refinement, it might be beneficial to switch to k_flip_exploration. This strategy allows for exploring multiple item flips at once, potentially uncovering new profitable configurations that single swaps might miss. It provides an opportunity to enhance the solution further by examining broader changes in item selection, potentially escaping local optima and improving the overall profitability of the solution.
+Item Inclusion Count: 17->18
+Profit: 11714.0->12281.0
+---Round 18---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain:  The current solution shows a high feasibility ratio and substantial remaining capacity across all resource dimensions. After exploring k_flip_exploration, switching to swap_refinement could allow for fine-tuning the solution by exploring profitable swaps. This approach can help maximize profit without drastically altering the existing configuration, leveraging the remaining capacity effectively to identify new opportunities for improvement. Given the current state of the solution and its density, swap_refinement might uncover additional profitable combinations that have been overlooked.
+Item Inclusion Count: 18->19
+Profit: 12281.0->13312.0
+---Round 19---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain: The current solution has a high feasibility ratio and significant remaining capacity across all resource dimensions, indicating potential for further optimization. After using swap refinement, switching to k_flip_exploration can help explore broader changes in item selection by flipping multiple items simultaneously. This approach may uncover new profitable configurations that individual swaps might miss and potentially escape local optima, further enhancing the solution's profitability.
+Item Inclusion Count: 19->20
+Profit: 13312.0->14050.0
+---Round 20---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution shows a high feasibility ratio and significant remaining capacity across all resource dimensions, indicating potential for further optimization. After exploring k_flip_exploration, switching to swap_refinement could allow for fine-tuning the solution by exploring profitable swaps. This approach can help maximize profit without drastically altering the existing configuration. Leveraging the remaining capacity effectively can identify new opportunities for improvement, and swap_refinement might uncover additional profitable combinations that have been overlooked.
+Item Inclusion Count: 20->21
+Profit: 14050.0->14604.0
+---Round 21---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution shows a high feasibility ratio with significant remaining capacity across all resource dimensions, indicating potential for further optimization. By switching to the k_flip_exploration category, you can explore broader changes in item selection by flipping multiple items simultaneously. This approach may uncover new profitable configurations that individual swaps might miss, potentially escaping local optima and enhancing the overall profitability of the solution. Given the current state, k_flip_exploration offers a promising opportunity to further improve the solution.
+Item Inclusion Count: 21->22
+Profit: 14604.0->15249.0
+---Round 22---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution shows a high feasibility ratio with significant remaining capacity across all resource dimensions. After utilizing k_flip_exploration, switching to swap_refinement can help fine-tune the solution by exploring profitable swaps. This approach will allow for optimizing the configuration by swapping items in and out of the knapsack, potentially increasing overall profit without drastically altering the existing balance. Given the current state, swap_refinement may uncover additional profitable combinations that k_flip_exploration might have missed, leading to further improvements in profitability.
+Item Inclusion Count: 22->23
+Profit: 15249.0->16222.0
+---Round 23---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution shows a high feasibility ratio and substantial remaining capacity across all resource dimensions, indicating potential for further optimization. Although swap_refinement has been effective in fine-tuning the solution, switching to k_flip_exploration can help explore broader changes in item selection by flipping multiple items simultaneously. This approach may uncover new profitable configurations that individual swaps might miss, potentially escaping local optima and further enhancing the overall profitability of the solution.
+Item Inclusion Count: 23->24
+Profit: 16222.0->17219.0
+---Round 24---
+Heuristic: greedy_by_weight_e7f9
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution shows a high feasibility ratio and substantial remaining capacity across all resource dimensions, indicating room for further optimization. Given that we've just explored k_flip_exploration, switching to swap_refinement can help fine-tune the solution by exploring profitable swaps. This approach allows for optimizing the configuration by swapping items in and out of the knapsack, potentially increasing overall profit without drastically altering the existing balance. By leveraging the remaining capacity effectively, swap_refinement might uncover additional profitable combinations that have been overlooked. This strategy can help further enhance the solution's profitability.
+Item Inclusion Count: 24->25
+Profit: 17219.0->18057.0
+---Round 25---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  Given the current high feasibility ratio and substantial remaining capacity across all resource dimensions, there is room for further optimization. While swap_refinement has been effective, switching to k_flip_exploration can help explore broader changes in item selection by flipping multiple items simultaneously. This approach may uncover new profitable configurations that individual swaps might miss, potentially escaping local optima and further enhancing the overall profitability of the solution.
+Item Inclusion Count: 25->26
+Profit: 18057.0->18688.0
+---Round 26---
+Heuristic: greedy_by_density_bb0a
+Heuristic Category: swap_refinement
+Running Steps: 1
+Explain: The current solution has a high feasibility ratio and significant remaining capacity across all resource dimensions, indicating potential for further optimization. While k_flip_exploration has been beneficial, switching to swap_refinement can help fine-tune the solution by exploring profitable swaps. This approach allows for optimizing the configuration by swapping items in and out of the knapsack, potentially increasing overall profit without drastically altering the existing balance. By leveraging the remaining capacity effectively, swap_refinement might uncover additional profitable combinations that have been overlooked, further enhancing the solution's profitability.
+Item Inclusion Count: 26->27
+Profit: 18688.0->19683.0
+---Round 27---
+Heuristic: greedy_by_profit_1597
+Heuristic Category: k_flip_exploration
+Running Steps: 1
+Explain:  The current solution is strong but has room for further optimization, as indicated by the significant remaining capacity in several resource dimensions. Switching to k_flip_exploration can help explore multiple item flips simultaneously, potentially uncovering new profitable configurations that individual swaps might miss. This approach offers a chance to escape local optima and improve the overall profitability of the solution, especially given the current high feasibility ratio and the list of feasible items to add.
+Item Inclusion Count: 27->28
+Profit: 19683.0->20316.0
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:selected_items: 1,3,5,11,12,22,27,28,30,34,35,36,42,45,49,53,55,57,63,68,70,76,78,79,86,88,94,95
+current_profit:20316.0
+current_weights:[11490.0, 9941.0, 9952.0, 9570.0, 12368.0]
+remaining_capacity:[1674.0, 2092.0, 2232.0, 3608.0, 320.0]
+items_in_knapsack:[1, 3, 5, 11, 12, 22, 27, 28, 30, 34, 35, 36, 42, 45, 49, 53, 55, 57, 63, 68, 70, 76, 78, 79, 86, 88, 94, 95]
+selected_item_num:28
+items_not_in_knapsack:[0, 2, 4, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 29, 31, 32, 33, 37, 38, 39, 40, 41, 43, 44, 46, 47, 48, 50, 51, 52, 54, 56, 58, 59, 60, 61, 62, 64, 65, 66, 67, 69, 71, 72, 73, 74, 75, 77, 80, 81, 82, 83, 84, 85, 87, 89, 90, 91, 92, 93, 96, 97, 98, 99]
+unselected_item_num:72
+feasible_items_to_add:[2, 6, 8, 13, 19, 24, 25, 33, 38, 52, 54, 64, 75, 77, 81, 84, 90, 91, 96]
+current_solution_value:20316.0
+solution_density:0.28
+average_remaining_capacity:1985.2
+remaining_capacity_variance:1115106.56
+feasibility_ratio:0.2638888888888889
+utilized_capacity_ratio:[0.8728350045578851, 0.8261447685531456, 0.8168089297439265, 0.7262103505843072, 0.9747793190416141]
+item_profitability_in_solution:725.5714285714286
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: greedy_by_profit_1597(k_flip_exploration). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: density_based,profit_based,weight_based,swap_refinement,k_flip_exploration
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(density_based,profit_based,weight_based,swap_refinement,k_flip_exploration)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:swap_refinement
+explanation: The current solution shows a high feasibility ratio with significant remaining capacity in some resource dimensions, particularly the fourth and fifth dimensions. After employing k_flip_exploration, switching to swap_refinement can help fine-tune the solution by exploring profitable swaps. This approach could optimize the configuration by swapping items in and out of the knapsack, potentially increasing overall profit without drastically altering the existing balance. Given the current state and the list of feasible items to add, swap_refinement might uncover additional profitable combinations that have been overlooked, further enhancing the solution's profitability.
+***
+------------------------------------------------------------------------------------
+

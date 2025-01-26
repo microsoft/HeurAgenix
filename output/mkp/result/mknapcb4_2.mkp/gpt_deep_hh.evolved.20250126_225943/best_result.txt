@@ -1,0 +1,41 @@
+-data: mknapcb4_2.mkp
+-current_solution:
+selected_items: 6,10,12,13,15,18,23,25,26,29,30,32,45,46,47,49,52,55,59,61,65,70,71,73,85,89,95
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 22562.0
+-item_num: 100
+-resource_num: 10
+-selected_item_num: [6, 10, 12, 13, 15, 18, 23, 25, 26, 29, 30, 32, 45, 46, 47, 49, 52, 55, 59, 61, 65, 70, 71, 73, 85, 89, 95]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_bb0a	AddOperator(item_index=12)	selected_items: 12
+1	greedy_by_profit_1597	AddOperator(item_index=71)	selected_items: 12,71
+2	greedy_by_profit_1597	AddOperator(item_index=95)	selected_items: 12,71,95
+3	greedy_by_weight_e7f9	AddOperator(item_index=85)	selected_items: 12,71,85,95
+4	greedy_by_density_bb0a	AddOperator(item_index=32)	selected_items: 12,32,71,85,95
+5	greedy_by_profit_1597	AddOperator(item_index=10)	selected_items: 10,12,32,71,85,95
+6	greedy_by_weight_e7f9	AddOperator(item_index=18)	selected_items: 10,12,18,32,71,85,95
+7	greedy_by_profit_1597	AddOperator(item_index=61)	selected_items: 10,12,18,32,61,71,85,95
+8	greedy_by_weight_e7f9	AddOperator(item_index=45)	selected_items: 10,12,18,32,45,61,71,85,95
+9	greedy_by_profit_1597	AddOperator(item_index=47)	selected_items: 10,12,18,32,45,47,61,71,85,95
+10	greedy_by_profit_1597	AddOperator(item_index=73)	selected_items: 10,12,18,32,45,47,61,71,73,85,95
+11	greedy_by_profit_1597	AddOperator(item_index=29)	selected_items: 10,12,18,29,32,45,47,61,71,73,85,95
+12	greedy_by_weight_e7f9	AddOperator(item_index=15)	selected_items: 10,12,15,18,29,32,45,47,61,71,73,85,95
+13	greedy_by_profit_1597	AddOperator(item_index=65)	selected_items: 10,12,15,18,29,32,45,47,61,65,71,73,85,95
+14	greedy_by_weight_e7f9	AddOperator(item_index=46)	selected_items: 10,12,15,18,29,32,45,46,47,61,65,71,73,85,95
+15	greedy_by_density_bb0a	AddOperator(item_index=6)	selected_items: 6,10,12,15,18,29,32,45,46,47,61,65,71,73,85,95
+16	greedy_by_profit_1597	AddOperator(item_index=23)	selected_items: 6,10,12,15,18,23,29,32,45,46,47,61,65,71,73,85,95
+17	greedy_by_density_bb0a	AddOperator(item_index=97)	selected_items: 6,10,12,15,18,23,29,32,45,46,47,61,65,71,73,85,95,97
+18	greedy_by_density_bb0a	AddOperator(item_index=30)	selected_items: 6,10,12,15,18,23,29,30,32,45,46,47,61,65,71,73,85,95,97
+19	greedy_by_density_bb0a	AddOperator(item_index=52)	selected_items: 6,10,12,15,18,23,29,30,32,45,46,47,52,61,65,71,73,85,95,97
+20	greedy_by_profit_1597	AddOperator(item_index=55)	selected_items: 6,10,12,15,18,23,29,30,32,45,46,47,52,55,61,65,71,73,85,95,97
+21	greedy_by_density_bb0a	AddOperator(item_index=49)	selected_items: 6,10,12,15,18,23,29,30,32,45,46,47,49,52,55,61,65,71,73,85,95,97
+22	greedy_by_density_bb0a	AddOperator(item_index=89)	selected_items: 6,10,12,15,18,23,29,30,32,45,46,47,49,52,55,61,65,71,73,85,89,95,97
+23	greedy_by_profit_1597	AddOperator(item_index=26)	selected_items: 6,10,12,15,18,23,26,29,30,32,45,46,47,49,52,55,61,65,71,73,85,89,95,97
+24	greedy_by_profit_1597	AddOperator(item_index=59)	selected_items: 6,10,12,15,18,23,26,29,30,32,45,46,47,49,52,55,59,61,65,71,73,85,89,95,97
+25	greedy_by_profit_1597	AddOperator(item_index=8)	selected_items: 6,8,10,12,15,18,23,26,29,30,32,45,46,47,49,52,55,59,61,65,71,73,85,89,95,97
+26	greedy_by_profit_1597	AddOperator(item_index=62)	selected_items: 6,8,10,12,15,18,23,26,29,30,32,45,46,47,49,52,55,59,61,62,65,71,73,85,89,95,97
+27	greedy_by_density_bb0a	SwapOperator(item_index1=97, item_index2=25)	selected_items: 6,8,10,12,15,18,23,25,26,29,30,32,45,46,47,49,52,55,59,61,62,65,71,73,85,89,95
+28	greedy_by_density_bb0a	SwapOperator(item_index1=62, item_index2=13)	selected_items: 6,8,10,12,13,15,18,23,25,26,29,30,32,45,46,47,49,52,55,59,61,65,71,73,85,89,95
+29	greedy_by_density_bb0a	SwapOperator(item_index1=8, item_index2=70)	selected_items: 6,10,12,13,15,18,23,25,26,29,30,32,45,46,47,49,52,55,59,61,65,70,71,73,85,89,95

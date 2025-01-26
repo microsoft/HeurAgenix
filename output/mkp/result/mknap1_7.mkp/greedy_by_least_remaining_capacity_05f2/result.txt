@@ -1,0 +1,6 @@
+-data: mknap1_7.mkp
+-item_num: 50
+-resource_num: 5
+-current_profit: 13625
+-current_solution:
+selected_items:1,2,3,4,8,15,27,28,30,40,42,49

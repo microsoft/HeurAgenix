@@ -1,0 +1,327 @@
+user
+Hi GPT, I am working on Hyper-heuristics for Operation Research (OR) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of TSP.
+A list of integers where each integer represents a node (city) in the TSP tour.
+The order of the nodes in the list defines the order in which the cities are visited in the tour."""
+    def __init__(self, tour: list[int], node_num: int=None):
+        self.tour = tour
+        self.node_num = node_num
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append the node at the end of the solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour + [self.node]
+        return Solution(new_tour, solution.node_num)
+class InsertOperator(BaseOperator):
+    """Insert the node into the solution at the target position."""
+    def __init__(self, node: int, position: int):
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
+        return Solution(new_tour, solution.node_num)
+class SwapOperator(BaseOperator):
+    """Swap two nodes in the solution. swap_node_pairs is a list of tuples, each containing the two nodes to swap."""
+    def __init__(self, swap_node_pairs: list[tuple[int, int]]):
+        self.swap_node_pairs = swap_node_pairs
+    def run(self, solution: Solution) -> Solution:
+        node_to_index = {node: index for (index, node) in enumerate(solution.tour)}
+        new_tour = solution.tour.copy()
+        for (node_a, node_b) in self.swap_node_pairs:
+            index_a = node_to_index.get(node_a)
+            index_b = node_to_index.get(node_b)
+            assert index_a is not None
+            assert index_b is not None
+            (new_tour[index_a], new_tour[index_b]) = (new_tour[index_b], new_tour[index_a])
+        return Solution(new_tour, solution.node_num)
+class ReplaceOperator(BaseOperator):
+    """Replace a node with another one in the solution."""
+    def __init__(self, node: int, new_node: int):
+        self.node = node
+        self.new_node = new_node
+    def run(self, solution: Solution) -> Solution:
+        index = solution.tour.index(self.node)
+        new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
+        return Solution(new_tour, solution.node_num)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, segments: list[tuple[int, int]]):
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_tour)
+            assert 0 <= end_index < len(new_tour)
+            if start_index > end_index:
+                (start_index, end_index) = (end_index, start_index)
+            new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+        return Solution(new_tour, solution.node_num)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data contains the global static information data with:
+- "node_num" (int): The total number of nodes in the problem.
+- "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+state_data contains the current dynamic state data with:
+- "current_solution" (Solution): An instance of the Solution class representing the current solution.
+- "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
+- "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
+- "current_cost" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
+- "last_visited" (int): The last visited node.
+- "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data contains the data that necessary for some algorithms.
+get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please commit to memory the problem and our constructed framework.
+------------------------------------------------------------------------------------
+
+assistant
+Understood, you are working on a hyper-heuristic approach to tackle the Traveling Salesman Problem (TSP) using a framework that encapsulates both solutions and operators that can modify these solutions. Your `Solution` class represents a potential tour in the TSP, and you have developed several operator classes (`AppendOperator`, `InsertOperator`, `SwapOperator`, `ReplaceOperator`, and `ReverseSegmentOperator`) to manipulate these tours.
+
+You've also defined a standardized heuristic function signature that takes several arguments including global static information, the current dynamic state, algorithm-specific data, a function to get state data, and other hyper-parameters. The heuristic function is expected to return a tuple containing an operator instance and an updated algorithm data dictionary.
+
+I will keep this information in mind for our future discussions on the challenges you're encountering and the potential solutions. Please feel free to continue the conversation when you're ready to discuss those challenges.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def ant_colony_d4f7(): Ant Colony Optimization heuristic for the Traveling Salesman Problem. This function simulates the behavior of ants laying down pheromones and choosing paths probabilistically to construct a solution for the TSP.
+def cheapest_insertion_605f(): This heuristic selects the non-tour city that, when inserted into the current tour, results in the smallest possible increase in the total tour cost. It then returns an operator that performs this insertion.
+def farthest_insertion_b6d3(): This heuristic selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost.
+def greedy_algorithm_3ca7(): Greedy algorithm heuristic for TSP. Constructs a tour by repeatedly selecting the shortest edge and adding it to the tour.     This implementation assumes that the Solution class represents a tour and that the InsertOperator is used to add new nodes to the Solution.
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3): Greedy Randomized Adaptive Search Procedure (GRASP) function embodies the Greedy Randomized Adaptive Search Procedure (GRASP), a metaheuristic algorithm tailored for solving combinatorial optimization problems like the Traveling Salesman Problem (TSP). GRASP iteratively constructs a solution through a two-phase process: a greedy randomized construction phase and a local search phase. During the construction phase, it builds a partial solution by repeatedly adding the best candidate according to a greedy function, which is randomized within a Restricted Candidate List (RCL) determined by the alpha parameter. This parameter adjusts the level of greediness versus randomness, with lower values favoring greedy choices and higher values allowing for more exploration. Once an initial solution is constructed, the local search phase seeks to improve it by exploring the neighborhood of the current solution.
+def insertion_heuristics_050b(insertion_strategy: str = 'cheapest'): Insertion heuristics algorithm for the TSP problem. Builds a tour by incrementally adding cities to an existing sub-tour.     This function supports 'cheapest', 'farthest', and 'nearest' insertion strategies.
+def k_nearest_neighbors_insertion_9e8b(k: int = 1): Heuristic that builds a tour by inserting the nearest unvisited neighbor to the last visited node.     If multiple nearest neighbors are considered (k > 1), one is chosen based on a certain criterion.
+def nearest_insertion_c1f0(): Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
+def nearest_neighbor_f91d(): Implements the nearest neighbor heuristic for the TSP problem. Starting from an arbitrary city, at each step extend the tour by moving from the current city to its nearest unvisited neighbor until all cities are visited.
+def random_80a0(): Implements the random append heuristic for the TSP problem.      At each step, randomly select an unvisited node and append it to the current solution.
+def random_pairwise_insertion_7493(): Random Pairwise Insertion heuristic for the Traveling Salesman Problem. This heuristic selects two unvisited nodes at random and inserts them into the current tour at positions that result in the least increase in tour length. It returns an InsertOperator with the selected nodes and their positions.
+def random_successive_insertion_57b4(): Constructive heuristic that builds a tour by successively inserting random unvisited nodes into the current tour at a position that minimizes the increase in tour length.
+def simulated_annealing_e625(): Simulated Annealing heuristic for the Traveling Salesman Problem.     This function applies the simulated annealing technique to find a solution to the TSP.     It randomly selects two nodes and proposes to swap them. The swap is accepted based on     the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
+def tabu_search_895b(): Tabu search heuristic for TSP. It explores the solution space by swapping two nodes in the tour,     avoiding previously visited solutions by maintaining a tabu list.
+def _2opt_89aa(): The 2-opt heuristic seeks to untangle crossings and smooth the path by swapping two non-adjacent edges and reconnecting the resulting segments. Through repeated application of these edge swaps, the 2-opt algorithm converges towards a more efficient route, often leading to a substantial improvement over the initial solution. It is a simple yet powerful method for local optimization in the context of the TSP.
+def _3opt_e75b(): The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Each heuristic has its strengths and weaknesses, and their applicability can often be quantified based on specific characteristics of the TSP instance or the desired outcomes. Here's an analysis of when each heuristic might be most applicable:
+
+1. **Ant Colony Optimization (ant_colony_d4f7)**:
+   - Applicable when a probabilistic approach to exploration is desired.
+   - Useful for larger instances where the solution space is too vast for exact methods.
+   - Performs well on instances where pheromone trails can effectively guide the search.
+
+2. **Cheapest Insertion (cheapest_insertion_605f)**:
+   - Effective for instances where the goal is to minimize the incremental cost at each step.
+   - Best applied when the instance size is moderate, as the computational cost can grow quickly.
+
+3. **Farthest Insertion (farthest_insertion_b6d3)**:
+   - Suitable for sparse instances where farthest cities tend to be outliers.
+   - Can help in creating a more balanced initial tour that covers distant points early.
+
+4. **Greedy Algorithm (greedy_algorithm_3ca7)**:
+   - Ideal for instances where quick, myopic decisions are acceptable.
+   - Applicable when the edge weight distribution is relatively uniform.
+
+5. **GRASP (greedy_randomized_adaptive_search_procedure_grasp_5a6a)**:
+   - Best used when a balance between exploration (randomness) and exploitation (greediness) is needed.
+   - The alpha parameter can be tuned based on the specific instance characteristics.
+
+6. **Insertion Heuristics (insertion_heuristics_050b)**:
+   - Suitable for instances where the incremental construction of a tour is preferred.
+   - The choice of insertion strategy ('cheapest', 'farthest', 'nearest') can be based on preliminary analysis of the instance.
+
+7. **k-Nearest Neighbors Insertion (k_nearest_neighbors_insertion_9e8b)**:
+   - Useful when local proximity is a strong heuristic, especially in clustered instances.
+   - Parameter `k` allows for flexibility and adjustment to instance size and characteristics.
+
+8. **Nearest Insertion (nearest_insertion_c1f0)**:
+   - Good for instances with clusters or when creating a quick initial solution is necessary.
+   - It tends to work well on smaller or moderately sized instances.
+
+9. **Nearest Neighbor (nearest_neighbor_f91d)**:
+   - Ideal for producing an initial tour quickly.
+   - Best suited for instances with a strong local neighborhood structure.
+
+10. **Random (random_80a0)**:
+    - Applicable when no prior information is available or when a diverse set of initial solutions is required.
+    - Useful as a baseline to compare against more sophisticated heuristics.
+
+11. **Random Pairwise Insertion (random_pairwise_insertion_7493)**:
+    - Suitable for instances where random exploration is desired.
+    - Can be useful for escaping local optima in smaller instances.
+
+12. **Random Successive Insertion (random_successive_insertion_57b4)**:
+    - Applicable for creating diverse solutions or for multi-start strategies.
+    - Suitable for instances where a completely random approach is acceptable.
+
+13. **Simulated Annealing (simulated_annealing_e625)**:
+    - Effective for instances with rugged landscapes and local optima.
+    - Best when the cooling schedule and acceptance criteria are properly tuned.
+
+14. **Tabu Search (tabu_search_895b)**:
+    - Suitable for medium to large instances with a landscape that benefits from memory-based search.
+    - Works well when local search needs to be enhanced with a mechanism to avoid cycling.
+
+15. **2-opt (_2opt_89aa)**:
+    - Ideal for fine-tuning an existing solution, especially when the instance has many crossing edges.
+    - Best applied as a local improvement technique.
+
+16. **3-opt (_3opt_e75b)**:
+    - Suitable for further improving solutions that have already been optimized by 2-opt.
+    - Best used on instances where a more extensive local search is computationally feasible.
+
+Each heuristic's performance can be quantified by evaluating metrics such as solution quality, computation time, convergence rate, and robustness across different instances. The choice of heuristic is often a balance between the quality of the solution and the computational resources available. Additionally, hybrid approaches that combine elements from different heuristics might be useful to exploit the strengths of each.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+node_num:561
+average_distance:65.225
+min_distance:1.0
+max_distance:182.0
+std_dev_distance:31.437921781769244
+density:1.0
+centroid:480
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_cost:2099.0
+last_visited:465
+current_path_length:361
+remaining_nodes:200
+average_edge_cost:5.814404432132964
+last_edge_cost:54.0
+std_dev_edge_cost:5.271164716562725
+solution_validity:1
+min_edge_cost_remaining:12.0
+max_edge_cost_remaining:108.0
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 9 rounds discuss and the summary are:
+---Round 0---
+Heuristic: nearest_neighbor_f91d
+Parameters: {}
+Running Steps: 1
+Explain: As we are at the initial stage with an empty tour, the 'nearest_neighbor_f91d' heuristic is a straightforward choice to quickly establish a complete initial tour. It selects the closest unvisited city, creating a greedy path that can later be refined. Running it for one step will determine the starting city and set the stage for subsequent heuristic applications.
+Delta of Visited Node: 1
+Delta of Current Cost: 0
+---Round 1---
+Heuristic: cheapest_insertion_605f
+Parameters: {}
+Running Steps: 10
+Explain: Given the early stage of the solution with only the starting node in the tour, it is beneficial to expand the tour in a cost-effective manner. The 'cheapest_insertion_605f' heuristic will help us construct an initial tour by selecting the most economical insertion at each step. Running it for 10 steps will allow us to make significant progress in constructing the tour while keeping the computational effort reasonable.
+Delta of Visited Node: 10
+Delta of Current Cost: 35.0
+---Round 2---
+Heuristic: nearest_insertion_c1f0
+Parameters: {}
+Running Steps: 50
+Explain: The `nearest_insertion_c1f0` heuristic will allow us to efficiently incorporate nearby nodes into the current tour. Given the current partial tour and the remaining unvisited nodes, this heuristic can help to expand the tour further while keeping an eye on the overall cost. Executing it for 50 steps gives us a balance between making significant progress and avoiding excessive computational cost at this stage.
+Delta of Visited Node: 50
+Delta of Current Cost: 212.0
+---Round 3---
+Heuristic: farthest_insertion_b6d3
+Parameters: {}
+Running Steps: 100
+Explain: Given the large number of nodes remaining and the current average edge cost, employing the 'farthest_insertion_b6d3' heuristic can help to quickly include distant outliers into the tour, which might be more difficult to insert later on. This approach can also help in creating a more diversified initial solution. A higher number of steps is chosen to make substantial progress in constructing the tour, given that we still have 500 nodes to visit.
+Delta of Visited Node: 100
+Delta of Current Cost: 1093.0
+---Round 4---
+Heuristic: k_nearest_neighbors_insertion_9e8b
+Parameters: {}
+Running Steps: 100
+Explain: The 'k_nearest_neighbors_insertion_9e8b' heuristic with k=5 allows us to consider a set of close options for each insertion, rather than the single nearest, which can help avoid local optima traps. By running it for 100 steps, we should see a significant expansion of the tour with a careful balance between extending the tour and managing the overall cost, as we are still in a relatively early phase of the solution construction.
+Delta of Visited Node: 100
+Delta of Current Cost: 437.0
+---Round 5---
+Heuristic: _2opt_89aa
+Parameters: {}
+Running Steps: 100
+Explain: At this stage of the solution construction, with 300 remaining nodes and an average edge cost of 6.8084, the application of the 2-opt heuristic can potentially untangle suboptimal edges and crossings, leading to a reduction in the total tour cost. Running it for 100 steps will allow for a thorough local optimization while keeping the computational time in check. This should improve the current solution by reordering the nodes to create a shorter path.
+Delta of Visited Node: 0
+Delta of Current Cost: -250.0
+---Round 6---
+Heuristic: greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Parameters: {}
+Running Steps: 100
+Explain: Given that we have a significant number of nodes left to visit, the GRASP heuristic's ability to balance greediness and randomness can help us effectively expand the tour. An alpha of 0.5 is chosen to provide an equal balance between these two aspects. Running it for 100 steps will allow the heuristic to make a considerable impact on the solution while avoiding excessive computation time.
+Delta of Visited Node: 100
+Delta of Current Cost: 641.0
+---Round 7---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Given that we have a partial solution with 200 remaining nodes, applying the '3-opt' heuristic for 50 steps should allow us to improve the existing tour's quality by considering more complex edge exchanges. This could potentially reduce the total cost significantly, as '3-opt' is known for making substantial improvements on tours, especially after '2-opt' has been applied. It will also give us insight into how much further optimization can be achieved at this stage before we resume inserting the remaining nodes.
+Delta of Visited Node: 0
+Delta of Current Cost: -69.0
+---Round 8---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Continuing with the 3-opt heuristic allows us to further improve the existing tour's quality. Since it previously resulted in a cost reduction and we still have a significant number of nodes to insert, it is important to ensure that the current path is as optimized as possible before we resume inserting the remaining nodes. Running for another 50 steps provides additional opportunities for optimization without committing excessive computational resources.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: _3opt_e75b. How does _3opt_e75b perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+Given the information provided about the progress of the solution construction and the performance of the heuristics applied thus far, it seems that we have reached a point where the remaining 200 nodes need to be inserted into the current tour. The last heuristic applied was `3-opt`, which has been run for a total of 100 steps over the last two rounds without improving the current cost in the most recent round. This could indicate that the current tour is locally optimized with respect to `3-opt` moves, and it might be beneficial to switch back to insertion heuristics to continue building the tour.
+
+Considering the remaining nodes and the need to balance the overall cost while inserting them, we may want to focus on a heuristic that offers a good compromise between cost-effectiveness and solution quality. Given that `nearest_insertion_c1f0` has been used earlier and has likely inserted many of the closest nodes already, we might consider using `cheapest_insertion_605f` again to ensure that the new nodes are added in a manner that minimizes the increase in tour cost.
+
+***Run heuristic:
+selected heuristic: cheapest_insertion_605f
+running steps: 100
+explanation: At this stage, with 200 nodes remaining to be inserted, the `cheapest_insertion_605f` heuristic will allow us to continue building the tour in a cost-effective manner. It selects the non-tour city that, when inserted, results in the smallest possible increase in the total tour cost. Running it for 100 steps will help us make substantial progress in constructing the tour while managing the computational effort and keeping the incremental cost low.
+***
+
+This approach aims to incrementally insert the remaining nodes while keeping the total cost as low as possible. After these 100 steps, we should re-evaluate the solution's cost and quality to determine if further optimization with local search heuristics like `2-opt` or `3-opt` is warranted, or if we should continue with the insertion heuristics until all nodes are included in the tour.
+------------------------------------------------------------------------------------
+

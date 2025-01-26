@@ -1,0 +1,24 @@
+-data: test_case_1
+-current_solution:
+production_line_0: 0->7
+production_line_1: 1->9
+production_line_2: 6
+production_line_3: 2
+production_line_4: 4->8
+
+-is_complete_solution: True
+-is_valid_solution: True
+-fulfilled_order_num: 8
+-production_line_num: 5
+-product_num: 5
+-order_num: 10
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	least_order_remaining_27ca	AppendOperator(production_line_id=0, order_id=0)	production_line_0: 0\nproduction_line_1: \nproduction_line_2: \nproduction_line_3: \nproduction_line_4: \n
+1	least_order_remaining_27ca	AppendOperator(production_line_id=1, order_id=1)	production_line_0: 0\nproduction_line_1: 1\nproduction_line_2: \nproduction_line_3: \nproduction_line_4: \n
+2	least_order_remaining_27ca	AppendOperator(production_line_id=3, order_id=2)	production_line_0: 0\nproduction_line_1: 1\nproduction_line_2: \nproduction_line_3: 2\nproduction_line_4: \n
+3	least_order_remaining_27ca	AppendOperator(production_line_id=4, order_id=4)	production_line_0: 0\nproduction_line_1: 1\nproduction_line_2: \nproduction_line_3: 2\nproduction_line_4: 4\n
+4	least_order_remaining_27ca	AppendOperator(production_line_id=2, order_id=6)	production_line_0: 0\nproduction_line_1: 1\nproduction_line_2: 6\nproduction_line_3: 2\nproduction_line_4: 4\n
+5	least_order_remaining_27ca	AppendOperator(production_line_id=4, order_id=8)	production_line_0: 0\nproduction_line_1: 1\nproduction_line_2: 6\nproduction_line_3: 2\nproduction_line_4: 4->8\n
+6	least_order_remaining_27ca	AppendOperator(production_line_id=1, order_id=9)	production_line_0: 0\nproduction_line_1: 1->9\nproduction_line_2: 6\nproduction_line_3: 2\nproduction_line_4: 4->8\n
+7	least_order_remaining_27ca	AppendOperator(production_line_id=0, order_id=7)	production_line_0: 0->7\nproduction_line_1: 1->9\nproduction_line_2: 6\nproduction_line_3: 2\nproduction_line_4: 4->8\n

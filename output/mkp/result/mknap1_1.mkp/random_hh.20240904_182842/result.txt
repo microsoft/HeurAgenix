@@ -1,0 +1,7 @@
+-data: mknap1_1.mkp
+-item_num: 6
+-resource_num: 10
+-current_profit: 5600.0
+-current_solution:
+selected_items: 2,3,5
+-is_complete_solution: True

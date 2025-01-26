@@ -1,0 +1,806 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of TSP.
+A list of integers where each integer represents a node (city) in the TSP tour.
+The order of the nodes in the list defines the order in which the cities are visited in the tour."""
+    def __init__(self, tour: list[int]):
+        self.tour = tour
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append the node at the end of the solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour + [self.node]
+        return Solution(new_tour)
+class InsertOperator(BaseOperator):
+    """Insert the node into the solution at the target position."""
+    def __init__(self, node: int, position: int):
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
+        return Solution(new_tour)
+class SwapOperator(BaseOperator):
+    """Swap two nodes in the solution. swap_node_pairs is a list of tuples, each containing the two nodes to swap."""
+    def __init__(self, swap_node_pairs: list[tuple[int, int]]):
+        self.swap_node_pairs = swap_node_pairs
+    def run(self, solution: Solution) -> Solution:
+        node_to_index = {node: index for (index, node) in enumerate(solution.tour)}
+        new_tour = solution.tour.copy()
+        for (node_a, node_b) in self.swap_node_pairs:
+            index_a = node_to_index.get(node_a)
+            index_b = node_to_index.get(node_b)
+            assert index_a is not None
+            assert index_b is not None
+            (new_tour[index_a], new_tour[index_b]) = (new_tour[index_b], new_tour[index_a])
+        return Solution(new_tour)
+class ReplaceOperator(BaseOperator):
+    """Replace a node with another one in the solution."""
+    def __init__(self, node: int, new_node: int):
+        self.node = node
+        self.new_node = new_node
+    def run(self, solution: Solution) -> Solution:
+        index = solution.tour.index(self.node)
+        new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
+        return Solution(new_tour)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, segments: list[tuple[int, int]]):
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_tour)
+            assert 0 <= end_index < len(new_tour)
+            if start_index <= end_index:
+                new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+            else:
+                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index] + list(reversed(new_tour[:end_index + 1]))
+        return Solution(new_tour)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "std_dev_distance" (float): The standard deviation of the distances.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
+    - "visited_num" (int): Number of nodes that have been visited.
+    - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
+    - "unvisited_num" (int): Number of nodes that have not been visited.
+    - "current_cost" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
+    - "last_visited" (int): The last visited node.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is tsp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Traveling Salesman Problem (TSP) is indeed a combinatorial optimization problem and can be effectively addressed using heuristics. The framework you've outlined with the `Solution` and `Operator` classes, along with the standardized heuristic function signature, seems appropriate for developing and applying heuristic algorithms to solve the TSP.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def nearest_neighbor_e8a4(): Implements an enhanced nearest neighbor heuristic for the TSP problem. This heuristic starts from the node with the second lowest average distance to all other nodes when the tour is empty. It then proceeds by extending the tour using the nearest neighbor, nearest insertion, or cheapest insertion heuristics based on certain criteria. Periodically, the 2-opt heuristic is applied to untangle crossings and smooth the path. It includes additional rules for specific scenarios to enhance performance.
+def _3opt_e75b(): The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
+def cheapest_insertion_7a30(): An enhanced heuristic algorithm for cheapest insertion in the Traveling Salesman Problem (TSP). This heuristic incorporates specific rules based on the current state of the tour and certain global data metrics to optimize the solution.
+def _2opt_89aa(): The 2-opt heuristic seeks to untangle crossings and smooth the path by swapping two non-adjacent edges and reconnecting the resulting segments. Through repeated application of these edge swaps, the 2-opt algorithm converges towards a more efficient route, often leading to a substantial improvement over the initial solution. It is a simple yet powerful method for local optimization in the context of the TSP.
+def farthest_insertion_54db(): Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost. This heuristic also periodically applies the 2-opt heuristic to improve the solution.
+def simulated_annealing_e625(): Simulated Annealing heuristic for the Traveling Salesman Problem. This function applies the simulated annealing technique to find a solution to the TSP. It randomly selects two nodes and proposes to swap them. The swap is accepted based on the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3): Greedy Randomized Adaptive Search Procedure (GRASP) function embodies the Greedy Randomized Adaptive Search Procedure (GRASP), a metaheuristic algorithm tailored for solving combinatorial optimization problems like the Traveling Salesman Problem (TSP). GRASP iteratively constructs a solution through a two-phase process: a greedy randomized construction phase and a local search phase. During the construction phase, it builds a partial solution by repeatedly adding the best candidate according to a greedy function, which is randomized within a Restricted Candidate List (RCL) determined by the alpha parameter. This parameter adjusts the level of greediness versus randomness, with lower values favoring greedy choices and higher values allowing for more exploration. Once an initial solution is constructed, the local search phase seeks to improve it by exploring the neighborhood of the current solution.
+def random_80a0(): Implements the random append heuristic for the TSP problem. At each step, randomly select an unvisited node and append it to the current solution.
+def random_pairwise_insertion_7493(): Random Pairwise Insertion heuristic for the Traveling Salesman Problem. This heuristic selects two unvisited nodes at random and inserts them into the current tour at positions that result in the least increase in tour length. It returns an InsertOperator with the selected nodes and their positions.
+def greedy_algorithm_3ca7(): Greedy algorithm heuristic for TSP. Constructs a tour by repeatedly selecting the shortest edge and adding it to the tour. This implementation assumes that the Solution class represents a tour and that the InsertOperator is used to add new nodes to the Solution.
+def k_nearest_neighbors_insertion_9e8b(k: int = 1): Heuristic that builds a tour by inserting the nearest unvisited neighbor to the last visited node. If multiple nearest neighbors are considered (k > 1), one is chosen based on a certain criterion.
+def insertion_heuristics_050b(insertion_strategy: str = 'cheapest'): Insertion heuristics algorithm for the TSP problem. Builds a tour by incrementally adding cities to an existing sub-tour. This function supports 'cheapest', 'farthest', and 'nearest' insertion strategies.
+def nearest_insertion_c1f0(): Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
+def ant_colony_d4f7(): Ant Colony Optimization heuristic for the Traveling Salesman Problem. This function simulates the behavior of ants laying down pheromones and choosing paths probabilistically to construct a solution for the TSP.
+def random_successive_insertion_57b4(): Constructive heuristic that builds a tour by successively inserting random unvisited nodes into the current tour at a position that minimizes the increase in tour length.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios where each heuristic algorithm can be most applicable involves understanding the strengths, weaknesses, and specific characteristics of each approach. Here's a breakdown of potential scenarios for each algorithm:
+
+1. **nearest_neighbor_e8a4()**:
+   - **Scenario**: Suitable for quickly generating an initial feasible solution that can be further refined. It's beneficial in cases where starting from a strategic point (second lowest average distance node) can lead to better paths.
+   - **Quantified by**: The density of nodes and relative uniformity of distances between them.
+
+2. **_3opt_e75b()**:
+   - **Scenario**: Effective in scenarios where a locally optimized solution is needed. It is suitable when the initial solution is suboptimal and requires significant refinement.
+   - **Quantified by**: Number of possible segments to reorder, complexity of the route.
+
+3. **cheapest_insertion_7a30()**:
+   - **Scenario**: Best for scenarios where minimizing incremental cost is crucial. It works well when there is a need to build a tour economically.
+   - **Quantified by**: Cost-benefit analysis of each insertion, sparsity of node distribution.
+
+4. **_2opt_89aa()**:
+   - **Scenario**: Useful for smoothing and optimizing an existing solution. Suitable for scenarios where the tour has many unnecessary crossings.
+   - **Quantified by**: Number of crossings and the extent of detours in the tour.
+
+5. **farthest_insertion_54db()**:
+   - **Scenario**: Ideal for scenarios where spreading out the tour initially helps in better coverage and later refinement. Useful when the tour has distinct clusters of nodes.
+   - **Quantified by**: Spread of nodes and the presence of isolated nodes.
+
+6. **simulated_annealing_e625()**:
+   - **Scenario**: Applicable in scenarios where a global search is needed, and there's a possibility to escape local optima. Suitable for large instances with complex landscapes.
+   - **Quantified by**: Temperature schedule, acceptance probability, and landscape ruggedness.
+
+7. **greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3)**:
+   - **Scenario**: Useful in scenarios requiring a balance between exploration and exploitation. Effective when multiple runs can be performed to refine the solution.
+   - **Quantified by**: Level of randomness and greediness, number of iterations.
+
+8. **random_80a0()**:
+   - **Scenario**: Suitable for generating diverse initial solutions quickly. It serves as a baseline or for testing purposes.
+   - **Quantified by**: Randomness and diversity of the solutions generated.
+
+9. **random_pairwise_insertion_7493()**:
+   - **Scenario**: Effective in scenarios requiring diverse tours by random insertions. Useful when the goal is to explore a wide solution space.
+   - **Quantified by**: Number of random pairwise insertions and their effect on tour length.
+
+10. **greedy_algorithm_3ca7()**:
+    - **Scenario**: Applicable for straightforward problems where the shortest paths between nodes dominate the solution quality.
+    - **Quantified by**: Edge length distribution and node connectivity.
+
+11. **k_nearest_neighbors_insertion_9e8b(k: int = 1)**:
+    - **Scenario**: Useful when local proximity of nodes can be exploited effectively. Best in scenarios with clustered node distributions.
+    - **Quantified by**: Value of `k` and density of node clusters.
+
+12. **insertion_heuristics_050b(insertion_strategy: str = 'cheapest')**:
+    - **Scenario**: Useful for scenarios where different insertion strategies can be tested to find the most effective one for a given instance.
+    - **Quantified by**: Effectiveness of each insertion strategy under varying node distributions.
+
+13. **nearest_insertion_c1f0()**:
+    - **Scenario**: Ideal for scenarios where proximity-based growth of the tour is beneficial. Works well with relatively uniform node distributions.
+    - **Quantified by**: Distance matrix characteristics and proximity of nodes.
+
+14. **ant_colony_d4f7()**:
+    - **Scenario**: Best for complex, large-scale problems where simulation of natural processes can lead to emergent optimal solutions.
+    - **Quantified by**: Pheromone decay rate, number of ants, and problem complexity.
+
+15. **random_successive_insertion_57b4()**:
+    - **Scenario**: Suitable for generating varied solutions in an exploratory phase. Effective when randomness can lead to discovering new paths.
+    - **Quantified by**: Variability and randomness in insertion positions.
+
+By understanding these scenarios, you can select the most appropriate heuristic based on the specific characteristics and requirements of the TSP instance you are tackling.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+node_num:666
+std_dev_distance:4449.813971977081
+average_distance:7656.494632978844
+min_distance:1.0
+max_distance:20039.0
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+visited_num:666
+unvisited_nodes:[]
+unvisited_num:0
+current_cost:315352.0
+last_visited:642
+current_path_length:666
+remaining_nodes:0
+average_edge_cost:473.5015015015015
+last_edge_cost:599.0
+std_dev_edge_cost:533.7190116254584
+solution_validity:1
+min_edge_cost_remaining:inf
+max_edge_cost_remaining:0
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 77 rounds discuss and the summary are:
+---Round 0---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Starting with a constructive heuristic like `farthest_insertion_54db` is suitable given the fully unvisited state of the nodes. This approach will help in spreading out the tour and establishing an initial structure. Running it for 40 steps strikes a balance between constructing a meaningful portion of the tour and allowing for refinement in subsequent steps.
+Delta of Visited Node: 36
+Delta of Current Cost: 46016.0
+---Round 1---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic used was `farthest_insertion_54db`, and we have established a constructive partial solution, it's appropriate to switch to the `_3opt_e75b` heuristic. This will help in refining and optimizing the current tour by potentially reducing the travel distance through segment reordering, addressing any inefficiencies in the current path.
+Delta of Visited Node: 0
+Delta of Current Cost: -441.0
+---Round 2---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `_3opt_e75b`, which resulted in a reduction of the current cost by 441.0. Given the improvement achieved, it is reasonable to continue with `_3opt_e75b` for another 50 steps to further refine the solution. The current data indicates room for optimization, especially given the high last edge cost and standard deviation of edge costs, suggesting inefficiencies that could still be addressed by 3-opt moves.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 3---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `_3opt_e75b`, which resulted in no change in the cost during the last application. Given the high standard deviation of edge costs and the large last edge cost, further application of `_3opt_e75b` could still address inefficiencies in the current solution. Continuing with `_3opt_e75b` for another 50 steps may help in achieving further refinements and reducing the overall tour cost.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 4---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` for three consecutive rounds, resulting in no further cost reduction, it's time to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, which can then be optimized further with subsequent applications of `3opt`. Running for 40 steps should provide a balance between construction and leaving room for future refinement.
+Delta of Visited Node: 37
+Delta of Current Cost: 5974.0
+---Round 5---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `farthest_insertion_54db`, which added 37 nodes and increased the current cost. To refine the current solution and reduce inefficiencies, especially given the high standard deviation and last edge cost, it is appropriate to switch to `_3opt_e75b`. This heuristic will help in optimizing the current tour by addressing any suboptimal segments, potentially reducing the overall travel distance.
+Delta of Visited Node: 0
+Delta of Current Cost: -395.0
+---Round 6---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given that the last heuristic used was `_3opt_e75b` and we observed a slight improvement in cost reduction, it would be strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps will maintain a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 34
+Delta of Current Cost: 19619.0
+---Round 7---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which added nodes and increased the current cost, it is appropriate to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance.
+Delta of Visited Node: 0
+Delta of Current Cost: -111.0
+---Round 8---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Given that the last heuristic applied was `_3opt_e75b` and the cost reduction was minimal, continuing with `_3opt_e75b` for another 50 steps is a strategic choice. The high standard deviation of edge costs indicates potential inefficiencies in the current path that can be optimized further. By applying `_3opt_e75b`, we aim to identify and implement beneficial segment reorders, which could lead to a reduction in the overall tour cost and improve the solution.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 9---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` with no further cost reduction, switching to `farthest_insertion_54db` will help expand the tour by strategically inserting unvisited nodes. Running it for 40 steps provides a balance between constructive expansion and leaving room for further optimization with `_3opt_e75b`. This approach aims to create a more robust structure for subsequent refinement.
+Delta of Visited Node: 37
+Delta of Current Cost: 5016.0
+---Round 10---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which helped in expanding the tour by strategically inserting unvisited nodes, it is now appropriate to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. The consistent high standard deviation of edge costs indicates that there are inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -180.0
+---Round 11---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given that the last heuristic applied was `_3opt_e75b` and resulted in a minimal cost reduction, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps will maintain a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 37
+Delta of Current Cost: 23096.0
+---Round 12---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Given that the last heuristic applied was `farthest_insertion_54db`, which resulted in a significant increase in the current cost, it is appropriate to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance and smoothing out the path.
+Delta of Visited Node: 0
+Delta of Current Cost: -1526.0
+---Round 13---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given that the last heuristic applied was `_3opt_e75b` and resulted in a cost reduction, it's strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 35
+Delta of Current Cost: 17368.0
+---Round 14---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, it is appropriate to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. The consistent high standard deviation of edge costs indicates inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -1980.0
+---Round 15---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` and there was a cost reduction, it's strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 32
+Delta of Current Cost: 12828.0
+---Round 16---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `farthest_insertion_54db`, which increased the current cost and added nodes to the solution. To refine and optimize the current tour, it is strategic to switch to `_3opt_e75b`. This heuristic will help address inefficiencies and reduce the overall travel distance by optimizing the tour, particularly given the high standard deviation of edge costs.
+Delta of Visited Node: 0
+Delta of Current Cost: -188.0
+---Round 17---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given the pattern of alternating between a constructive heuristic and the 3-opt heuristic, and considering that the last heuristic applied was `_3opt_e75b`, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. This approach will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with 3-opt.
+Delta of Visited Node: 33
+Delta of Current Cost: 18255.0
+---Round 18---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which expanded the tour with additional nodes and increased the current cost, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour, addressing any inefficiencies, and potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -2308.0
+---Round 19---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in a reduction of the current cost, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 34
+Delta of Current Cost: 31633.0
+---Round 20---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `farthest_insertion_54db`, which expanded the tour and increased the current cost. Switching to `_3opt_e75b` is strategic to refine the current solution by optimizing the tour and addressing any inefficiencies, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -5437.0
+---Round 21---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in a reduction of the current cost, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help expand the tour by strategically inserting unvisited nodes, maintaining a balance between construction and allowing room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 26
+Delta of Current Cost: 14839.0
+---Round 22---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic used was `farthest_insertion_54db`, which expanded the tour and increased the current cost. To refine and optimize the current solution, applying `_3opt_e75b` is strategic. This heuristic will help address inefficiencies and reduce the overall travel distance by optimizing the tour, particularly given the high standard deviation of edge costs. Running it for 50 steps should allow for meaningful improvements in the tour's efficiency.
+Delta of Visited Node: 0
+Delta of Current Cost: -1452.0
+---Round 23---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given the recent application of `_3opt_e75b` and its resulting cost reduction, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 36
+Delta of Current Cost: 20579.0
+---Round 24---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which added nodes and increased the current cost, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -9446.0
+---Round 25---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in a significant cost reduction, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 28
+Delta of Current Cost: 8289.0
+---Round 26---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `farthest_insertion_54db`, which added nodes and increased the current cost. Switching to `_3opt_e75b` is strategic to refine the current solution by optimizing the tour and addressing any inefficiencies, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 27---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: The last heuristic applied was `_3opt_e75b`, which did not result in any change in the current cost. As per the strategy of alternating between constructive and optimization heuristics, it is now strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 35
+Delta of Current Cost: 3826.0
+---Round 28---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which added nodes and increased the current cost, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -46.0
+---Round 29---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in only a small cost reduction, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 38
+Delta of Current Cost: 6664.0
+---Round 30---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which added nodes and increased the current cost, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour, addressing any suboptimal segments, and potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -723.0
+---Round 31---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which helped optimize the tour and reduce costs, switching to `farthest_insertion_54db` allows for strategic insertion of unvisited nodes to expand the tour. Running it for 40 steps will maintain a balance between construction and leaving room for further refinement with `_3opt_e75b`.
+Delta of Visited Node: 32
+Delta of Current Cost: 5889.0
+---Round 32---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: We are applying `_3opt_e75b` to optimize the current tour by addressing suboptimal segments and reducing the overall travel distance. The high standard deviation of edge costs indicates potential inefficiencies that this heuristic can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -672.0
+---Round 33---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given that the last heuristic applied was `_3opt_e75b` and resulted in a cost reduction, it's strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help in expanding the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 36
+Delta of Current Cost: 11317.0
+---Round 34---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which expanded the tour and increased the current cost, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -76.0
+---Round 35---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `_3opt_e75b`, continuing with it for another 50 steps is strategic. This approach aims to further refine and optimize the tour by addressing suboptimal segments, especially given the high standard deviation of edge costs, which suggests potential inefficiencies that can be improved.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 36---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: The last heuristic applied was `_3opt_e75b`, which resulted in no change in the current cost. According to the strategic approach, we should switch to a constructive heuristic like `farthest_insertion_54db` to expand the tour by strategically inserting unvisited nodes. Running it for 40 steps will provide a balanced expansion, preparing the tour for further optimization.
+Delta of Visited Node: 37
+Delta of Current Cost: 17706.0
+---Round 37---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which expanded the tour and increased the current cost, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -520.0
+---Round 38---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in a cost reduction, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 37
+Delta of Current Cost: 16814.0
+---Round 39---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which expanded the tour and increased the current cost, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -128.0
+---Round 40---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in a cost reduction, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. This will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 35
+Delta of Current Cost: 34648.0
+---Round 41---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which increased the current cost and added nodes, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. The high standard deviation of edge costs suggests inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: -5390.0
+---Round 42---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic was `_3opt_e75b`, which helped reduce the cost, switching to `farthest_insertion_54db` will strategically expand the tour by inserting unvisited nodes. Running it for 40 steps maintains a balance between construction and leaving room for further refinement with `_3opt_e75b`.
+Delta of Visited Node: 11
+Delta of Current Cost: 25995.0
+---Round 43---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, it's strategic to refine the current solution using `_3opt_e75b`. This approach helps optimize the tour by addressing suboptimal segments and potentially reducing the overall travel distance. The consistent high standard deviation of edge costs indicates inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 44---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: The last heuristic applied was `_3opt_e75b`, which did not result in any change in the current cost. Following the strategic approach, it is appropriate to switch to a constructive heuristic like `farthest_insertion_54db`. This will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 45---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, and according to the strategy, we switch to `_3opt_e75b` to refine and optimize the current solution. This heuristic will help address inefficiencies by optimizing the tour and potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 46---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, and there was no change in the current cost, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, creating a robust structure for further optimization. This approach maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 47---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which did not result in any change in the current cost or visited nodes, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 48---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given the current state where the last heuristic applied was `_3opt_e75b` and there was no change in the current cost, it's strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 49---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db` and there was no change in the current cost or visited nodes, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 50---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` and there was no change in the current cost, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 51---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, and it did not result in any change in the current cost or visited nodes, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 52---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` and there was no change in the current cost, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 53---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic was `farthest_insertion_54db` with no cost change, applying `_3opt_e75b` can help refine and optimize the tour by addressing suboptimal segments and potentially reducing the overall travel distance. The consistent high standard deviation of edge costs suggests that there are inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 54---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` with no change in the current cost, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 55---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, the strategic approach is to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 56---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given that the last heuristic applied was `_3opt_e75b` and there was no change in the current cost, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 57---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db` and there was no change in the current cost, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 58---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Given that the last heuristic applied was `_3opt_e75b` and there was no change in the current cost, it is strategic to continue with `_3opt_e75b`. The high standard deviation of edge costs suggests potential inefficiencies that `_3opt_e75b` can still target for improvement. Running it for 50 steps should help to further refine and optimize the current tour.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 59---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, and we have seen no change in the current cost after several rounds, it's strategic to switch to a constructive heuristic like `farthest_insertion_54db`. This will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement with `_3opt_e75b`.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 60---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which did not result in any change in the current cost or visited nodes, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 61---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given the pattern of alternating between constructive and optimization heuristics, and since the last heuristic applied was `_3opt_e75b`, it is strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. This approach maintains a balance between construction and refinement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 62---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied was `farthest_insertion_54db`, and given the pattern of alternating between constructive and optimization heuristics, it's strategic to refine the current solution using `_3opt_e75b`. This approach helps optimize the tour by addressing suboptimal segments and potentially reducing the overall travel distance. The high standard deviation of edge costs suggests that there are inefficiencies `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 63---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic was `_3opt_e75b` and no improvement was observed, it's strategic to switch to `farthest_insertion_54db`. This will help expand the tour by strategically inserting nodes, setting a foundation for further optimization.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 64---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Given the pattern of alternating between constructive and optimization heuristics and the fact that the last heuristic applied was `farthest_insertion_54db`, it is strategic to switch to `_3opt_e75b`. This will help refine the current solution by optimizing the tour and addressing any suboptimal segments, potentially reducing the overall travel distance. The high standard deviation of edge costs suggests that there are inefficiencies `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 65---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, it is strategic to switch to `_3opt_e75b` to refine the current solution. This heuristic will help optimize the tour by addressing suboptimal segments and potentially reducing the overall travel distance. The high standard deviation of edge costs suggests that there are inefficiencies `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 66---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: The strategy involves alternating between constructive and optimization heuristics. Since the last heuristic applied was `_3opt_e75b` with no further improvements observed, it's strategic to switch to `farthest_insertion_54db` to expand the tour by inserting unvisited nodes. Running it for 40 steps maintains a balance between construction and leaving room for subsequent refinement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 67---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, switching to `_3opt_e75b` will help refine the current solution by optimizing the tour, addressing suboptimal segments, and potentially reducing the overall travel distance. The high standard deviation of edge costs suggests inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 68---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b`, which resulted in no further improvement, it's strategic to switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization. This approach maintains a balance between construction and refinement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 69---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, it is strategic to switch to `_3opt_e75b` to refine the current solution. This heuristic will help optimize the tour by addressing suboptimal segments and potentially reducing the overall travel distance. The high standard deviation of edge costs suggests that there are inefficiencies `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 70---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, which resulted in no further improvement, it is strategic to switch to `_3opt_e75b`. This heuristic will help refine the current solution by optimizing the tour, addressing suboptimal segments, and potentially reducing the overall travel distance. The high standard deviation of edge costs suggests inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 71---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Given that the last heuristic applied was `_3opt_e75b` and there was no further improvement, we should continue with `_3opt_e75b` for another 50 steps. This approach aims to further refine and optimize the tour by addressing suboptimal segments, especially given the high standard deviation of edge costs, which suggests potential inefficiencies that can be improved.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 72---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Since the last heuristic applied was `_3opt_e75b` with no further improvement observed, it is strategic to switch back to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 73---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: Since the last heuristic applied was `farthest_insertion_54db`, we should switch to `_3opt_e75b` to refine the current solution. This heuristic will help optimize the tour by addressing suboptimal segments and potentially reducing the overall travel distance. Given the high standard deviation of edge costs, there are likely inefficiencies that `_3opt_e75b` can target for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 74---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 100
+Explain: Given the pattern and current state, we should switch to a constructive heuristic like `farthest_insertion_54db` to expand the tour. Running it for 100 steps will help explore new paths and add structure to the tour, providing a basis for further optimization.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 75---
+Heuristic: _3opt_e75b
+Parameters: {}
+Running Steps: 50
+Explain: The last heuristic applied, `farthest_insertion_54db`, did not result in any improvement, indicating potential inefficiencies in the current tour structure. Switching to `_3opt_e75b` will help refine the solution by optimizing the tour, addressing suboptimal segments, and potentially reducing the overall travel distance. This heuristic targets the high standard deviation of edge costs, suggesting areas for improvement.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+---Round 76---
+Heuristic: farthest_insertion_54db
+Parameters: {}
+Running Steps: 40
+Explain: Given the current state and the strategic approach of alternating between constructive and optimization heuristics, we should switch to a constructive heuristic like `farthest_insertion_54db`. Running it for 40 steps will help expand the current tour by strategically inserting unvisited nodes, providing a robust structure for further optimization in subsequent iterations.
+Delta of Visited Node: 0
+Delta of Current Cost: 0.0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: farthest_insertion_54db. How does farthest_insertion_54db perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+Try in this way:
+run constructive heuristic (such as farthest_insertion_54db) 30/40/50 or 100 steps and then 3opt 50 steps as a loop.
+If last heuristic is  constructive heuristic, we run 3opt 50 steps.
+If last heuristic is 3opt 50 steps,we run 3opt 50 steps  constructive heuristic (such as farthest_insertion_54db) for  30/40/50 or 100 steps.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+Given the information provided, the last heuristic applied was `farthest_insertion_54db`, which did not result in any improvement. According to the strategy of alternating between constructive and optimization heuristics, it is appropriate to switch to `_3opt_e75b` to refine the current solution by optimizing the tour and addressing any suboptimal segments.
+
+***Run heuristic:
+selected heuristic: _3opt_e75b
+running steps: 50
+explanation: Since the last heuristic applied was `farthest_insertion_54db` with no improvement, switching to `_3opt_e75b` is strategic to refine and optimize the tour. This heuristic targets the high standard deviation of edge costs, which suggests potential inefficiencies that can be improved.
+***
+------------------------------------------------------------------------------------
+

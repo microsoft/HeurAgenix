@@ -1,0 +1,2 @@
+AppendOperator(vehicle_id=0, node=1)
+AppendOperator(vehicle_id=1, node=2)

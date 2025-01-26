@@ -1,0 +1,443 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on jssp problem:
+Job Shop Scheduling Problem (JSSP) involves scheduling a series of jobs, each comprising a sequence of operations, across different machines to optimize production efficiency. In this variant, there is a one-to-one correspondence between machines and operation types, ensuring that each operation is carried out by a specific machine. Consequently, the number of operations (N) matches the number of machines, and each job includes these N operations precisely once.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the Job Shop Scheduling Problem (JSSP).
+A list of lists where each sublist represents the sequence of jobs scheduled on a machine, identified by its index in the outer list.
+Each job is represented by its integer identifier and is processed in the order specified within the sublist.
+Each sublist in 'job_sequences' corresponds to a machine's job processing sequence, with machines sorted by their identifier (index in the outer list).
+Each job within a sublist is sorted by its scheduled order of execution on that machine.
+Job matrix records the target operation(machine) sequence in job."""
+    def __init__(self, job_sequences: list[list[int]], job_operation_sequence: list[list[int]], job_operation_index: list[int]):
+        self.job_sequences = job_sequences
+        self.job_operation_sequence = job_operation_sequence
+        self.job_operation_index = job_operation_index
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AdvanceOperator(BaseOperator):
+    """AdvanceOperator is responsible for advancing the next operation in the job's processing sequence.
+This operator appends the next operation of the specified job to the processing queue of the machine that is scheduled to execute the operation.
+It identifies the appropriate machine based on the job's current operation index and the job matrix within the provided Solution instance."""
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        machine_id = solution.job_operation_sequence[self.job_id][solution.job_operation_index[self.job_id]]
+        new_job_sequences[machine_id].append(self.job_id)
+        job_operation_index = solution.job_operation_index
+        job_operation_index[self.job_id] += 1
+        return Solution(new_job_sequences, solution.job_operation_sequence, job_operation_index)
+class SwapOperator(BaseOperator):
+    """Swaps two operations in corresponding jobs in the same machine's."""
+    def __init__(self, machine_id: int, job_id1: int, job_id2: int):
+        self.machine_id = machine_id
+        self.job_id1 = job_id1
+        self.job_id2 = job_id2
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        index1 = new_job_sequences[self.machine_id].index(self.job_id1)
+        index2 = new_job_sequences[self.machine_id].index(self.job_id2)
+        (new_job_sequences[self.machine_id][index1], new_job_sequences[self.machine_id][index2]) = (new_job_sequences[self.machine_id][index2], new_job_sequences[self.machine_id][index1])
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ReverseSequenceOperator(BaseOperator):
+    """Reverses a sequence of operations in corresponding jobs within a machine's queue."""
+    def __init__(self, machine_id: int, start_position: int, end_position: int):
+        self.machine_id = machine_id
+        self.start_position = start_position
+        self.end_position = end_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        sequence = new_job_sequences[self.machine_id][self.start_position:self.end_position + 1]
+        new_job_sequences[self.machine_id][self.start_position:self.end_position + 1] = sequence[::-1]
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ShiftOperator(BaseOperator):
+    """Shifts an operation to a new position within the same machine's queue."""
+    def __init__(self, machine_id: int, job_id: int, new_position: int):
+        self.machine_id = machine_id
+        self.job_id = job_id
+        self.new_position = new_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        current_position = new_job_sequences[self.machine_id].index(self.job_id)
+        operation = new_job_sequences[self.machine_id].pop(current_position)
+        new_job_sequences[self.machine_id].insert(self.new_position, operation)
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
+    - "job_num" (int): The total number of jobs in the problem.
+    - "machine_num" (int): The total number of machines in the problem, also as operation num.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "finished_jobs" (list[int]): List of all finished jobs.
+    - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+    - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+    - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in current solution.
+    - "machine_operation_index" (list[int]): The index of the next operation to be scheduled for each machine.
+    - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+    - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is jssp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Job Shop Scheduling Problem (JSSP) is a classic example of a combinatorial optimization problem. It involves making a sequence of decisions to determine the optimal schedule for jobs across machines, which inherently involves combinatorial decision-making. Heuristics are commonly used to find good solutions for JSSP due to the problem's complexity and the large search space. Your framework, including the Solution and Operator classes, as well as the heuristic function signature, seems well-suited for addressing this type of problem.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): priority_based,local_optimization,dynamic_scoring,specialized_scenarios
+
+priority_based: these heuristics prioritize jobs based on specific criteria such as processing times, remaining work, or job length to optimize scheduling.
+def first_come_first_served_af26(): Enhanced First Come First Served (FCFS) heuristic to dynamically prioritize jobs based on immediate impact and adapt to diverse datasets. This heuristic introduces a dynamic scoring mechanism to balance alignment with the positive solution trajectory, machine availability, and dataset-specific characteristics.
+def shortest_processing_time_first_d471(): Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP. This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability, alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
+def most_work_remaining_df20(): Most Work Remaining Heuristic with Dynamic Scoring and Local Optimization for JSSP.
+def least_work_remaining_66c9(): Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
+def longest_job_next_2e23(): Longest Job Next heuristic for JSSP. Prioritizes the job with the longest total processing time remaining. It uses the AdvanceOperator to schedule the next operation for the job with the maximum remaining processing time.
+def longest_processing_time_first_9dc9(): Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
+
+local_optimization: these heuristics focus on improving the current solution by making local changes like swaps or shifts to reduce the makespan.
+def _2opt_f9c1(): Implements a 2-opt heuristic for the Job Shop Scheduling Problem (JSSP). This heuristic attempts to reduce the makespan by swapping two non-adjacent operations in the schedule. It iteratively checks all possible pairs of operations to determine if a shorter sequence can be found.
+def _3opt_6ee0(): 3-opt heuristic for Job Shop Scheduling Problem (JSSP). This function does not generate a complete 3-opt operator since JSSP requires operations within a job to be executed in sequence and does not allow reordering of these operations.The heuristic is adapted to generate a series of 2-opt swaps (using the SwapOperator) which approximate a 3-opt move.
+def shift_operator_109f(): This heuristic attempts to find a better schedule by shifting an operation within the same machine's queue. For each machine, it tries shifting each operation to all possible positions and evaluates the makespan. The shift that results in the best improvement (reduction in makespan) is selected.
+
+dynamic_scoring: these heuristics utilize dynamic scoring mechanisms to adapt to the current state and prioritize jobs accordingly.
+def first_come_first_served_af26(): Enhanced First Come First Served (FCFS) heuristic to dynamically prioritize jobs based on immediate impact and adapt to diverse datasets. This heuristic introduces a dynamic scoring mechanism to balance alignment with the positive solution trajectory, machine availability, and dataset-specific characteristics.
+def shortest_processing_time_first_d471(): Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP. This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability, alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
+def most_work_remaining_df20(): Most Work Remaining Heuristic with Dynamic Scoring and Local Optimization for JSSP.
+
+specialized_scenarios: these heuristics are tailored for scenarios where specific job characteristics, such as job length or processing times, are the primary consideration.
+def shortest_job_next_5b42(): Implements the Shortest Job Next heuristic for the Job Shop Scheduling Problem. This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
+def longest_job_next_2e23(): Longest Job Next heuristic for JSSP. Prioritizes the job with the longest total processing time remaining. It uses the AdvanceOperator to schedule the next operation for the job with the maximum remaining processing time.
+def longest_processing_time_first_9dc9(): Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
+
+
+We aim to solve this problem using the following data:
+job_num:10
+machine_num:5
+job_operation_sequence:[[0, 3, 1, 4, 2], [4, 2, 0, 1, 3], [1, 2, 4, 0, 3], [2, 1, 4, 0, 3], [4, 0, 3, 2, 1], [1, 0, 4, 3, 2], [4, 1, 3, 0, 2], [1, 0, 2, 3, 4], [4, 0, 2, 1, 3], [4, 2, 1, 3, 0]]
+job_operation_time:[[20, 87, 31, 76, 17], [25, 32, 24, 18, 81], [72, 23, 28, 58, 99], [86, 76, 97, 45, 90], [27, 42, 48, 17, 46], [67, 98, 48, 27, 62], [28, 12, 19, 80, 50], [63, 94, 98, 50, 80], [14, 75, 50, 41, 55], [72, 18, 37, 79, 61]]
+total_operation_num:50
+average_operation_time:52.86
+max_operation_time:99
+min_operation_time:12
+std_deviation_operation_time:26.944394593310125
+job_operation_time_range:87
+average_job_length:5.0
+max_job_length:5
+min_job_length:5
+machine_utilization:0.8
+job_diversity:5
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 1 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+Developing a strategic guide for selecting heuristic categories and defining execution steps is crucial for effectively solving the JSSP through an iterative process. Here's a suggested framework:
+
+### Strategic Guide for Heuristic Selection
+
+#### Phase 1: Initial Construction
+1. **Priority-Based Heuristics**
+   - **Objective:** Quickly generate a feasible initial solution by prioritizing jobs.
+   - **Execution Steps:**
+     - Start with a simple priority-based heuristic like `first_come_first_served_af26` to establish a baseline solution.
+     - Evaluate the solution's makespan and identify bottlenecks in job processing.
+     - If initial results are not satisfactory, switch to `shortest_processing_time_first_d471` or `least_work_remaining_66c9` to explore different priority criteria.
+
+#### Phase 2: Solution Improvement
+2. **Local Optimization Heuristics**
+   - **Objective:** Refine the initial solution by making local changes to reduce the makespan.
+   - **Execution Steps:**
+     - Apply `_2opt_f9c1` to perform swaps and reduce the makespan iteratively.
+     - Use `shift_operator_109f` to test shifting operations and evaluate its impact.
+     - If improvements plateau, attempt `3opt_6ee0` to introduce more complex swaps.
+
+3. **Dynamic Scoring Heuristics**
+   - **Objective:** Adaptively adjust priorities based on the current state to improve efficiency.
+   - **Execution Steps:**
+     - Test `first_come_first_served_af26` with dynamic scoring to adapt to changes in machine availability and job alignment.
+     - If certain jobs consistently delay makespan, try `most_work_remaining_df20` for a different perspective on job priorities.
+     - Use dynamic scoring as a way to continuously refine job ordering without committing to static priorities.
+
+#### Phase 3: Specialized Scenarios
+4. **Specialized Scenarios Heuristics**
+   - **Objective:** Address specific characteristics of the problem instance that may require tailored approaches.
+   - **Execution Steps:**
+     - If certain jobs dominate the schedule, consider `longest_job_next_2e23` to focus on the most time-consuming tasks.
+     - For jobs with significant processing time variations, `shortest_job_next_5b42` can help address short tasks quickly.
+     - Use this category sparingly to target specific issues revealed during earlier phases.
+
+### Iterative Approach
+- **Evaluation:** After applying a heuristic, always evaluate the solution's performance in terms of makespan and resource utilization.
+- **Switching:** If a heuristic no longer provides significant improvements, switch categories or heuristics.
+- **Diversity:** Regularly alternate between categories to prevent getting stuck in local optima and explore diverse solution spaces.
+- **Feedback Loop:** Use solution feedback to guide heuristic selection, focusing on reducing bottlenecks and balancing machine loads.
+
+This strategic guide is flexible and can be adapted based on the problem's specific characteristics and observed performance of the heuristics. The key is to maintain a balance between exploration and exploitation, iteratively refining the solution while considering different heuristic approaches.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+job_num:10
+machine_num:5
+job_operation_sequence:[[0, 3, 1, 4, 2], [4, 2, 0, 1, 3], [1, 2, 4, 0, 3], [2, 1, 4, 0, 3], [4, 0, 3, 2, 1], [1, 0, 4, 3, 2], [4, 1, 3, 0, 2], [1, 0, 2, 3, 4], [4, 0, 2, 1, 3], [4, 2, 1, 3, 0]]
+job_operation_time:[[20, 87, 31, 76, 17], [25, 32, 24, 18, 81], [72, 23, 28, 58, 99], [86, 76, 97, 45, 90], [27, 42, 48, 17, 46], [67, 98, 48, 27, 62], [28, 12, 19, 80, 50], [63, 94, 98, 50, 80], [14, 75, 50, 41, 55], [72, 18, 37, 79, 61]]
+total_operation_num:50
+average_operation_time:52.86
+max_operation_time:99
+min_operation_time:12
+std_deviation_operation_time:26.944394593310125
+job_operation_time_range:87
+average_job_length:5.0
+max_job_length:5
+min_job_length:5
+machine_utilization:0.8
+job_diversity:5
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 20 rounds discuss and the summary are:
+---Round 0---
+Heuristic: first_come_first_served_af26
+Heuristic Category: priority_based
+Running Steps: 1
+Explain: Since there have been no operations scheduled yet, it's beneficial to start with a priority-based heuristic to construct an initial feasible solution. This approach will allow you to quickly schedule jobs and establish a baseline, which can be subsequently refined using other heuristics. Starting with priority-based heuristics will help in identifying immediate scheduling opportunities and setting the stage for more complex optimization in later phases.
+current_makespan: 0->25
+Finished Job Num: 0->0
+Finished Operation Num: 0->1
+---Round 1---
+Heuristic: _3opt_6ee0
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  Since the initial heuristic has started scheduling operations and established a baseline makespan, it is beneficial to switch to a local optimization strategy. This approach can focus on refining the current solution by making targeted changes to reduce the makespan and improve job and machine utilization. The current state shows an opportunity to enhance the schedule by addressing idle times and optimizing job sequences on machines.
+current_makespan: 25->25
+Finished Job Num: 0->0
+Finished Operation Num: 1->1
+---Round 2---
+Heuristic: shortest_processing_time_first_d471
+Heuristic Category: priority_based
+Running Steps: 1
+Explain:  Given the current state, only one operation has been scheduled, and the makespan has not improved with the last local optimization step. Returning to a priority-based heuristic can help schedule more operations and build a more substantial base for further optimization. This approach will focus on advancing the scheduling process and potentially increasing the number of finished operations, which can then be further refined with other heuristics.
+current_makespan: 25->25
+Finished Job Num: 0->0
+Finished Operation Num: 1->2
+---Round 3---
+Heuristic: _3opt_6ee0
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  The current state indicates that only two operations have been scheduled, and the makespan has not improved significantly. Since the priority-based approach has already attempted to advance the solution by scheduling operations, it is now beneficial to focus on local optimization. This category can help refine the schedule by addressing idle times and optimizing job sequences on machines. By doing so, we can potentially reduce the makespan and improve overall efficiency. Local optimization can exploit the current partial schedule and enhance it by making targeted changes, thereby improving machine utilization and reducing idle times.
+current_makespan: 25->25
+Finished Job Num: 0->0
+Finished Operation Num: 2->2
+---Round 4---
+Heuristic: first_come_first_served_af26
+Heuristic Category: priority_based
+Running Steps: 1
+Explain:  The current state shows that only two operations have been scheduled, and there has been no improvement in the makespan with the local optimization approach. Switching back to a priority-based heuristic can help in advancing the scheduling process by adding more operations to the schedule. Given the early stage of the solution and the need to build a more substantial base, a priority-based heuristic like shortest_processing_time_first_d471 or least_work_remaining_66c9 can facilitate progress by focusing on scheduling operations that are more likely to reduce the makespan or balance machine load. This will provide a more developed solution that can be further refined with local optimization or dynamic scoring in future steps.
+current_makespan: 25->57
+Finished Job Num: 0->0
+Finished Operation Num: 2->3
+---Round 5---
+Heuristic: _2opt_f9c1
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  Given the current state, where only three operations have been scheduled and there is a significant gap in makespan, it would be beneficial to switch to a local optimization heuristic. This approach can potentially refine the existing schedule by addressing idle times and optimizing the sequence of operations on machines. Since priority-based heuristics have been employed several times with limited progress, local optimization could provide the necessary adjustments to decrease makespan and enhance machine utilization.
+current_makespan: 57->57
+Finished Job Num: 0->0
+Finished Operation Num: 3->3
+---Round 6---
+Heuristic: most_work_remaining_df20
+Heuristic Category: priority_based
+Running Steps: 1
+Explain:  The current state shows that only three operations have been scheduled, and the makespan remains relatively high with no jobs completed. Priority-based heuristics can help in advancing the scheduling process by adding more operations to the schedule. Since local optimization strategies have been applied with limited success, focusing on scheduling more operations can build a more substantial base. This will potentially reduce idle times and balance the load across machines, setting the stage for more effective optimization in subsequent phases.
+current_makespan: 57->72
+Finished Job Num: 0->0
+Finished Operation Num: 3->4
+---Round 7---
+Heuristic: _2opt_f9c1
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  The current state indicates that only four operations have been scheduled, and no jobs have been completed, with a relatively high makespan of 72. Priority-based heuristics have been used several times, resulting in limited progress. Switching to local optimization can help refine the current solution by focusing on reducing idle times and optimizing sequences on the machines. This approach can potentially decrease the makespan and improve machine utilization, addressing the inefficiencies observed in the current schedule.
+current_makespan: 72->72
+Finished Job Num: 0->0
+Finished Operation Num: 4->4
+---Round 8---
+Heuristic: most_work_remaining_df20
+Heuristic Category: priority_based
+Running Steps: 1
+Explain: The current state indicates limited progress with local optimization, as the makespan has not decreased, and no jobs have been completed. With only four operations scheduled and a high makespan, returning to a priority-based heuristic can help advance the scheduling process. By focusing on scheduling more operations, we can potentially build a more substantial base for future optimizations. Priority-based heuristics can help address the imbalance between finished and unfinished jobs and improve machine utilization, setting the stage for more effective optimization in subsequent phases.
+current_makespan: 72->81
+Finished Job Num: 0->0
+Finished Operation Num: 4->5
+---Round 9---
+Heuristic: _2opt_f9c1
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  The current state shows limited progress in completing operations and reducing the makespan, with only five operations scheduled and no finished jobs. Given that priority-based heuristics have been used extensively with marginal gains, switching to local optimization could provide the necessary adjustments to improve the current solution. Local optimization can help refine the job sequences on machines by reducing idle times and optimizing the order of operations, potentially decreasing the makespan and improving machine utilization. This approach will address the inefficiencies observed in the current schedule and may lead to a more balanced and effective job allocation.
+current_makespan: 81->81
+Finished Job Num: 0->0
+Finished Operation Num: 5->5
+---Round 10---
+Heuristic: first_come_first_served_af26
+Heuristic Category: dynamic_scoring
+Running Steps: 1
+Explain:  The current state shows that progress has been slow, with only five operations completed and no finished jobs, despite multiple rounds of local optimization and priority-based heuristics. The makespan has not improved in the last few rounds. Switching to dynamic scoring can provide a fresh approach by adapting priorities based on the current state, which may help in scheduling operations more effectively and reducing idle times. This strategy can dynamically adjust to changes in machine availability and job completion status, potentially leading to improved machine utilization and a reduced makespan.
+current_makespan: 81->101
+Finished Job Num: 0->0
+Finished Operation Num: 5->5
+---Round 11---
+Heuristic: most_work_remaining_df20
+Heuristic Category: priority_based
+Running Steps: 1
+Explain: The current solution has seen limited progress, with only five operations completed and no finished jobs. The makespan has increased, and machine utilization remains suboptimal. Returning to a priority-based heuristic can help schedule more operations, build a more substantial solution base, and address the imbalance between finished and unfinished jobs. By focusing on scheduling operations that are more likely to reduce the makespan and balance machine load, we can set the stage for more effective optimization in subsequent phases.
+current_makespan: 101->101
+Finished Job Num: 0->0
+Finished Operation Num: 5->6
+---Round 12---
+Heuristic: shortest_processing_time_first_d471
+Heuristic Category: dynamic_scoring
+Running Steps: 1
+Explain:  The current state shows limited progress with priority-based heuristics, as the makespan remains high and no jobs have been completed. Dynamic scoring offers a flexible approach that can adapt priorities based on the current state, potentially leading to more effective scheduling decisions. By dynamically adjusting to changes in machine availability and job completion status, we can explore new scheduling opportunities and improve machine utilization, which may help reduce the makespan and advance the solution.
+current_makespan: 101->101
+Finished Job Num: 0->0
+Finished Operation Num: 6->7
+---Round 13---
+Heuristic: shift_operator_109f
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  Given the current state, there has been limited progress in reducing the makespan, and no jobs have been completed despite using dynamic scoring and priority-based heuristics. With seven operations finished and a high makespan of 101, the focus should now shift to refining the existing schedule. Local optimization can help by addressing idle times and optimizing sequences on machines, potentially decreasing the makespan and improving machine utilization. The previous rounds of local optimization have not yet yielded significant improvements, but with more operations scheduled, there might be new opportunities to exploit through targeted adjustments.
+current_makespan: 101->101
+Finished Job Num: 0->0
+Finished Operation Num: 7->7
+---Round 14---
+Heuristic: shortest_processing_time_first_d471
+Heuristic Category: dynamic_scoring
+Running Steps: 1
+Explain: The current solution has stagnated, with only seven operations completed and no finished jobs, resulting in a high makespan of 101. Local optimization has not significantly improved the situation, indicating that the current approach may not be effectively reducing idle times or optimizing job sequences. Switching to dynamic scoring can provide a fresh perspective by adaptively adjusting priorities based on the current state. This flexibility can help identify more effective scheduling decisions, potentially reducing the makespan by improving machine utilization and advancing the solution more dynamically.
+current_makespan: 101->101
+Finished Job Num: 0->0
+Finished Operation Num: 7->8
+---Round 15---
+Heuristic: shift_operator_109f
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain: The current state shows that the makespan remains high at 101 with no jobs finished, despite multiple rounds of dynamic scoring and priority-based heuristics. With only eight operations completed, it's crucial to focus on refining the existing schedule to reduce idle times and optimize operation sequences. Switching to local optimization can exploit the partial schedule and make targeted adjustments to decrease the makespan and improve machine utilization. Previous local optimization attempts haven't yielded significant improvements, but with more operations scheduled, there might be new opportunities to refine the solution further.
+current_makespan: 101->101
+Finished Job Num: 0->0
+Finished Operation Num: 8->8
+---Round 16---
+Heuristic: shortest_processing_time_first_d471
+Heuristic Category: dynamic_scoring
+Running Steps: 1
+Explain: The current state shows that the makespan remains high at 101 with no jobs finished, despite multiple rounds of local optimization and priority-based heuristics. The solution appears to have stagnated, with only eight operations completed. Switching to dynamic scoring can provide a fresh perspective by adaptively adjusting priorities based on the current state. This flexibility can help identify more effective scheduling decisions, potentially reducing the makespan by improving machine utilization and advancing the solution more dynamically. Dynamic scoring can dynamically react to the current schedule and adjust the focus to areas that need improvement.
+current_makespan: 101->101
+Finished Job Num: 0->0
+Finished Operation Num: 8->9
+---Round 17---
+Heuristic: longest_job_next_2e23
+Heuristic Category: priority_based
+Running Steps: 1
+Explain:  Given the current state with no finished jobs and a high makespan, it's important to advance the scheduling process more rapidly. While dynamic scoring has been used, it hasn't significantly improved the solution. Returning to a priority-based heuristic could help prioritize operations that can reduce the makespan and increase the number of scheduled operations. This approach will help build a more substantial base for future optimization by focusing on jobs with criteria like least work remaining, which could balance machine load and potentially reduce idle times.
+current_makespan: 101->180
+Finished Job Num: 0->1
+Finished Operation Num: 9->10
+---Round 18---
+Heuristic: shift_operator_109f
+Heuristic Category: local_optimization
+Running Steps: 1
+Explain:  The current makespan has significantly increased to 180, and only one job has been completed. Priority-based heuristics have been used extensively, with limited success in reducing the makespan. Given the current state, focusing on local optimization can help refine the existing schedule by addressing idle times and optimizing job sequences on machines. This approach is likely to provide the necessary adjustments to decrease the makespan and improve machine utilization. By making targeted changes, we can exploit the current partial schedule and enhance it by reducing inefficiencies and balancing the workload across machines.
+current_makespan: 180->180
+Finished Job Num: 1->1
+Finished Operation Num: 10->10
+---Round 19---
+Heuristic: first_come_first_served_af26
+Heuristic Category: dynamic_scoring
+Running Steps: 1
+Explain:  Given the current state, the makespan is relatively high at 180, with only one job completed and significant machine idle times. Local optimization efforts have not yielded substantial improvements in recent rounds. Switching to dynamic scoring could provide a fresh perspective by adaptively adjusting priorities based on the current state, potentially leading to more effective scheduling decisions and reducing idle times. This category allows for flexibility and can dynamically react to the current schedule to focus on areas needing improvement.
+current_makespan: 180->180
+Finished Job Num: 1->1
+Finished Operation Num: 10->11
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:
+machine_0: 1->0
+machine_1: 2->1
+machine_2: 1->2
+machine_3: 1
+machine_4: 1->4->6->2
+
+finished_jobs:[1]
+unfinished_jobs:[0, 2, 3, 4, 5, 6, 7, 8, 9]
+job_operation_index:[1, 5, 3, 0, 1, 0, 1, 0, 0, 0]
+job_last_operation_end_times:[101, 180, 123, 0, 52, 0, 80, 0, 0, 0]
+machine_operation_index:[2, 2, 2, 1, 4]
+machine_last_operation_end_times:[101, 99, 95, 180, 123]
+finished_operation_num:11
+current_makespan:180
+num_finished_jobs:1
+num_unfinished_jobs:9
+average_job_completion:53.6
+max_job_completion_time:180
+min_job_completion_time:0
+std_dev_job_completion_time:61.72876152977638
+average_machine_completion:119.6
+max_machine_completion_time:180
+min_machine_completion_time:95
+std_dev_machine_completion_time:31.733893552477927
+average_idle_time_per_machine:60.4
+proportion_of_finished_jobs:0.1
+proportion_of_unfinished_jobs:0.9
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: first_come_first_served_af26(dynamic_scoring). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: priority_based,local_optimization,dynamic_scoring,specialized_scenarios
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(priority_based,local_optimization,dynamic_scoring,specialized_scenarios)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:local_optimization
+explanation: The current state indicates that the makespan remains high at 180 with only one job completed. Dynamic scoring has been used, but it hasn't significantly improved the solution. Given the high idle times and the need to optimize the partial schedule, focusing on local optimization can help refine the existing solution by addressing these inefficiencies. This approach can potentially decrease the makespan and improve machine utilization by making targeted changes to the job sequences and reducing idle times. Local optimization can exploit the current partial schedule and enhance it by making necessary adjustments to balance the workload across machines.
+***
+------------------------------------------------------------------------------------
+

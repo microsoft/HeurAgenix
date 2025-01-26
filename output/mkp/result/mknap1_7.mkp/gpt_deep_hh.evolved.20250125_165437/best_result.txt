@@ -1,0 +1,47 @@
+-data: mknap1_7.mkp
+-current_solution:
+selected_items: 1,3,5,6,7,10,12,13,14,15,16,18,24,28,29,30,31,36,37,38,39,40,41,42,44,46,47,48,49
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 16537.0
+-item_num: 50
+-resource_num: 5
+-selected_item_num: [1, 3, 5, 6, 7, 10, 12, 13, 14, 15, 16, 18, 24, 28, 29, 30, 31, 36, 37, 38, 39, 40, 41, 42, 44, 46, 47, 48, 49]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_bb0a	AddOperator(item_index=41)	selected_items: 41
+1	greedy_by_profit_1597	AddOperator(item_index=49)	selected_items: 41,49
+2	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=38)	selected_items: 38,41,49
+3	greedy_by_profit_1597	AddOperator(item_index=13)	selected_items: 13,38,41,49
+4	greedy_by_profit_1597	AddOperator(item_index=19)	selected_items: 13,19,38,41,49
+5	greedy_by_profit_1597	AddOperator(item_index=29)	selected_items: 13,19,29,38,41,49
+6	greedy_by_profit_1597	AddOperator(item_index=12)	selected_items: 12,13,19,29,38,41,49
+7	greedy_by_profit_1597	AddOperator(item_index=48)	selected_items: 12,13,19,29,38,41,48,49
+8	greedy_by_profit_1597	AddOperator(item_index=18)	selected_items: 12,13,18,19,29,38,41,48,49
+9	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=28)	selected_items: 12,13,18,19,28,29,38,41,48,49
+10	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=14)	selected_items: 12,13,14,18,19,28,29,38,41,48,49
+11	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=24)	selected_items: 12,13,14,18,19,24,28,29,38,41,48,49
+12	single_swap_heuristic_b3d6	SwapOperator(item_index1=19, item_index2=15)	selected_items: 12,13,14,15,18,24,28,29,38,41,48,49
+13	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=31)	selected_items: 12,13,14,15,18,24,28,29,31,38,41,48,49
+14	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=16)	selected_items: 12,13,14,15,16,18,24,28,29,31,38,41,48,49
+15	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=10)	selected_items: 10,12,13,14,15,16,18,24,28,29,31,38,41,48,49
+16	single_swap_heuristic_b3d6	SwapOperator(item_index1=13, item_index2=42)	selected_items: 10,12,14,15,16,18,24,28,29,31,38,41,42,48,49
+17	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=47)	selected_items: 10,12,14,15,16,18,24,28,29,31,38,41,42,47,48,49
+18	greedy_by_profit_1597	AddOperator(item_index=19)	selected_items: 10,12,14,15,16,18,19,24,28,29,31,38,41,42,47,48,49
+19	greedy_by_weight_e7f9	AddOperator(item_index=39)	selected_items: 10,12,14,15,16,18,19,24,28,29,31,38,39,41,42,47,48,49
+20	greedy_by_weight_e7f9	AddOperator(item_index=40)	selected_items: 10,12,14,15,16,18,19,24,28,29,31,38,39,40,41,42,47,48,49
+21	greedy_by_density_bb0a	AddOperator(item_index=35)	selected_items: 10,12,14,15,16,18,19,24,28,29,31,35,38,39,40,41,42,47,48,49
+22	greedy_by_resource_balance_52f0	AddOperator(item_index=13)	selected_items: 10,12,13,14,15,16,18,19,24,28,29,31,35,38,39,40,41,42,47,48,49
+23	block_flip_d4f4	FlipBlockOperator(index_list=[0, 1])	selected_items: 0,1,10,12,13,14,15,16,18,19,24,28,29,31,35,38,39,40,41,42,47,48,49
+24	greedy_by_weight_e7f9	AddOperator(item_index=46)	selected_items: 0,1,10,12,13,14,15,16,18,19,24,28,29,31,35,38,39,40,41,42,46,47,48,49
+25	block_flip_d4f4	FlipBlockOperator(index_list=[21, 22])	selected_items: 0,1,10,12,13,14,15,16,18,19,21,22,24,28,29,31,35,38,39,40,41,42,46,47,48,49
+26	greedy_improvement_ccbf	SwapOperator(item_index1=19, item_index2=36)	selected_items: 0,1,10,12,13,14,15,16,18,21,22,24,28,29,31,35,36,38,39,40,41,42,46,47,48,49
+27	greedy_by_profit_1597	AddOperator(item_index=30)	selected_items: 0,1,10,12,13,14,15,16,18,21,22,24,28,29,30,31,35,36,38,39,40,41,42,46,47,48,49
+28	greedy_by_density_bb0a	AddOperator(item_index=19)	selected_items: 0,1,10,12,13,14,15,16,18,19,21,22,24,28,29,30,31,35,36,38,39,40,41,42,46,47,48,49
+29	single_swap_heuristic_b3d6	SwapOperator(item_index1=21, item_index2=43)	selected_items: 0,1,10,12,13,14,15,16,18,19,22,24,28,29,30,31,35,36,38,39,40,41,42,43,46,47,48,49
+30	k_flip_2f3e	FlipBlockOperator(index_list=[5, 22])	selected_items: 0,1,5,10,12,13,14,15,16,18,19,24,28,29,30,31,35,36,38,39,40,41,42,43,46,47,48,49
+31	greedy_by_density_bb0a	SwapOperator(item_index1=0, item_index2=3)	selected_items: 1,3,5,10,12,13,14,15,16,18,19,24,28,29,30,31,35,36,38,39,40,41,42,43,46,47,48,49
+32	greedy_improvement_ccbf	SwapOperator(item_index1=43, item_index2=7)	selected_items: 1,3,5,7,10,12,13,14,15,16,18,19,24,28,29,30,31,35,36,38,39,40,41,42,46,47,48,49
+33	greedy_by_least_remaining_capacity_05f2	AddOperator(item_index=6)	selected_items: 1,3,5,6,7,10,12,13,14,15,16,18,19,24,28,29,30,31,35,36,38,39,40,41,42,46,47,48,49
+34	single_swap_heuristic_b3d6	SwapOperator(item_index1=35, item_index2=37)	selected_items: 1,3,5,6,7,10,12,13,14,15,16,18,19,24,28,29,30,31,36,37,38,39,40,41,42,46,47,48,49
+35	greedy_improvement_ccbf	SwapOperator(item_index1=19, item_index2=44)	selected_items: 1,3,5,6,7,10,12,13,14,15,16,18,24,28,29,30,31,36,37,38,39,40,41,42,44,46,47,48,49

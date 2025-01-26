@@ -1,0 +1,868 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on cvrp problem:
+Capacitated Vehicle Routing Problem (CVRP) is an optimization challenge focused on determining the most efficient routes for a fleet of vehicles to deliver goods to various locations, considering vehicle capacity constraints.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of CVRP.
+A list of lists where each sublist represents a vehicle's route.
+Each sublist contains integers representing the nodes (customers) visited by the vehicle in the order of visitation.
+The routes are sorted by vehicle identifier and the nodes in the list sorted by visited order."""
+    def __init__(self, routes: list[list[int]], depot: int):
+        self.routes = routes
+        self.depot = depot
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append a node at the end of the specified vehicle's route."""
+    def __init__(self, vehicle_id: int, node: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].append(self.node)
+        return Solution(new_routes, solution.depot)
+class InsertOperator(BaseOperator):
+    """Insert a node at a specified position within the route of a specified vehicle."""
+    def __init__(self, vehicle_id: int, node: int, position: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].insert(self.position, self.node)
+        return Solution(new_routes, solution.depot)
+class SwapOperator(BaseOperator):
+    """Swap two nodes between or within vehicle routes."""
+    def __init__(self, vehicle_id1: int, position1: int, vehicle_id2: int, position2: int):
+        if vehicle_id1 <= vehicle_id2:
+            self.vehicle_id1 = vehicle_id1
+            self.position1 = position1
+            self.vehicle_id2 = vehicle_id2
+            self.position2 = position2
+        else:
+            self.vehicle_id1 = vehicle_id2
+            self.position1 = position2
+            self.vehicle_id2 = vehicle_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        (new_routes[self.vehicle_id1][self.position1], new_routes[self.vehicle_id2][self.position2]) = (new_routes[self.vehicle_id2][self.position2], new_routes[self.vehicle_id1][self.position1])
+        return Solution(new_routes, solution.depot)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, vehicle_id: int, segments: list[tuple[int, int]]):
+        self.vehicle_id = vehicle_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_route = new_routes[self.vehicle_id][:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_routes[self.vehicle_id])
+            assert 0 <= end_index < len(new_routes[self.vehicle_id])
+            if start_index <= end_index:
+                new_route[start_index:end_index + 1] = reversed(new_route[start_index:end_index + 1])
+            else:
+                new_route = list(reversed(new_route[start_index:])) + new_route[end_index + 1:start_index] + list(reversed(new_route[:end_index + 1]))
+        new_routes = solution.routes[:self.vehicle_id] + [new_route] + solution.routes[self.vehicle_id + 1:]
+        return Solution(new_routes, solution.depot)
+class RelocateOperator(BaseOperator):
+    """Move a node from one position in a route to another, possibly in a different route."""
+    def __init__(self, source_vehicle_id: int, source_position: int, target_vehicle_id: int, target_position: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.source_position = source_position
+        self.target_vehicle_id = target_vehicle_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        node = new_routes[self.source_vehicle_id].pop(self.source_position)
+        if not new_routes[self.target_vehicle_id]:
+            new_routes[self.target_vehicle_id].append(node)
+        else:
+            new_routes[self.target_vehicle_id].insert(self.target_position, node)
+        return Solution(new_routes, solution.depot)
+class MergeRoutesOperator(BaseOperator):
+    """Merge two routes by appending the route of the source vehicle to the beginning of the route of the target vehicle. 
+The merged route is assigned to the target vehicle, and the source vehicle's route is cleared."""
+    def __init__(self, source_vehicle_id: int, target_vehicle_id: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.target_vehicle_id = target_vehicle_id
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        source_depot_index = solution.routes[self.source_vehicle_id].index(solution.depot)
+        target_depot_index = solution.routes[self.target_vehicle_id].index(solution.depot)
+        merge_route = new_routes[self.source_vehicle_id][source_depot_index + 1:] + new_routes[self.source_vehicle_id][:source_depot_index] + new_routes[self.target_vehicle_id][target_depot_index + 1:] + new_routes[self.target_vehicle_id][:target_depot_index]
+        new_routes[self.target_vehicle_id] = [solution.depot] + merge_route + [solution.depot]
+        new_routes[self.source_vehicle_id] = [solution.depot]
+        return Solution(new_routes, solution.depot)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "vehicle_num" (int): The total number of vehicles.
+    - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
+    - "depot" (int): The index for depot node.
+    - "demands" (numpy.ndarray): The demand of each node.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): The current set of routes for all vehicles.
+    - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - "visited_num" (int): Number of nodes visited by each vehicle.
+    - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+    - "visited_num" (int): Number of nodes have not been visited by each vehicle.
+    - "total_current_cost" (int): The total cost of the current solution.
+    - "last_visited" (list[int]): The last visited node for each vehicle.
+    - "vehicle_loads" (list[int]): The current load of each vehicle.
+    - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is cvrp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Capacitated Vehicle Routing Problem (CVRP) is indeed a combinatorial optimization problem and can be effectively addressed using heuristic methods. The framework you've built seems well-structured to support various heuristic algorithms with the use of operators to modify solutions. The data structures and methods described align with typical requirements for solving CVRP using heuristic approaches.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): construction_heuristics,improvement_heuristics,metaheuristics,route_merging,node_relocation
+
+construction_heuristics: These heuristics focus on constructing an initial feasible solution by adding nodes to routes based on different criteria like nearest distance, insertion cost, or polar angle.
+def nearest_neighbor_54a9(): Enhanced Nearest Neighbor Heuristic for CVRP. This heuristic prioritizes nodes with higher demands that can fit into the vehicle's remaining capacity, especially when the number of unvisited nodes is low. It also periodically applies a 2-opt heuristic to improve route compactness.
+def farthest_insertion_6308(): Farthest Insertion Heuristic Algorithm with Improvements for the Capacitated Vehicle Routing Problem (CVRP). This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, and vehicle capacity utilization. It periodically performs greedy improvements and inter-vehicle swaps to enhance the solution.
+def min_cost_insertion_3b2b(): Optimized Min-Cost Insertion Heuristic for CVRP. This heuristic algorithm is optimized for performance by restructuring the order of operations, adjusting hyper-parameters, and implementing efficient logic to enhance the solution.
+def greedy_f4c4(): Greedy heuristic algorithm for the CVRP. This algorithm attempts to construct a solution by iteratively adding the closest unvisited node to a vehicle's route until all nodes are visited or the vehicle reaches its capacity. It starts with an empty route for each vehicle and selects nodes based on the shortest distance from the last node in the route.
+def petal_algorithm_b384(): Petal construction heuristic algorithm for the CVRP. This heuristic attempts to build feasible routes (petals) around the depot and combine them into a set of vehicle routes. Each petal starts and ends at the depot, creating a loop that can serve as an individual route for a vehicle.
+
+improvement_heuristics: These heuristics improve an existing solution by modifying node sequences to reduce total travel cost or improve compactness.
+def two_opt_0554(): Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+def three_opt_e8d7(): Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+def variable_neighborhood_search_614b(): Variable Neighborhood Search heuristic algorithm for CVRP. This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions. It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
+
+metaheuristics: This heuristic employs a metaheuristic approach by systematically exploring multiple neighborhoods to escape local optima.
+def variable_neighborhood_search_614b(): Variable Neighborhood Search heuristic algorithm for CVRP. This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions. It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
+
+route_merging: This heuristic focuses on merging routes to reduce the number of routes and optimize the total distance by calculating potential savings.
+def saving_algorithm_710e(merge_threshold: float = 0.0): Saving Algorithm heuristic for CVRP. Calculates savings for combining two routes into one for each pair of end nodes of existing routes and sorts these savings in descending order. Routes are then merged by the highest savings while considering vehicle capacity constraints.
+
+node_relocation: This heuristic attempts to improve the solution by relocating nodes between different routes while considering capacity constraints.
+def node_shift_between_routes_7b8a(): Node Shift Between Routes heuristic for CVRP. This heuristic attempts to move a node from one route to another route, aiming to reduce the total distance or improve load balance. It considers the capacity constraints and ensures that the move is beneficial before applying it.
+
+
+We aim to solve this problem using the following data:
+node_num:101
+vehicle_num:4
+capacity:400
+depot:0
+demands:[0, 10, 7, 13, 19, 26, 3, 5, 9, 16, 16, 12, 19, 23, 20, 8, 19, 2, 12, 17, 9, 11, 18, 29, 3, 6, 17, 16, 16, 9, 21, 27, 23, 11, 14, 8, 5, 8, 16, 31, 9, 5, 5, 7, 18, 16, 1, 27, 36, 30, 13, 10, 9, 14, 18, 2, 6, 7, 18, 28, 3, 13, 19, 10, 9, 20, 25, 25, 36, 6, 5, 15, 25, 9, 8, 18, 13, 14, 3, 23, 6, 26, 16, 11, 7, 41, 35, 26, 9, 15, 3, 1, 2, 22, 27, 20, 11, 12, 10, 9, 17]
+average_demand:14.435643564356436
+demand_variance:79.21615527889422
+average_distance:33.9160396039604
+max_distance:92.0
+min_distance:1.0
+distance_variance:267.38780213704536
+vehicle_capacity_utilization:0.91125
+node_to_vehicle_ratio:25.25
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 2 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+To strategically guide the selection of heuristic categories and define execution steps for solving the CVRP, we can break down the process into several phases. Each phase will involve different heuristic categories based on the problem's current state and the effectiveness of previous heuristics. Here's a proposed framework:
+
+### Strategic Guide for Heuristic Selection
+
+#### Phase 1: Initial Solution Construction
+
+- **Objective**: Create an initial feasible solution quickly.
+- **Heuristic Categories**: 
+  - **Construction Heuristics**: Use a combination of methods to generate diverse starting points.
+    - **Execution Steps**:
+      1. Apply `nearest_neighbor_54a9()` to generate an initial route that takes node demands into account.
+      2. Utilize `farthest_insertion_6308()` to explore alternative routes that might be more optimal.
+      3. Evaluate the performance of each construction heuristic based on initial solution feasibility and cost.
+      4. Select the most promising initial solution to proceed.
+
+#### Phase 2: Initial Improvement
+
+- **Objective**: Refine the initial solution to improve efficiency and cost.
+- **Heuristic Categories**:
+  - **Improvement Heuristics**: Focus on optimizing the sequence within existing routes.
+    - **Execution Steps**:
+      1. Apply `two_opt_0554()` to perform basic route optimization.
+      2. Use `three_opt_e8d7()` if further improvements are necessary.
+      3. Assess the impact of each improvement heuristic on the total cost and compactness of routes.
+      4. Choose the best improved solution for further refinement.
+
+#### Phase 3: Advanced Improvement and Exploration
+
+- **Objective**: Escape local optima and explore better solutions.
+- **Heuristic Categories**:
+  - **Metaheuristics**: Explore multiple neighborhoods to find global optima.
+  - **Node Relocation**: Adjust node positions across routes to balance loads.
+    - **Execution Steps**:
+      1. Implement `variable_neighborhood_search_614b()` to explore diverse solutions and escape local optima.
+      2. Use `node_shift_between_routes_7b8a()` to relocate nodes for better load balancing.
+      3. Evaluate the effectiveness of these heuristics in achieving a lower cost and better solution quality.
+
+#### Phase 4: Route Merging and Final Optimization
+
+- **Objective**: Reduce the number of routes and finalize the solution.
+- **Heuristic Categories**:
+  - **Route Merging**: Combine routes to optimize vehicle usage.
+    - **Execution Steps**:
+      1. Apply `saving_algorithm_710e()` to merge routes where possible, considering capacity constraints.
+      2. Re-evaluate using improvement heuristics if merging creates suboptimal routes.
+      3. Finalize the solution by ensuring all nodes are serviced efficiently.
+
+### Iterative Approach
+
+- **Alternation Strategy**: Continuously alternate between different heuristic categories during each phase to avoid stagnation.
+- **Evaluation Criteria**: Regularly assess the solution based on total travel cost, vehicle load balance, and overall route efficiency.
+- **Flexibility**: Be prepared to revisit previous phases if a new heuristic reveals potential for further improvement.
+
+### Conclusion
+
+This strategic guide emphasizes flexibility and experimentation with various heuristics to find the most effective solution for the CVRP. By iteratively testing and evaluating different heuristic categories, you can dynamically adapt to the problem's complexities and improve solution quality over time.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+node_num:101
+vehicle_num:4
+capacity:400
+depot:0
+demands:[0, 10, 7, 13, 19, 26, 3, 5, 9, 16, 16, 12, 19, 23, 20, 8, 19, 2, 12, 17, 9, 11, 18, 29, 3, 6, 17, 16, 16, 9, 21, 27, 23, 11, 14, 8, 5, 8, 16, 31, 9, 5, 5, 7, 18, 16, 1, 27, 36, 30, 13, 10, 9, 14, 18, 2, 6, 7, 18, 28, 3, 13, 19, 10, 9, 20, 25, 25, 36, 6, 5, 15, 25, 9, 8, 18, 13, 14, 3, 23, 6, 26, 16, 11, 7, 41, 35, 26, 9, 15, 3, 1, 2, 22, 27, 20, 11, 12, 10, 9, 17]
+average_demand:14.435643564356436
+demand_variance:79.21615527889422
+average_distance:33.9160396039604
+max_distance:92.0
+min_distance:1.0
+distance_variance:267.38780213704536
+vehicle_capacity_utilization:0.91125
+node_to_vehicle_ratio:25.25
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 68 rounds discuss and the summary are:
+---Round 0---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  The current solution is essentially at the initial stage with no nodes visited beyond the depot. We need to build a feasible initial solution by assigning nodes to vehicle routes. Starting with construction heuristics will allow us to create a baseline solution to work from. Using methods like nearest neighbor or farthest insertion will help us begin populating routes efficiently, considering vehicle capacity and node demands.
+Visited Node Num: 1->3
+Current Cost: 0.0->18.0
+Fulfilled Demands: 0->30
+---Round 1---
+Heuristic: min_cost_insertion_3b2b
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  The current solution is still in the early stages, with only a small fraction of nodes visited and a significant number of nodes remaining unvisited. Continuing with construction heuristics will allow us to further develop the initial solution and populate vehicle routes more effectively. This approach will help ensure that we efficiently utilize the available capacity while considering the demands of unvisited nodes. Once a more comprehensive initial solution is established, we can transition to improvement heuristics or other categories to enhance and refine the solution.
+Visited Node Num: 3->5
+Current Cost: 18.0->32.0
+Fulfilled Demands: 30->63
+---Round 2---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  The current solution is still in the early stages with a significant number of nodes unvisited and a substantial remaining demand. Continuing with construction heuristics allows us to further populate the vehicle routes, ensuring that we efficiently utilize available capacity while considering the demands of unvisited nodes. Completing the initial solution with construction heuristics will provide a stronger foundation for subsequent improvement phases.
+Visited Node Num: 5->7
+Current Cost: 32.0->40.0
+Fulfilled Demands: 63->90
+---Round 3---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  The current solution has started to take shape with 7 nodes visited and a total current cost of 40.0. However, a significant number of nodes remain unvisited, and there's room to optimize the already constructed routes. Switching to improvement heuristics allows us to refine the current solution by optimizing the sequence of visited nodes, reducing the total travel cost, and better utilizing the vehicle capacities. This approach will help in enhancing the existing routes before proceeding to add more nodes or consider merging routes.
+Visited Node Num: 7->9
+Current Cost: 40.0->55.0
+Fulfilled Demands: 90->122
+---Round 4---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain: Given the current state of the solution, with only 9 nodes visited and a large number of unvisited nodes (92), it's important to further build the solution. Although improvement heuristics have optimized the initial routes, the focus should now return to populating more routes and visiting additional nodes. Construction heuristics will allow us to efficiently add more nodes to the existing solution, considering the vehicle capacity and demands, before returning to improvement heuristics or exploring other categories for optimization.
+Visited Node Num: 9->11
+Current Cost: 55.0->64.0
+Fulfilled Demands: 122->172
+---Round 5---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Although some initial improvement heuristics have been applied, the solution is still in its infancy, with only 11 nodes visited and 90 nodes remaining unvisited. Continuing with construction heuristics will help further populate the vehicle routes. This approach will ensure that we efficiently utilize available capacity while considering the demands of unvisited nodes. Completing the initial solution with construction heuristics will provide a stronger foundation for subsequent improvement phases.
+Visited Node Num: 11->13
+Current Cost: 64.0->69.0
+Fulfilled Demands: 172->191
+---Round 6---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  The current solution has begun to take shape, with 13 nodes visited and a single vehicle utilized, leaving a large number of nodes and vehicles unaddressed. Continuing with construction heuristics may yield diminishing returns since the current solution's foundation is sufficiently established. Switching to improvement heuristics can optimize the routes already constructed, potentially reducing costs and enhancing route efficiency. This phase can help balance vehicle loads and make better use of vehicle capacity before introducing more nodes and vehicles. After refining the existing routes, further construction or exploration of other heuristic categories could be considered.
+Visited Node Num: 13->15
+Current Cost: 69.0->84.0
+Fulfilled Demands: 191->227
+---Round 7---
+Heuristic: nearest_neighbor_54a9
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain: With 86 nodes still unvisited and significant remaining demand, it is crucial to continue building the solution by visiting more nodes. Although improvement heuristics have optimized the existing route, the focus should shift back to construction heuristics to populate more routes and utilize the available vehicle capacity. This will establish a more comprehensive solution foundation, allowing for further refinement and optimization in subsequent phases.
+Visited Node Num: 15->17
+Current Cost: 84.0->100.0
+Fulfilled Demands: 227->239
+---Round 8---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state of the solution, with only 17 nodes visited and a significant number of nodes remaining unvisited, it is crucial to refine the existing routes before expanding further. Switching to improvement heuristics will allow us to optimize the current routes, reduce costs, and better utilize the vehicle capacity. This refinement will provide a more efficient foundation for future construction or other heuristic applications, ultimately leading to a more optimal overall solution.
+Visited Node Num: 17->19
+Current Cost: 100.0->109.0
+Fulfilled Demands: 239->276
+---Round 9---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given that only 19 nodes have been visited out of 101, with a significant number of nodes (82) still unvisited, the focus should shift back to construction heuristics. This will allow for the continued development of the solution by adding more nodes to the routes. The current vehicle capacity utilization is relatively low, and additional nodes need to be assigned to vehicles to better utilize capacity and increase the total demand served. Construction heuristics can help efficiently expand the solution by exploring new nodes and incorporating them into existing routes, thereby creating a more comprehensive initial solution that can be further optimized later.
+Visited Node Num: 19->21
+Current Cost: 109.0->125.0
+Fulfilled Demands: 276->293
+---Round 10---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 21 nodes visited and 80 nodes still unvisited, the current solution has begun to take shape. The vehicle capacity utilization for the first vehicle is relatively high, suggesting that further construction may lead to suboptimal routes due to the capacity constraints. By switching to improvement heuristics, we can optimize the current routes, reduce costs, and better utilize vehicle capacities before expanding further. This will provide a more efficient foundation for future construction or other heuristic applications.
+Visited Node Num: 21->23
+Current Cost: 125.0->142.0
+Fulfilled Demands: 293->319
+---Round 11---
+Heuristic: nearest_neighbor_54a9
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  The current solution has a large number of unvisited nodes (78) and considerable remaining demand (1139). With only 23 nodes visited, there is still significant work to be done in building out the solution. While improvement heuristics have been applied to optimize the routes, the focus should now return to populating more routes and utilizing the remaining vehicle capacity. Construction heuristics will enable the addition of more nodes to the existing solution, allowing for the development of a more comprehensive foundation that can be further optimized in subsequent phases. This approach will help ensure that the vehicle capacity is efficiently utilized while addressing the demands of the unvisited nodes.
+Visited Node Num: 23->25
+Current Cost: 142.0->159.0
+Fulfilled Demands: 319->369
+---Round 12---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 76 nodes still unvisited and significant remaining demand, it's crucial to refine the existing solution to enhance route efficiency and cost-effectiveness. Improvement heuristics will help optimize the current routes, potentially reducing costs and better utilizing vehicle capacities before further expanding the solution. This approach will provide a more robust foundation for future construction or other heuristic applications.
+Visited Node Num: 25->25
+Current Cost: 159.0->159.0
+Fulfilled Demands: 369->369
+---Round 13---
+Heuristic: farthest_insertion_6308
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With a significant number of nodes still unvisited (76), it's crucial to continue building the solution by visiting more nodes. The current vehicle capacity utilization is relatively low for three vehicles, indicating that additional nodes need to be assigned to these vehicles to better utilize capacity and increase the total demand served. Returning to construction heuristics will allow us to efficiently expand the solution by exploring new nodes and incorporating them into existing routes. This approach will help ensure that the vehicle capacity is efficiently utilized while addressing the demands of the unvisited nodes, providing a more comprehensive foundation for future optimization.
+Visited Node Num: 25->26
+Current Cost: 159.0->160.0
+Fulfilled Demands: 369->372
+---Round 14---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: Given the current state of the solution with 26 visited nodes and one vehicle fully utilized, there is room to optimize the existing route. Switching to improvement heuristics can help refine the current routes, reduce costs, and better balance vehicle loads. With 75 nodes still unvisited, optimizing the current solution will provide a more efficient foundation before further expanding the routes with additional nodes.
+Visited Node Num: 26->26
+Current Cost: 160.0->160.0
+Fulfilled Demands: 372->372
+---Round 15---
+Heuristic: farthest_insertion_6308
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given that only 26 nodes have been visited and a substantial number of nodes (75) remain unvisited, it's crucial to continue building the solution. While improvement heuristics have been applied to optimize the current routes, the focus should shift back to construction heuristics to populate more routes and utilize the available vehicle capacity effectively. By expanding the solution with construction heuristics, we can ensure that the vehicle capacity is efficiently utilized while addressing the demands of the unvisited nodes, thus providing a more comprehensive foundation for future optimization.
+Visited Node Num: 26->28
+Current Cost: 160.0->171.0
+Fulfilled Demands: 372->394
+---Round 16---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state of the solution, with 28 nodes visited and a single vehicle utilized, there is significant room for optimization. The vehicle's load is nearly at capacity, indicating that further node additions may not be feasible without route restructuring. Improvement heuristics can refine the current solution by optimizing route sequences and potentially redistributing nodes among vehicles. This will help reduce costs and balance vehicle loads, creating a more efficient foundation for future node additions.
+Visited Node Num: 28->28
+Current Cost: 171.0->171.0
+Fulfilled Demands: 394->394
+---Round 17---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 73 nodes still unvisited and a significant amount of remaining demand, it is important to continue building the solution by adding more nodes to the routes. Although improvement heuristics have been applied to optimize the existing route, the focus should shift back to construction heuristics to populate more routes and utilize the available vehicle capacity effectively. Expanding the solution with construction heuristics will allow for a more comprehensive foundation that can be further optimized in future phases.
+Visited Node Num: 28->30
+Current Cost: 171.0->200.0
+Fulfilled Demands: 394->415
+---Round 18---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  The current solution has 30 nodes visited, with a significant number of nodes (71) still unvisited. The vehicle capacity utilization for vehicle 0 is at its limit, which suggests that further construction may not be feasible without optimizing existing routes. Improvement heuristics can help refine the current routes, potentially reducing costs and allowing better use of vehicle capacities. This will provide a more efficient foundation for further node additions or other heuristic applications.
+Visited Node Num: 30->30
+Current Cost: 200.0->200.0
+Fulfilled Demands: 415->415
+---Round 19---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  The current solution has one vehicle fully utilized, while the others have significant remaining capacity. Additionally, 71 nodes are still unvisited, which suggests the need to balance the vehicle loads better and address the unvisited demand. Using node relocation can help redistribute nodes more effectively across the available vehicles, potentially reducing costs and improving capacity utilization. This approach will allow us to enhance the existing solution by making better use of the available resources and setting a stronger foundation for future node additions or optimizations.
+Visited Node Num: 30->30
+Current Cost: 200.0->200.0
+Fulfilled Demands: 415->415
+---Round 20---
+Heuristic: saving_algorithm_710e
+Heuristic Category: route_merging
+Running Steps: 2
+Explain:  Given the current state of the solution, with vehicle 0 fully utilized and other vehicles having significant remaining capacity, route merging could help optimize the number of routes and improve the overall efficiency. Merging routes might allow for better load balancing across vehicles, potentially reducing the total cost and making use of the available capacity more effectively. This approach will also help in addressing the large number of unvisited nodes by freeing up vehicle capacity for additional node assignments.
+Visited Node Num: 30->30
+Current Cost: 200.0->200.0
+Fulfilled Demands: 415->415
+---Round 21---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 71 nodes still unvisited and a significant remaining demand, it is essential to continue building the solution by visiting more nodes. The current solution has one vehicle fully utilized, while others have substantial remaining capacity. By returning to construction heuristics, we can efficiently expand the solution, exploring new nodes and incorporating them into existing routes. This will help ensure that the vehicle capacity is better utilized and provide a more comprehensive foundation for future optimizations.
+Visited Node Num: 30->32
+Current Cost: 200.0->218.0
+Fulfilled Demands: 415->436
+---Round 22---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  The current solution has utilized a construction heuristic to add more nodes, but there are still 69 unvisited nodes and substantial remaining demand. Vehicle 0 is fully loaded, indicating that further construction may not be feasible without optimizing existing routes. Improvement heuristics can refine the current routes, potentially reducing costs and allowing better use of vehicle capacities. This will help in balancing vehicle loads and creating a more efficient foundation for future node additions or other heuristic applications.
+Visited Node Num: 32->34
+Current Cost: 218.0->230.0
+Fulfilled Demands: 436->450
+---Round 23---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  Given the current solution state with vehicle 0 fully loaded and a significant number of nodes (67) still unvisited, node relocation can help rebalance the load among vehicles. This category is suitable because it addresses the imbalance in vehicle utilization by redistributing nodes to vehicles with remaining capacity, potentially lowering costs and improving route efficiency. This step will help make better use of the available resources before considering further node additions or optimizations.
+Visited Node Num: 34->34
+Current Cost: 230.0->230.0
+Fulfilled Demands: 450->450
+---Round 24---
+Heuristic: saving_algorithm_710e
+Heuristic Category: route_merging
+Running Steps: 2
+Explain:  The current solution has vehicle 0 fully loaded while other vehicles have significant remaining capacity. With a large number of nodes still unvisited, merging routes could optimize the number of routes and improve overall efficiency. This approach might allow for better load balancing across vehicles, potentially reducing the total cost and making use of the available capacity more effectively. This step can provide a more consolidated and efficient foundation for further node additions or other heuristic applications.
+Visited Node Num: 34->34
+Current Cost: 230.0->230.0
+Fulfilled Demands: 450->450
+---Round 25---
+Heuristic: nearest_neighbor_54a9
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given the current solution state with only 34 nodes visited and 67 nodes remaining unvisited, it's crucial to continue expanding the solution by visiting more nodes. The existing routes have been optimized to some extent with improvement and route merging heuristics, but the vehicle capacity for vehicles 2 and 3 remains completely unused. By returning to construction heuristics, we can efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help address the significant remaining demand and provide a more comprehensive foundation for future optimization.
+Visited Node Num: 34->36
+Current Cost: 230.0->280.0
+Fulfilled Demands: 450->471
+---Round 26---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: Given the current state with 65 nodes still unvisited, a fully loaded vehicle, and other vehicles with significant remaining capacity, it's crucial to optimize the existing solution before further expanding it. Improvement heuristics can help refine current routes, potentially reducing costs and allowing better use of vehicle capacities. This approach will help in balancing vehicle loads and creating a more efficient foundation for future node additions or other heuristic applications.
+Visited Node Num: 36->38
+Current Cost: 280.0->287.0
+Fulfilled Demands: 471->508
+---Round 27---
+Heuristic: nearest_neighbor_54a9
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  The current solution has addressed 38 nodes with 63 still unvisited, and vehicles 2 and 3 remain completely unused. Given this substantial number of unvisited nodes and available capacity, it is crucial to expand the solution by visiting more nodes. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help address the significant remaining demand and provide a more comprehensive foundation for future optimization.
+Visited Node Num: 38->40
+Current Cost: 287.0->295.0
+Fulfilled Demands: 508->540
+---Round 28---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state, with 40 nodes visited and vehicles 2 and 3 completely unused, it's crucial to optimize the existing solution before further expanding it. Improvement heuristics can help refine current routes, potentially reducing costs and allowing better use of vehicle capacities. This approach will help in balancing vehicle loads and creating a more efficient foundation for future node additions or other heuristic applications. By addressing inefficiencies in the current routes, we can better utilize the available capacity and prepare for subsequent construction phases if necessary.
+Visited Node Num: 40->42
+Current Cost: 295.0->299.0
+Fulfilled Demands: 540->589
+---Round 29---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given the current state, with only 42 nodes visited and 59 nodes still unvisited, there is a significant portion of the problem space yet to be explored. Vehicles 2 and 3 remain completely unused, indicating available capacity that has not been utilized. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help address the significant remaining demand and provide a more comprehensive foundation for future optimization.
+Visited Node Num: 42->44
+Current Cost: 299.0->305.0
+Fulfilled Demands: 589->607
+---Round 30---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  The current solution has utilized a construction heuristic to add nodes, resulting in 44 visited nodes and 57 unvisited nodes. Vehicle 0 is at full capacity while others have significant remaining capacity. Switching to improvement heuristics will allow us to optimize the current routes, reduce costs, and better balance vehicle loads. This will provide a more efficient foundation for future node additions or other heuristic applications, especially given the high number of unvisited nodes and the need to make use of the available capacity more effectively.
+Visited Node Num: 44->44
+Current Cost: 305.0->280.0
+Fulfilled Demands: 607->607
+---Round 31---
+Heuristic: farthest_insertion_6308
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 57 nodes still unvisited and vehicles 2 and 3 completely unused, there is substantial remaining capacity and demand to address. Continuing with construction heuristics will allow us to efficiently add more nodes to the routes, utilizing the available vehicle capacity. This approach will help in expanding the solution to cover more nodes, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 44->46
+Current Cost: 280.0->286.0
+Fulfilled Demands: 607->660
+---Round 32---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 46 nodes visited and 55 nodes still unvisited, the current solution has utilized some of the available vehicle capacity, but there is still room for optimization. Vehicle 0 is fully loaded, while vehicles 2 and 3 are not utilized at all. Switching to improvement heuristics can help refine the existing routes, potentially reducing costs and better balancing vehicle loads. This will provide a more efficient foundation for future node additions or other heuristic applications, especially given the high number of unvisited nodes and the need to make use of the available capacity more effectively.
+Visited Node Num: 46->46
+Current Cost: 286.0->286.0
+Fulfilled Demands: 660->660
+---Round 33---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 55 nodes still unvisited and vehicles 2 and 3 completely unused, there is substantial remaining capacity and demand to address. Continuing with construction heuristics will allow us to efficiently add more nodes to the routes, utilizing the available vehicle capacity. This will help in expanding the solution to cover more nodes, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 46->48
+Current Cost: 286.0->346.0
+Fulfilled Demands: 660->686
+---Round 34---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state of the solution with 48 nodes visited and 53 nodes remaining unvisited, it is crucial to optimize the existing routes to make better use of vehicle capacity before expanding further. Vehicle 0 is at full capacity, while vehicles 2 and 3 are entirely unused, indicating an imbalance in load distribution. Applying improvement heuristics can help refine route sequences, reduce costs, and balance vehicle loads more effectively. This will provide a more efficient foundation for future node additions or other heuristic applications, allowing for better utilization of available capacity and potentially reducing the total cost.
+Visited Node Num: 48->50
+Current Cost: 346.0->348.0
+Fulfilled Demands: 686->706
+---Round 35---
+Heuristic: min_cost_insertion_3b2b
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 51 nodes still unvisited and substantial remaining demand, it's crucial to continue expanding the solution by visiting more nodes. Vehicles 2 and 3 remain completely unused, indicating available capacity that has not been utilized. By returning to construction heuristics, we can efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help address the significant remaining demand and provide a more comprehensive foundation for future optimization.
+Visited Node Num: 50->51
+Current Cost: 348.0->348.0
+Fulfilled Demands: 706->732
+---Round 36---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 51 nodes visited and 50 nodes remaining unvisited, the current solution shows a high vehicle load on vehicle 0, while vehicles 2 and 3 are unused. This indicates an imbalance in the load distribution. Using improvement heuristics can help optimize the current routes, potentially reducing costs and better balancing vehicle loads. This will provide a more efficient foundation for further node additions or other heuristic applications, especially given the high number of unvisited nodes and the need to make use of the available capacity more effectively.
+Visited Node Num: 51->53
+Current Cost: 348.0->351.0
+Fulfilled Demands: 732->769
+---Round 37---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  With 48 nodes still unvisited and vehicles 2 and 3 completely unused, there is potential for better load balancing and capacity utilization. Node relocation can help redistribute nodes across vehicles, especially considering vehicle 1 has some remaining capacity and vehicles 2 and 3 are entirely available. This approach can optimize the current solution by addressing imbalances and preparing a more efficient structure for future node additions.
+Visited Node Num: 53->53
+Current Cost: 351.0->333.0
+Fulfilled Demands: 769->769
+---Round 38---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given the current solution state with 53 visited nodes and 48 unvisited nodes, there is a significant portion of the problem space yet to be explored. Vehicles 2 and 3 remain completely unused, indicating available capacity that has not been utilized. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help address the significant remaining demand and provide a more comprehensive foundation for future optimization.
+Visited Node Num: 53->55
+Current Cost: 333.0->342.0
+Fulfilled Demands: 769->783
+---Round 39---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  The current solution shows that vehicles 2 and 3 are completely unused, indicating a significant imbalance in vehicle load distribution. With 46 nodes still unvisited and a considerable amount of remaining capacity, node relocation can help redistribute nodes more effectively across vehicles, potentially reducing costs and improving capacity utilization. This approach will enhance the existing solution by making better use of the available resources and setting a stronger foundation for future node additions or optimizations.
+Visited Node Num: 55->55
+Current Cost: 342.0->342.0
+Fulfilled Demands: 783->783
+---Round 40---
+Heuristic: saving_algorithm_710e
+Heuristic Category: route_merging
+Running Steps: 2
+Explain:  Given the current state, with vehicles 2 and 3 completely unused and a significant number of nodes still unvisited, it would be beneficial to optimize the number of routes and improve overall efficiency. Route merging could help consolidate the existing routes, allowing for better load balancing across vehicles and potentially freeing up capacity for more node assignments. This approach will create a more efficient foundation for adding unvisited nodes and addressing the remaining demand.
+Visited Node Num: 55->55
+Current Cost: 342.0->342.0
+Fulfilled Demands: 783->783
+---Round 41---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain: Given that vehicles 2 and 3 are completely unused and there are still 46 unvisited nodes with substantial remaining demand, it is crucial to continue expanding the solution by visiting more nodes. Construction heuristics will allow us to effectively utilize the unused vehicle capacity, ensuring that the remaining demand is addressed. This approach will help develop a more comprehensive solution foundation before further refinement with other heuristics.
+Visited Node Num: 55->57
+Current Cost: 342.0->355.0
+Fulfilled Demands: 783->799
+---Round 42---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  With 44 nodes still unvisited and vehicles 2 and 3 completely unused, there is a significant imbalance in vehicle load distribution. Node relocation can help address this by redistributing nodes across vehicles to optimize capacity utilization. This approach can improve the existing solution by balancing the loads more effectively and setting a stronger foundation for future node additions or optimizations.
+Visited Node Num: 57->57
+Current Cost: 355.0->355.0
+Fulfilled Demands: 799->799
+---Round 43---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given that 44 nodes remain unvisited and vehicles 2 and 3 are completely unused, it is crucial to continue expanding the solution to utilize the available vehicle capacity more effectively. By returning to construction heuristics, we can efficiently add more nodes to the routes, addressing the significant remaining demand. This approach will help develop a more comprehensive solution foundation before further refinement with other heuristics.
+Visited Node Num: 57->59
+Current Cost: 355.0->414.0
+Fulfilled Demands: 799->813
+---Round 44---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  Given the current state, with vehicles 2 and 3 having substantial remaining capacity and 42 nodes still unvisited, focusing on node relocation can help rebalance the load across vehicles. This approach can improve capacity utilization and potentially reduce costs by redistributing nodes from overloaded vehicles to those with excess capacity. By addressing the load imbalance, the solution can be enhanced before continuing with other heuristic categories to address the unvisited nodes.
+Visited Node Num: 59->59
+Current Cost: 414.0->396.0
+Fulfilled Demands: 813->813
+---Round 45---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 42 nodes still unvisited and vehicle 3 completely unused, there is a significant amount of remaining capacity and demand to address. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help address the significant remaining demand and provide a more comprehensive foundation for future optimization.
+Visited Node Num: 59->61
+Current Cost: 396.0->402.0
+Fulfilled Demands: 813->865
+---Round 46---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 40 nodes still unvisited and vehicle 3 completely unused, there is significant room for optimization in the existing solution. Improvement heuristics can help refine the current routes, reduce costs, and better balance vehicle loads. This will provide a more efficient foundation for future node additions or other heuristic applications, especially given the high number of unvisited nodes and the need to make use of the available capacity more effectively.
+Visited Node Num: 61->63
+Current Cost: 402.0->416.0
+Fulfilled Demands: 865->896
+---Round 47---
+Heuristic: min_cost_insertion_3b2b
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 38 nodes still unvisited and vehicle 3 completely unused, there is substantial remaining capacity and demand to address. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, utilizing the available vehicle capacity more effectively. This approach can help in expanding the solution to cover more nodes and fulfill the remaining demand, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 63->65
+Current Cost: 416.0->426.0
+Fulfilled Demands: 896->905
+---Round 48---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 36 nodes still unvisited and vehicle 3 entirely unused, there is a need to optimize the current solution to make better use of vehicle capacity and reduce overall costs. Improvement heuristics can help refine the existing routes, potentially reducing costs and better balancing vehicle loads. This will provide a more efficient foundation before revisiting construction heuristics to add more nodes. Given the high number of unvisited nodes and the imbalance in vehicle utilization, focusing on improvement heuristics is a strategic step to optimize the current solution.
+Visited Node Num: 65->67
+Current Cost: 426.0->443.0
+Fulfilled Demands: 905->937
+---Round 49---
+Heuristic: nearest_neighbor_54a9
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain: With 34 nodes still unvisited and vehicle 3 completely unused, there is significant remaining capacity and demand to address. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, utilizing the available vehicle capacity more effectively. This approach will help in expanding the solution to cover more nodes and fulfill the remaining demand, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 67->69
+Current Cost: 443.0->461.0
+Fulfilled Demands: 937->990
+---Round 50---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 69 nodes visited and 32 nodes still unvisited, the current solution shows an imbalance in vehicle load distribution, with vehicle 3 completely unused. Improvement heuristics can help refine the existing routes, optimize sequences, and reduce costs. This will provide a more efficient foundation for future node additions, allowing better use of available vehicle capacities while addressing the significant remaining demand.
+Visited Node Num: 69->71
+Current Cost: 461.0->484.0
+Fulfilled Demands: 990->1027
+---Round 51---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  Given that the current solution has a significant imbalance in vehicle load distribution, with vehicle 3 completely unused and some vehicles nearly at capacity, node relocation can help rebalance the loads across vehicles. This will allow better utilization of available capacity and potentially reduce costs. Additionally, with 30 nodes still unvisited, addressing the load distribution will set a stronger foundation for adding these nodes in subsequent phases.
+Visited Node Num: 71->71
+Current Cost: 484.0->478.0
+Fulfilled Demands: 1027->1027
+---Round 52---
+Heuristic: farthest_insertion_6308
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 30 nodes still unvisited and vehicle 3 completely unused, there is substantial remaining capacity and demand to address. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, utilizing the available vehicle capacity more effectively. This approach will help in expanding the solution to cover more nodes and fulfill the remaining demand, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 71->73
+Current Cost: 478.0->488.0
+Fulfilled Demands: 1027->1060
+---Round 53---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: With 28 nodes still unvisited and vehicle 3 completely unused, there's potential to optimize the existing solution before expanding further. Improvement heuristics can refine current routes, reduce costs, and better balance vehicle loads. This will provide a more efficient foundation for future node additions, allowing better use of available vehicle capacities and addressing the significant remaining demand.
+Visited Node Num: 73->73
+Current Cost: 488.0->488.0
+Fulfilled Demands: 1060->1060
+---Round 54---
+Heuristic: petal_algorithm_b384
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 28 nodes still unvisited and vehicle 3 completely unused, there is substantial remaining capacity and demand to address. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, utilizing the available vehicle capacity more effectively. This approach will help in expanding the solution to cover more nodes and fulfill the remaining demand, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 73->75
+Current Cost: 488.0->501.0
+Fulfilled Demands: 1060->1091
+---Round 55---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 75 nodes visited and 26 nodes still unvisited, there is a substantial portion of the problem space yet to be explored. Vehicle 3 is completely unused, indicating a significant imbalance in vehicle load distribution. By switching to improvement heuristics, we can refine the current routes, potentially reducing costs and better balancing vehicle loads. This approach will create a more efficient foundation for future node additions, allowing better use of available vehicle capacities while addressing the significant remaining demand. Given the relatively high total current cost and the number of unvisited nodes, focusing on optimization before further construction is strategic.
+Visited Node Num: 75->75
+Current Cost: 501.0->494.0
+Fulfilled Demands: 1091->1091
+---Round 56---
+Heuristic: farthest_insertion_6308
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  With 26 nodes still unvisited and vehicle 3 completely unused, there is substantial remaining capacity and demand to address. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, ensuring that the remaining vehicle capacity is utilized effectively. This approach will help in expanding the solution to cover more nodes and fulfill the remaining demand, providing a more comprehensive foundation for subsequent improvement phases.
+Visited Node Num: 75->77
+Current Cost: 494.0->615.0
+Fulfilled Demands: 1091->1094
+---Round 57---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: Given the current state, with 77 nodes visited and 24 nodes remaining unvisited, it's important to focus on optimizing the existing solution to make better use of vehicle capacity and reduce overall costs. Improvement heuristics can help refine the current routes, potentially lowering costs and better balancing vehicle loads. This approach will provide a more efficient foundation for addressing the remaining unvisited nodes and fulfilling the remaining demand. Additionally, vehicle 3 is completely unused, indicating an imbalance that can be addressed through optimization before considering further node additions.
+Visited Node Num: 77->79
+Current Cost: 615.0->629.0
+Fulfilled Demands: 1094->1115
+---Round 58---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  With 22 nodes still unvisited and vehicle 3 completely unused, there is a significant imbalance in vehicle load distribution. Node relocation can help redistribute nodes across vehicles to optimize capacity utilization and potentially reduce costs. By addressing the load imbalance, the solution can be enhanced, and the remaining demand can be better managed before proceeding with further node additions or other heuristic applications. This step will help make better use of the available resources and set a stronger foundation for future optimization.
+Visited Node Num: 79->79
+Current Cost: 629.0->536.0
+Fulfilled Demands: 1115->1115
+---Round 59---
+Heuristic: greedy_f4c4
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given that there are still 22 unvisited nodes and vehicle 3 remains completely unused, it is crucial to continue expanding the solution to utilize the available vehicle capacity more effectively. Returning to construction heuristics will allow us to efficiently add more nodes to the routes, addressing the significant remaining demand and providing a more comprehensive foundation for subsequent improvement phases. This approach will help ensure that the vehicle capacity is better utilized while addressing the demands of the unvisited nodes.
+Visited Node Num: 79->80
+Current Cost: 536.0->541.0
+Fulfilled Demands: 1115->1125
+---Round 60---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  Given the current state of the solution, there is a significant imbalance in vehicle load distribution, with vehicle 3 completely unused and some vehicles nearly at capacity. Node relocation can help redistribute nodes across vehicles to optimize capacity utilization and potentially reduce costs. By addressing the load imbalance, the solution can be enhanced, and the remaining demand can be better managed before proceeding with further node additions or other heuristic applications. This step will help make better use of the available resources and set a stronger foundation for future optimization.
+Visited Node Num: 80->80
+Current Cost: 541.0->530.0
+Fulfilled Demands: 1125->1125
+---Round 61---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  The current solution shows a significant imbalance in vehicle load distribution, with vehicle 3 completely unused and some vehicles nearly at capacity. Although node relocation has addressed some imbalances, there are still 21 unvisited nodes with a total remaining demand of 333. Improvement heuristics, such as 2-opt or 3-opt, can refine the current routes, potentially reducing costs and better balancing vehicle loads. This approach will provide a more efficient foundation for addressing the remaining unvisited nodes and fulfilling the remaining demand. Given the relatively high total current cost and number of unvisited nodes, focusing on route optimization before further construction is strategic.
+Visited Node Num: 80->82
+Current Cost: 530.0->542.0
+Fulfilled Demands: 1125->1146
+---Round 62---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  The current solution shows a significant imbalance in vehicle load distribution, with vehicle 3 completely unused and some vehicles nearly at capacity. With 19 nodes still unvisited and a total remaining demand of 312, focusing on node relocation can help rebalance the load across vehicles. This will allow better utilization of available capacity and potentially reduce costs. By addressing the load imbalance, the solution can be enhanced, setting a stronger foundation for adding these nodes and improving overall efficiency before further construction or other heuristic applications.
+Visited Node Num: 82->82
+Current Cost: 542.0->538.0
+Fulfilled Demands: 1146->1146
+---Round 63---
+Heuristic: variable_neighborhood_search_614b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 19 nodes still unvisited and vehicle 3 completely unused, there's significant room for optimization in the existing solution. Improvement heuristics can refine the current routes, reduce costs, and better balance vehicle loads. This approach will provide a more efficient foundation for addressing the remaining unvisited nodes and fulfilling the remaining demand. Additionally, improvement heuristics can help minimize route costs and balance vehicle loads, ensuring that the available capacity is utilized effectively before considering further node additions.
+Visited Node Num: 82->84
+Current Cost: 538.0->555.0
+Fulfilled Demands: 1146->1159
+---Round 64---
+Heuristic: min_cost_insertion_3b2b
+Heuristic Category: construction_heuristics
+Running Steps: 2
+Explain:  Given the current solution state with 17 nodes still unvisited and vehicle 3 completely unused, it is crucial to continue expanding the solution to utilize the available vehicle capacity more effectively. The unvisited nodes still represent a significant portion of the problem, and construction heuristics can help efficiently add these nodes to the routes. This approach will address the remaining demand and provide a more comprehensive foundation for subsequent improvement phases, ensuring that the vehicle capacity is better utilized while addressing the demands of the unvisited nodes.
+Visited Node Num: 84->86
+Current Cost: 555.0->663.0
+Fulfilled Demands: 1159->1185
+---Round 65---
+Heuristic: two_opt_0554
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: With 86 nodes visited and 15 nodes remaining unvisited, the current solution is relatively well-developed, but there is room for optimization. The vehicle loads are close to capacity, and vehicle 3 remains unused, indicating potential inefficiencies in route distribution. Switching to improvement heuristics will help refine the existing routes, potentially reducing costs and better balancing vehicle loads. This will provide a more efficient foundation for addressing the remaining unvisited nodes and fulfilling the remaining demand. Given the relatively high total current cost and the number of unvisited nodes, focusing on optimization before further construction is strategic.
+Visited Node Num: 86->88
+Current Cost: 663.0->721.0
+Fulfilled Demands: 1185->1211
+---Round 66---
+Heuristic: node_shift_between_routes_7b8a
+Heuristic Category: node_relocation
+Running Steps: 2
+Explain:  The current solution shows that vehicle 3 is significantly underutilized, with only 18 units of demand served and substantial remaining capacity. Given that there are still 13 unvisited nodes with a total remaining demand of 247, focusing on node relocation can help rebalance the load across vehicles. This will allow better utilization of available capacity and potentially reduce costs. By addressing the load imbalance, the solution can be enhanced, setting a stronger foundation for adding these nodes and improving overall efficiency before further construction or other heuristic applications.
+Visited Node Num: 88->88
+Current Cost: 721.0->670.0
+Fulfilled Demands: 1211->1211
+---Round 67---
+Heuristic: three_opt_e8d7
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 13 nodes still unvisited and some vehicles nearly at capacity, focusing on improvement heuristics can help optimize the existing routes and better balance vehicle loads. This approach will provide a more efficient foundation before addressing the remaining unvisited nodes. Given the relatively high total current cost and the number of unvisited nodes, optimizing the current solution is strategic before considering further construction or other heuristic categories.
+Visited Node Num: 88->88
+Current Cost: 670.0->670.0
+Fulfilled Demands: 1211->1211
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:
+vehicle_0: 0->53->13->58->40->26->12->80->68->54->55->25->24->29->78->34->35->71->9->51->81->33->79->3->77->50->76->28->30->0
+vehicle_1: 0->4->56->74->72->21->73->2->87->97->92->37->98->100->91->85->93->59->96->99->5->60->83->18->88->31->70->1->69->27->0
+vehicle_2: 0->89->6->94->95->57->42->14->44->86->16->61->84->17->45->46->8->82->48->47->19->11->63->90->10->62->7->52->0
+vehicle_3: 0->15->41->22->0
+
+visited_nodes:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 37, 40, 41, 42, 44, 45, 46, 47, 48, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 68, 69, 70, 71, 72, 73, 74, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100]
+visited_num:88
+unvisited_nodes:[20, 23, 32, 36, 38, 39, 43, 49, 64, 65, 66, 67, 75]
+unvisited_num:13
+total_current_cost:670.0
+last_visited:[30, 0, 61, 0]
+vehicle_loads:[396, 397, 387, 31]
+vehicle_remaining_capacity:[4, 3, 13, 369]
+average_route_length:22.75
+max_route_length:30
+min_route_length:4
+std_dev_route_length:10.848386976873567
+average_route_cost:145.75
+total_demand_served:1211
+average_vehicle_load:302.75
+average_remaining_vehicle_capacity:97.25
+number_of_unvisited_nodes:13
+average_unvisited_node_demand:19.0
+total_remaining_demand:247
+solution_validity:True
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: three_opt_e8d7(improvement_heuristics). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: construction_heuristics,improvement_heuristics,metaheuristics,route_merging,node_relocation
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(construction_heuristics,improvement_heuristics,metaheuristics,route_merging,node_relocation)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:construction_heuristics
+explanation: With 13 nodes still unvisited and vehicle 3 significantly underutilized, there's a need to expand the solution further to address the remaining demand and utilize the available capacity. Construction heuristics will allow us to efficiently integrate the unvisited nodes into the existing routes, ensuring better vehicle capacity utilization. This approach will help in covering the remaining demand and provide a more comprehensive foundation for any subsequent optimization phases.
+***
+------------------------------------------------------------------------------------
+

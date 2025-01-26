@@ -1,0 +1,491 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on dposp problem:
+Dynamic Production Order Scheduling Problem (DPOSP) involves multiple machines, each capable of producing various products. The production speed for different products varies across machines, and some transitions between products are not allowed. Each order specifies the required product, quantity, and deadline, and an order is considered completed only if all requirements are met by the deadline. Orders completed after the deadline are invalid. Each production action corresponds to an order, and the plan for each production line can be represented as a list, where each item denotes an order. The start time of each production is calculated based on the sum of the previous production and transition times, ensuring that each production is completed before the deadline. Our objective is to maximize the number of completed orders, with each order having the same priority, regardless of the quantity required.
+
+To formally describe DPOSP, we build the following optimization model. Let X_ij represent the j-th production action on the i-th production line, whereX_ij=k indicates that the j-th action on the i-th production line is producing order k, and X_ij=0 if there is no production action. The problem includes the following components:
+
+**Maximize**
+Sum over all production lines (i) and production actions (j) of the indicator function I(X_ij != 0)
+
+**Subject to**
+1. For each order k, sum over all production lines (i) and production actions (j) of the indicator function I(X_ij = k) <= 1.
+2. The start time s_ij is set to:
+   - 0 if j = 1 (the first action on the production line starts at time 0)
+   - The end time of the previous action (e_i,j-1) plus the transition time between the products of the previous action (P_k_j-1) and the current action (P_k_j) if j > 1.
+3. The end time e_ij is calculated as the start time s_ij plus the quantity of order k divided by the production speed of the production line i for product P_k, if X_ij = k.
+4. The end time e_ij must be less than or equal to the deadline D_k for the order k, if X_ij = k.
+
+Where:
+- X_ij (Decision Variable) represents the j-th production action on the i-th production line, with X_ij = k indicating production of order k and X_ij = 0 indicating no action; X_ij can take values in the set {0, 1, ..., k}.
+- v_ip (Input Variable) is the production speed of production line i for product p. If v_ip = 0, the product cannot be produced on line i.
+- t_i,p,p' (Input Variable) is the transition time for production line i from product p to product p'. If t_i,p,p' is infinity, the transition is not allowed.
+- Q_k (Input Variable) is the quantity required for order k.
+- P_k (Input Variable) is the product required for order k.
+- D_k (Input Variable) is the deadline for order k.
+- s_ij (Intermediate Variable) is the start time of the j-th production action on production line i.
+- e_ij (Intermediate Variable) is the end time of the j-th production action on production line i.
+- I() (Indicator Function) equals 1 if the condition is true, and 0 otherwise.
+
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of DPOSP.
+A list of lists, where each sublist corresponds to a production line's planned sequence of orders.
+Each integer within the sublist represents an order to be fulfilled by the machine, in the sequence they are to be produced."""
+    def __init__(self, production_schedule: list[list[int]]):
+        self.production_schedule = production_schedule
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Appends an order to the end of a specified production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].append(self.order_id)
+        return Solution(new_schedule)
+class InsertOperator(BaseOperator):
+    """Inserts an order at a specified position within a production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int, position: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].insert(self.position, self.order_id)
+        return Solution(new_schedule)
+class SwapOperator(BaseOperator):
+    """Swaps two orders between or within production lines."""
+    def __init__(self, production_line_id1: int, position1: int, production_line_id2: int, position2: int):
+        if production_line_id1 <= production_line_id2:
+            self.production_line_id1 = production_line_id1
+            self.position1 = position1
+            self.production_line_id2 = production_line_id2
+            self.position2 = position2
+        else:
+            self.production_line_id1 = production_line_id2
+            self.position1 = position2
+            self.production_line_id2 = production_line_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        (new_schedule[self.production_line_id1][self.position1], new_schedule[self.production_line_id2][self.position2]) = (new_schedule[self.production_line_id2][self.position2], new_schedule[self.production_line_id1][self.position1])
+        return Solution(new_schedule)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverses a segment of orders within a production line's schedule."""
+    def __init__(self, production_line_id: int, segments: list[tuple[int, int]]):
+        self.production_line_id = production_line_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_schedule[self.production_line_id])
+            assert 0 <= end_index < len(new_schedule[self.production_line_id])
+            if start_index > end_index:
+                (start_index, end_index) = (end_index, start_index)
+            new_schedule[self.production_line_id][start_index:end_index + 1] = reversed(new_schedule[self.production_line_id][start_index:end_index + 1])
+        return Solution(new_schedule)
+class RelocateOperator(BaseOperator):
+    """Moves an order from one position to another within the same or to a different production line."""
+    def __init__(self, source_production_line_id: int, source_position: int, target_production_line_id: int, target_position: int):
+        self.source_production_line_id = source_production_line_id
+        self.source_position = source_position
+        self.target_production_line_id = target_production_line_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        order = new_schedule[self.source_production_line_id].pop(self.source_position)
+        if not new_schedule[self.target_production_line_id]:
+            new_schedule[self.target_production_line_id].append(order)
+        else:
+            new_schedule[self.target_production_line_id].insert(self.target_position, order)
+        return Solution(new_schedule)
+class MergeOperator(BaseOperator):
+    """Merges the schedule of a source production line into the beginning of a target production line's schedule. 
+The merged schedule is assigned to the target production line, and the source production line's schedule is cleared."""
+    def __init__(self, source_production_line_id: int, target_production_line_id: int):
+        self.source_production_line_id = source_production_line_id
+        self.target_production_line_id = target_production_line_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.target_production_line_id] = new_schedule[self.source_production_line_id] + new_schedule[self.target_production_line_id]
+        new_schedule[self.source_production_line_id] = []
+        return Solution(new_schedule)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+- "product_num" (int): Total number of unique products.
+- "production_line_num" (int): Total number of production lines.
+- "order_num" (int): Total number of orders to be scheduled.
+- "production_rate" (numpy.array): 2D array of production time for each product on each production line, and shape is (production_line_num, product_num)
+- "transition_time" (numpy.array): 3D array of transition time between products on each production line, and shape is (production_line_num, product_num, product_num)
+- "order_product" (numpy.array): 1D array mapping each order to its required product and length is order_num.
+- "order_quantity" (numpy.array): 1D array of the quantity required for each order and length is order_num.
+- "order_deadline" (numpy.array): 1D array of the deadline for each order and length is order_num.
+- "current_solution" (Solution): Current scheduling solution.
+- "fulfilled_order_num" (int): Number of fulfilled orders.
+- "fulfilled_orders" (list[int]): List of fulfilled orders.
+- "unfulfilled_orders" (list[int]): List of unfulfilled orders.
+- "total_time_cost_per_production_line" (numpy.array): 1D array of the sum of production and transition times for each production line.
+- "feasible_orders_to_fulfill" (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
+- "validation_single_production_schedule" (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
+- "get_time_cost_delta" (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
+- "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is dposp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+Got it! Here's a summary of the problem and the framework you've constructed for the Dynamic Production Order Scheduling Problem (DPOSP):
+
+### Problem Overview
+#### Dynamic Production Order Scheduling Problem (DPOSP)
+- **Objective**: Maximize the number of completed orders before their deadlines.
+- **Scenario**: Multiple machines with varying production speeds and transition times for different products. Some transitions are not allowed.
+- **Constraints**: Orders must be completed by their deadlines. Each order can only be processed once.
+
+#### Mathematical Model
+- **Decision Variables**: \(X_{ij}\) represents the j-th production action on the i-th production line.
+- **Objective Function**: Maximize the sum of indicators \(I(X_{ij} \neq 0)\).
+- **Constraints**:
+  1. Each order \(k\) is processed at most once across all production lines and actions.
+  2. Start time \(s_{ij}\) depends on the end time of the previous action plus transition time.
+  3. End time \(e_{ij}\) is calculated based on start time and production speed.
+  4. End time \(e_{ij}\) must be less than or equal to the deadline \(D_k\) for order \(k\).
+
+#### Variables and Parameters
+- **Variables**:
+  - \(X_{ij}\): Decision variable for production actions.
+  - \(s_{ij}\): Start time of production action.
+  - \(e_{ij}\): End time of production action.
+- **Parameters**:
+  - \(v_{ip}\): Production speed of line \(i\) for product \(p\).
+  - \(t_{i,p,p'}\): Transition time on line \(i\) from product \(p\) to \(p'\).
+  - \(Q_k\): Quantity required for order \(k\).
+  - \(P_k\): Product required for order \(k\).
+  - \(D_k\): Deadline for order \(k\).
+
+### Framework
+#### Solution Class
+- Represents the production schedule as a list of lists, where each sublist corresponds to a production line's planned sequence of orders.
+
+#### Operators
+- **AppendOperator**: Appends an order to the end of a production line's schedule.
+- **InsertOperator**: Inserts an order at a specified position within a production line's schedule.
+- **SwapOperator**: Swaps two orders between or within production lines.
+- **ReverseSegmentOperator**: Reverses a segment of orders within a production line's schedule.
+- **RelocateOperator**: Moves an order from one position to another within the same or different production lines.
+- **MergeOperator**: Merges the schedule of a source production line into the beginning of a target production line's schedule.
+
+#### Heuristic Function Signature
+```python
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+```
+- **Inputs**:
+  - `global_data`: Contains static information such as product numbers, production rates, transition times, etc.
+  - `state_data`: Contains dynamic state information such as the current solution, fulfilled orders, total time costs, etc.
+  - `algorithm_data`: Contains data necessary for specific algorithms.
+  - `get_state_data_function`: Function to get the state dictionary for a new solution.
+  - Other hyper-parameters in `kwargs`.
+- **Outputs**:
+  - The operator to apply (an instance of a predefined target operator type).
+  - Updated algorithm dictionary with new information for future work.
+
+### Summary of Data Structures
+#### Global Data
+- `product_num`: Total number of unique products.
+- `production_line_num`: Total number of production lines.
+- `order_num`: Total number of orders.
+- `production_rate`: 2D array of production times.
+- `transition_time`: 3D array of transition times.
+- `order_product`: 1D array mapping orders to products.
+- `order_quantity`: 1D array of quantities required.
+- `order_deadline`: 1D array of deadlines.
+
+#### State Data
+- `current_solution`: Current scheduling solution.
+- `fulfilled_order_num`: Number of fulfilled orders.
+- `fulfilled_orders`: List of fulfilled orders.
+- `unfulfilled_orders`: List of unfulfilled orders.
+- `total_time_cost_per_production_line`: Sum of production and transition times for each line.
+- `feasible_orders_to_fulfill`: Feasible orders that can be fulfilled without delaying others.
+- Validation and time cost functions: `validation_single_production_schedule`, `get_time_cost_delta`, `validation_solution`.
+
+I have committed this information to memory. You can now proceed to describe the challenges you're encountering, and we can explore solutions together.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def exchange_production_orders_eda2(): The exchange production orders heuristic tries to improve the current production schedule by swapping two non-adjacent orders from the same or different production lines and assessing the impact on the total production and transition times. The heuristic is based on the 2-opt approach from TSP and is adapted to consider DPOSP-specific constraints such as varying production speeds, transition times, order deadlines, and production line capabilities.
+def farthest_deadline_insertion_7e8a(): Farthest Deadline Insertion heuristic for DPOSP. This heuristic selects the unfulfilled order with the farthest deadline and attempts to insert it into a production schedule where it causes the least increase in overall production and transition times, without violating any existing deadlines. The heuristic iterates over each production line, evaluating the insertion of the farthest deadline order at various positions, considering both the production speed of the line for the product and the transition times between orders. The goal is to minimize the impact on the current schedule while ensuring that all orders are completed before their respective deadlines.
+def greedy_by_order_density_c702(): This heuristic for DPOSP selects the next order to schedule based on an 'order density' metric, defined as the ratio of the order's value to the combined time taken for production and transition. For each unscheduled order, compute the order density as 1 divided by the sum of the production time on the assigned production line and the transition time from the last scheduled product. Select the order with the highest density value that can be completed before its deadline and append it to the corresponding production line schedule.
+def greedy_deadline_proximity_ac6e(): Greedy Deadline Proximity heuristic for DPOSP. This heuristic attempts to construct a production schedule by iteratively appending orders to production lines based on their proximity to their deadline and the transition times between orders. It begins with an empty schedule for each production line and selects orders based on the closest deadline from the current time in the schedule. The heuristic also accounts for the transition time from the last scheduled order to the potential new order and production speeds, ensuring that the added order can be completed before its deadline without violating transition constraints. Orders are chosen to maximize the number of orders fulfilled, considering the remaining processing time and capacity constraints of each production line.
+def greedy_order_selection_2882(): Greedy heuristic algorithm for the DPOSP. This algorithm attempts to construct a solution by iteratively adding the most suitable order to a production line's schedule based on a specific criterion such as closest deadline or shortest processing time.
+def least_order_remaining_9c3c(): Heuristic for selecting the next order to append to the production schedule based on least cumulative remaining work. The heuristic identifies the order with the shortest processing time left from the unfulfilled orders list and appends it to a production line.
+def longest_order_next_c9cb(): Longest Order Next heuristic algorithm for DPOSP which selects the unfulfilled order with the longest processing time and schedules it in the most appropriate position on a production line that minimizes delays and respects deadlines.
+def maximum_remaining_work_order_ec9c(): Heuristic that selects the order with the most remaining work that can be feasibly scheduled on any production line without violating existing order deadlines. The chosen order is then appended or inserted into the most appropriate production line's schedule, aiming to maximize the number of orders fulfilled before their respective deadlines.
+def nearest_order_scheduling_1a5e(): Implements the nearest order scheduling heuristic for DPOSP. Starting from an initial order, the heuristic builds a production schedule by selecting and appending the next order that minimizes the combined criteria of setup time (transition time between orders) and proximity to the delivery deadline. The heuristic begins with either a randomly selected order or the one with the earliest deadline and iteratively adds to the schedule the order that is closest in terms of transition time from the previously scheduled order while also taking into account the urgency of order deadlines. This process continues until no further orders can be feasibly added to the schedule without violating deadline constraints.
+def order_shift_between_lines_bd0c(): This heuristic attempts to shift an unfulfilled order from one production line to another while adhering to machine capabilities, transition rules, and order deadlines.
+def random_c05a(max_attempts: int = 100) -> tuple[AppendOperator, dict]:
+    """Random Order Selection Heuristic for DPOSP.
+    
+    This heuristic randomly selects an unfulfilled order from the list of feasible orders and attempts to append it
+    to a randomly selected production line's schedule. The insertion is validated to ensure that it
+    maintains a valid schedule respecting all production and transition constraints.
+
+    Args): Random Order Selection Heuristic for DPOSP. This heuristic randomly selects an unfulfilled order from the list of feasible orders and attempts to append it to a randomly selected production line's schedule. The insertion is validated to ensure that it maintains a valid schedule respecting all production and transition constraints.
+def shortest_operation_ff40(): Shortest Operation Heuristic for DPOSP. This heuristic iterates over each production line and attempts to insert the shortest unfulfilled order that can be appended to the end of the production line's schedule without violating any constraints.
+def shortest_order_next_25bd(): Shortest Order Next heuristic for DPOSP selects the unfulfilled order with the shortest processing time and inserts it into the best position in the production schedule.
+def _2opt_production_sequence_8e5e(): The 2-opt Production Sequence heuristic adapts the 2-opt approach from TSP to the context of DPOSP. It aims to improve the sequence of production orders on each production line by swapping two non-adjacent orders and re-evaluating the schedule's efficiency. By considering the production rates, transition times, and order deadlines, this heuristic explores alternative sequences that could lead to a higher number of completed orders or reduced total production and transition time. The heuristic iteratively checks all possible pairs of non-adjacent orders within a production line to determine if a more optimal order sequence can be found, taking care to maintain the feasibility of the schedule with respect to order deadlines. If a more efficient sequence is identified, the heuristic generates a ReverseSegmentOperator that applies this improved order sequence to the production line.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Certainly! Here's an analysis of the scenarios where each heuristic might be most applicable, along with some quantifiable criteria for determining their suitability:
+
+### Heuristics and Their Applicable Scenarios
+
+1. **exchange_production_orders_eda2**
+   - **Scenario**: This heuristic is beneficial when the current solution is fairly well-formed but can be improved by minor adjustments.
+   - **Quantifiable Criteria**: 
+     - High initial order fulfillment rate.
+     - Low number of unfulfilled orders close to their deadlines.
+     - Relatively balanced production lines.
+
+2. **farthest_deadline_insertion_7e8a**
+   - **Scenario**: Useful when orders have widely varying deadlines, and some orders with far deadlines can be strategically placed to optimize the schedule.
+   - **Quantifiable Criteria**: 
+     - High variance in order deadlines.
+     - Moderate to high number of unfulfilled orders.
+     - Availability of production lines with flexibility in their schedules.
+
+3. **greedy_by_order_density_c702**
+   - **Scenario**: Effective when there is a need to balance production and transition times while maximizing order fulfillment.
+   - **Quantifiable Criteria**: 
+     - Moderate to high number of unfulfilled orders.
+     - High variance in production and transition times.
+     - Orders with varying production complexities.
+
+4. **greedy_deadline_proximity_ac6e**
+   - **Scenario**: Suitable when deadlines are tight, and the focus is on fulfilling orders as close to their deadlines as possible.
+   - **Quantifiable Criteria**: 
+     - High number of orders with imminent deadlines.
+     - Low to moderate variance in production and transition times.
+     - High urgency in scheduling.
+
+5. **greedy_order_selection_2882**
+   - **Scenario**: General-purpose heuristic suitable for initial schedule construction or when no specific optimization criteria are dominant.
+   - **Quantifiable Criteria**: 
+     - Moderate number of unfulfilled orders.
+     - Balanced production and transition times.
+     - Moderate variance in order deadlines.
+
+6. **least_order_remaining_9c3c**
+   - **Scenario**: Useful when the focus is on quickly completing orders with the least remaining work to free up production lines.
+   - **Quantifiable Criteria**: 
+     - High number of orders with small quantities remaining.
+     - High production line availability.
+     - Low to moderate variance in order deadlines.
+
+7. **longest_order_next_c9cb**
+   - **Scenario**: Effective when there are a few large orders that need to be prioritized to avoid bottlenecks.
+   - **Quantifiable Criteria**: 
+     - Presence of large orders with high production times.
+     - Moderate to high number of unfulfilled orders.
+     - High variance in order quantities.
+
+8. **maximum_remaining_work_order_ec9c**
+   - **Scenario**: Suitable when there are significant orders that need to be scheduled strategically to maximize throughput.
+   - **Quantifiable Criteria**: 
+     - Presence of high-priority orders with large quantities.
+     - Moderate to high production line flexibility.
+     - High variance in order quantities and deadlines.
+
+9. **nearest_order_scheduling_1a5e**
+   - **Scenario**: Optimal when minimizing transition times is crucial and orders are clustered in terms of production requirements.
+   - **Quantifiable Criteria**: 
+     - High number of orders with similar production requirements.
+     - Low to moderate variance in transition times.
+     - Tight order deadlines.
+
+10. **order_shift_between_lines_bd0c**
+    - **Scenario**: Useful when there is an imbalance in production line schedules, and orders can be shifted to optimize the overall schedule.
+    - **Quantifiable Criteria**: 
+      - High imbalance in production line workloads.
+      - High variance in production line capabilities.
+      - Moderate number of unfulfilled orders.
+
+11. **random_c05a**
+    - **Scenario**: Useful for generating diverse initial solutions or escaping local optima.
+    - **Quantifiable Criteria**: 
+      - High number of iterations allowed.
+      - High variance in initial solutions.
+      - Moderate to high number of unfulfilled orders.
+
+12. **shortest_operation_time_first_e891**
+    - **Scenario**: Effective when the goal is to quickly complete small orders to improve throughput.
+    - **Quantifiable Criteria**: 
+      - High number of small orders.
+      - Low to moderate variance in production times.
+      - Moderate to high production line availability.
+
+13. **shortest_order_next_25bd**
+    - **Scenario**: Similar to the shortest operation time first heuristic but focuses on inserting orders in the best position.
+    - **Quantifiable Criteria**: 
+      - High number of small orders.
+      - High variance in transition times.
+      - Moderate number of unfulfilled orders.
+
+14. **_2opt_production_sequence_8e5e**
+    - **Scenario**: Best used when the current schedule is reasonably good but can be improved by optimizing order sequences.
+    - **Quantifiable Criteria**: 
+      - High initial order fulfillment rate.
+      - Low number of unfulfilled orders close to their deadlines.
+      - Moderate to high number of production actions.
+
+### Summary
+Each heuristic has its strengths and is best suited for different scenarios based on the characteristics of the orders and production lines. The quantifiable criteria can help in selecting the appropriate heuristic for a given situation, ensuring that the scheduling process is optimized for maximum efficiency and order fulfillment.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+product_num:10
+production_line_num:5
+order_num:50
+production_rate:[[0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 10.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 3.0, 10.0, 0.0, 10.0, 0.0, 0.0, 0.0], [5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0], [0.0, 5.0, 0.0, 0.0, 10.0, 10.0, 0.0, 3.0, 1.0, 5.0], [0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 10.0, 0.0]]
+order_product:[8, 6, 7, 6, 3, 8, 0, 3, 0, 8, 8, 3, 7, 4, 1, 3, 0, 0, 1, 7, 6, 6, 0, 0, 6, 7, 1, 3, 7, 6, 7, 8, 8, 3, 1, 7, 6, 0, 8, 3, 9, 8, 7, 7, 0, 3, 7, 4, 0, 8]
+order_quantity:[20.0, 20.0, 3.0, 30.0, 9.0, 20.0, 15.0, 6.0, 15.0, 20.0, 20.0, 6.0, 3.0, 30.0, 15.0, 6.0, 15.0, 10.0, 10.0, 6.0, 20.0, 10.0, 10.0, 15.0, 30.0, 3.0, 5.0, 6.0, 9.0, 30.0, 9.0, 30.0, 20.0, 6.0, 5.0, 3.0, 30.0, 5.0, 10.0, 9.0, 10.0, 20.0, 9.0, 6.0, 5.0, 6.0, 6.0, 30.0, 15.0, 10.0]
+order_deadline:[12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0, 24.0]
+average_production_rate:[1.0, 1.0, 0.0, 0.6, 4.6, 2.6, 4.0, 0.6, 2.2, 1.4]
+maximum_transition_time:inf
+average_order_quantity:13.22
+deadline_variance:34.56
+product_to_order_ratio:0.2
+average_deadline_per_product:[18.666666666666668, 18.0, nan, 18.0, 18.0, nan, 20.571428571428573, 20.4, 18.666666666666668, 24.0]
+production_line_utilization_potential:[inf, inf, inf, inf, inf]
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_solution:
+production_line_0: 3->1->20->21->24->29->36
+production_line_1: 7->4->11->15
+production_line_2: 8->6->16->17->22->23
+production_line_3: 2->12->13->14->25
+production_line_4: 9->5->0->10->31->32->38->41
+
+fulfilled_order_num:30
+fulfilled_orders:[3, 1, 20, 21, 24, 29, 36, 7, 4, 11, 15, 8, 6, 16, 17, 22, 23, 2, 12, 13, 14, 25, 9, 5, 0, 10, 31, 32, 38, 41]
+unfulfilled_orders:[18, 19, 26, 27, 28, 30, 33, 34, 35, 37, 39, 40, 42, 43, 44, 45, 46, 47, 48, 49]
+total_time_cost_per_production_line:[17.0, 9.0, 16.0, 12.0, 16.0]
+feasible_orders_to_fulfill:[26, 27, 28, 30, 33, 34, 35, 37, 39, 40, 42, 43, 44, 45, 46, 47, 48, 49]
+fulfillment_ratio:0.6
+average_time_cost:14.0
+max_time_cost:17.0
+unfulfilled_order_quantity_sum:170.0
+unfulfilled_order_deadline_variance:12.959999999999999
+feasible_order_count:18
+solution_validity:True
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 4 rounds discuss and the summary are:
+---Round 0---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 10
+Explain: The greedy_deadline_proximity_ac6e heuristic is ideal for constructing the initial solution as it prioritizes orders based on their deadlines and considers production and transition times. Given the initial state with no fulfilled orders and varying deadlines, this heuristic will help in quickly building a feasible solution while respecting the constraints.
+Delta of Total Time Cost For All Production Lines: 23.0
+Delta of Feasible Orders To Fulfill Num: -45
+Delta of Fulfilled Order Num: 10
+---Round 1---
+Heuristic: greedy_by_order_density_c702
+Parameters: {}
+Running Steps: 10
+Explain: The greedy_by_order_density_c702 heuristic will help in balancing production and transition times while maximizing order fulfillment. Given the current state with 40 unfulfilled orders and varying production rates, this heuristic aims to optimize the schedule by selecting orders with the highest density value that can be completed before their deadlines.
+Delta of Total Time Cost For All Production Lines: 22.0
+Delta of Feasible Orders To Fulfill Num: -282
+Delta of Fulfilled Order Num: 10
+---Round 2---
+Heuristic: nearest_order_scheduling_1a5e
+Parameters: {}
+Running Steps: 10
+Explain: The `nearest_order_scheduling_1a5e` heuristic is ideal for minimizing transition times and respecting deadlines, which aligns with our current need to efficiently schedule the remaining orders with significant quantities and tight deadlines.
+Delta of Total Time Cost For All Production Lines: 25.0
+Delta of Feasible Orders To Fulfill Num: -205
+Delta of Fulfilled Order Num: 10
+---Round 3---
+Heuristic: nearest_order_scheduling_1a5e
+Parameters: {}
+Running Steps: 5
+Explain: The nearest_order_scheduling_1a5e heuristic has been effective in minimizing transition times and respecting deadlines. Given the current state with 20 unfulfilled orders, continuing with this heuristic is likely to yield further improvements.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: nearest_order_scheduling_1a5e. How does nearest_order_scheduling_1a5e perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+Given the current state data and the results of the previous rounds, let's assess the situation:
+
+- We have 20 unfulfilled orders remaining.
+- The last heuristic, `nearest_order_scheduling_1a5e`, was run for 5 steps but did not yield any improvement in the number of fulfilled orders or feasible orders to fulfill.
+- The total time cost for all production lines has reached a plateau, indicating that further improvements might require a different approach.
+
+Considering these points and the available heuristics, we might need to explore a heuristic that can handle specific unfulfilled orders more effectively. The `exchange_production_orders_eda2` heuristic could be a good candidate as it attempts to improve the schedule by swapping orders, which might help in optimizing the current solution.
+
+### Decision
+Let's run the `exchange_production_orders_eda2` heuristic for 10 steps. This heuristic will help explore potential improvements by swapping non-adjacent orders within or between production lines.
+
+***Run heuristic:
+selected heuristic: exchange_production_orders_eda2
+running steps: 10
+explanation: The `exchange_production_orders_eda2` heuristic will attempt to improve the current schedule by swapping non-adjacent orders. Given the current state with 20 unfulfilled orders and no recent improvements, this heuristic aims to optimize the sequence of orders to potentially fulfill more orders before their deadlines.
+***
+------------------------------------------------------------------------------------
+

@@ -1,0 +1,4 @@
+-data: pcb442.tsp
+-node_num: 442
+-visited_num: 442
+-current_cost: 65728.0

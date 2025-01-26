@@ -1,0 +1,42 @@
+-data: mknapcb1_3.mkp
+-current_solution:
+selected_items: 4,10,11,13,18,21,28,32,33,34,36,37,42,44,48,51,55,59,64,69,72,74,79,81,84,87,92,93,96
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 23515.0
+-item_num: 100
+-resource_num: 5
+-selected_item_num: [4, 10, 11, 13, 18, 21, 28, 32, 33, 34, 36, 37, 42, 44, 48, 51, 55, 59, 64, 69, 72, 74, 79, 81, 84, 87, 92, 93, 96]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_bb0a	AddOperator(item_index=28)	selected_items: 28
+1	greedy_by_profit_1597	AddOperator(item_index=37)	selected_items: 28,37
+2	greedy_by_weight_e7f9	AddOperator(item_index=21)	selected_items: 21,28,37
+3	greedy_by_profit_1597	AddOperator(item_index=87)	selected_items: 21,28,37,87
+4	greedy_by_weight_e7f9	AddOperator(item_index=44)	selected_items: 21,28,37,44,87
+5	greedy_by_profit_1597	AddOperator(item_index=72)	selected_items: 21,28,37,44,72,87
+6	greedy_by_density_bb0a	AddOperator(item_index=74)	selected_items: 21,28,37,44,72,74,87
+7	greedy_by_weight_e7f9	AddOperator(item_index=55)	selected_items: 21,28,37,44,55,72,74,87
+8	greedy_by_profit_1597	AddOperator(item_index=92)	selected_items: 21,28,37,44,55,72,74,87,92
+9	greedy_by_density_bb0a	AddOperator(item_index=11)	selected_items: 11,21,28,37,44,55,72,74,87,92
+10	greedy_by_density_bb0a	AddOperator(item_index=13)	selected_items: 11,13,21,28,37,44,55,72,74,87,92
+11	greedy_by_density_bb0a	AddOperator(item_index=84)	selected_items: 11,13,21,28,37,44,55,72,74,84,87,92
+12	greedy_by_profit_1597	AddOperator(item_index=96)	selected_items: 11,13,21,28,37,44,55,72,74,84,87,92,96
+13	greedy_by_density_bb0a	AddOperator(item_index=18)	selected_items: 11,13,18,21,28,37,44,55,72,74,84,87,92,96
+14	greedy_by_profit_1597	AddOperator(item_index=48)	selected_items: 11,13,18,21,28,37,44,48,55,72,74,84,87,92,96
+15	greedy_by_profit_1597	AddOperator(item_index=69)	selected_items: 11,13,18,21,28,37,44,48,55,69,72,74,84,87,92,96
+16	greedy_by_weight_e7f9	AddOperator(item_index=32)	selected_items: 11,13,18,21,28,32,37,44,48,55,69,72,74,84,87,92,96
+17	greedy_by_density_bb0a	AddOperator(item_index=59)	selected_items: 11,13,18,21,28,32,37,44,48,55,59,69,72,74,84,87,92,96
+18	greedy_by_density_bb0a	AddOperator(item_index=4)	selected_items: 4,11,13,18,21,28,32,37,44,48,55,59,69,72,74,84,87,92,96
+19	greedy_by_density_bb0a	AddOperator(item_index=93)	selected_items: 4,11,13,18,21,28,32,37,44,48,55,59,69,72,74,84,87,92,93,96
+20	greedy_by_profit_1597	AddOperator(item_index=51)	selected_items: 4,11,13,18,21,28,32,37,44,48,51,55,59,69,72,74,84,87,92,93,96
+21	greedy_by_density_bb0a	AddOperator(item_index=36)	selected_items: 4,11,13,18,21,28,32,36,37,44,48,51,55,59,69,72,74,84,87,92,93,96
+22	greedy_by_weight_e7f9	AddOperator(item_index=42)	selected_items: 4,11,13,18,21,28,32,36,37,42,44,48,51,55,59,69,72,74,84,87,92,93,96
+23	greedy_by_profit_1597	AddOperator(item_index=79)	selected_items: 4,11,13,18,21,28,32,36,37,42,44,48,51,55,59,69,72,74,79,84,87,92,93,96
+24	greedy_by_profit_1597	AddOperator(item_index=5)	selected_items: 4,5,11,13,18,21,28,32,36,37,42,44,48,51,55,59,69,72,74,79,84,87,92,93,96
+25	greedy_by_profit_1597	AddOperator(item_index=81)	selected_items: 4,5,11,13,18,21,28,32,36,37,42,44,48,51,55,59,69,72,74,79,81,84,87,92,93,96
+26	greedy_by_weight_e7f9	AddOperator(item_index=10)	selected_items: 4,5,10,11,13,18,21,28,32,36,37,42,44,48,51,55,59,69,72,74,79,81,84,87,92,93,96
+27	greedy_by_profit_1597	AddOperator(item_index=33)	selected_items: 4,5,10,11,13,18,21,28,32,33,36,37,42,44,48,51,55,59,69,72,74,79,81,84,87,92,93,96
+28	greedy_by_weight_e7f9	AddOperator(item_index=99)	selected_items: 4,5,10,11,13,18,21,28,32,33,36,37,42,44,48,51,55,59,69,72,74,79,81,84,87,92,93,96,99
+29	greedy_by_density_bb0a	SwapOperator(item_index1=5, item_index2=64)	selected_items: 4,10,11,13,18,21,28,32,33,36,37,42,44,48,51,55,59,64,69,72,74,79,81,84,87,92,93,96,99
+30	greedy_by_density_bb0a	SwapOperator(item_index1=99, item_index2=34)	selected_items: 4,10,11,13,18,21,28,32,33,34,36,37,42,44,48,51,55,59,64,69,72,74,79,81,84,87,92,93,96

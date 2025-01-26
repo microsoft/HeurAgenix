@@ -1,0 +1,59 @@
+-data: test_case_2
+-current_solution:
+production_line_0: 21->1->20->3->36->24->29
+production_line_1: 7->11->15->27->33->45->39->47
+production_line_2: 37->44->17->22->6->8->23->48
+production_line_3: 2->12->25->35->19->43->46->42->28->30->40
+production_line_4: 38->49->0->5->9->10->32->41->31
+
+-is_complete_solution: True
+-is_valid_solution: True
+-fulfilled_order_num: 43
+-production_line_num: 5
+-product_num: 10
+-order_num: 50
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=2)	production_line_0: \nproduction_line_1: \nproduction_line_2: \nproduction_line_3: 2\nproduction_line_4: \n
+1	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=12)	production_line_0: \nproduction_line_1: \nproduction_line_2: \nproduction_line_3: 2->12\nproduction_line_4: \n
+2	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=37)	production_line_0: \nproduction_line_1: \nproduction_line_2: 37\nproduction_line_3: 2->12\nproduction_line_4: \n
+3	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=44)	production_line_0: \nproduction_line_1: \nproduction_line_2: 37->44\nproduction_line_3: 2->12\nproduction_line_4: \n
+4	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=25)	production_line_0: \nproduction_line_1: \nproduction_line_2: 37->44\nproduction_line_3: 2->12->25\nproduction_line_4: \n
+5	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=35)	production_line_0: \nproduction_line_1: \nproduction_line_2: 37->44\nproduction_line_3: 2->12->25->35\nproduction_line_4: \n
+6	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=21)	production_line_0: 21\nproduction_line_1: \nproduction_line_2: 37->44\nproduction_line_3: 2->12->25->35\nproduction_line_4: \n
+7	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=38)	production_line_0: 21\nproduction_line_1: \nproduction_line_2: 37->44\nproduction_line_3: 2->12->25->35\nproduction_line_4: 38\n
+8	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=49)	production_line_0: 21\nproduction_line_1: \nproduction_line_2: 37->44\nproduction_line_3: 2->12->25->35\nproduction_line_4: 38->49\n
+9	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=17)	production_line_0: 21\nproduction_line_1: \nproduction_line_2: 37->44->17\nproduction_line_3: 2->12->25->35\nproduction_line_4: 38->49\n
+10	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=7)	production_line_0: 21\nproduction_line_1: 7\nproduction_line_2: 37->44->17\nproduction_line_3: 2->12->25->35\nproduction_line_4: 38->49\n
+11	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=11)	production_line_0: 21\nproduction_line_1: 7->11\nproduction_line_2: 37->44->17\nproduction_line_3: 2->12->25->35\nproduction_line_4: 38->49\n
+12	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=15)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17\nproduction_line_3: 2->12->25->35\nproduction_line_4: 38->49\n
+13	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=19)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49\n
+14	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=22)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49\n
+15	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=0)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0\n
+16	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=5)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5\n
+17	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=9)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9\n
+18	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=10)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9->10\n
+19	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=32)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9->10->32\n
+20	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=41)	production_line_0: 21\nproduction_line_1: 7->11->15\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+21	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=27)	production_line_0: 21\nproduction_line_1: 7->11->15->27\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+22	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=33)	production_line_0: 21\nproduction_line_1: 7->11->15->27->33\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+23	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=45)	production_line_0: 21\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+24	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=43)	production_line_0: 21\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19->43\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+25	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=46)	production_line_0: 21\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+26	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=1)	production_line_0: 21->1\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+27	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=20)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41\n
+28	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=31)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+29	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=6)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22->6\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+30	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=8)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22->6->8\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+31	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=23)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22->6->8->23\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+32	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=48)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+33	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=39)	production_line_0: 21->1->20\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+34	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=3)	production_line_0: 21->1->20->3\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+35	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=42)	production_line_0: 21->1->20->3\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+36	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=28)	production_line_0: 21->1->20->3\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+37	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=30)	production_line_0: 21->1->20->3\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28->30\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+38	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=40)	production_line_0: 21->1->20->3\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28->30->40\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+39	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=36)	production_line_0: 21->1->20->3->36\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28->30->40\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+40	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=24)	production_line_0: 21->1->20->3->36->24\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28->30->40\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+41	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=29)	production_line_0: 21->1->20->3->36->24->29\nproduction_line_1: 7->11->15->27->33->45->39\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28->30->40\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n
+42	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=47)	production_line_0: 21->1->20->3->36->24->29\nproduction_line_1: 7->11->15->27->33->45->39->47\nproduction_line_2: 37->44->17->22->6->8->23->48\nproduction_line_3: 2->12->25->35->19->43->46->42->28->30->40\nproduction_line_4: 38->49->0->5->9->10->32->41->31\n

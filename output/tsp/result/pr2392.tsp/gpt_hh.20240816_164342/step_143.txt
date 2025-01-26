@@ -1,0 +1,1368 @@
+user
+Hi GPT, I am working on Hyper-heuristics for Operation Research (OR) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on the Traveling Salesman Problem (TSP).
+
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+Please commit to memory the problem.
+------------------------------------------------------------------------------------
+
+assistant
+Got it! You've introduced the Traveling Salesman Problem (TSP), which involves finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city. You're working on this using Hyper-heuristics for Operation Research (OR). I've committed this information to memory. Please proceed with describing your framework or any further details you have.
+------------------------------------------------------------------------------------
+
+user
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of TSP.
+A list of integers where each integer represents a node (city) in the TSP tour.
+The order of the nodes in the list defines the order in which the cities are visited in the tour."""
+    def __init__(self, tour: list[int], node_num: int=None):
+        self.tour = tour
+        self.node_num = node_num
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append the node at the end of the solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour + [self.node]
+        return Solution(new_tour, solution.node_num)
+class InsertOperator(BaseOperator):
+    """Insert the node into the solution at the target position."""
+    def __init__(self, node: int, position: int):
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
+        return Solution(new_tour, solution.node_num)
+class SwapOperator(BaseOperator):
+    """Swap two nodes in the solution. swap_node_pairs is a list of tuples, each containing the two nodes to swap."""
+    def __init__(self, swap_node_pairs: list[tuple[int, int]]):
+        self.swap_node_pairs = swap_node_pairs
+    def run(self, solution: Solution) -> Solution:
+        node_to_index = {node: index for (index, node) in enumerate(solution.tour)}
+        new_tour = solution.tour.copy()
+        for (node_a, node_b) in self.swap_node_pairs:
+            index_a = node_to_index.get(node_a)
+            index_b = node_to_index.get(node_b)
+            assert index_a is not None
+            assert index_b is not None
+            (new_tour[index_a], new_tour[index_b]) = (new_tour[index_b], new_tour[index_a])
+        return Solution(new_tour, solution.node_num)
+class ReplaceOperator(BaseOperator):
+    """Replace a node with another one in the solution."""
+    def __init__(self, node: int, new_node: int):
+        self.node = node
+        self.new_node = new_node
+    def run(self, solution: Solution) -> Solution:
+        index = solution.tour.index(self.node)
+        new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
+        return Solution(new_tour, solution.node_num)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, segments: list[tuple[int, int]]):
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_tour)
+            assert 0 <= end_index < len(new_tour)
+            if start_index > end_index:
+                (start_index, end_index) = (end_index, start_index)
+            new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+        return Solution(new_tour, solution.node_num)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data contains the global static information data with:
+- node_num (int): The total number of nodes in the problem.
+- distance_matrix (numpy.ndarray): A 2D array representing the distances between nodes.
+- average_distance (float): Average distance between all pairs of nodes
+- average_distance_to_nearest_neighbors (float): Average distance to nearest neighbors for each node
+- std_dev_distance (float): Standard deviation of distances
+- edge_length_distribution (tuple[numpy.ndarray, numpy.ndarray]): Distribution of Edge Lengths
+state_data contains the current dynamic state data with:
+- current_solution (Solution): An instance of the Solution class representing the current solution.
+- visited_nodes (list[int]): A list of integers representing the IDs of nodes that have been visited.
+- visited_num (int): Number of visited nodes.
+- unvisited_nodes (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
+- unvisited_num (int): Number of unvisited nodes.
+- current_cost (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
+- last_visited (int): The last visited node.
+- nearest_neighbors (dict): The dict from node to nearest neighbor node.
+- validation_solution (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data contains the data that necessary for some algorithms.
+get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please commit to memory our constructed framework.
+------------------------------------------------------------------------------------
+
+assistant
+Got it! Here's a summary of the constructed framework for your Hyper-heuristics for the Traveling Salesman Problem (TSP):
+
+### Classes and Structures
+
+#### Solution
+- **Purpose**: Represents a TSP tour.
+- **Attributes**:
+  - `tour`: List of integers where each integer represents a node (city) in the TSP tour.
+  - `node_num`: Total number of nodes (optional).
+
+#### Operators
+Operators serve as mechanisms to modify the solution, enabling the application of heuristic algorithms. The following operators are defined:
+
+1. **AppendOperator**
+   - **Purpose**: Appends a node at the end of the solution.
+   - **Attributes**: `node` (int).
+   - **Method**: `run(solution: Solution) -> Solution`.
+
+2. **InsertOperator**
+   - **Purpose**: Inserts a node into the solution at a target position.
+   - **Attributes**: `node` (int), `position` (int).
+   - **Method**: `run(solution: Solution) -> Solution`.
+
+3. **SwapOperator**
+   - **Purpose**: Swaps two nodes in the solution.
+   - **Attributes**: `swap_node_pairs` (list of tuples).
+   - **Method**: `run(solution: Solution) -> Solution`.
+
+4. **ReplaceOperator**
+   - **Purpose**: Replaces a node with another one in the solution.
+   - **Attributes**: `node` (int), `new_node` (int).
+   - **Method**: `run(solution: Solution) -> Solution`.
+
+5. **ReverseSegmentOperator**
+   - **Purpose**: Reverses multiple segments of indices in the solution.
+   - **Attributes**: `segments` (list of tuples).
+   - **Method**: `run(solution: Solution) -> Solution`.
+
+### Heuristic Function Signature
+The heuristic function has the following standardized signature:
+
+```python
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+```
+
+#### Inputs
+- `global_data`:
+  - `node_num`: Total number of nodes.
+  - `distance_matrix`: 2D array representing distances between nodes.
+  - `average_distance`: Average distance between all pairs of nodes.
+  - `average_distance_to_nearest_neighbors`: Average distance to nearest neighbors for each node.
+  - `std_dev_distance`: Standard deviation of distances.
+  - `edge_length_distribution`: Distribution of edge lengths.
+
+- `state_data`:
+  - `current_solution`: Current solution instance.
+  - `visited_nodes`: List of visited node IDs.
+  - `visited_num`: Number of visited nodes.
+  - `unvisited_nodes`: List of unvisited node IDs.
+  - `unvisited_num`: Number of unvisited nodes.
+  - `current_cost`: Total cost of the current solution (excluding the return to the starting point until the path is fully constructed).
+  - `last_visited`: Last visited node.
+  - `nearest_neighbors`: Dict from node to nearest neighbor node.
+  - `validation_solution`: Callable to validate the new solution.
+
+- `algorithm_data`: Data necessary for some algorithms.
+- `get_state_data_function`: Function that receives the new solution as input and returns the state dictionary for the new solution without modifying the original solution.
+- `kwargs`: Other hyper-parameters.
+
+#### Outputs
+- `operator`: Instance of a predefined target operator type.
+- `updated_algorithm_data`: Updated algorithm dict containing new information for future work.
+
+I've committed the entire framework to memory. Please proceed with describing the challenges you're encountering or any further details.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following algorithms, please remember:
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, alpha: float = 0.3, **kwargs) -> tuple[InsertOperator, dict]:	Greedy Randomized Adaptive Search Procedure (GRASP) function embodies the Greedy Randomized Adaptive Search Procedure (GRASP), a metaheuristic algorithm tailored for solving combinatorial optimization problems like the Traveling Salesman Problem (TSP). GRASP iteratively constructs a solution through a two-phase process: a greedy randomized construction phase and a local search phase. During the construction phase, it builds a partial solution by repeatedly adding the best candidate according to a greedy function, which is randomized within a Restricted Candidate List (RCL) determined by the alpha parameter. This parameter adjusts the level of greediness versus randomness, with lower values favoring greedy choices and higher values allowing for more exploration. Once an initial solution is constructed, the local search phase seeks to improve it by exploring the neighborhood of the current solution.
+def cheapest_insertion_605f(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	This heuristic selects the non-tour city that, when inserted into the current tour, results in the smallest possible increase in the total tour cost. It then returns an operator that performs this insertion.
+def random_80a0(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:	Implements the random append heuristic for the TSP problem.      At each step, randomly select an unvisited node and append it to the current solution.
+def greedy_algorithm_3ca7(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	Greedy algorithm heuristic for TSP. Constructs a tour by repeatedly selecting the shortest edge and adding it to the tour.     This implementation assumes that the Solution class represents a tour and that the InsertOperator is used to add new nodes to the Solution.
+def _2opt_89aa(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:	The 2-opt heuristic seeks to untangle crossings and smooth the path by swapping two non-adjacent edges and reconnecting the resulting segments. Through repeated application of these edge swaps, the 2-opt algorithm converges towards a more efficient route, often leading to a substantial improvement over the initial solution. It is a simple yet powerful method for local optimization in the context of the TSP.
+def simulated_annealing_e625(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:	Simulated Annealing heuristic for the Traveling Salesman Problem.     This function applies the simulated annealing technique to find a solution to the TSP.     It randomly selects two nodes and proposes to swap them. The swap is accepted based on     the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
+def farthest_insertion_b6d3(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	This heuristic selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost.
+def tabu_search_895b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:	Tabu search heuristic for TSP. It explores the solution space by swapping two nodes in the tour,     avoiding previously visited solutions by maintaining a tabu list.
+def k_nearest_neighbors_insertion_9e8b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, k: int = 1, **kwargs) -> tuple[InsertOperator, dict]:	Heuristic that builds a tour by inserting the nearest unvisited neighbor to the last visited node.     If multiple nearest neighbors are considered (k > 1), one is chosen based on a certain criterion.
+def _3opt_e75b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:	The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
+def nearest_insertion_c1f0(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
+def random_pairwise_insertion_7493(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	Random Pairwise Insertion heuristic for the Traveling Salesman Problem. This heuristic selects two unvisited nodes at random and inserts them into the current tour at positions that result in the least increase in tour length. It returns an InsertOperator with the selected nodes and their positions.
+def insertion_heuristics_050b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, insertion_strategy: str = 'cheapest', **kwargs) -> tuple[InsertOperator, dict]:	Insertion heuristics algorithm for the TSP problem. Builds a tour by incrementally adding cities to an existing sub-tour.     This function supports 'cheapest', 'farthest', and 'nearest' insertion strategies.
+def ant_colony_d4f7(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	Ant Colony Optimization heuristic for the Traveling Salesman Problem. This function simulates the behavior of ants laying down pheromones and choosing paths probabilistically to construct a solution for the TSP.
+def random_successive_insertion_57b4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	Constructive heuristic that builds a tour by successively inserting random unvisited nodes into the current tour at a position that minimizes the increase in tour length.
+def nearest_neighbor_f91d(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:	Implements the nearest neighbor heuristic for the TSP problem. Starting from an arbitrary city, at each step extend the tour by moving from the current city to its nearest unvisited neighbor until all cities are visited.
+
+Before we solve the actual problem, can you analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Certainly! Each heuristic algorithm has its strengths and weaknesses, and they tend to perform better under different scenarios and problem characteristics. Here's an analysis of the scenarios where each algorithm may be most applicable:
+
+### 1. Greedy Randomized Adaptive Search Procedure (GRASP)
+- **Scenario**: Suitable for large and complex TSP instances where a combination of greediness and randomness can help in escaping local optima.
+- **Quantification**: Effective when the problem has a high variance in edge lengths and a large search space. The alpha parameter allows tuning between exploration and exploitation.
+
+### 2. Cheapest Insertion
+- **Scenario**: Best when edge costs vary significantly, and the goal is to minimize incremental costs.
+- **Quantification**: Works well when the average distance to nearest neighbors is low, and there are clear, incremental gains in building the tour.
+
+### 3. Random Append
+- **Scenario**: Useful for generating diverse initial solutions or when the problem size is small.
+- **Quantification**: Effective when the problem has low complexity (small number of cities) or when used as a part of a multi-start heuristic.
+
+### 4. Greedy Algorithm
+- **Scenario**: Best for problems where the shortest edges form a good approximation of the optimal solution.
+- **Quantification**: Works well when the standard deviation of distances is low, and the shortest edges are part of the optimal tour.
+
+### 5. 2-opt
+- **Scenario**: Ideal for refining existing solutions by removing crossings and smoothing paths.
+- **Quantification**: Effective when the initial solution is close to optimal and has many crossing edges. Works well when the average distance is close to the minimum distance.
+
+### 6. Simulated Annealing
+- **Scenario**: Suitable for large, complex problems with many local optima.
+- **Quantification**: Best when the problem has high variance in edge lengths and requires a stochastic approach to escape local optima. The cooling schedule and initial temperature are crucial parameters.
+
+### 7. Farthest Insertion
+- **Scenario**: Works well when the farthest nodes are likely to be part of the optimal tour.
+- **Quantification**: Effective when the problem has a high average distance to the nearest neighbors and a large variance in edge lengths.
+
+### 8. Tabu Search
+- **Scenario**: Ideal for problems where avoiding previously visited solutions is crucial to finding a better tour.
+- **Quantification**: Suitable for large problems with many local optima and a need for memory-based search strategies.
+
+### 9. k-Nearest Neighbors Insertion
+- **Scenario**: Best when the nearest neighbors form a good approximation of the optimal tour.
+- **Quantification**: Effective when the average distance to the nearest neighbors is low, and k is chosen based on the problem size.
+
+### 10. 3-opt
+- **Scenario**: Suitable for refining solutions by considering more complex rearrangements than 2-opt.
+- **Quantification**: Works well when the problem has a high variance in edge lengths and requires more significant adjustments to improve the tour.
+
+### 11. Nearest Insertion
+- **Scenario**: Ideal for problems where the nearest neighbors form a good approximation of the optimal tour.
+- **Quantification**: Effective when the average distance to the nearest neighbors is low, and the distances are relatively uniform.
+
+### 12. Random Pairwise Insertion
+- **Scenario**: Useful for generating diverse initial solutions or when the problem size is small.
+- **Quantification**: Effective when the problem has low complexity (small number of cities) or when used as a part of a multi-start heuristic.
+
+### 13. Insertion Heuristics
+- **Scenario**: Flexible approach that can be tailored to different insertion strategies (cheapest, farthest, nearest).
+- **Quantification**: The choice of insertion strategy should be based on the problem characteristics, such as edge length distribution and variance.
+
+### 14. Ant Colony Optimization
+- **Scenario**: Suitable for large, complex problems where pheromone-based probabilistic paths can help in finding good solutions.
+- **Quantification**: Best when the problem has high variance in edge lengths and requires a collaborative search strategy.
+
+### 15. Random Successive Insertion
+- **Scenario**: Useful for generating diverse initial solutions or when the problem size is small.
+- **Quantification**: Effective when the problem has low complexity (small number of cities) or when used as a part of a multi-start heuristic.
+
+### 16. Nearest Neighbor
+- **Scenario**: Best for problems where the nearest neighbors form a good approximation of the optimal tour.
+- **Quantification**: Works well when the average distance to the nearest neighbors is low, and the distances are relatively uniform.
+
+### General Recommendations
+- **For Large Problems**: Simulated Annealing, Tabu Search, Ant Colony Optimization, and GRASP are generally more effective due to their ability to explore large solution spaces and escape local optima.
+- **For Initial Solution Construction**: Random Append, Nearest Neighbor, Cheapest Insertion, and Greedy Algorithm can provide quick initial solutions that can be further refined.
+- **For Local Optimization**: 2-opt, 3-opt, and other local search methods are effective in refining existing solutions and improving their quality.
+- **For Diverse Solutions**: Random Pairwise Insertion, Random Successive Insertion, and Random Append can generate diverse solutions that can be used as starting points for more sophisticated algorithms.
+
+By understanding the problem characteristics and the strengths of each heuristic, you can choose the most appropriate algorithm or combination of algorithms to solve the TSP effectively.
+------------------------------------------------------------------------------------
+
+user
+Global Data Overview for TSP Analysis:
+- node_num: 2392
+- average_distance: 6374.918910658559
+- average_distance_to_nearest_neighbors: 122.16053511705685
+- std_dev_distance: 3125.4856941200574
+Note: Full distance matrix details are omitted due to space constraints.
+
+Progress Summary from Previous Discussions:
+Before this discuss, we have already 143 rounds discuss and the summary are:
+---Round 0---
+Heuristic:nearest_neighbor_f91d
+Hyper Parameter:None
+Running Steps:10
+Explain:The Nearest Neighbor heuristic is suitable for constructing an initial solution by iteratively adding the nearest unvisited node to the current tour. This will help in quickly forming a base solution that can be refined using more complex heuristics in subsequent steps.
+Delta of Visited Node:10
+Delta of Current Cost:1538.0
+---Round 1---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Simulated Annealing will help in refining the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, it is crucial to use a heuristic that can handle such complexity. The initial temperature and cooling rate are set to allow sufficient exploration initially, gradually focusing on exploitation.
+Delta of Visited Node:0
+Delta of Current Cost:725.0
+---Round 2---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion will help in efficiently adding new nodes to the current solution by selecting the non-tour city that results in the smallest possible increase in the total tour cost. This approach will help in gradually building a more optimal tour while keeping the incremental costs low.
+Delta of Visited Node:20
+Delta of Current Cost:3344.0
+---Round 3---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Continue with Cheapest Insertion to efficiently add more nodes to the current solution while keeping the incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic.
+Delta of Visited Node:20
+Delta of Current Cost:2937.0
+---Round 4---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:Given the current state, using k-Nearest Neighbors Insertion will help efficiently add nodes to the tour by considering the nearest unvisited neighbors. The parameter k=3 allows some flexibility in node selection while focusing on close neighbors, which should help in maintaining a low incremental cost.
+Delta of Visited Node:20
+Delta of Current Cost:3857.0
+---Round 5---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:The Cheapest Insertion heuristic will continue to add unvisited nodes to the current solution efficiently, minimizing the incremental cost. This approach will help in building a more optimal tour while keeping the costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:20
+Delta of Current Cost:3020.0
+---Round 6---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has shown consistent performance in adding nodes with minimal cost increase. Given the high number of remaining unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic if necessary.
+Delta of Visited Node:30
+Delta of Current Cost:6125.0
+---Round 7---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has shown consistent performance in adding nodes with minimal cost increase. Continuing with this heuristic for 20 more steps will help in further constructing the solution efficiently. After these steps, we will reassess the solution and consider introducing a refinement heuristic if necessary.
+Delta of Visited Node:20
+Delta of Current Cost:3412.0
+---Round 8---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:Given the current state and historical performance of the Cheapest Insertion heuristic, the k-Nearest Neighbors Insertion heuristic with k=3 will help in efficiently adding nodes while introducing some level of flexibility in node selection. This approach will help in maintaining a low incremental cost and potentially exploring different parts of the solution space.
+Delta of Visited Node:20
+Delta of Current Cost:4769.0
+---Round 9---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in efficiently building a more optimal tour. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5583.0
+---Round 10---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 will help in efficiently adding nodes while introducing some level of flexibility in node selection. This approach will help in maintaining a low incremental cost and potentially exploring different parts of the solution space.
+Delta of Visited Node:20
+Delta of Current Cost:2676.0
+---Round 11---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 will continue to efficiently add nodes while maintaining flexibility in node selection. This approach helps in maintaining a low incremental cost and exploring different parts of the solution space, which is crucial given the high number of unvisited nodes.
+Delta of Visited Node:30
+Delta of Current Cost:4660.0
+---Round 12---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics if necessary.
+Delta of Visited Node:30
+Delta of Current Cost:5155.0
+---Round 13---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 will continue to efficiently add nodes while maintaining flexibility in node selection. This approach helps in maintaining a low incremental cost and exploring different parts of the solution space, which is crucial given the high number of unvisited nodes.
+Delta of Visited Node:20
+Delta of Current Cost:3857.0
+---Round 14---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Continuing with this heuristic for 20 more steps will help in further constructing the solution efficiently. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics if necessary.
+Delta of Visited Node:20
+Delta of Current Cost:2490.0
+---Round 15---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:Continue with k-Nearest Neighbors Insertion to efficiently add nodes while maintaining flexibility in node selection. This approach helps in maintaining a low incremental cost and exploring different parts of the solution space. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:20
+Delta of Current Cost:2859.0
+---Round 16---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:20
+Explain:Continue with k-Nearest Neighbors Insertion to efficiently add nodes while maintaining flexibility in node selection. This approach helps in maintaining a low incremental cost and exploring different parts of the solution space. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:20
+Delta of Current Cost:5235.0
+---Round 17---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has shown good performance in adding nodes with minimal cost increment. Continuing with this heuristic for 20 steps will help in efficiently building a more optimal tour. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:20
+Delta of Current Cost:2916.0
+---Round 18---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheaper Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5054.0
+---Round 19---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 20 more steps will help in building a more optimal tour while keeping incremental costs low.
+Delta of Visited Node:20
+Delta of Current Cost:3485.0
+---Round 20---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5477.0
+---Round 21---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 will help in efficiently adding nodes while maintaining flexibility in node selection. This approach helps in maintaining a low incremental cost and exploring different parts of the solution space, which is crucial given the high number of unvisited nodes.
+Delta of Visited Node:30
+Delta of Current Cost:4383.0
+---Round 22---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently, given the high number of unvisited nodes.
+Delta of Visited Node:30
+Delta of Current Cost:4372.0
+---Round 23---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Simulated Annealing will help in refining the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, it is crucial to use a heuristic that can handle such complexity. This will allow us to improve the current solution while maintaining flexibility in node selection.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 24---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:4352.0
+---Round 25---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently, given the high number of unvisited nodes.
+Delta of Visited Node:30
+Delta of Current Cost:5453.0
+---Round 26---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently.
+Delta of Visited Node:30
+Delta of Current Cost:5209.0
+---Round 27---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently.
+Delta of Visited Node:30
+Delta of Current Cost:4439.0
+---Round 28---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently.
+Delta of Visited Node:30
+Delta of Current Cost:4230.0
+---Round 29---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Simulated Annealing will help in refining the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, it is crucial to use a heuristic that can handle such complexity. This will allow us to improve the current solution while maintaining flexibility in node selection.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 30---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Given the high number of unvisited nodes (1732), continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently.
+Delta of Visited Node:30
+Delta of Current Cost:5544.0
+---Round 31---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:6625.0
+---Round 32---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates, which is crucial given the high variance in distances and the large number of unvisited nodes.
+Delta of Visited Node:30
+Delta of Current Cost:44378.0
+---Round 33---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:10.0
+---Round 34---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:82.0
+---Round 35---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:325.0
+---Round 36---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:50
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 50 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:50
+Delta of Current Cost:1168.0
+---Round 37---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:1292.0
+---Round 38---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 20 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:20
+Delta of Current Cost:1334.0
+---Round 39---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates, which is crucial given the high variance in distances and the large number of unvisited nodes.
+Delta of Visited Node:30
+Delta of Current Cost:20509.0
+---Round 40---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low.
+Delta of Visited Node:30
+Delta of Current Cost:49.0
+---Round 41---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:50
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 50 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:50
+Delta of Current Cost:1396.0
+---Round 42---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:20
+Explain:Given the high number of unvisited nodes (1342) and the significant variance in distances, GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates. This approach will help in constructing a more optimal solution by potentially exploring different parts of the solution space.
+Delta of Visited Node:20
+Delta of Current Cost:13075.0
+---Round 43---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:315.0
+---Round 44---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Simulated Annealing will help in refining the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, it is crucial to use a heuristic that can handle such complexity. This will allow us to improve the current solution while maintaining flexibility in node selection.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 45---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:20
+Explain:Given the high variance in distances and the need for a balance between exploration and exploitation, GRASP is a suitable choice. It will help in constructing a more optimal solution by iteratively building and refining the tour. The alpha parameter (0.3) allows for some randomness while still focusing on promising candidates. We will run it for 20 steps to observe its impact on the solution and reassess afterward.
+Delta of Visited Node:20
+Delta of Current Cost:8902.0
+---Round 46---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:40
+Explain:GRASP has shown promise in balancing greedy and random choices, which is crucial given the high variance in distances and the large number of unvisited nodes. Running it for 40 steps will allow us to make significant progress before reassessing the solution for potential refinements.
+Delta of Visited Node:40
+Delta of Current Cost:12772.0
+---Round 47---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:171.0
+---Round 48---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:994.0
+---Round 49---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we can reassess the solution and consider introducing a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:30
+Delta of Current Cost:2043.0
+---Round 50---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. This is crucial given the high variance in distances. Running it for 20 steps will allow us to observe its impact on the current solution and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 51---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:50
+Explain:Cheapest Insertion has shown consistent performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 50 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:50
+Delta of Current Cost:4308.0
+---Round 52---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. This is crucial given the high variance in distances. Running it for 30 steps will allow us to observe its impact on the current solution and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 53---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates. This approach will help in constructing a more optimal solution by potentially exploring different parts of the solution space.
+Delta of Visited Node:30
+Delta of Current Cost:9195.0
+---Round 54---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, it is crucial to use a heuristic that can handle such complexity.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 55---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, it is crucial to use a heuristic that can handle such complexity. Running it for 30 steps will allow us to observe its impact on the current solution and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 56---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:2171.0
+---Round 57---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:50
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 50 steps will allow us to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 58---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:3335.0
+---Round 59---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion will help in efficiently adding more nodes to the current solution, minimizing the incremental cost. This approach will help in building a more optimal tour while keeping the costs low. After these steps, we will reassess the solution and likely switch to a refinement heuristic.
+Delta of Visited Node:20
+Delta of Current Cost:2319.0
+---Round 60---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has shown consistent performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in further constructing the solution while keeping incremental costs low.
+Delta of Visited Node:30
+Delta of Current Cost:3365.0
+---Round 61---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:3399.0
+---Round 62---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has shown consistent performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in further constructing the solution while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:3847.0
+---Round 63---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in further constructing the solution while keeping incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:30
+Delta of Current Cost:4700.0
+---Round 64---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 30 steps will allow us to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 65---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:50
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 50 steps will allow us to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 66---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:4940.0
+---Round 67---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:4884.0
+---Round 68---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:50
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 50 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:50
+Delta of Current Cost:9222.0
+---Round 69---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:Given the high variance in distances and the large number of unvisited nodes, GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates. This approach will help in constructing a more optimal solution by potentially exploring different parts of the solution space.
+Delta of Visited Node:30
+Delta of Current Cost:14019.0
+---Round 70---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:580.0
+---Round 71---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with k=3 has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:30
+Delta of Current Cost:11481.0
+---Round 72---
+Heuristic:k_nearest_neighbors_insertion_9e8b
+Hyper Parameter:None
+Running Steps:30
+Explain:The k-Nearest Neighbors Insertion heuristic with \( k=3 \) has consistently shown good performance in efficiently adding nodes while maintaining flexibility in node selection. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in further constructing the solution efficiently. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:30
+Delta of Current Cost:7728.0
+---Round 73---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates, which is crucial given the high variance in distances and the large number of unvisited nodes. Running it for 30 steps will help in making significant progress before reassessing the solution for potential refinements.
+Delta of Visited Node:30
+Delta of Current Cost:16444.0
+---Round 74---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:Given the high variance in distances and the large number of unvisited nodes, GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates. Running it for 30 steps will help in making significant progress before reassessing the solution for potential refinements.
+Delta of Visited Node:30
+Delta of Current Cost:8606.0
+---Round 75---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:118.0
+---Round 76---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:50
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 50 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 77---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates. This approach will help in constructing a more optimal solution by potentially exploring different parts of the solution space.
+Delta of Visited Node:30
+Delta of Current Cost:9596.0
+---Round 78---
+Heuristic:greedy_randomized_adaptive_search_procedure_grasp_5a6a
+Hyper Parameter:None
+Running Steps:30
+Explain:GRASP will help in constructing a solution by balancing greedy and random choices. The alpha parameter (0.3) will allow for some exploration while still focusing on promising candidates. This approach will help in constructing a more optimal solution by potentially exploring different parts of the solution space.
+Delta of Visited Node:30
+Delta of Current Cost:6515.0
+---Round 79---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Given the high number of unvisited nodes (482), continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low.
+Delta of Visited Node:30
+Delta of Current Cost:585.0
+---Round 80---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in further constructing the solution while keeping incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:30
+Delta of Current Cost:2273.0
+---Round 81---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Given the high number of unvisited nodes (422) and the consistent performance of the Cheapest Insertion heuristic, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:3474.0
+---Round 82---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:30
+Delta of Current Cost:4772.0
+---Round 83---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Given the high number of unvisited nodes (362) and the consistent performance of the Cheapest Insertion heuristic, continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5153.0
+---Round 84---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Continuing with the Cheapest Insertion heuristic for 30 more steps will help in efficiently adding the remaining nodes to the solution while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5041.0
+---Round 85---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Given the consistent performance of the Cheapest Insertion heuristic in efficiently adding nodes with minimal cost increments and the high number of unvisited nodes (302), continuing with this heuristic for 20 more steps will help in further constructing the solution while keeping incremental costs low. After these steps, we will reassess the solution and consider switching to a refinement heuristic such as Simulated Annealing.
+Delta of Visited Node:20
+Delta of Current Cost:3306.0
+---Round 86---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Continuing with the Cheapest Insertion heuristic will help in efficiently adding the remaining nodes to the solution while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5492.0
+---Round 87---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:50
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 50 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 88---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has shown consistent performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5708.0
+---Round 89---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Continuing with the Cheapest Insertion heuristic will help in efficiently adding the remaining nodes to the solution while keeping incremental costs low. This has consistently shown good performance in previous rounds and will allow us to make significant progress before reassessing the solution for potential refinements.
+Delta of Visited Node:30
+Delta of Current Cost:5180.0
+---Round 90---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Continuing with Cheapest Insertion for 20 more steps will help in efficiently adding the remaining nodes while keeping incremental costs low. This will allow us to make significant progress before reassessing the solution for potential refinements.
+Delta of Visited Node:20
+Delta of Current Cost:3764.0
+---Round 91---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:The Cheapest Insertion heuristic has shown consistent performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in further constructing the solution while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:5600.0
+---Round 92---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has shown consistent performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:6318.0
+---Round 93---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Given that we are nearing the completion of the tour with only 112 unvisited nodes left and the current cost being relatively high, it is crucial to refine the solution and escape potential local optima. Simulated Annealing is well-suited for this task due to its ability to explore the solution space and make probabilistic decisions that can lead to a more optimal solution. Running it for 30 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 94---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:30
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 30 more steps will help in building a more optimal tour while keeping incremental costs low. After these steps, we will reassess the solution and consider potential refinements or alternative heuristics.
+Delta of Visited Node:30
+Delta of Current Cost:8594.0
+---Round 95---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Given that we are nearing the completion of the tour with only 82 unvisited nodes left and the current cost being relatively high, it is crucial to refine the solution and escape potential local optima. Simulated Annealing is well-suited for this task due to its ability to explore the solution space and make probabilistic decisions that can lead to a more optimal solution. Running it for 30 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 96---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increments. With only 82 unvisited nodes left, continuing with this heuristic for 20 more steps will help in further constructing the solution efficiently while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:20
+Delta of Current Cost:4573.0
+---Round 97---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has consistently shown good performance in efficiently adding nodes with minimal cost increment. Continuing with this heuristic for 20 more steps will help in further constructing the solution while keeping incremental costs low. After these steps, we will reassess the solution for potential refinements or alternative heuristics.
+Delta of Visited Node:20
+Delta of Current Cost:3700.0
+---Round 98---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Given that we are close to completing the tour with only 42 unvisited nodes left and the current cost being relatively high, it is crucial to refine the solution and escape potential local optima. Simulated Annealing is well-suited for this task due to its ability to explore the solution space and make probabilistic decisions that can lead to a more optimal solution. Running it for 20 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 99---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Given the high variance in distances and the need to refine the current solution, Simulated Annealing is well-suited for this task. Running it for 30 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 100---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic will help in refining the current solution by removing crossings and smoothing paths. This is crucial given the high variance in distances and the nearing completion of the tour with only 42 unvisited nodes left. Running it for 20 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:19.0
+---Round 101---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown promise in refining the solution by removing crossings and smoothing paths. Given that we are close to completing the tour with only 42 unvisited nodes left, continuing with this heuristic for 30 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-9405.0
+---Round 102---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the nearing completion of the tour with only 42 unvisited nodes left, continuing with this heuristic for 30 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-5564.0
+---Round 103---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the nearing completion of the tour with only 42 unvisited nodes left, continuing with this heuristic for 30 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-4155.0
+---Round 104---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the nearing completion of the tour with only 42 unvisited nodes left, continuing with this heuristic for 20 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-2746.0
+---Round 105---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the nearing completion of the tour with only 42 unvisited nodes left, continuing with this heuristic for 30 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-2814.0
+---Round 106---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the nearing completion of the tour with only 42 unvisited nodes left, continuing with this heuristic for 30 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-2429.0
+---Round 107---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Continuing with this heuristic for 20 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-1183.0
+---Round 108---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Continuing with this heuristic for 20 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-1202.0
+---Round 109---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Continuing with this heuristic for 20 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-1074.0
+---Round 110---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Continuing with this heuristic for 20 more steps will help in further improving the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-181.0
+---Round 111---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated significant cost reductions in recent rounds. Continuing with it for 20 more steps will help in further refining the solution by removing crossings and smoothing paths. After these steps, we will reassess the performance and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 112---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has shown significant cost reductions in recent rounds. Continuing with it for 20 more steps will help in further refining the solution by removing crossings and smoothing paths. After these steps, we will reassess the performance and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 113---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant cost reductions in recent rounds. Continuing with it for 30 more steps will help in further refining the solution by removing crossings and smoothing paths. After these steps, we will reassess the performance and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 114---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Continuing with it for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. We will reassess the performance after these steps and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 115---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in recent rounds in reducing the tour cost by removing crossings and smoothing paths. Continuing with it for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. We will reassess the performance after these steps and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 116---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Continuing with it for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. Given the high variance in distances and the nearing completion of the tour, this approach will help in achieving a more optimal solution.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 117---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has consistently shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 118---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has consistently shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 119---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated consistent promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. After these steps, we will reassess the performance and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 120---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. This will allow us to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 121---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated significant promise in recent rounds by reducing the tour cost through removing crossings and smoothing paths. Continuing with it for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. We will reassess the performance after these steps and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 122---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated consistent promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 123---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. This will allow us to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 124---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has consistently shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 125---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has consistently shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 126---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated consistent promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. We will reassess the performance after these steps and consider potential heuristic switches if necessary.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 127---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 128---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 129---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances and the nearing completion of the tour, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 30 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 130---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated consistent promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 131---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:30
+Explain:Simulated Annealing will help refine the current solution by exploring the solution space and escaping local optima. Given the high variance in distances and the nearing completion of the tour, this heuristic can handle the complexity and potentially lead to a more optimal solution. Running it for 30 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 132---
+Heuristic:simulated_annealing_e625
+Hyper Parameter:None
+Running Steps:20
+Explain:Given the high variance in distances and the nearing completion of the tour, Simulated Annealing is well-suited for refining the current solution. It can explore the solution space and escape local optima, potentially leading to a more optimal solution. Running it for 20 steps will provide a sufficient number of iterations to observe its impact and make further decisions.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 133---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 134---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 135---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has demonstrated significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the nearing completion of the tour, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 136---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has demonstrated consistent promise in reducing the tour cost by removing crossings and smoothing paths. Given the small number of unvisited nodes (42) and the high variance in distances, continuing with this heuristic for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 137---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:With only 42 nodes left, using Cheapest Insertion will help efficiently add these nodes while keeping the incremental costs low. This will make significant progress towards completing the solution.
+Delta of Visited Node:20
+Delta of Current Cost:4632.0
+---Round 138---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:20
+Explain:Cheapest Insertion has shown consistent performance in adding nodes with minimal cost increment. Given the small number of unvisited nodes (22), continuing with this heuristic for 20 more steps will efficiently handle the remaining nodes and allow us to reassess the solution for potential refinements.
+Delta of Visited Node:20
+Delta of Current Cost:5680.0
+---Round 139---
+Heuristic:cheapest_insertion_605f
+Hyper Parameter:None
+Running Steps:2
+Explain:With only 2 nodes left, using Cheapest Insertion will help efficiently add these nodes while keeping the incremental costs low. This will make significant progress towards completing the solution.
+Delta of Visited Node:2
+Delta of Current Cost:1202.0
+---Round 140---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the need for local optimization, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:-2824.0
+---Round 141---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:30
+Explain:The 2-opt heuristic has shown significant promise in reducing the tour cost by removing crossings and smoothing paths. Given the high variance in distances and the need for local optimization, continuing with this heuristic for 30 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+---Round 142---
+Heuristic:_2opt_89aa
+Hyper Parameter:None
+Running Steps:20
+Explain:The 2-opt heuristic has consistently shown promise in reducing the tour cost by removing crossings and smoothing paths. Given the nearing completion of the tour and the high variance in distances, continuing with this heuristic for 20 more steps will help in further refining the solution while maintaining a focus on minimizing the total tour cost. If improvements become negligible, we will consider switching to 3-opt for further optimization.
+Delta of Visited Node:0
+Delta of Current Cost:0.0
+
+Current State:
+- visited_num: 2392
+- unvisited_num: 0
+- current_cost: 414857.0
+- last_heuristic: _2opt_89aa
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- How does _2opt_89aa perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+After review the data, historical and consideration, Considering the advantages and disadvantages of each algorithm you mentioned before,please make the choice from follow items:
+1. If you believe the data are sufficient, the heuristic introduction are clear enough and you can make the decision, please respond me the selected heuristic with target running steps (each step will return one operator and we hope to run a few steps and then review performance) in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you need to review the code to understand it more clearly, respond to me in this format:
+***Review heuristic:heuristic_name;heuristic_name;...***
+3. If you need more data to analysis, respond to me in this format:
+***More data:
+data_name: description
+data_name: description
+...
+***
+4. If you think all heuristics in heuristic heuristic pool are not good enough, please respond new proposed heuristic in this format:
+***New heuristic:
+heuristic_name1: description
+heuristic_name2: description
+...
+***
+5. If you think the solution can not be improved, respond me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+Based on the current state and historical data, the following considerations can be made:
+
+- **Current State**: All nodes have been visited, and the current cost is 414,857.0.
+- **Last Heuristic Used**: 2-opt has been used extensively in recent rounds and has shown significant promise in reducing the tour cost.
+- **Heuristic Performance**: The 2-opt heuristic has demonstrated consistent improvements, but the magnitude of improvements has been decreasing, suggesting diminishing returns.
+- **Variance in Distances**: Given the high variance in distances, it is crucial to use heuristics that can handle such complexity.
+
+### Decision
+
+Given the diminishing returns from the 2-opt heuristic and the high variance in distances, it might be beneficial to switch to a more powerful local search heuristic like 3-opt, which can make more significant improvements by considering more complex rearrangements of the tour segments.
+
+### Proposed Heuristic and Steps
+
+***Run heuristic:
+selected heuristic: _3opt_e75b
+running steps: 30
+explanation: The 3-opt heuristic can potentially make more significant improvements by considering more complex rearrangements of the tour segments. Given the high variance in distances and the nearing completion of the tour, running 30 steps of 3-opt will help in further refining the solution while maintaining a focus on minimizing the total tour cost.
+***
+
+This approach will allow us to observe the impact of 3-opt on the current solution and decide on further steps based on the performance.
+------------------------------------------------------------------------------------
+

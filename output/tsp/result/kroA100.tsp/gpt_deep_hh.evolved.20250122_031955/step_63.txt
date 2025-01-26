@@ -1,0 +1,689 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of TSP.
+A list of integers where each integer represents a node (city) in the TSP tour.
+The order of the nodes in the list defines the order in which the cities are visited in the tour."""
+    def __init__(self, tour: list[int]):
+        self.tour = tour
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append the node at the end of the solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour + [self.node]
+        return Solution(new_tour)
+class InsertOperator(BaseOperator):
+    """Insert the node into the solution at the target position."""
+    def __init__(self, node: int, position: int):
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
+        return Solution(new_tour)
+class SwapOperator(BaseOperator):
+    """Swap two nodes in the solution. swap_node_pairs is a list of tuples, each containing the two nodes to swap."""
+    def __init__(self, swap_node_pairs: list[tuple[int, int]]):
+        self.swap_node_pairs = swap_node_pairs
+    def run(self, solution: Solution) -> Solution:
+        node_to_index = {node: index for (index, node) in enumerate(solution.tour)}
+        new_tour = solution.tour.copy()
+        for (node_a, node_b) in self.swap_node_pairs:
+            index_a = node_to_index.get(node_a)
+            index_b = node_to_index.get(node_b)
+            assert index_a is not None
+            assert index_b is not None
+            (new_tour[index_a], new_tour[index_b]) = (new_tour[index_b], new_tour[index_a])
+        return Solution(new_tour)
+class ReplaceOperator(BaseOperator):
+    """Replace a node with another one in the solution."""
+    def __init__(self, node: int, new_node: int):
+        self.node = node
+        self.new_node = new_node
+    def run(self, solution: Solution) -> Solution:
+        index = solution.tour.index(self.node)
+        new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
+        return Solution(new_tour)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, segments: list[tuple[int, int]]):
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_tour)
+            assert 0 <= end_index < len(new_tour)
+            if start_index <= end_index:
+                new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+            else:
+                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index] + list(reversed(new_tour[:end_index + 1]))
+        return Solution(new_tour)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "std_dev_distance" (float): The standard deviation of the distances.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
+    - "visited_num" (int): Number of nodes that have been visited.
+    - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
+    - "unvisited_num" (int): Number of nodes that have not been visited.
+    - "current_cost" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
+    - "last_visited" (int): The last visited node.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is tsp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Traveling Salesman Problem (TSP) is indeed a combinatorial optimization problem, which falls under the broader category of combinatorial operation problems. It involves finding an optimal ordering of discrete elements (cities) based on defined constraints (distances). Heuristic approaches are commonly used to find approximate solutions to TSP, especially when the problem size is large and exact solutions become computationally infeasible. Your framework with solutions and operators aligns well with heuristic strategies to tackle such problems.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): constructive_heuristics,improvement_heuristics,metaheuristics,adaptive_heuristics,nearest_insertion_variants
+
+constructive_heuristics: These heuristics build a tour from scratch by iteratively adding nodes based on specific criteria such as cheapest cost increase, farthest distance, or nearest neighbor.
+def cheapest_insertion_7a30(): An enhanced heuristic algorithm for cheapest insertion in the Traveling Salesman Problem (TSP). This heuristic incorporates specific rules based on the current state of the tour and certain global data metrics to optimize the solution.
+def farthest_insertion_54db(): Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost. This heuristic also periodically applies the 2-opt heuristic to improve the solution.
+def nearest_neighbor_e8a4(): Implements an enhanced nearest neighbor heuristic for the TSP problem. This heuristic starts from the node with the second lowest average distance to all other nodes when the tour is empty. It then proceeds by extending the tour using the nearest neighbor, nearest insertion, or cheapest insertion heuristics based on certain criteria. Periodically, the 2-opt heuristic is applied to untangle crossings and smooth the path. It includes additional rules for specific scenarios to enhance performance.
+def nearest_insertion_c1f0(): Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
+
+improvement_heuristics: These heuristics focus on improving an existing solution by modifying segments of the tour or swapping nodes to reduce the total cost.
+def _2opt_89aa(): The 2-opt heuristic seeks to untangle crossings and smooth the path by swapping two non-adjacent edges and reconnecting the resulting segments. Through repeated application of these edge swaps, the 2-opt algorithm converges towards a more efficient route, often leading to a substantial improvement over the initial solution. It is a simple yet powerful method for local optimization in the context of the TSP.
+def _3opt_e75b(): The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
+def simulated_annealing_e625(): Simulated Annealing heuristic for the Traveling Salesman Problem. This function applies the simulated annealing technique to find a solution to the TSP. It randomly selects two nodes and proposes to swap them. The swap is accepted based on the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
+
+metaheuristics: These heuristics use a combination of randomization and local search strategies to explore the solution space and escape local optima.
+def simulated_annealing_e625(): Simulated Annealing heuristic for the Traveling Salesman Problem. This function applies the simulated annealing technique to find a solution to the TSP. It randomly selects two nodes and proposes to swap them. The swap is accepted based on the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3): Greedy Randomized Adaptive Search Procedure (GRASP) function embodies the Greedy Randomized Adaptive Search Procedure (GRASP), a metaheuristic algorithm tailored for solving combinatorial optimization problems like the Traveling Salesman Problem (TSP). GRASP iteratively constructs a solution through a two-phase process: a greedy randomized construction phase and a local search phase. During the construction phase, it builds a partial solution by repeatedly adding the best candidate according to a greedy function, which is randomized within a Restricted Candidate List (RCL) determined by the alpha parameter. This parameter adjusts the level of greediness versus randomness, with lower values favoring greedy choices and higher values allowing for more exploration. Once an initial solution is constructed, the local search phase seeks to improve it by exploring the neighborhood of the current solution.
+
+adaptive_heuristics: These heuristics adaptively select nodes or strategies based on certain conditions or parameters, such as balancing greediness and randomness.
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3): Greedy Randomized Adaptive Search Procedure (GRASP) function embodies the Greedy Randomized Adaptive Search Procedure (GRASP), a metaheuristic algorithm tailored for solving combinatorial optimization problems like the Traveling Salesman Problem (TSP). GRASP iteratively constructs a solution through a two-phase process: a greedy randomized construction phase and a local search phase. During the construction phase, it builds a partial solution by repeatedly adding the best candidate according to a greedy function, which is randomized within a Restricted Candidate List (RCL) determined by the alpha parameter. This parameter adjusts the level of greediness versus randomness, with lower values favoring greedy choices and higher values allowing for more exploration. Once an initial solution is constructed, the local search phase seeks to improve it by exploring the neighborhood of the current solution.
+def insertion_heuristics_050b(insertion_strategy: str = 'cheapest'): Insertion heuristics algorithm for the TSP problem. Builds a tour by incrementally adding cities to an existing sub-tour. This function supports 'cheapest', 'farthest', and 'nearest' insertion strategies.
+
+nearest_insertion_variants: These heuristics specifically utilize nearest neighbor strategies to build or extend the tour.
+def nearest_neighbor_e8a4(): Implements an enhanced nearest neighbor heuristic for the TSP problem. This heuristic starts from the node with the second lowest average distance to all other nodes when the tour is empty. It then proceeds by extending the tour using the nearest neighbor, nearest insertion, or cheapest insertion heuristics based on certain criteria. Periodically, the 2-opt heuristic is applied to untangle crossings and smooth the path. It includes additional rules for specific scenarios to enhance performance.
+def nearest_insertion_c1f0(): Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
+def k_nearest_neighbors_insertion_9e8b(k: int = 1): Heuristic that builds a tour by inserting the nearest unvisited neighbor to the last visited node. If multiple nearest neighbors are considered (k > 1), one is chosen based on a certain criterion.
+
+
+We aim to solve this problem using the following data:
+node_num:100
+std_dev_distance:927.2014221712777
+average_distance:1710.700404040404
+min_distance:13.0
+max_distance:4150.0
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 2 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+Creating a strategic guide for selecting heuristic categories and defining execution steps involves a phased approach that considers the characteristics of the TSP instance, the current state of the solution, and the performance of past heuristics. Below is a proposed guide for alternating between different heuristics during the construction and improvement phases:
+
+### Strategic Guide for Heuristic Selection
+
+#### Initial Construction Phase
+- **Objective:** Build an initial feasible solution quickly.
+- **Approach:** Utilize **constructive_heuristics** to build a base tour.
+  1. **Constructive Heuristics:** Start with simple and fast heuristics like `nearest_neighbor_e8a4` or `nearest_insertion_c1f0` to quickly establish an initial tour.
+  2. **Evaluation:** Briefly assess the quality of the tour using criteria such as total cost and distribution of nodes.
+
+#### Intermediate Improvement Phase
+- **Objective:** Enhance the initial solution by reducing the tour cost and improving node placement.
+- **Approach:** Apply **improvement_heuristics** to refine the tour.
+  1. **Improvement Heuristics:** Use `2opt_89aa` to eliminate crossings and smooth paths. Progress to `3opt_e75b` if further improvement is needed.
+  2. **Evaluation:** Monitor the improvement in tour cost and ensure that changes are leading to a more efficient route.
+
+#### Exploration and Diversification Phase
+- **Objective:** Escape local optima and explore diverse solutions.
+- **Approach:** Introduce **metaheuristics** to diversify the search.
+  1. **Metaheuristics:** Implement `simulated_annealing_e625` to allow controlled randomization and exploration of solution space.
+  2. **Evaluation:** Check for improvements in tour cost and diversity of solutions.
+
+#### Adaptive and Hybrid Phase
+- **Objective:** Adaptively select strategies based on solution characteristics and performance metrics.
+- **Approach:** Use **adaptive_heuristics** to fine-tune the solution.
+  1. **Adaptive Heuristics:** Apply `greedy_randomized_adaptive_search_procedure_grasp_5a6a` to balance greediness and randomness. Adjust the alpha parameter to control exploration intensity.
+  2. **Hybrid Approach:** Consider combining nearest insertion variants with adaptive heuristics for a more robust strategy.
+
+#### Final Refinement Phase
+- **Objective:** Achieve the best possible solution by making final adjustments.
+- **Approach:** Revisit **nearest_insertion_variants** for targeted adjustments.
+  1. **Nearest Insertion Variants:** Use `k_nearest_neighbors_insertion_9e8b` with different k values to optimize node insertion based on specific criteria.
+  2. **Final Evaluation:** Perform a detailed assessment of the solution's cost, efficiency, and adherence to constraints.
+
+### Execution Steps
+1. **Cycle through Phases:** Progress through each phase, applying the appropriate heuristics and evaluating their performance.
+2. **Iterative Testing:** After completing a cycle, assess the overall performance and decide whether to revisit certain phases or heuristics.
+3. **Adaptive Switching:** Be prepared to switch strategies based on the solution's progress and performance metrics, ensuring a dynamic and flexible approach.
+4. **Document and Analyze:** Keep records of heuristic performance to inform future decisions and refine the strategy over time.
+
+This strategic guide allows for flexibility in heuristic selection and encourages exploration of various algorithms to optimize TSP solutions effectively.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+node_num:100
+std_dev_distance:927.2014221712777
+average_distance:1710.700404040404
+min_distance:13.0
+max_distance:4150.0
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 63 rounds discuss and the summary are:
+---Round 0---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain: Since no nodes have been visited yet and the current solution is effectively empty, starting with a constructive heuristic is appropriate. Constructive heuristics like nearest neighbor or cheapest insertion can quickly build an initial tour, which can then be refined in subsequent phases.
+Visited Node: 0->2
+Current Cost: 0->4586.0
+---Round 1---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that the current solution has started with a constructive heuristic and only two nodes have been visited, it is beneficial to switch to improvement heuristics like 2-opt or 3-opt. These can help refine the initial tour by reducing the path cost and improving the node sequence, especially since there are a significant number of unvisited nodes remaining. This switch can optimize the current path before further expanding it with other nodes.
+Visited Node: 2->2
+Current Cost: 4586.0->4586.0
+---Round 2---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain: Given that the current solution has only two nodes and a high number of unvisited nodes remain, it would be prudent to continue building the solution using a constructive heuristic. This allows for the rapid expansion of the tour by adding new nodes. Starting with a constructive heuristic like cheapest insertion or nearest neighbor can effectively grow the tour and create a stronger foundation for subsequent improvement phases.
+Visited Node: 2->4
+Current Cost: 4586.0->8216.0
+---Round 3---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that the current tour has only 4 nodes and there are still a significant number of unvisited nodes (96), it is beneficial to continue expanding the solution using a constructive heuristic. This allows for further building of the tour by adding new nodes efficiently. The current high average edge cost and a relatively low number of visited nodes suggest that the tour is still in the early stages of development, and constructive methods such as nearest or cheapest insertion can help in rapidly growing the tour and improving the current solution's foundation.
+Visited Node: 4->6
+Current Cost: 8216.0->8982.0
+---Round 4---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain: Given the current state with only 6 nodes visited and a significant number of unvisited nodes (94), it is beneficial to continue building the solution using a constructive heuristic. This allows for further development of the tour by efficiently adding new nodes. The current average edge cost and the relatively low number of visited nodes suggest that the tour is still in the early stages of development. Constructive methods like nearest or cheapest insertion can help rapidly grow the tour and improve the current solution's foundation. Additionally, the current path length and high number of remaining nodes indicate that the solution is not yet mature enough to switch to purely improvement or metaheuristic strategies.
+Visited Node: 6->8
+Current Cost: 8982.0->11689.0
+---Round 5---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  At this stage, with 8 nodes visited and a significant number of unvisited nodes remaining (92), the current average edge cost and high variance suggest that the tour could benefit from refinement. The constructive phase has provided a foundational tour, but the relatively high current cost indicates room for optimization. Switching to improvement heuristics like 2-opt or 3-opt can help in reducing the total cost by optimizing the sequence of the visited nodes, smoothing the path, and eliminating potential crossings. This approach will help in setting a more efficient path before further expanding the tour with new nodes.
+Visited Node: 8->8
+Current Cost: 11689.0->11689.0
+---Round 6---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With the current solution having only 8 nodes visited and 92 unvisited nodes remaining, there is significant potential for expanding the tour. The previous use of improvement heuristics did not reduce the current cost, suggesting that further refinement of the existing small tour may not yield substantial benefits at this stage. Returning to constructive heuristics will allow for the efficient addition of new nodes, which can build a more robust foundation for subsequent improvement phases. Constructive methods like nearest or cheapest insertion can help rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes.
+Visited Node: 8->10
+Current Cost: 11689.0->11689.0
+---Round 7---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: With 10 nodes visited and 90 unvisited, the current solution is still developing. However, the previous constructive heuristic did not reduce the cost, suggesting the need for refinement. Switching to improvement heuristics like 2-opt or 3-opt can help optimize the existing tour by reducing crossings and improving node sequence, potentially lowering the current cost before further expansion.
+Visited Node: 10->10
+Current Cost: 11689.0->11403.0
+---Round 8---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  The current solution has only 10 nodes visited out of 100, which suggests that it is still in the early stages of development. While the improvement heuristic (3-opt) managed to slightly reduce the cost, a significant number of nodes remain unvisited. Switching back to constructive heuristics will allow for the efficient addition of new nodes to the tour. Given the current high average edge cost and substantial number of unvisited nodes, focusing on expanding the tour with constructive methods like nearest or cheapest insertion can further develop the solution and create a more robust foundation for subsequent improvement phases. This approach will help build the tour rapidly before further refinement with improvement heuristics.
+Visited Node: 10->12
+Current Cost: 11403.0->11403.0
+---Round 9---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 12 nodes visited and 88 remaining, the current solution is still in development, but the average edge cost is quite high. Given that the last constructive heuristic did not reduce the cost, switching to improvement heuristics like 2-opt or 3-opt can help optimize the existing tour by reducing crossings and improving node sequence. This could potentially lower the current cost before further expansion. Improvement heuristics are effective at refining the tour and creating a more efficient path, which is crucial at this stage where the tour's cost is relatively high.
+Visited Node: 12->12
+Current Cost: 11403.0->11403.0
+---Round 10---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that only 12 nodes have been visited out of 100, there is still a significant number of unvisited nodes (88) and potential for further developing the solution. The last improvement heuristic (_2opt_89aa) did not yield a reduction in cost, suggesting that refinement of the current tour may have reached its limit for now. Therefore, it would be beneficial to switch back to a constructive heuristic to expand the tour by adding new nodes efficiently. This will help build a more robust foundation for subsequent improvement phases. Using a constructive approach like nearest or cheapest insertion can rapidly grow the tour and potentially improve the current solution's foundation before further refinement with improvement or metaheuristic strategies.
+Visited Node: 12->14
+Current Cost: 11403.0->11405.0
+---Round 11---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 14 nodes visited and 86 remaining, and given that the last constructive heuristic did not significantly reduce the cost (only a slight increase), it's beneficial to switch to improvement heuristics. Improvement heuristics like 2-opt or 3-opt can help optimize the existing tour by reducing crossings and improving node sequence. This could potentially lower the current cost before further expansion. Since the average edge cost is relatively high and the standard deviation indicates variability in edge costs, refining the current sequence might yield a more efficient path.
+Visited Node: 14->14
+Current Cost: 11405.0->11405.0
+---Round 12---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With only 14 nodes visited out of 100, there is still significant potential for expanding the tour. The previous improvement heuristic (simulated annealing) did not reduce the cost, suggesting that further refinement of the existing small tour may not yield substantial benefits at this stage. Returning to constructive heuristics will allow for the efficient addition of new nodes, which can build a more robust foundation for subsequent improvement phases. This approach will help build the tour rapidly before further refinement with improvement heuristics.
+Visited Node: 14->16
+Current Cost: 11405.0->11437.0
+---Round 13---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 16 nodes visited and a significant number of unvisited nodes (84) remaining, the current solution is still in development. The average edge cost is relatively high, and recent constructive heuristics have not significantly improved the cost. Switching to improvement heuristics can help optimize the existing tour by reducing crossings and improving node sequences. This approach is crucial at this stage to refine the tour and potentially reduce the current cost before further expanding it with new nodes.
+Visited Node: 16->16
+Current Cost: 11437.0->11437.0
+---Round 14---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that only 16 nodes have been visited out of 100, there is still a significant number of unvisited nodes (84) and potential for further developing the solution. The recent improvement heuristic (simulated annealing) did not reduce the cost, suggesting that further refinement of the existing small tour may not yield substantial benefits at this stage. Returning to constructive heuristics will allow for the efficient addition of new nodes to expand the tour. This approach is beneficial to build a more robust foundation for subsequent improvement phases, enabling rapid growth of the tour before further refinement with improvement heuristics.
+Visited Node: 16->18
+Current Cost: 11437.0->11441.0
+---Round 15---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 18 nodes visited and 82 remaining, the current solution is still developing. The average edge cost is relatively high, and the standard deviation indicates variability in edge costs. While constructive heuristics have built a base, it's crucial to refine the current tour to reduce costs and improve efficiency. Switching to improvement heuristics, such as 2-opt or 3-opt, can optimize the existing tour by reducing crossings and improving node sequences, potentially lowering the current cost before further expansion.
+Visited Node: 18->18
+Current Cost: 11441.0->11441.0
+---Round 16---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that only 18 nodes have been visited out of 100, there is still a significant number of unvisited nodes (82). The previous improvement heuristic (_2opt_89aa) did not reduce the cost, indicating that the current sequence might have reached a local optimum for the nodes visited so far. Switching back to constructive heuristics will allow for the efficient addition of new nodes, which can help expand the tour further. This approach will build a more robust foundation, enabling further development before applying improvement or metaheuristics again. The focus should be on rapidly growing the tour with methods like nearest or cheapest insertion to improve the current solution's foundation.
+Visited Node: 18->20
+Current Cost: 11441.0->11592.0
+---Round 17---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 20 nodes visited and 80 remaining, the current solution is still developing. The average edge cost and standard deviation suggest variability in the edge costs, indicating potential for optimization. Recent constructive heuristics have not significantly reduced the cost, and the last edge cost is relatively high. Switching to improvement heuristics such as 2-opt or 3-opt can help optimize the current tour by reducing crossings and improving node sequences, potentially lowering the overall cost before further expansion. This approach can refine the tour and create a more efficient path, making it a suitable next step.
+Visited Node: 20->20
+Current Cost: 11592.0->11592.0
+---Round 18---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With only 20 nodes visited and 80 remaining, there is still significant potential to expand the tour. The current solution has not shown improvement in cost with recent improvement heuristics, suggesting that further refinement may not yield substantial benefits at this stage. Returning to constructive heuristics will allow for efficient addition of new nodes to build a more robust foundation before applying improvement or metaheuristics again. This approach will help grow the tour rapidly, considering the high number of unvisited nodes and the need to establish a strong base for future optimization.
+Visited Node: 20->22
+Current Cost: 11592.0->11663.0
+---Round 19---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that 22 nodes have been visited and 78 remain, the solution is still in development. The average edge cost is relatively high, and the last edge cost is notably higher than the average, indicating potential inefficiencies in the current path. The recent use of a constructive heuristic did not reduce the cost, suggesting that refinement is needed to optimize the existing tour. Switching to improvement heuristics, such as 2-opt or 3-opt, can help reduce crossings and improve node sequences, potentially lowering the overall cost before further expansion. This approach will allow for a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 22->22
+Current Cost: 11663.0->11663.0
+---Round 20---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 22 nodes have been visited and 78 remain, there is still significant potential for expanding the tour. The recent improvement heuristic (_2opt_89aa) did not yield a reduction in cost, suggesting that further refinement of the existing tour may not be beneficial at this stage. Returning to constructive heuristics will allow for the efficient addition of new nodes, which can help expand the tour further. This approach is beneficial for building a more robust foundation, enabling further development before applying improvement or metaheuristics again. Utilizing constructive heuristics like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially with the high number of remaining nodes.
+Visited Node: 22->24
+Current Cost: 11663.0->11666.0
+---Round 21---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that 24 nodes have been visited and 76 remain, the current solution is still in development. The average edge cost is relatively high, and the last edge cost is notably higher than the average, indicating potential inefficiencies in the current path. The recent use of a constructive heuristic resulted in only a slight increase in cost, suggesting that the current sequence might benefit from refinement. Switching to improvement heuristics, such as 2-opt or 3-opt, can help optimize the existing tour by reducing crossings and improving node sequences, potentially lowering the overall cost before further expansion. This approach will allow for a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 24->24
+Current Cost: 11666.0->11666.0
+---Round 22---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 24 nodes visited and 76 remaining, the current solution is still developing, and there's significant room for expansion. While recent improvement heuristics have not significantly reduced the cost, switching back to constructive heuristics can efficiently add new nodes to the tour. This will help build a more robust foundation, enabling further development before applying improvement or metaheuristics again. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and potentially improve the current solution's foundation, especially given the high number of remaining nodes.
+Visited Node: 24->26
+Current Cost: 11666.0->11674.0
+---Round 23---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 26 nodes visited and 74 remaining, the current solution has room for refinement. The average edge cost is relatively high, and the standard deviation indicates variability in edge costs. The last edge cost is notably higher than the average, suggesting inefficiencies in the current path. Improvement heuristics, such as 2-opt or 3-opt, can help reduce crossings and improve node sequences, potentially lowering the overall cost. This approach will refine the tour and create a more efficient path, preparing it for further expansion with constructive or adaptive heuristics.
+Visited Node: 26->26
+Current Cost: 11674.0->11674.0
+---Round 24---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that only 26 nodes have been visited out of 100, there is still a significant number of unvisited nodes (74) and potential for further developing the solution. The recent improvement heuristic (_3opt_e75b) did not yield a reduction in cost, suggesting that further refinement of the existing tour may have reached its limit for now. Therefore, it would be beneficial to switch back to a constructive heuristic to expand the tour by adding new nodes efficiently. This will help build a more robust foundation for subsequent improvement phases. Using a constructive approach like nearest or cheapest insertion can rapidly grow the tour and potentially improve the current solution's foundation before further refinement with improvement or metaheuristic strategies.
+Visited Node: 26->28
+Current Cost: 11674.0->11702.0
+---Round 25---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that 28 nodes have been visited and the current cost is relatively high, with the last edge cost significantly above the average, it indicates potential inefficiencies in the tour. The high standard deviation in edge costs also suggests variability that can be optimized. Switching to an improvement heuristic like 2-opt or 3-opt can refine the current tour by reducing crossings and improving node sequences, potentially lowering the overall cost before further expansion. This approach will help optimize the tour's efficiency and prepare the solution for future expansion with constructive or adaptive heuristics.
+Visited Node: 28->28
+Current Cost: 11702.0->12346.0
+---Round 26---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given the high number of unvisited nodes (72) and the relatively high average edge cost, it is beneficial to continue expanding the solution. The recent improvement heuristic (_3opt_e75b) did not yield a reduction in cost, suggesting that the current tour may not be optimized effectively. Switching back to constructive heuristics will allow for the efficient addition of new nodes to the tour, helping to build a more robust foundation. This approach will help grow the tour rapidly and improve the current solution's foundation before further refinement with improvement or metaheuristic strategies.
+Visited Node: 28->30
+Current Cost: 12346.0->12375.0
+---Round 27---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: With 30 nodes visited and 70 remaining, the current solution has room for refinement. The average edge cost is relatively high, and the standard deviation indicates variability in edge costs. Improvement heuristics, such as 2-opt or 3-opt, can help reduce crossings and improve node sequences, potentially lowering the overall cost. This approach will refine the tour and create a more efficient path, preparing it for further expansion with constructive or adaptive heuristics.
+Visited Node: 30->30
+Current Cost: 12375.0->11729.0
+---Round 28---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 30 nodes visited and 70 remaining, there is still significant potential for expanding the tour. The recent improvement heuristic (_2opt_89aa) led to a reduction in cost, indicating that the current tour has been optimized to some extent. However, with a high number of unvisited nodes, it is beneficial to switch back to constructive heuristics to efficiently add new nodes and further develop the solution. This approach will help build a more robust foundation before applying further improvement or adaptive strategies.
+Visited Node: 30->32
+Current Cost: 11729.0->13177.0
+---Round 29---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 32 nodes visited and 68 remaining, the solution is at a stage where refinement can lead to significant improvements in the tour's efficiency. The recent application of the constructive heuristic has increased the current cost, suggesting that further refinement of the existing tour is necessary. Improvement heuristics like 2-opt or 3-opt can help reduce crossings and optimize the node sequence, potentially lowering the overall cost before further expansion. Given the high average edge cost and variability indicated by the standard deviation, focusing on optimizing the current path is crucial before adding more nodes.
+Visited Node: 32->32
+Current Cost: 13177.0->12597.0
+---Round 30---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 32 nodes have been visited and 68 remain unvisited, there's substantial potential to expand the tour further. The recent improvement heuristic (_3opt_e75b) effectively reduced the cost, but with a high number of unvisited nodes, it's beneficial to switch back to constructive heuristics. This will allow for efficient addition of new nodes, helping to further develop the tour and maintain its momentum. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high variability in edge costs and room for further expansion.
+Visited Node: 32->34
+Current Cost: 12597.0->12634.0
+---Round 31---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that you have visited 34 nodes with a current cost of 12634.0, and the recent constructive heuristic slightly increased the cost, it's an opportune moment to switch to improvement heuristics. The high average edge cost and significant standard deviation suggest variability that can be optimized. Applying an improvement heuristic like 2-opt or 3-opt can help reduce crossings and improve node sequences, potentially lowering the overall cost before further expansion. This refinement can create a more efficient path as you prepare to incorporate more nodes.
+Visited Node: 34->34
+Current Cost: 12634.0->12634.0
+---Round 32---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 34 nodes visited and 66 remaining, there is still significant potential for expanding the tour. The recent improvement heuristic (_2opt_89aa) did not yield a reduction in cost, suggesting that further refinement of the existing tour may not be beneficial at this stage. Switching back to constructive heuristics will allow for the efficient addition of new nodes, helping to further develop the solution. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes and the variability in edge costs. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 34->36
+Current Cost: 12634.0->12685.0
+---Round 33---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 36 nodes visited and 64 remaining, the current solution is in a mid-development stage. The recent application of the constructive heuristic (cheapest_insertion_7a30) slightly increased the cost, and the average edge cost is relatively high with significant variability, indicated by the standard deviation. This suggests potential inefficiencies in the current tour. Switching to improvement heuristics, such as 2-opt or 3-opt, can help optimize the existing tour by reducing crossings and improving node sequences, potentially lowering the overall cost before further expansion. This refinement will create a more efficient path and prepare the solution for future expansion with additional nodes.
+Visited Node: 36->36
+Current Cost: 12685.0->12685.0
+---Round 34---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given the current state with 36 nodes visited and 64 remaining, and considering the recent improvement heuristic did not reduce the cost, it would be beneficial to switch back to constructive heuristics. This allows for efficient expansion of the tour by adding new nodes, which can help build a more robust foundation before further refinement. Constructive methods like nearest or cheapest insertion can potentially improve the current solution's foundation, especially given the high number of remaining nodes and variability in edge costs. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 36->38
+Current Cost: 12685.0->12808.0
+---Round 35---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: With 38 nodes visited and 62 remaining, the current average edge cost and the high variability in edge costs (indicated by the standard deviation) suggest that the tour could benefit from refinement. The recent constructive heuristic increased the cost, indicating potential inefficiencies in the current tour. Switching to improvement heuristics, such as 2-opt or 3-opt, can help reduce crossings and improve node sequences, potentially lowering the overall cost and creating a more efficient path before further expansion with additional nodes.
+Visited Node: 38->38
+Current Cost: 12808.0->12140.0
+---Round 36---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 38 nodes visited and 62 remaining, there is significant potential for further expanding the tour. The recent improvement heuristic (simulated annealing) effectively reduced the cost, indicating that the current tour has been optimized to some extent. However, with a high number of unvisited nodes, it's beneficial to switch back to constructive heuristics. This will allow for efficient addition of new nodes, helping to further develop the tour and maintain its momentum. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high variability in edge costs and room for further expansion.
+Visited Node: 38->40
+Current Cost: 12140.0->12424.0
+---Round 37---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: With 40 nodes visited and 60 remaining, the solution is at a mid-development stage. The current cost is relatively high, and the average edge cost suggests room for optimization. The high standard deviation in edge costs indicates variability that could be reduced. Improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 40->40
+Current Cost: 12424.0->12424.0
+---Round 38---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 40 nodes have been visited and 60 remain unvisited, there is still substantial potential for expanding the tour. The current average edge cost and the last edge cost are relatively high, suggesting room for improvement in the current path. Since the recent improvement heuristic (simulated annealing) did not reduce the cost, it would be beneficial to switch back to constructive heuristics. This approach allows for efficient expansion of the tour by adding new nodes, which can help build a more robust foundation before further refinement. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This strategy will lay a stronger groundwork for subsequent refinement phases.
+Visited Node: 40->42
+Current Cost: 12424.0->12859.0
+---Round 39---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that 42 nodes have been visited and 58 remain, the current solution is in a mid-development stage. The average edge cost is relatively high, and the last edge cost is notably above the average, suggesting inefficiencies in the current path. The recent use of a constructive heuristic increased the cost, indicating that further refinement of the existing tour is needed. Switching to improvement heuristics like 2-opt or 3-opt can help reduce crossings and optimize node sequences, potentially lowering the overall cost before further expansion. This refinement will create a more efficient path and prepare the solution for future constructive or adaptive strategies.
+Visited Node: 42->42
+Current Cost: 12859.0->12859.0
+---Round 40---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 42 nodes visited and 58 remaining, there is still significant potential for expanding the tour. The current average edge cost and high standard deviation indicate variability and room for improvement in node sequences. The recent improvement heuristic (_3opt_e75b) did not yield a reduction in cost, suggesting that further refinement of the existing tour may not be beneficial at this stage. Switching back to constructive heuristics will allow for efficient addition of new nodes, helping to further develop the solution. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 42->44
+Current Cost: 12859.0->12884.0
+---Round 41---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 44 nodes visited and 56 remaining, the current cost is relatively high, and the last edge cost significantly exceeds the average edge cost, indicating inefficiencies in the path. The high standard deviation suggests variability that can be optimized. Switching to improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost. This approach will create a more efficient path before further expanding with additional nodes.
+Visited Node: 44->44
+Current Cost: 12884.0->12884.0
+---Round 42---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 44 nodes have been visited and 56 remain unvisited, there is substantial potential for further expanding the tour. The recent improvement heuristic (_3opt_e75b) did not yield a reduction in cost, indicating that the current sequence might have reached a local optimum. The high average edge cost and standard deviation suggest variability that could be addressed by expanding the tour with additional nodes. Switching back to constructive heuristics will allow for the efficient addition of new nodes, helping to further develop the solution. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 44->45
+Current Cost: 12884.0->13519.0
+---Round 43---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: Given that 45 nodes have been visited and 55 remain unvisited, the current solution is in a mid-development stage. The average edge cost and standard deviation indicate variability in edge costs, suggesting room for optimization. The recent use of a constructive heuristic (nearest_neighbor_e8a4) increased the cost significantly, indicating potential inefficiencies in the current path. Switching to improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 45->45
+Current Cost: 13519.0->13519.0
+---Round 44---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 45 nodes visited and 55 remaining, there is still significant potential for expanding the tour. The recent improvement heuristic (simulated annealing) did not yield a reduction in cost, indicating that the current sequence might have reached a local optimum for the nodes visited so far. Switching back to constructive heuristics will allow for the efficient addition of new nodes, which can help expand the tour further. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 45->47
+Current Cost: 13519.0->13948.0
+---Round 45---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 47 nodes visited and 53 remaining, the solution is in mid-development. The average edge cost and standard deviation suggest room for optimization in the current path. The recent use of a constructive heuristic increased the cost, indicating potential inefficiencies that could be addressed by refinement. Switching to improvement heuristics, such as 2-opt or 3-opt, can help reduce crossings and optimize node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 47->47
+Current Cost: 13948.0->13948.0
+---Round 46---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain: With 47 nodes visited and 53 unvisited, there is significant potential for further expanding the tour. The recent improvement heuristic (_3opt_e75b) did not yield a reduction in cost, indicating that the current sequence might have reached a local optimum. Constructive heuristics can efficiently add new nodes to the tour, helping to build a more robust foundation for future refinements. Given the high number of unvisited nodes, constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation.
+Visited Node: 47->49
+Current Cost: 13948.0->14104.0
+---Round 47---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that 49 nodes have been visited and 51 remain unvisited, the tour is halfway complete, and there's a significant opportunity for optimization. The current average edge cost and the standard deviation suggest variability in the path that can be improved. Since the previous constructive heuristic increased the cost, it indicates potential inefficiencies in the current tour. Switching to improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 49->49
+Current Cost: 14104.0->14104.0
+---Round 48---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given the current state with 49 nodes visited and 51 remaining, there is significant potential for further expanding the tour. The recent use of an improvement heuristic (simulated annealing) did not yield a reduction in cost, suggesting that the current sequence might have reached a local optimum for the nodes visited so far. Switching back to constructive heuristics will allow for the efficient addition of new nodes, helping to further develop the tour. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 49->50
+Current Cost: 14104.0->14528.0
+---Round 49---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain: Given that 50 nodes have been visited and 50 remain, the current solution is halfway through its development. The average edge cost and the relatively high standard deviation suggest variability in the path that can be optimized. The recent use of a constructive heuristic increased the cost, indicating potential inefficiencies in the current tour. Switching to improvement heuristics, such as 2-opt or 3-opt, can help reduce crossings and optimize node sequences, potentially lowering the overall cost before further expansion. This approach will refine the existing tour and create a more efficient path, preparing the solution for future constructive expansions.
+Visited Node: 50->50
+Current Cost: 14528.0->14528.0
+---Round 50---
+Heuristic: farthest_insertion_54db
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 50 nodes visited and 50 remaining, the tour is halfway through its development. The recent use of an improvement heuristic did not yield a reduction in cost, suggesting that further refinement of the current tour might have reached a local optimum. The average edge cost is relatively high, and the standard deviation indicates variability in edge costs, suggesting potential for optimization by adding new nodes. Switching to constructive heuristics can efficiently expand the tour by incorporating unvisited nodes, building a more robust foundation for subsequent refinement phases. This approach will allow for rapid growth of the tour, improving the current solution's foundation before applying further improvement or adaptive strategies.
+Visited Node: 50->51
+Current Cost: 14528.0->14509.0
+---Round 51---
+Heuristic: _2opt_89aa
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state with 51 nodes visited and 49 remaining, the tour is slightly over halfway complete. The recent use of a constructive heuristic slightly decreased the cost, indicating some potential inefficiencies have been addressed. However, the average edge cost remains relatively high, and the standard deviation indicates variability in the path. This suggests room for optimization. Switching to improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 51->51
+Current Cost: 14509.0->14509.0
+---Round 52---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given the current state with 51 nodes visited and 49 remaining, there's still significant potential for expanding the tour. The recent improvement heuristic (_2opt_89aa) did not yield a reduction in cost, indicating that further refinement of the existing tour may not be beneficial at this stage. Additionally, the average edge cost remains relatively high, and the variability in edge costs suggests potential for optimization. Switching back to constructive heuristics will allow for the efficient addition of new nodes, which can help expand the tour further. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 51->53
+Current Cost: 14509.0->15460.0
+---Round 53---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 53 nodes visited and 47 remaining, and considering the current cost and average edge cost, it's beneficial to switch to improvement heuristics. The high standard deviation in edge costs suggests variability that can be optimized. Improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path as we prepare to incorporate more nodes.
+Visited Node: 53->53
+Current Cost: 15460.0->15460.0
+---Round 54---
+Heuristic: nearest_insertion_c1f0
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 53 nodes have been visited and 47 remain unvisited, there is significant potential for further expanding the tour. The recent use of an improvement heuristic (simulated annealing) did not yield a reduction in cost, indicating that further refinement of the current tour may not be beneficial at this stage. Additionally, the average edge cost and the variability in edge costs suggest potential for optimization by adding new nodes. Switching back to constructive heuristics will allow for the efficient addition of new nodes, which can help expand the tour further. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 53->55
+Current Cost: 15460.0->15873.0
+---Round 55---
+Heuristic: simulated_annealing_e625
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state with 55 nodes visited and 45 remaining, the solution is over halfway complete. The average edge cost is relatively high, and the last edge cost is significantly above the average, indicating inefficiencies in the path. The recent use of a constructive heuristic increased the cost, suggesting that further expansion without refinement might lead to suboptimal results. Switching to improvement heuristics, such as 2-opt or 3-opt, can help optimize the existing tour by reducing crossings and improving node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for future constructive expansions.
+Visited Node: 55->55
+Current Cost: 15873.0->15873.0
+---Round 56---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 55 nodes have been visited and 45 remain unvisited, there is still significant potential for expanding the tour. The recent improvement heuristic (simulated annealing) did not yield a reduction in cost, suggesting that further refinement of the existing tour may not be beneficial at this stage. Additionally, the average edge cost remains relatively high, and the variability in edge costs suggests potential for optimization by adding new nodes. Switching back to constructive heuristics will allow for the efficient addition of new nodes, which can help expand the tour further. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 55->55
+Current Cost: 15873.0->15435.0
+---Round 57---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given the current state with 55 nodes visited and 45 remaining, the recent use of a constructive heuristic (nearest_neighbor_e8a4) has effectively decreased the cost, suggesting that the current tour has been optimized to some extent. However, there remains a substantial number of unvisited nodes, and the average edge cost and standard deviation indicate variability that can be further reduced. Switching to improvement heuristics, such as 2-opt or 3-opt, can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path, ensuring the solution is well-optimized before adding more nodes.
+Visited Node: 55->55
+Current Cost: 15435.0->15389.0
+---Round 58---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that 55 nodes have been visited and 45 remain unvisited, there is still significant potential for expanding the tour. The recent use of an improvement heuristic (_3opt_e75b) effectively decreased the cost, suggesting that the current tour has been optimized to some extent. However, with a substantial number of unvisited nodes, it would be beneficial to switch back to constructive heuristics. This approach allows for the efficient addition of new nodes, helping to further develop the tour. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This strategy will lay a stronger groundwork for subsequent refinement phases.
+Visited Node: 55->56
+Current Cost: 15389.0->15226.0
+---Round 59---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  With 56 nodes visited and 44 remaining, the solution is in a mid-to-late development stage. The current cost has been effectively reduced through recent constructive heuristics, but the average edge cost and standard deviation indicate variability that could be further optimized. Switching to improvement heuristics can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for the final stages of node addition.
+Visited Node: 56->56
+Current Cost: 15226.0->15226.0
+---Round 60---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  With 56 nodes visited and 44 remaining, the solution is in the mid-to-late development stage. Although the recent use of the improvement heuristic (_3opt_e75b) did not yield further cost reduction, there is still potential for expanding the tour by adding new nodes. The average edge cost and variability suggest room for optimization by incorporating unvisited nodes. Constructive heuristics can efficiently expand the tour, creating a more robust foundation for subsequent refinement phases. This approach will help quickly integrate the remaining nodes, providing a solid base for further optimization.
+Visited Node: 56->58
+Current Cost: 15226.0->15838.0
+---Round 61---
+Heuristic: _3opt_e75b
+Heuristic Category: improvement_heuristics
+Running Steps: 2
+Explain:  Given that 58 nodes have been visited and 42 remain, the solution is in the mid-to-late development stage. The recent constructive heuristic increased the cost, indicating potential inefficiencies in the current path. The average edge cost is relatively high, and the standard deviation suggests variability that could be optimized. Switching to improvement heuristics can help refine the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for integrating the remaining nodes.
+Visited Node: 58->58
+Current Cost: 15838.0->15924.0
+---Round 62---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: constructive_heuristics
+Running Steps: 2
+Explain:  Given that there are still 42 unvisited nodes and the current cost is relatively high, with a high average edge cost and standard deviation, there is significant potential for expanding the tour. The recent use of improvement heuristics did not yield a substantial reduction in cost, indicating that the current tour might have reached a local optimum for the nodes visited so far. Switching back to constructive heuristics will allow for the efficient addition of new nodes, helping to further develop the tour. Constructive methods like nearest or cheapest insertion can rapidly grow the tour and improve the current solution's foundation, especially given the high number of remaining nodes. This approach will set a stronger base for subsequent refinement phases.
+Visited Node: 58->60
+Current Cost: 15924.0->16714.0
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:tour: 72->49->38->81->94->12->32->75->36->4->95->77->51->29->47->99->40->70->13->2->42->45->28->33->8->86->50->46->71->83->35->98->37->23->17->78->52->87->15->93->21->69->65->25->64->3->96->7->92->60->24->80->68->63->39->53->1->43->67->84->72
+visited_nodes:[72, 49, 38, 81, 94, 12, 32, 75, 36, 4, 95, 77, 51, 29, 47, 99, 40, 70, 13, 2, 42, 45, 28, 33, 8, 86, 50, 46, 71, 83, 35, 98, 37, 23, 17, 78, 52, 87, 15, 93, 21, 69, 65, 25, 64, 3, 96, 7, 92, 60, 24, 80, 68, 63, 39, 53, 1, 43, 67, 84]
+visited_num:60
+unvisited_nodes:[0, 5, 6, 9, 10, 11, 14, 16, 18, 19, 20, 22, 26, 27, 30, 31, 34, 41, 44, 48, 54, 55, 56, 57, 58, 59, 61, 62, 66, 73, 74, 76, 79, 82, 85, 88, 89, 90, 91, 97]
+unvisited_num:40
+current_cost:16714.0
+last_visited:84
+current_path_length:60
+remaining_nodes:40
+average_edge_cost:278.56666666666666
+last_edge_cost:412.0
+std_dev_edge_cost:191.6862951200665
+solution_validity:1
+min_edge_cost_remaining:714.0
+max_edge_cost_remaining:2511.0
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: cheapest_insertion_7a30(constructive_heuristics). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: constructive_heuristics,improvement_heuristics,metaheuristics,adaptive_heuristics,nearest_insertion_variants
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(constructive_heuristics,improvement_heuristics,metaheuristics,adaptive_heuristics,nearest_insertion_variants)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:improvement_heuristics
+explanation: With 60 nodes visited and 40 remaining, the current cost is relatively high, and the average edge cost and standard deviation suggest variability that could be optimized. The recent use of the constructive heuristic (cheapest_insertion_7a30) increased the cost significantly, indicating potential inefficiencies in the current path. Switching to improvement heuristics will allow for refinement of the existing tour by reducing crossings and optimizing node sequences, potentially lowering the overall cost before further expansion. This approach will create a more efficient path and prepare the solution for integrating the remaining nodes.
+***
+------------------------------------------------------------------------------------
+

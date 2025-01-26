@@ -1,0 +1,613 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on dposp problem:
+Dynamic Production Order Scheduling Problem (DPOSP) involves multiple machines, each capable of producing various products. The production speed for different products varies across machines, and some transitions between products are not allowed. Each order specifies the required product, quantity, and deadline, and an order is considered completed only if all requirements are met by the deadline. Orders completed after the deadline are invalid. Each production action corresponds to an order, and the plan for each production line can be represented as a list, where each item denotes an order. The start time of each production is calculated based on the sum of the previous production and transition times, ensuring that each production is completed before the deadline. Our objective is to maximize the number of completed orders, with each order having the same priority, regardless of the quantity required.
+
+To formally describe DPOSP, we build the following optimization model. Let X_ij represent the j-th production action on the i-th production line, whereX_ij=k indicates that the j-th action on the i-th production line is producing order k, and X_ij=0 if there is no production action. The problem includes the following components:
+
+**Maximize**
+Sum over all production lines (i) and production actions (j) of the indicator function I(X_ij != 0)
+
+**Subject to**
+1. For each order k, sum over all production lines (i) and production actions (j) of the indicator function I(X_ij = k) <= 1.
+2. The start time s_ij is set to:
+   - 0 if j = 1 (the first action on the production line starts at time 0)
+   - The end time of the previous action (e_i,j-1) plus the transition time between the products of the previous action (P_k_j-1) and the current action (P_k_j) if j > 1.
+3. The end time e_ij is calculated as the start time s_ij plus the quantity of order k divided by the production speed of the production line i for product P_k, if X_ij = k.
+4. The end time e_ij must be less than or equal to the deadline D_k for the order k, if X_ij = k.
+
+Where:
+- X_ij (Decision Variable) represents the j-th production action on the i-th production line, with X_ij = k indicating production of order k and X_ij = 0 indicating no action; X_ij can take values in the set {0, 1, ..., k}.
+- v_ip (Input Variable) is the production speed of production line i for product p. If v_ip = 0, the product cannot be produced on line i.
+- t_i,p,p' (Input Variable) is the transition time for production line i from product p to product p'. If t_i,p,p' is infinity, the transition is not allowed.
+- Q_k (Input Variable) is the quantity required for order k.
+- P_k (Input Variable) is the product required for order k.
+- D_k (Input Variable) is the deadline for order k.
+- s_ij (Intermediate Variable) is the start time of the j-th production action on production line i.
+- e_ij (Intermediate Variable) is the end time of the j-th production action on production line i.
+- I() (Indicator Function) equals 1 if the condition is true, and 0 otherwise.
+
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of DPOSP.
+A list of lists, where each sublist corresponds to a production line's planned sequence of orders.
+Each integer within the sublist represents an order to be fulfilled by the machine, in the sequence they are to be produced."""
+    def __init__(self, production_schedule: list[list[int]]):
+        self.production_schedule = production_schedule
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Appends an order to the end of a specified production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].append(self.order_id)
+        return Solution(new_schedule)
+class InsertOperator(BaseOperator):
+    """Inserts an order at a specified position within a production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int, position: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].insert(self.position, self.order_id)
+        return Solution(new_schedule)
+class SwapOperator(BaseOperator):
+    """Swaps two orders between or within production lines."""
+    def __init__(self, production_line_id1: int, position1: int, production_line_id2: int, position2: int):
+        if production_line_id1 <= production_line_id2:
+            self.production_line_id1 = production_line_id1
+            self.position1 = position1
+            self.production_line_id2 = production_line_id2
+            self.position2 = position2
+        else:
+            self.production_line_id1 = production_line_id2
+            self.position1 = position2
+            self.production_line_id2 = production_line_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        (new_schedule[self.production_line_id1][self.position1], new_schedule[self.production_line_id2][self.position2]) = (new_schedule[self.production_line_id2][self.position2], new_schedule[self.production_line_id1][self.position1])
+        return Solution(new_schedule)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverses a segment of orders within a production line's schedule."""
+    def __init__(self, production_line_id: int, segments: list[tuple[int, int]]):
+        self.production_line_id = production_line_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_schedule[self.production_line_id])
+            assert 0 <= end_index < len(new_schedule[self.production_line_id])
+            if start_index > end_index:
+                (start_index, end_index) = (end_index, start_index)
+            new_schedule[self.production_line_id][start_index:end_index + 1] = reversed(new_schedule[self.production_line_id][start_index:end_index + 1])
+        return Solution(new_schedule)
+class RelocateOperator(BaseOperator):
+    """Moves an order from one position to another within the same or to a different production line."""
+    def __init__(self, source_production_line_id: int, source_position: int, target_production_line_id: int, target_position: int):
+        self.source_production_line_id = source_production_line_id
+        self.source_position = source_position
+        self.target_production_line_id = target_production_line_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        order = new_schedule[self.source_production_line_id].pop(self.source_position)
+        if not new_schedule[self.target_production_line_id]:
+            new_schedule[self.target_production_line_id].append(order)
+        else:
+            new_schedule[self.target_production_line_id].insert(self.target_position, order)
+        return Solution(new_schedule)
+class MergeOperator(BaseOperator):
+    """Merges the schedule of a source production line into the beginning of a target production line's schedule. 
+The merged schedule is assigned to the target production line, and the source production line's schedule is cleared."""
+    def __init__(self, source_production_line_id: int, target_production_line_id: int):
+        self.source_production_line_id = source_production_line_id
+        self.target_production_line_id = target_production_line_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.target_production_line_id] = new_schedule[self.source_production_line_id] + new_schedule[self.target_production_line_id]
+        new_schedule[self.source_production_line_id] = []
+        return Solution(new_schedule)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+- "product_num" (int): Total number of unique products.
+- "production_line_num" (int): Total number of production lines.
+- "order_num" (int): Total number of orders to be scheduled.
+- "production_rate" (numpy.array): 2D array of production time for each product on each production line, and shape is (production_line_num, product_num)
+- "transition_time" (numpy.array): 3D array of transition time between products on each production line, and shape is (production_line_num, product_num, product_num)
+- "order_product" (numpy.array): 1D array mapping each order to its required product and length is order_num.
+- "order_quantity" (numpy.array): 1D array of the quantity required for each order and length is order_num.
+- "order_deadline" (numpy.array): 1D array of the deadline for each order and length is order_num.
+- "current_solution" (Solution): Current scheduling solution.
+- "fulfilled_order_num" (int): Number of fulfilled orders.
+- "fulfilled_orders" (list[int]): List of fulfilled orders.
+- "unfulfilled_orders" (list[int]): List of unfulfilled orders.
+- "total_time_cost_per_production_line" (numpy.array): 1D array of the sum of production and transition times for each production line.
+- "feasible_orders_to_fulfill" (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
+- "validation_single_production_schedule" (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
+- "get_time_cost_delta" (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
+- "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is dposp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def exchange_production_orders_eda2(): The exchange production orders heuristic tries to improve the current production schedule by swapping two non-adjacent orders from the same or different production lines and assessing the impact on the total production and transition times. The heuristic is based on the 2-opt approach from TSP and is adapted to consider DPOSP-specific constraints such as varying production speeds, transition times, order deadlines, and production line capabilities.
+def greedy_by_order_density_de77(): Heuristic to prioritize orders based on a weighted combination of deadline tightness, production feasibility, and potential flexibility for future scheduling.
+def least_order_remaining_27ca(): Heuristic to prioritize orders based on a weighted score incorporating deadline proximity, production feasibility, and potential to maximize fulfilled orders.
+def order_shift_between_lines_bd0c(): This heuristic attempts to shift an unfulfilled order from one production line to another while adhering to machine capabilities, transition rules, and order deadlines.
+def shortest_operation_ae31(): Shortest Operation Heuristic with Optimization (AE31) for DPOSP. This heuristic aims to maximize the number of fulfilled orders by prioritizing orders based on deadlines, feasibility, and production times. It dynamically searches for better insertion positions, shifts orders, and periodically optimizes through swaps.
+def _2opt_production_sequence_8e5e(): The 2-opt Production Sequence heuristic adapts the 2-opt approach from TSP to the context of DPOSP. It aims to improve the sequence of production orders on each production line by swapping two non-adjacent orders and re-evaluating the schedule's efficiency. By considering the production rates, transition times, and order deadlines, this heuristic explores alternative sequences that could lead to a higher number of completed orders or reduced total production and transition time. The heuristic iteratively checks all possible pairs of non-adjacent orders within a production line to determine if a more optimal order sequence can be found, taking care to maintain the feasibility of the schedule with respect to order deadlines. If a more efficient sequence is identified, the heuristic generates a ReverseSegmentOperator that applies this improved order sequence to the production line.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios where each heuristic is applicable requires an understanding of the specific characteristics of the DPOSP problem and the nature of each heuristic. Below is an analysis of the scenarios where each heuristic might be most beneficial, along with suggestions for quantifiable metrics to determine their applicability.
+
+---
+
+### 1. **`exchange_production_orders_eda2()`**
+   - **Scenario**: 
+     - This heuristic is applicable when the current production schedule has room for improvement in terms of reducing transition times or rearranging orders to meet deadlines.
+     - It is particularly useful when there are non-adjacent orders that, if swapped, could lead to a better overall schedule or increased feasibility of fulfilling more orders.
+   - **Quantifiable Scenarios**:
+     - **High transition cost**: Average or total transition time between orders is high.
+     - **Low schedule efficiency**: Number of unfulfilled orders is high, or the total unutilized time on production lines is significant.
+     - **Sparse order distribution**: The orders on production lines are non-clustered or poorly sequenced.
+   - **Key Metric**: 
+     - Reduction in total production and transition time after applying the heuristic.
+
+---
+
+### 2. **`greedy_by_order_density_de77()`**
+   - **Scenario**:
+     - This heuristic is applicable when orders have varying levels of deadline tightness, production feasibility, and potential scheduling flexibility.
+     - It is most effective when prioritization based on a weighted combination of these factors can lead to better decision-making.
+   - **Quantifiable Scenarios**:
+     - **Order density**: Orders have varying levels of "density," defined as the ratio of quantity to the remaining time until the deadline.
+     - **High variability in deadlines**: Orders have a wide range of deadlines, from very tight to very loose.
+     - **Multiple feasible options**: There are many feasible orders to choose from at each step.
+   - **Key Metric**:
+     - Weighted prioritization score for orders and its correlation with the number of fulfilled orders.
+
+---
+
+### 3. **`least_order_remaining_27ca()`**
+   - **Scenario**:
+     - This heuristic is suitable when the focus is on maximizing the number of fulfilled orders by prioritizing orders that are close to their deadlines.
+     - It is effective in scenarios where tight deadlines significantly constrain the scheduling decisions.
+   - **Quantifiable Scenarios**:
+     - **Near-deadline orders**: A large proportion of orders have deadlines close to the current time.
+     - **High deadline variance**: Orders have diverse deadlines, creating opportunities to prioritize those that are more urgent.
+     - **Feasibility issues**: There are many unfulfilled orders due to deadline constraints.
+   - **Key Metric**:
+     - Number of near-deadline orders successfully scheduled.
+
+---
+
+### 4. **`order_shift_between_lines_bd0c()`**
+   - **Scenario**:
+     - This heuristic is applicable when there are unfulfilled orders on a production line that might be fulfilled by shifting them to another line with better capabilities or lower load.
+     - It is particularly useful in scenarios with imbalanced workloads or machine-specific limitations.
+   - **Quantifiable Scenarios**:
+     - **Unbalanced production lines**: Significant differences in the total time cost across production lines.
+     - **Machine-specific constraints**: Some production lines have restricted capabilities, making them bottlenecks.
+     - **Underutilized lines**: Some production lines have minimal or no scheduled orders.
+   - **Key Metric**:
+     - Reduction in the imbalance of total time cost across production lines.
+
+---
+
+### 5. **`shortest_operation_ae31()`**
+   - **Scenario**:
+     - This heuristic is effective in scenarios where orders have significant variability in production times and deadlines.
+     - It is most applicable when the goal is to dynamically adjust the schedule to maximize fulfilled orders while minimizing production and transition times.
+   - **Quantifiable Scenarios**:
+     - **High variability in production times**: Orders require vastly different times for production.
+     - **Dynamic scheduling opportunities**: Frequent opportunities to insert, shift, or swap orders for better results.
+     - **High deadline constraints**: Many orders have tight deadlines, requiring efficient scheduling.
+   - **Key Metric**:
+     - Number of fulfilled orders and reduction in total production and transition time.
+
+---
+
+### 6. **`_2opt_production_sequence_8e5e()`**
+   - **Scenario**:
+     - This heuristic is applicable when the sequence of orders on a production line significantly affects the overall schedule efficiency.
+     - It is particularly useful in scenarios where transition times between products are high or where better sequencing could lead to more fulfilled orders.
+   - **Quantifiable Scenarios**:
+     - **High transition cost**: Average or total transition time between products is high.
+     - **Sequence inefficiency**: The current sequence of orders leads to many unmet deadlines or high total time costs.
+     - **Opportunities for swaps**: There are multiple pairs of non-adjacent orders that, if swapped, could improve the schedule.
+   - **Key Metric**:
+     - Reduction in total time cost (production + transition) per production line after applying the heuristic.
+
+---
+
+### Summary of Quantifiable Metrics
+To determine the best heuristic for a given scenario, the following metrics can be used:
+1. **Transition cost**: Total or average transition time between orders.
+2. **Deadline tightness**: Ratio of order quantity to remaining time until the deadline.
+3. **Production line balance**: Variance in total time cost across production lines.
+4. **Production time variability**: Range or standard deviation of production times across orders.
+5. **Sequence inefficiency**: Number of unmet deadlines or high time costs due to suboptimal sequencing.
+6. **Fulfilled orders**: Total number of orders successfully scheduled and completed.
+
+By analyzing these metrics, you can better match each heuristic to the specific characteristics of the problem instance.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+product_num:20
+production_line_num:10
+order_num:200
+order_product:[3, 13, 10, 13, 15, 12, 11, 5, 10, 12, 4, 11, 15, 9, 3, 8, 2, 13, 14, 9, 0, 4, 4, 15, 18, 7, 1, 14, 8, 19, 0, 5, 11, 16, 0, 4, 19, 7, 4, 2, 16, 17, 18, 12, 16, 17, 9, 8, 0, 12, 2, 1, 2, 5, 6, 4, 13, 1, 5, 11, 7, 7, 1, 2, 18, 12, 17, 15, 1, 8, 19, 15, 12, 16, 18, 8, 12, 0, 12, 19, 18, 2, 11, 0, 9, 14, 8, 11, 8, 11, 8, 1, 15, 13, 4, 4, 17, 1, 12, 16, 5, 10, 8, 4, 14, 16, 13, 16, 1, 4, 1, 1, 18, 16, 8, 16, 16, 18, 16, 3, 11, 13, 15, 0, 1, 13, 5, 18, 8, 12, 9, 5, 4, 6, 0, 2, 5, 17, 2, 12, 19, 1, 16, 16, 13, 7, 1, 6, 5, 17, 8, 13, 14, 15, 3, 14, 1, 14, 8, 13, 19, 17, 5, 2, 1, 19, 9, 4, 6, 14, 10, 19, 1, 10, 5, 1, 14, 11, 8, 16, 19, 0, 8, 19, 13, 19, 7, 19, 13, 17, 9, 4, 3, 1, 13, 19, 6, 12, 5, 11]
+average_production_rate:[1.0, 0.1, 1.0, 0.0, 0.6, 1.8, 1.3, 1.3, 0.5, 0.0, 0.8, 1.0, 0.3, 1.5, 2.2, 1.8, 0.1, 0.0, 0.9, 0.3]
+maximum_transition_time:inf
+average_order_quantity:17.375
+deadline_variance:187.4544
+product_to_order_ratio:0.1
+average_deadline_per_product:[22.22222222222222, 30.22222222222222, 21.333333333333332, 27.2, 22.153846153846153, 29.333333333333332, 35.2, 22.666666666666668, 27.733333333333334, 25.142857142857142, 27.2, 24.0, 22.0, 30.285714285714285, 31.11111111111111, 19.0, 28.0, 29.0, 22.0, 35.07692307692308]
+production_line_utilization_potential:[inf, inf, inf, inf, inf, inf, inf, inf, inf, inf]
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_solution:
+production_line_0: 35->191->22->38->55->94
+production_line_1: 69->88->102->15->28
+production_line_2: 72->9->43->49->65
+production_line_3: 32->59->82->87->199->39->50->63->81
+production_line_4: 185->29->36->70
+production_line_5: 169->18
+production_line_6: 62->97->141->175->51->57->91->108->110->111->124->146->156->172->193
+production_line_7: 33->40->107->113->116->1->144->44->73->99->105->115->142->143->179
+production_line_8: 
+production_line_9: 20->123->181->24
+
+fulfilled_order_num:65
+fulfilled_orders:[35, 191, 22, 38, 55, 94, 69, 88, 102, 15, 28, 72, 9, 43, 49, 65, 32, 59, 82, 87, 199, 39, 50, 63, 81, 185, 29, 36, 70, 169, 18, 62, 97, 141, 175, 51, 57, 91, 108, 110, 111, 124, 146, 156, 172, 193, 33, 40, 107, 113, 116, 1, 144, 44, 73, 99, 105, 115, 142, 143, 179, 20, 123, 181, 24]
+unfulfilled_orders:[0, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 26, 27, 30, 31, 34, 37, 41, 42, 45, 46, 47, 48, 52, 53, 54, 56, 58, 60, 61, 64, 66, 67, 68, 71, 74, 75, 76, 77, 78, 79, 80, 83, 84, 85, 86, 89, 90, 92, 93, 95, 96, 98, 100, 101, 103, 104, 106, 109, 112, 114, 117, 118, 119, 120, 121, 122, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 145, 147, 148, 149, 150, 151, 152, 153, 154, 155, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 170, 171, 173, 174, 176, 177, 178, 180, 182, 183, 184, 186, 187, 188, 189, 190, 192, 194, 195, 196, 197, 198]
+total_time_cost_per_production_line:[10.0, 7.0, 9.0, 13.0, 7.0, 3.0, 26.0, 23.0, 0.0, 5.0]
+feasible_orders_to_fulfill:[3, 4, 5, 10, 17, 21, 26, 27, 30, 34, 42, 47, 48, 52, 53, 54, 56, 58, 60, 64, 67, 68, 71, 74, 75, 76, 77, 78, 79, 80, 83, 85, 86, 89, 90, 92, 93, 95, 98, 100, 101, 103, 104, 106, 109, 112, 114, 117, 118, 120, 121, 122, 125, 126, 127, 128, 129, 131, 132, 133, 134, 135, 136, 138, 139, 140, 145, 147, 148, 150, 151, 152, 153, 155, 157, 158, 159, 160, 162, 163, 164, 165, 167, 168, 170, 171, 173, 174, 176, 177, 178, 180, 182, 183, 184, 186, 187, 188, 194, 195, 196, 197, 198]
+fulfillment_ratio:0.325
+average_time_cost:10.3
+max_time_cost:26.0
+unfulfilled_order_quantity_sum:3135.0
+unfulfilled_order_deadline_variance:186.6447187928669
+feasible_order_count:103
+solution_validity:True
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 33 rounds discuss and the summary are:
+---Round 0---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 1
+Explain: The current state indicates that no orders have been fulfilled yet, and the unfulfilled order quantity sum is high (3475.0). Additionally, 179 feasible orders can be fulfilled at this stage. The `greedy_by_order_density_de77` heuristic is well-suited for prioritizing orders based on deadline tightness and production feasibility. This initial heuristic will help establish a foundation by selecting and scheduling the most feasible orders based on their density.
+Delta of Total Time Cost For All Production Lines: 1.0
+Delta of Feasible Orders To Fulfill Num: -33
+Delta of Fulfilled Order Num: 1
+---Round 1---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The fulfillment ratio is still very low (0.005), and the unfulfilled order quantity sum remains high (3474.0). Additionally, 178 feasible orders are available for scheduling, indicating ample opportunities to improve the solution. The `greedy_by_order_density_de77` heuristic has already shown progress by fulfilling one order and reducing feasible orders by 33 in the previous step. Running it for 2 more steps can continue to prioritize high-density orders, building a stronger foundation for the solution.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -102
+Delta of Fulfilled Order Num: 2
+---Round 2---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has demonstrated progress in reducing the feasible orders and fulfilling orders in the initial steps. The fulfillment ratio (0.015) is still very low, and the unfulfilled order quantity sum remains high (3472.0). Additionally, 176 feasible orders are still available for scheduling, indicating substantial room for improvement. Continuing with this heuristic for two more steps will likely prioritize high-density orders and further reduce the pool of feasible orders while increasing the number of fulfilled orders. This will help establish a stronger foundation for subsequent heuristics to operate on.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -132
+Delta of Fulfilled Order Num: 2
+---Round 3---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The current fulfillment ratio remains low (0.025), and there are still 174 feasible orders available, indicating significant room for improvement. The `greedy_by_order_density_de77` heuristic has shown consistent progress in previous rounds by prioritizing high-density orders, reducing the pool of feasible orders, and increasing the number of fulfilled orders. Running this heuristic for 2 more steps will likely continue to enhance the foundation of the solution by targeting the most promising orders, particularly given the high variability in deadlines and the unfulfilled order quantity sum of 3468.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -248
+Delta of Fulfilled Order Num: 2
+---Round 4---
+Heuristic: order_shift_between_lines_bd0c
+Parameters: {}
+Running Steps: 2
+Explain: The fulfillment ratio remains low (0.035), and there are significant unfulfilled orders (quantity sum of 3466.0). The current solution has unbalanced production line utilization, with several lines entirely empty. The `order_shift_between_lines_bd0c` heuristic is well-suited for redistributing orders to underutilized lines, which can potentially lead to better utilization and higher fulfillment. Running this heuristic for 2 steps will help explore these opportunities.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 5---
+Heuristic: order_shift_between_lines_bd0c
+Parameters: {}
+Running Steps: 2
+Explain: The current solution shows unbalanced production line utilization, with several production lines entirely empty. The fulfillment ratio is still very low (0.035), and the unfulfilled order quantity sum remains high (3466.0). Although the previous run of `order_shift_between_lines_bd0c` did not yield any improvements, it is reasonable to explore this heuristic for two more steps to further redistribute orders and potentially unlock better utilization of underutilized lines. This step is critical to ensuring that the solution exploration has covered this heuristic sufficiently before considering a switch to another approach.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 6---
+Heuristic: order_shift_between_lines_bd0c
+Parameters: {}
+Running Steps: 2
+Explain: The current state shows unbalanced production line utilization, with several lines still entirely empty. While the previous two rounds of `order_shift_between_lines_bd0c` did not yield visible improvements, the heuristic remains relevant given the unbalanced workload. Redistributing orders to underutilized lines may unlock additional fulfillment opportunities and improve overall utilization. Running this heuristic for 2 more steps allows for further exploration of this strategy before considering switching to another heuristic.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 7---
+Heuristic: order_shift_between_lines_bd0c
+Parameters: {}
+Running Steps: 2
+Explain: The current solution shows unbalanced production line utilization, with several lines entirely empty. While the past runs of `order_shift_between_lines_bd0c` did not yield improvements, the heuristic remains relevant given the unbalanced workload. Redistributing orders to underutilized lines could unlock potential fulfillment opportunities. Running this heuristic for 2 more steps allows for further exploration before deciding on switching to another approach, ensuring a thorough exploration of its potential.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 8---
+Heuristic: order_shift_between_lines_bd0c
+Parameters: {}
+Running Steps: 2
+Explain: While the previous rounds of `order_shift_between_lines_bd0c` did not yield visible improvements, the unbalanced workload across production lines and the presence of entirely empty lines still make this heuristic relevant. Redistributing orders to underutilized lines may help unlock new fulfillment opportunities and improve utilization. Running this heuristic for 2 more steps ensures a thorough exploration of its potential before deciding to switch to another approach.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 9---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `order_shift_between_lines_bd0c` heuristic has been repeatedly tested over several rounds, yielding no improvement in the fulfillment ratio, feasible orders, or utilization. The consistent lack of progress suggests that this heuristic is not suitable at the current stage. However, the current state still indicates a low fulfillment ratio (0.035) and high unfulfilled order quantity sum (3466.0), along with 172 feasible orders to fulfill. Given these conditions, switching back to the `greedy_by_order_density_de77` heuristic is recommended as it has previously demonstrated the ability to prioritize and fulfill high-density orders effectively. Running it for 2 steps can help identify and schedule the most promising orders, potentially increasing the fulfillment ratio and reducing the pool of feasible orders.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -229
+Delta of Fulfilled Order Num: 2
+---Round 10---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has demonstrated consistent progress in prioritizing high-density orders and increasing the fulfillment ratio in previous rounds. Although the fulfillment ratio remains low (0.045), the high number of feasible orders (170) and the unfulfilled order quantity sum (3464.0) indicate significant room for improvement. Running this heuristic for 2 more steps will likely continue to increase fulfilled orders and reduce the pool of feasible orders, building upon the existing progress.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -207
+Delta of Fulfilled Order Num: 2
+---Round 11---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated progress in prioritizing and fulfilling high-density orders, which is critical given the low fulfillment ratio (0.055) and the significant unfulfilled order quantity sum (3453.0). Additionally, the number of feasible orders (168) and the high deadline variance (188.4686) indicate room for further improvement. Running this heuristic for 2 more steps will likely continue to increase the fulfillment ratio and reduce the pool of feasible orders, further building upon the progress achieved in previous rounds.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -110
+Delta of Fulfilled Order Num: 2
+---Round 12---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently shown positive progress in previous rounds, effectively reducing the pool of feasible orders and increasing the fulfillment ratio. The current fulfillment ratio (0.065) is still very low, and there are 165 feasible orders to fulfill, indicating significant room for improvement. With a high deadline variance (187.8656) and a substantial unfulfilled order quantity sum (3440.0), this heuristic remains suitable for prioritizing high-density orders. Running it for 2 more steps will likely continue to increase fulfilled orders while reducing the pool of feasible orders, building on the momentum of previous rounds.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -89
+Delta of Fulfilled Order Num: 2
+---Round 13---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated progress in previous rounds by effectively reducing the pool of feasible orders and increasing the fulfillment ratio. With the current fulfillment ratio at 0.075 and 163 feasible orders remaining, there is still significant room for improvement. The high unfulfilled order quantity sum (3425.0) and deadline variance (187.196) indicate that prioritizing high-density orders is still a relevant and effective approach. Running the heuristic for 2 more steps can further refine the solution and capitalize on the progress achieved so far.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -250
+Delta of Fulfilled Order Num: 2
+---Round 14---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The fulfillment ratio remains low (0.085), and the number of feasible orders (161) suggests that there are still opportunities to improve the solution. The `greedy_by_order_density_de77` heuristic has consistently demonstrated its ability to prioritize high-density orders and increase fulfilled orders in previous rounds. Running it for 2 more steps will likely continue to refine the solution and reduce the pool of feasible orders. This will build upon the momentum achieved so far and further improve the fulfillment ratio.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -170
+Delta of Fulfilled Order Num: 2
+---Round 15---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has demonstrated consistent positive progress in previous rounds by effectively reducing the pool of feasible orders and increasing the fulfillment ratio. While the fulfillment ratio has improved to 0.095, it remains low, and there are still 159 feasible orders left to fulfill. The high unfulfilled order quantity sum (3397.0) and significant deadline variance (188.1418) indicate that prioritizing high-density orders remains a relevant and effective approach. Running the heuristic for 2 more steps will continue to refine the solution and build upon the momentum achieved in prior rounds, further increasing the fulfillment ratio.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -272
+Delta of Fulfilled Order Num: 2
+---Round 16---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The heuristic `greedy_by_order_density_de77` has demonstrated consistent progress in previous rounds, effectively reducing the pool of feasible orders and increasing the fulfillment ratio. The current fulfillment ratio is still low (0.105), and there are 157 feasible orders remaining. Additionally, the high unfulfilled order quantity sum (3384.0) and significant deadline variance (187.7914) indicate that prioritizing high-density orders remains a relevant and effective approach. Running this heuristic for 2 more steps will likely continue to refine the solution, further increasing the fulfillment ratio and reducing the pool of feasible orders.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -271
+Delta of Fulfilled Order Num: 2
+---Round 17---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated its ability to prioritize high-density orders effectively, leading to incremental improvements in the fulfillment ratio. With the current fulfillment ratio still low (0.115) and 155 feasible orders remaining, there is room for further progress. The high unfulfilled order quantity sum (3369.0) and significant deadline variance (188.8602) suggest that prioritizing high-density orders remains a relevant and impactful approach. Running this heuristic for 2 more steps will likely continue to refine the solution, increase the fulfillment ratio, and reduce the pool of feasible orders.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -343
+Delta of Fulfilled Order Num: 2
+---Round 18---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently shown incremental progress in improving the fulfillment ratio and reducing the pool of feasible orders across multiple rounds. The current fulfillment ratio (0.125) remains low, and there are still 153 feasible orders, indicating significant room for further improvement. Additionally, the high unfulfilled order quantity sum (3349.0) and deadline variance (187.5591) suggest that prioritizing high-density orders remains relevant. Continuing with this heuristic for 2 more steps is a logical choice to further capitalize on its effectiveness in this phase.
+Delta of Total Time Cost For All Production Lines: 2.0
+Delta of Feasible Orders To Fulfill Num: -304
+Delta of Fulfilled Order Num: 2
+---Round 19---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental improvements in fulfillment ratio and reduction of feasible orders. The current fulfillment ratio (0.135) remains low, and 151 feasible orders are still available, indicating potential for further improvement. The high unfulfilled order quantity sum (3329.0) and significant deadline variance (187.0026) suggest that prioritizing high-density orders remains an effective approach. Running this heuristic for 2 additional steps will likely continue to refine the solution, increase the fulfillment ratio, and reduce the pool of feasible orders.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -178
+Delta of Fulfilled Order Num: 2
+---Round 20---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental improvements in fulfillment ratio and reduction of feasible orders over multiple rounds. While the fulfillment ratio has improved to 0.145, it remains relatively low, and 148 feasible orders are still available, indicating room for further progress. The high unfulfilled order quantity sum (3325.0) and significant deadline variance (187.8042) suggest that prioritizing high-density orders remains an effective strategy. Running this heuristic for 2 more steps is a logical choice to continue refining the solution, building on its consistent performance in previous rounds.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -108
+Delta of Fulfilled Order Num: 2
+---Round 21---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The heuristic `greedy_by_order_density_de77` has consistently demonstrated incremental improvements in reducing the pool of feasible orders and increasing the fulfillment ratio over previous rounds. While the fulfillment ratio has improved to 0.155, it remains relatively low, indicating room for further progress. Additionally, 146 feasible orders are still available, and the high unfulfilled order quantity sum (3321.0) and significant deadline variance (188.5917) suggest that prioritizing high-density orders remains effective. Running this heuristic for 2 more steps is logical to continue refining the solution and capitalize on its demonstrated performance.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -190
+Delta of Fulfilled Order Num: 2
+---Round 22---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently shown incremental progress in reducing the pool of feasible orders and increasing the fulfillment ratio. While the fulfillment ratio has improved to 0.165, it remains relatively low, indicating room for further progress. Additionally, 144 feasible orders are still available, and the high unfulfilled order quantity sum (3317.0) and significant deadline variance (190.7356) suggest that prioritizing high-density orders remains effective. Running this heuristic for 2 more steps is a logical choice to continue refining the solution and building on its demonstrated performance in previous rounds.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -220
+Delta of Fulfilled Order Num: 2
+---Round 23---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental improvements in fulfillment ratio and reduction of feasible orders over multiple rounds. While the fulfillment ratio has improved to 0.175, it remains low, and 142 feasible orders are still available, indicating room for further progress. Additionally, the high unfulfilled order quantity sum (3313.0) and significant deadline variance (192.7546) suggest that prioritizing high-density orders remains effective. Running this heuristic for 2 more steps is a logical choice to further refine the solution and capitalize on its demonstrated performance in previous rounds.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -285
+Delta of Fulfilled Order Num: 2
+---Round 24---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The heuristic `greedy_by_order_density_de77` has consistently demonstrated incremental improvements in fulfillment ratio and reduction of feasible orders over multiple rounds. While the fulfillment ratio has improved to 0.185, it remains low, and 140 feasible orders are still available, indicating that there is room for further progress. Additionally, the high unfulfilled order quantity sum (3309.0) and significant deadline variance (193.9294) suggest that prioritizing high-density orders remains effective. Running this heuristic for 2 more steps is a logical choice to continue refining the solution and capitalize on its demonstrated performance in previous rounds.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -218
+Delta of Fulfilled Order Num: 2
+---Round 25---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated progress in increasing the fulfillment ratio and reducing the pool of feasible orders in previous rounds. While the fulfillment ratio has improved to 0.195, it remains relatively low, and there are still 138 feasible orders available, indicating room for further improvement. Additionally, the high unfulfilled order quantity sum (3305.0) and significant deadline variance (196.0171) suggest that prioritizing high-density orders remains effective at this stage. Running this heuristic for 2 more steps will likely continue to refine the solution and build upon its demonstrated performance.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -235
+Delta of Fulfilled Order Num: 2
+---Round 26---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The heuristic `greedy_by_order_density_de77` has shown consistent progress in increasing the fulfillment ratio and reducing the pool of feasible orders in previous rounds. The current fulfillment ratio is still relatively low (0.205), and there are 136 feasible orders available, indicating significant room for further improvement. Additionally, the high unfulfilled order quantity sum (3301.0) and considerable deadline variance (198.1491) suggest that prioritizing high-density orders remains effective. Running this heuristic for 2 more steps will likely continue to refine the solution and build upon its demonstrated performance in prior rounds.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -302
+Delta of Fulfilled Order Num: 2
+---Round 27---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 2
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental improvements in fulfillment ratio and reduction of feasible orders over multiple rounds. The fulfillment ratio (0.215) remains low, and there are still 134 feasible orders available, indicating room for further progress. Additionally, the high unfulfilled order quantity sum (3297.0) and considerable deadline variance (198.4314) suggest that prioritizing high-density orders remains effective. Running this heuristic for 2 more steps is a logical choice to continue refining the solution and capitalize on its demonstrated performance in prior rounds.
+Delta of Total Time Cost For All Production Lines: 4.0
+Delta of Feasible Orders To Fulfill Num: -201
+Delta of Fulfilled Order Num: 2
+---Round 28---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 4
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental progress in previous rounds, effectively increasing the fulfillment ratio and reducing the pool of feasible orders. While the fulfillment ratio has improved to 0.225, it remains low, and 132 feasible orders are still available, indicating significant room for further improvement. Additionally, the high unfulfilled order quantity sum (3289.0) and considerable deadline variance (195.8067) suggest that prioritizing high-density orders remains effective. Running this heuristic for 4 steps, rather than 2, would allow for a more aggressive refinement of the solution and capitalize on its demonstrated performance in prior rounds.
+Delta of Total Time Cost For All Production Lines: 8.0
+Delta of Feasible Orders To Fulfill Num: -459
+Delta of Fulfilled Order Num: 4
+---Round 29---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 4
+Explain: The heuristic `greedy_by_order_density_de77` has consistently demonstrated incremental progress in fulfillment ratio and reduction of feasible orders over multiple rounds. The fulfillment ratio (0.245) remains low, and 126 feasible orders are still available, indicating room for further progress. Additionally, the high unfulfilled order quantity sum (3269.0) and considerable deadline variance (190.3467) suggest that prioritizing high-density orders remains effective. Running this heuristic for 4 steps will aggressively refine the solution and capitalize on its consistent performance in prior rounds.
+Delta of Total Time Cost For All Production Lines: 8.0
+Delta of Feasible Orders To Fulfill Num: -172
+Delta of Fulfilled Order Num: 4
+---Round 30---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 4
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental progress in improving the fulfillment ratio and reducing the pool of feasible orders across multiple rounds. While the fulfillment ratio has improved to 0.265, it remains relatively low, and there are still 118 feasible orders available, indicating significant room for further improvement. The unfulfilled order quantity sum (3241.0) and considerable deadline variance (187.5011) suggest that prioritizing high-density orders remains relevant. Running this heuristic for 4 more steps will aggressively refine the solution, leveraging its demonstrated effectiveness in previous rounds.
+Delta of Total Time Cost For All Production Lines: 8.0
+Delta of Feasible Orders To Fulfill Num: -195
+Delta of Fulfilled Order Num: 4
+---Round 31---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 4
+Explain: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental progress in improving the fulfillment ratio and reducing the pool of feasible orders across multiple rounds. While the fulfillment ratio has improved to 0.285, it remains relatively low, and there are still 112 feasible orders available, indicating significant room for further improvement. The high unfulfilled order quantity sum (3195.0) and considerable deadline variance (185.7875) suggest that prioritizing high-density orders remains effective. Running this heuristic for 4 more steps will aggressively refine the solution, leveraging its demonstrated effectiveness in previous rounds.
+Delta of Total Time Cost For All Production Lines: 8.0
+Delta of Feasible Orders To Fulfill Num: -210
+Delta of Fulfilled Order Num: 4
+---Round 32---
+Heuristic: greedy_by_order_density_de77
+Parameters: {}
+Running Steps: 4
+Explain: The `greedy_by_order_density_de77` heuristic has consistently shown incremental progress in increasing the fulfillment ratio and reducing the pool of feasible orders over previous rounds. While the fulfillment ratio has improved to 0.305, it remains relatively low, and there are still 107 feasible orders available. The high unfulfilled order quantity sum (3159.0) and significant deadline variance (184.4973) suggest that prioritizing high-density orders remains effective. Running this heuristic for 4 more steps will allow for an aggressive refinement of the solution, leveraging its demonstrated effectiveness in previous rounds to further improve the fulfillment ratio and reduce the pool of feasible orders.
+Delta of Total Time Cost For All Production Lines: 8.0
+Delta of Feasible Orders To Fulfill Num: -251
+Delta of Fulfilled Order Num: 4
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: greedy_by_order_density_de77. How does greedy_by_order_density_de77 perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+***Run heuristic:  
+selected heuristic: greedy_by_order_density_de77  
+running steps: 4  
+hype parameter(optional): None  
+explanation: The `greedy_by_order_density_de77` heuristic has consistently demonstrated incremental improvements in fulfillment ratio and reduction of feasible orders across multiple rounds. While the fulfillment ratio has improved to 0.325, it remains relatively low, and there are still 103 feasible orders available, indicating significant room for further improvement. The high unfulfilled order quantity sum (3135.0) and considerable deadline variance (186.6447) suggest that prioritizing high-density orders remains effective. Running this heuristic for 4 more steps will allow for aggressive refinement of the solution, leveraging its demonstrated effectiveness in previous rounds to further improve the fulfillment ratio and reduce the pool of feasible orders.  
+***
+------------------------------------------------------------------------------------
+

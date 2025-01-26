@@ -1,0 +1,21 @@
+-data: mknap1_4.mkp
+-current_solution:
+selected_items: 0,9,13,14,15,16,17,18,19
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 6120.0
+-item_num: 20
+-resource_num: 10
+-selected_item_num: [0, 9, 13, 14, 15, 16, 17, 18, 19]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_bb0a	AddOperator(item_index=18)	selected_items: 18
+1	greedy_by_least_remaining_capacity_05f2	AddOperator(item_index=19)	selected_items: 18,19
+2	greedy_improvement_ccbf	SwapOperator(item_index1=18, item_index2=13)	selected_items: 13,19
+3	block_flip_d4f4	FlipBlockOperator(index_list=[9, 10])	selected_items: 9,10,13,19
+4	greedy_improvement_ccbf	SwapOperator(item_index1=10, item_index2=14)	selected_items: 9,13,14,19
+5	greedy_by_profit_1597	AddOperator(item_index=18)	selected_items: 9,13,14,18,19
+6	greedy_improvement_ccbf	SwapOperator(item_index1=18, item_index2=16)	selected_items: 9,13,14,16,19
+7	greedy_by_profit_1597	AddOperator(item_index=18)	selected_items: 9,13,14,16,18,19
+8	greedy_by_profit_1597	AddOperator(item_index=0)	selected_items: 0,9,13,14,16,18,19
+9	k_flip_2f3e	FlipBlockOperator(index_list=[15, 17])	selected_items: 0,9,13,14,15,16,17,18,19

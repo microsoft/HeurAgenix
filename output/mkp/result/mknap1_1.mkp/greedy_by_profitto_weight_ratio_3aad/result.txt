@@ -1,0 +1,6 @@
+-data: mknap1_1.mkp
+-item_num: 6
+-resource_num: 10
+-current_profit: 3800
+-current_solution:
+selected_items:1,2,5

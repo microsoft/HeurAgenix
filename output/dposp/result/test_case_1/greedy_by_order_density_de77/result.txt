@@ -1,0 +1,26 @@
+-data: test_case_1
+-current_solution:
+production_line_0: 8
+production_line_1: 9
+production_line_2: 0->3->5
+production_line_3: 1->2->7
+production_line_4: 4->6
+
+-is_complete_solution: True
+-is_valid_solution: True
+-fulfilled_order_num: 10
+-production_line_num: 5
+-product_num: 5
+-order_num: 10
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=1)	production_line_0: \nproduction_line_1: \nproduction_line_2: \nproduction_line_3: 1\nproduction_line_4: \n
+1	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=2)	production_line_0: \nproduction_line_1: \nproduction_line_2: \nproduction_line_3: 1->2\nproduction_line_4: \n
+2	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=0)	production_line_0: \nproduction_line_1: \nproduction_line_2: 0\nproduction_line_3: 1->2\nproduction_line_4: \n
+3	greedy_by_order_density_de77	AppendOperator(production_line_id=1, order_id=9)	production_line_0: \nproduction_line_1: 9\nproduction_line_2: 0\nproduction_line_3: 1->2\nproduction_line_4: \n
+4	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=4)	production_line_0: \nproduction_line_1: 9\nproduction_line_2: 0\nproduction_line_3: 1->2\nproduction_line_4: 4\n
+5	greedy_by_order_density_de77	AppendOperator(production_line_id=3, order_id=7)	production_line_0: \nproduction_line_1: 9\nproduction_line_2: 0\nproduction_line_3: 1->2->7\nproduction_line_4: 4\n
+6	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=3)	production_line_0: \nproduction_line_1: 9\nproduction_line_2: 0->3\nproduction_line_3: 1->2->7\nproduction_line_4: 4\n
+7	greedy_by_order_density_de77	AppendOperator(production_line_id=2, order_id=5)	production_line_0: \nproduction_line_1: 9\nproduction_line_2: 0->3->5\nproduction_line_3: 1->2->7\nproduction_line_4: 4\n
+8	greedy_by_order_density_de77	AppendOperator(production_line_id=0, order_id=8)	production_line_0: 8\nproduction_line_1: 9\nproduction_line_2: 0->3->5\nproduction_line_3: 1->2->7\nproduction_line_4: 4\n
+9	greedy_by_order_density_de77	AppendOperator(production_line_id=4, order_id=6)	production_line_0: 8\nproduction_line_1: 9\nproduction_line_2: 0->3->5\nproduction_line_3: 1->2->7\nproduction_line_4: 4->6\n

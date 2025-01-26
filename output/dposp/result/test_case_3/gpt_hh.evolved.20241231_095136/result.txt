@@ -1,0 +1,14 @@
+-data: test_case_3
+-current_solution:
+production_line_0: 3->59->54->20->1->76->36->29->24->21
+production_line_1: 45->33->27->15->11->7->87->53->39->83->56->85->71->61->80->99->81
+production_line_2: 67->60->58->22->17->94->75->48->23->37->44->77->79->91
+production_line_3: 18->73->34->26->43->19->2->12->28->65->50->46->25->35->89->98->57->70->68->86->84
+production_line_4: 41->32->10->9->5->0->69->64->55->52->51->49->38->88->72->63->62->90->82
+
+-is_complete_solution: True
+-is_valid_solution: True
+-fulfilled_order_num: 81
+-production_line_num: 5
+-product_num: 10
+-order_num: 100

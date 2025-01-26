@@ -1,0 +1,15 @@
+-data: mknap1_2.mkp
+-current_solution:
+selected_items: 1,3,4,7,9
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 8706.1
+-item_num: 10
+-resource_num: 10
+-selected_item_num: [1, 3, 4, 7, 9]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	k_flip_2f3e	FlipBlockOperator(index_list=[3, 7])	selected_items: 3,7
+1	greedy_by_density_bb0a	AddOperator(item_index=1)	selected_items: 1,3,7
+2	greedy_by_least_remaining_capacity_05f2	AddOperator(item_index=9)	selected_items: 1,3,7,9
+3	greedy_by_resource_balance_52f0	AddOperator(item_index=4)	selected_items: 1,3,4,7,9

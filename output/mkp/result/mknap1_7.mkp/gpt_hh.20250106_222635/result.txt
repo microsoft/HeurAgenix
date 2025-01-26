@@ -1,0 +1,22 @@
+-data: mknap1_7.mkp
+-current_solution:
+selected_items: 1,4,5,15,28,30,36,38,39,40,42
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 13863.0
+-item_num: 50
+-resource_num: 5
+-selected_item_num: [1, 4, 5, 15, 28, 30, 36, 38, 39, 40, 42]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_profit_8df3	AddOperator(item_index=15)	selected_items: 15
+1	greedy_by_profit_8df3	AddOperator(item_index=42)	selected_items: 15,42
+2	greedy_by_profit_8df3	AddOperator(item_index=4)	selected_items: 4,15,42
+3	greedy_by_profit_8df3	AddOperator(item_index=40)	selected_items: 4,15,40,42
+4	greedy_by_profit_8df3	AddOperator(item_index=1)	selected_items: 1,4,15,40,42
+5	greedy_by_profit_8df3	AddOperator(item_index=39)	selected_items: 1,4,15,39,40,42
+6	greedy_by_profit_8df3	AddOperator(item_index=5)	selected_items: 1,4,5,15,39,40,42
+7	greedy_by_profit_8df3	AddOperator(item_index=36)	selected_items: 1,4,5,15,36,39,40,42
+8	greedy_by_profit_8df3	AddOperator(item_index=28)	selected_items: 1,4,5,15,28,36,39,40,42
+9	greedy_by_profit_8df3	AddOperator(item_index=38)	selected_items: 1,4,5,15,28,36,38,39,40,42
+10	greedy_by_cost_benefit_fd45	AddOperator(item_index=30)	selected_items: 1,4,5,15,28,30,36,38,39,40,42

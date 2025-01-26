@@ -1,0 +1,242 @@
+user
+Hi GPT, I am working on Hyper-heuristics for Operation Research (OR) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on the Multidimensional Knapsack Problem (MKP).
+
+Multidimensional Knapsack Problem (MKP) is a combinatorial optimization problem where the objective is to maximize the total profit of selected items, each with a given profit value, subject to multiple constraints on the cumulative resource consumption of the items. The challenge lies in selecting the optimal combination of items that yields the highest profit without exceeding the available capacity for each resource dimension.
+
+Please commit to memory the problem.
+------------------------------------------------------------------------------------
+
+assistant
+Got it! Here's the information you've provided so far:
+
+**Problem: Multidimensional Knapsack Problem (MKP)**
+
+- **Objective:** Maximize the total profit of selected items.
+- **Constraints:** Multiple constraints on the cumulative resource consumption of the items.
+- **Challenge:** Selecting the optimal combination of items that yields the highest profit without exceeding the available capacity for each resource dimension.
+
+I'll remember this for our next conversation. When you're ready, you can describe the challenges you're encountering, and we can work together to resolve them.
+------------------------------------------------------------------------------------
+
+user
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MKP.
+A list of boolean values where each boolean represents whether the corresponding item is included in the knapsack."""
+    def __init__(self, item_inclusion: list[bool]):
+        self.item_inclusion = item_inclusion
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class ToggleOperator(BaseOperator):
+    """Toggle the inclusion status of an item in the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = not new_item_inclusion[self.item_index]
+        return Solution(new_item_inclusion)
+class AddOperator(BaseOperator):
+    """Include an item in the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = True
+        return Solution(new_item_inclusion)
+class RemoveOperator(BaseOperator):
+    """Exclude an item from the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = False
+        return Solution(new_item_inclusion)
+class SwapOperator(BaseOperator):
+    """Swap the inclusion status of two items."""
+    def __init__(self, item_index1: int, item_index2: int):
+        self.item_index1 = item_index1
+        self.item_index2 = item_index2
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index1], new_item_inclusion[self.item_index2] = (new_item_inclusion[self.item_index2], new_item_inclusion[self.item_index1])
+        return Solution(new_item_inclusion)
+class FlipBlockOperator(BaseOperator):
+    """Flip the a list of items."""
+    def __init__(self, index_list: list[int]):
+        self.index_list = index_list
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        for i in self.index_list:
+            new_item_inclusion[i] = not new_item_inclusion[i]
+        return Solution(new_item_inclusion)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data contains the global static information data with:
+- item_num (int): The total number of items available for selection.
+- resource_num (int): The number of resource dimensions or constraints.
+- profits (numpy.array): The profit value associated with each item.
+- weights (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
+- capacities (numpy.array): The maximum available capacity for each resource dimension.
+- average_profit (float): The average profit value of all items.
+- max_profit (float): The maximum profit value among all items.
+- min_profit (float): The minimum profit value among all items.
+- average_weight (numpy.array): The average resource consumption across all items for each dimension.
+- max_weight (numpy.array): The maximum resource consumption for each dimension across all items.
+- min_weight (numpy.array): The minimum resource consumption for each dimension across all items.
+- average_capacity (float): The average capacity value of all resources.
+- max_capacity (float): The maximum capacity value among all resources.
+- min_capacity (float): The minimum capacity value among all resources.
+- profit_to_weight_ratio (numpy.array): The ratio of profit to weight for each item in each dimension, which can be a useful heuristic for item selection.
+- sorted_items_by_ratio (list[int]): A list of item indices sorted by their profit-to-weight ratio, which can be used to prioritize items with higher ratios.
+state_data contains the current dynamic state data with:
+- current_solution (Solution): An instance of the Solution class representing the current solution.
+- current_profit (float): The total profit of the items included in the current solution.
+- current_weights (numpy.array): The total resource consumption for each dimension in the current solution.
+- remaining_capacity (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.
+- items_in_knapsack (list[int]): A list of item indices that are currently included in the knapsack.
+- items_not_in_knapsack (list[int]): A list of item indices that are currently not included in the knapsack.
+- item_inclusion_count (int): The number of items currently included in the knapsack.
+- profit_per_remaining_capacity (numpy.array): The ratio of the current profit to the remaining capacity for each dimension, which can indicate how efficiently the capacity is being used.
+- feasible_items_to_add (list[int]): A list of item indices that can be added to the knapsack without violating any resource constraints. 
+- validation_solution (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data contains the data that necessary for some algorithms.
+get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please commit to memory our constructed framework.
+------------------------------------------------------------------------------------
+
+assistant
+Got it! Here's a summary of the framework you've constructed for solving the Multidimensional Knapsack Problem (MKP) using hyper-heuristics:
+
+### Classes
+
+**Solution:**
+```python
+class Solution:
+    """The solution for the MKP. A list of boolean values where each boolean represents whether the corresponding item is included in the knapsack."""
+    def __init__(self, item_inclusion: list[bool]):
+        self.item_inclusion = item_inclusion
+```
+
+**Operators:**
+- **ToggleOperator:**
+  ```python
+  class ToggleOperator(BaseOperator):
+      """Toggle the inclusion status of an item in the knapsack."""
+      def __init__(self, item_index: int):
+          self.item_index = item_index
+      def run(self, solution: Solution) -> Solution:
+          new_item_inclusion = solution.item_inclusion[:]
+          new_item_inclusion[self.item_index] = not new_item_inclusion[self.item_index]
+          return Solution(new_item_inclusion)
+  ```
+
+- **AddOperator:**
+  ```python
+  class AddOperator(BaseOperator):
+      """Include an item in the knapsack."""
+      def __init__(self, item_index: int):
+          self.item_index = item_index
+      def run(self, solution: Solution) -> Solution:
+          new_item_inclusion = solution.item_inclusion[:]
+          new_item_inclusion[self.item_index] = True
+          return Solution(new_item_inclusion)
+  ```
+
+- **RemoveOperator:**
+  ```python
+  class RemoveOperator(BaseOperator):
+      """Exclude an item from the knapsack."""
+      def __init__(self, item_index: int):
+          self.item_index = item_index
+      def run(self, solution: Solution) -> Solution:
+          new_item_inclusion = solution.item_inclusion[:]
+          new_item_inclusion[self.item_index] = False
+          return Solution(new_item_inclusion)
+  ```
+
+- **SwapOperator:**
+  ```python
+  class SwapOperator(BaseOperator):
+      """Swap the inclusion status of two items."""
+      def __init__(self, item_index1: int, item_index2: int):
+          self.item_index1 = item_index1
+          self.item_index2 = item_index2
+      def run(self, solution: Solution) -> Solution:
+          new_item_inclusion = solution.item_inclusion[:]
+          new_item_inclusion[self.item_index1], new_item_inclusion[self.item_index2] = (new_item_inclusion[self.item_index2], new_item_inclusion[self.item_index1])
+          return Solution(new_item_inclusion)
+  ```
+
+- **FlipBlockOperator:**
+  ```python
+  class FlipBlockOperator(BaseOperator):
+      """Flip the a list of items."""
+      def __init__(self, index_list: list[int]):
+          self.index_list = index_list
+      def run(self, solution: Solution) -> Solution:
+          new_item_inclusion = solution.item_inclusion[:]
+          for i in self.index_list:
+              new_item_inclusion[i] = not new_item_inclusion[i]
+          return Solution(new_item_inclusion)
+  ```
+
+### Heuristic Function Signature
+
+```python
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+```
+
+#### Inputs:
+- **global_data:** Contains global static information.
+  - `item_num` (int)
+  - `resource_num` (int)
+  - `profits` (numpy.array)
+  - `weights` (numpy.array)
+  - `capacities` (numpy.array)
+  - `average_profit` (float)
+  - `max_profit` (float)
+  - `min_profit` (float)
+  - `average_weight` (numpy.array)
+  - `max_weight` (numpy.array)
+  - `min_weight` (numpy.array)
+  - `average_capacity` (float)
+  - `max_capacity` (float)
+  - `min_capacity` (float)
+  - `profit_to_weight_ratio` (numpy.array)
+  - `sorted_items_by_ratio` (list[int])
+
+- **state_data:** Contains the current dynamic state data.
+  - `current_solution` (Solution)
+  - `current_profit` (float)
+  - `current_weights` (numpy.array)
+  - `remaining_capacity` (numpy.array)
+  - `items_in_knapsack` (list[int])
+  - `items_not_in_knapsack` (list[int])
+  - `item_inclusion_count` (int)
+  - `profit_per_remaining_capacity` (numpy.array)
+  - `feasible_items_to_add` (list[int])
+  - `validation_solution` (callable)
+
+- **algorithm_data:** Contains data necessary for some algorithms.
+
+- **get_state_data_function:** Function that receives the new solution as input and returns the state dictionary for the new solution.
+
+- **kwargs:** Other hyper-parameters.
+
+#### Outputs:
+- **operator:** Must be an instance of a predefined target operator type.
+- **updated_algorithm_data:** Contains new information for future work for both this or other algorithms.
+
+I'll remember this framework for our next conversation. When you're ready, you can describe the challenges you're encountering, and we can work together to resolve them.
+------------------------------------------------------------------------------------
+

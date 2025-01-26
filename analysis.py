@@ -19,7 +19,7 @@ total_experiments = [
         "problem": "cvrp",
         "key_item": "total_current_cost",
         "data": ["A-n80-k10.vrp", "B-n78-k10.vrp", "E-n101-k14.vrp", "F-n135-k7.vrp", "M-n200-k17.vrp", "P-n101-k4.vrp"],
-        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_ce2b", "farthest_insertion_6308"],
+        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_4e1d", "farthest_insertion_6308"],
         "upper_bound": [1762, 1221, 1067, 1162, 1275, 681]
     },
     {
@@ -243,11 +243,12 @@ def get_hh_results(problem_dict: dict, data_index: int, test_dir: str, hh_name: 
     else:
         gap = ["None" for value in results]
         mean_gap = "None"
-    random_hh_value_gap = [f"{results[index]}({gap[index]}%)" for index in range(len(results))]
+    gap_str = [f"{results[index]}({gap[index]}%)" for index in range(len(results))]
     if results:
-        return(f"{problem}, {data}, random_hh, {random_hh_value_gap}, {np.mean(results)}({mean_gap}%)")
+        return(f"{problem}, {data}, random_hh, {gap_str}, {np.mean(results)}({mean_gap}%)")
     else:
         return(f"Missing {problem}, {data}, random_hh")
+    
 
 def dump_all_result():
     for problem_dict in total_experiments:
@@ -270,16 +271,24 @@ def dump_all_result():
                     print(F"Missing {problem}, {data}, {heuristic}")
             
             result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh")
-            print(result_str)
+            if result_str:
+                print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh.evolved")
+            if result_str:
+                print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh")
-            print(result_str)
+            if result_str:
+                print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh.evolved")
-            print(result_str)
+            if result_str:
+                print(result_str)
 
             result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_deep_hh.evolved")
-            print(result_str)
+            if result_str:
+                print(result_str)
 
 
 

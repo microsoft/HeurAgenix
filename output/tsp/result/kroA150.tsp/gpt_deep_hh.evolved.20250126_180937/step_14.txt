@@ -1,0 +1,342 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of TSP.
+A list of integers where each integer represents a node (city) in the TSP tour.
+The order of the nodes in the list defines the order in which the cities are visited in the tour."""
+    def __init__(self, tour: list[int]):
+        self.tour = tour
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append the node at the end of the solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour + [self.node]
+        return Solution(new_tour)
+class InsertOperator(BaseOperator):
+    """Insert the node into the solution at the target position."""
+    def __init__(self, node: int, position: int):
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
+        return Solution(new_tour)
+class SwapOperator(BaseOperator):
+    """Swap two nodes in the solution. swap_node_pairs is a list of tuples, each containing the two nodes to swap."""
+    def __init__(self, swap_node_pairs: list[tuple[int, int]]):
+        self.swap_node_pairs = swap_node_pairs
+    def run(self, solution: Solution) -> Solution:
+        node_to_index = {node: index for (index, node) in enumerate(solution.tour)}
+        new_tour = solution.tour.copy()
+        for (node_a, node_b) in self.swap_node_pairs:
+            index_a = node_to_index.get(node_a)
+            index_b = node_to_index.get(node_b)
+            assert index_a is not None
+            assert index_b is not None
+            (new_tour[index_a], new_tour[index_b]) = (new_tour[index_b], new_tour[index_a])
+        return Solution(new_tour)
+class ReplaceOperator(BaseOperator):
+    """Replace a node with another one in the solution."""
+    def __init__(self, node: int, new_node: int):
+        self.node = node
+        self.new_node = new_node
+    def run(self, solution: Solution) -> Solution:
+        index = solution.tour.index(self.node)
+        new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
+        return Solution(new_tour)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, segments: list[tuple[int, int]]):
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_tour)
+            assert 0 <= end_index < len(new_tour)
+            if start_index <= end_index:
+                new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+            else:
+                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index] + list(reversed(new_tour[:end_index + 1]))
+        return Solution(new_tour)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "std_dev_distance" (float): The standard deviation of the distances.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
+    - "visited_num" (int): Number of nodes that have been visited.
+    - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
+    - "unvisited_num" (int): Number of nodes that have not been visited.
+    - "current_cost" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
+    - "last_visited" (int): The last visited node.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is tsp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Traveling Salesman Problem (TSP) is indeed a combinatorial optimization problem, which is a type of combinatorial operation problem. It involves searching for the best solution from a finite set of possible solutions. Heuristic algorithms are commonly used to find approximate solutions to TSP, especially when the exact solution is computationally expensive to obtain. Your framework for implementing heuristic algorithms using operators to modify solutions is a suitable approach for this type of problem.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): insertion_heuristics,nearest_neighbor_heuristics,local_optimization_heuristics,periodic_optimization,disparity_sensitive
+
+insertion_heuristics: These heuristics focus on inserting nodes into the tour, optimizing based on specific criteria like cost increase or distance.
+def cheapest_insertion_7a30(): An enhanced heuristic algorithm for cheapest insertion in the Traveling Salesman Problem (TSP). This heuristic incorporates specific rules based on the current state of the tour and certain global data metrics to optimize the solution.
+def farthest_insertion_54db(): Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost. This heuristic also periodically applies the 2-opt heuristic to improve the solution.
+
+nearest_neighbor_heuristics: This heuristic extends the tour by selecting the nearest unvisited node, a classic strategy for TSP.
+def nearest_neighbor_e8a4(): Implements an enhanced nearest neighbor heuristic for the TSP problem. This heuristic starts from the node with the second lowest average distance to all other nodes when the tour is empty. It then proceeds by extending the tour using the nearest neighbor, nearest insertion, or cheapest insertion heuristics based on certain criteria. Periodically, the 2-opt heuristic is applied to untangle crossings and smooth the path. It includes additional rules for specific scenarios to enhance performance.
+
+local_optimization_heuristics: These heuristics focus on optimizing the tour by altering segments to reduce the overall distance, using methods like 2-opt and 3-opt to remove crossings and improve path smoothness.
+def _2opt_89aa(): The 2-opt heuristic seeks to untangle crossings and smooth the path by swapping two non-adjacent edges and reconnecting the resulting segments. Through repeated application of these edge swaps, the 2-opt algorithm converges towards a more efficient route, often leading to a substantial improvement over the initial solution. It is a simple yet powerful method for local optimization in the context of the TSP.
+def _3opt_e75b(): The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
+
+periodic_optimization: These heuristics periodically apply additional optimization techniques like 2-opt to enhance the solution further.
+def cheapest_insertion_7a30(): An enhanced heuristic algorithm for cheapest insertion in the Traveling Salesman Problem (TSP). This heuristic incorporates specific rules based on the current state of the tour and certain global data metrics to optimize the solution.
+def farthest_insertion_54db(): Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost. This heuristic also periodically applies the 2-opt heuristic to improve the solution.
+def nearest_neighbor_e8a4(): Implements an enhanced nearest neighbor heuristic for the TSP problem. This heuristic starts from the node with the second lowest average distance to all other nodes when the tour is empty. It then proceeds by extending the tour using the nearest neighbor, nearest insertion, or cheapest insertion heuristics based on certain criteria. Periodically, the 2-opt heuristic is applied to untangle crossings and smooth the path. It includes additional rules for specific scenarios to enhance performance.
+
+disparity_sensitive: This heuristic adjusts its strategy based on the disparity of distances, making it sensitive to variations in the problem's structure.
+def farthest_insertion_54db(): Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost. This heuristic also periodically applies the 2-opt heuristic to improve the solution.
+
+
+We aim to solve this problem using the following data:
+node_num:150
+std_dev_distance:926.5611610115714
+average_distance:1717.3530201342282
+min_distance:13.0
+max_distance:4218.0
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 1 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+To develop a strategic guide for selecting heuristic categories and defining execution steps for each phase of solving the Traveling Salesman Problem (TSP), consider the following framework. This guide will help balance exploration and exploitation across different heuristic categories during both the construction and improvement phases.
+
+### Phase 1: Initial Solution Construction
+
+1. **Nearest Neighbor Heuristics**
+   - Start with the `nearest_neighbor_e8a4` heuristic to construct a basic tour. This heuristic is fast and provides a reasonable starting point.
+   - **Execution Step:** Begin at a node with low average distance to others and proceed by adding the nearest neighbor.
+
+2. **Insertion Heuristics**
+   - Use `cheapest_insertion_7a30` or `farthest_insertion_54db` to refine the initial tour. These heuristics handle node insertion efficiently by minimizing cost increases.
+   - **Execution Step:** Evaluate both insertion methods; `cheapest_insertion` for cost-effective additions and `farthest_insertion` for strategic, disparity-sensitive insertions.
+
+3. **Periodic Optimization**
+   - Integrate periodic use of the 2-opt method within the above heuristics to reduce crossings and smooth the path.
+   - **Execution Step:** Apply a 2-opt swap after every few node insertions to maintain a well-optimized tour.
+
+### Phase 2: Local Optimization
+
+1. **Local Optimization Heuristics**
+   - Utilize `_2opt_89aa` and `_3opt_e75b` to improve the initial solution further. These heuristics are effective for removing path crossings and enhancing tour smoothness.
+   - **Execution Step:** Start with 2-opt for quick improvements, then switch to 3-opt for more in-depth optimization.
+
+2. **Periodic Optimization**
+   - Continue to apply periodic 2-opt during local optimization to ensure any new crossings introduced during other optimizations are resolved.
+   - **Execution Step:** Schedule periodic checks and swaps with 2-opt to maintain local optimality.
+
+### Phase 3: Iterative Improvement and Exploration
+
+1. **Disparity-Sensitive Heuristics**
+   - Use `farthest_insertion_54db` to address any remaining disparities in node distances, leveraging its sensitivity to variations.
+   - **Execution Step:** Assess and adjust node placements to handle large distance disparities effectively.
+
+2. **Evaluation and Switching**
+   - Regularly assess the performance of the current heuristic approach using metrics like total tour cost and computational time.
+   - **Execution Step:** If improvements stagnate, switch to a different heuristic category or combination for further exploration.
+
+### General Strategy
+
+- **Alternate Heuristics:** Regularly switch between heuristic categories to prevent getting stuck in local optima and encourage exploration of the solution space.
+- **Evaluation Metrics:** Use key metrics (e.g., current cost, number of iterations since last improvement) to guide when to switch heuristics.
+- **Adaptive Approach:** Be flexible in the application of heuristics, allowing the solution's context and performance data to guide decisions on which heuristics to apply and when.
+
+This strategic guide provides a structured yet adaptable approach to solving the TSP using various heuristics, ensuring a balanced exploration-exploitation strategy while adapting to the problem's specific characteristics.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+node_num:150
+std_dev_distance:926.5611610115714
+average_distance:1717.3530201342282
+min_distance:13.0
+max_distance:4218.0
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 14 rounds discuss and the summary are:
+---Round 0---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: nearest_neighbor_heuristics
+Running Steps: 1
+Explain:  4218.0) and the high standard deviation in distances. This method will provide a foundational structure that can be further refined with other heuristics later.
+Visited Node: 0->1
+Current Cost: 0->0.0
+---Round 1---
+Heuristic: farthest_insertion_54db
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Since the initial heuristic (nearest_neighbor_e8a4) has only visited one node, it might be beneficial to switch to an insertion heuristic. Using insertion heuristics like cheapest or farthest insertion can help strategically build out the tour by considering cost increases and disparity in distances, which can be crucial given the high standard deviation and wide range of distances in the problem.
+Visited Node: 1->2
+Current Cost: 0.0->96.0
+---Round 2---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Given the current state of the solution with only two nodes visited, continuing with the insertion heuristic category can help strategically build out the tour by leveraging its ability to manage cost increases effectively. The farthest insertion method has begun to structure the solution with consideration of distance disparities, which is important given the high standard deviation in distances. Continuing with this category will allow further exploitation of its benefits in constructing a more complete and potentially optimal initial solution before switching to optimization-focused heuristics.
+Visited Node: 2->3
+Current Cost: 96.0->4634.0
+---Round 3---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: nearest_neighbor_heuristics
+Running Steps: 1
+Explain: Given the current state of the solution, where only three nodes have been visited, and the significant disparity in edge costs, switching to the nearest neighbor heuristic category could help improve the solution construction process. The nearest neighbor approach can quickly add more nodes to the tour by selecting the nearest unvisited nodes, which may help reduce the average edge cost and bring more structure to the initial tour. This method is particularly effective when the solution is still in its early stages and there are many unvisited nodes, allowing for a more cost-efficient tour extension before applying more complex optimization heuristics.
+Visited Node: 3->4
+Current Cost: 4634.0->5103.0
+---Round 4---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Given the current state of the solution with only four nodes visited and the high standard deviation in edge costs, continuing with insertion heuristics such as `cheapest_insertion_7a30` or `farthest_insertion_54db` would be beneficial. These heuristics are well-suited for building out the tour by strategically adding nodes while managing cost increases and considering distance disparities. This approach can help improve the efficiency of the tour by optimizing node placement before moving to more complex optimization-focused heuristics.
+Visited Node: 4->5
+Current Cost: 5103.0->8704.0
+---Round 5---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: nearest_neighbor_heuristics
+Running Steps: 1
+Explain:  Given the current state of the solution with only 5 nodes visited and a high number of unvisited nodes (145), switching to the nearest_neighbor_heuristics category can quickly add more nodes to the tour by selecting the nearest unvisited nodes. This approach could help reduce the average edge cost and bring more structure to the initial tour, especially given the significant disparity in edge costs and high standard deviation. Utilizing nearest_neighbor_heuristics at this stage can provide a more cost-efficient tour extension before applying more complex optimization-focused heuristics.
+Visited Node: 5->5
+Current Cost: 8704.0->8545.0
+---Round 6---
+Heuristic: farthest_insertion_54db
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Given the current state of the solution, with only 5 nodes visited and a significant number of unvisited nodes, it would be beneficial to switch to an insertion heuristic. The high standard deviation and wide range of edge costs indicate that strategic insertion could help manage cost increases effectively. Insertion heuristics like `cheapest_insertion_7a30` or `farthest_insertion_54db` can leverage these disparities to build a more efficient tour by optimizing node placements based on cost and distance disparities.
+Visited Node: 5->6
+Current Cost: 8545.0->8564.0
+---Round 7---
+Heuristic: farthest_insertion_54db
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Given the current state of the solution, with only 6 nodes visited and a significant number of unvisited nodes remaining (144), continuing with an insertion heuristic is sensible. The high standard deviation in edge costs and the wide range of edge costs indicate that strategic node insertion can be beneficial. Farthest or cheapest insertion can optimize node placements based on cost and distance disparities, helping to efficiently build out the tour before shifting focus to local optimization or periodic optimization strategies.
+Visited Node: 6->7
+Current Cost: 8564.0->8564.0
+---Round 8---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  The current solution is still in the early stages with only 7 nodes visited out of 150. Given the high number of remaining nodes (143) and the significant standard deviation in edge costs, continuing with insertion heuristics, such as `farthest_insertion_54db`, can help strategically build out the tour. Insertion heuristics are effective at managing cost increases while considering distance disparities, which is crucial given the problem's characteristics. This approach allows for continued expansion of the tour in a controlled manner, optimizing node placements based on cost and distance disparities before transitioning to more complex local or periodic optimization strategies.
+Visited Node: 7->8
+Current Cost: 8564.0->8564.0
+---Round 9---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Given the current state of the solution with only 8 nodes visited and a significant number of unvisited nodes remaining (142), continuing with insertion heuristics is advisable. The high standard deviation and wide range of edge costs indicate that strategic node insertion can help manage cost increases effectively. Insertion heuristics, such as `cheapest_insertion_7a30` or `farthest_insertion_54db`, can leverage these disparities to build a more efficient tour by optimizing node placements based on cost and distance disparities. This approach will continue to expand the tour in a controlled manner, optimizing node placements before transitioning to more complex local or periodic optimization strategies.
+Visited Node: 8->9
+Current Cost: 8564.0->8564.0
+---Round 10---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: nearest_neighbor_heuristics
+Running Steps: 1
+Explain: Given the current state of the solution, with only 9 nodes visited and 141 unvisited, it would be beneficial to switch to a nearest neighbor heuristic. This approach can quickly extend the tour by adding the nearest unvisited nodes, which may help reduce the average edge cost and provide a more structured tour. The nearest neighbor heuristic is particularly effective at this stage due to the high number of remaining nodes and can efficiently guide the tour extension before applying more complex optimization heuristics.
+Visited Node: 9->10
+Current Cost: 8564.0->8748.0
+---Round 11---
+Heuristic: cheapest_insertion_7a30
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain:  Given the current state with 10 nodes visited and a significant number of unvisited nodes remaining (140), continuing with an insertion heuristic is advisable. The high standard deviation and range of edge costs suggest that strategic node insertion can effectively manage cost increases. Insertion heuristics like `cheapest_insertion_7a30` or `farthest_insertion_54db` can optimize node placements based on cost and distance disparities, helping to efficiently build out the tour before shifting focus to local optimization strategies. This approach leverages the disparity-sensitive nature of the problem, allowing for controlled expansion of the tour.
+Visited Node: 10->11
+Current Cost: 8748.0->8902.0
+---Round 12---
+Heuristic: farthest_insertion_54db
+Heuristic Category: insertion_heuristics
+Running Steps: 1
+Explain: Given the current state of the solution with 11 nodes visited and a high number of unvisited nodes (139), continuing with the insertion heuristic category can help strategically build out the tour. The high standard deviation and wide range of edge costs suggest that strategic node insertion can effectively manage cost increases. Insertion heuristics like `cheapest_insertion_7a30` can optimize node placements based on cost and distance disparities, continuing to expand the tour efficiently before shifting focus to local optimization strategies. This approach leverages the disparity-sensitive nature of the problem, allowing for controlled expansion of the tour while considering the existing partial solution's structure.
+Visited Node: 11->12
+Current Cost: 8902.0->9484.0
+---Round 13---
+Heuristic: nearest_neighbor_e8a4
+Heuristic Category: nearest_neighbor_heuristics
+Running Steps: 1
+Explain: The current state shows a significant number of unvisited nodes (138), and the average edge cost is relatively high compared to the minimum edge cost remaining. Using a nearest neighbor heuristic can quickly extend the tour by selecting the nearest unvisited nodes, potentially reducing the overall tour cost by taking advantage of shorter edges. This approach will add more structure to the tour and provide a solid foundation before applying more complex optimization heuristics. Additionally, given the high disparity in edge costs, nearest neighbor heuristics can help mitigate cost increases effectively at this stage.
+Visited Node: 12->13
+Current Cost: 9484.0->9679.0
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:tour: 128->25->3->27->92->28->70->40->6->130->46->108->90->128
+visited_nodes:[128, 25, 3, 27, 92, 28, 70, 40, 6, 130, 46, 108, 90]
+visited_num:13
+unvisited_nodes:[0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 91, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 129, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149]
+unvisited_num:137
+current_cost:9679.0
+last_visited:90
+current_path_length:13
+remaining_nodes:137
+average_edge_cost:744.5384615384615
+last_edge_cost:2174.0
+std_dev_edge_cost:558.2759858608365
+solution_validity:1
+min_edge_cost_remaining:99.0
+max_edge_cost_remaining:2746.0
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: nearest_neighbor_e8a4(nearest_neighbor_heuristics). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: insertion_heuristics,nearest_neighbor_heuristics,local_optimization_heuristics,periodic_optimization,disparity_sensitive
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(insertion_heuristics,nearest_neighbor_heuristics,local_optimization_heuristics,periodic_optimization,disparity_sensitive)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:insertion_heuristics
+explanation: Given the current state of the solution with 13 nodes visited and 137 unvisited, continuing to build the solution with insertion heuristics is advisable. The insertion heuristics, such as `cheapest_insertion_7a30` and `farthest_insertion_54db`, can strategically manage the cost increases and leverage the disparities in edge costs, which are highlighted by the significant standard deviation and range of remaining edge costs. This approach will help optimize node placements and further develop the tour, potentially reducing the current average edge cost and enhancing the overall solution. Once more nodes are incorporated efficiently, we can then consider transitioning to local optimization heuristics to refine the tour further.***
+------------------------------------------------------------------------------------
+

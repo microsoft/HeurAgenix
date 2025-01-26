@@ -1,0 +1,27 @@
+-data: test_case_7
+-production_line_num: 20
+-product_num: 40
+-order_num: 2000
+-fulfilled_order_num: 65
+-current_solution:
+production_line_0: 87->380->442->586->622->671->772->912->1052->1094->1193->1412->1832->1925
+production_line_1: 689
+production_line_2: 51->189->299->405->1064->1454->1584->1716->1817
+production_line_3: 177
+production_line_4: 
+production_line_5: 74->459->487->895->935->1086->1358->1514->1586
+production_line_6: 54->524->956->1098->1171
+production_line_7: 149
+production_line_8: 49
+production_line_9: 194->430->584->933->1231->1428->1476->1529->1710->1835
+production_line_10: 123
+production_line_11: 60->94->160
+production_line_12: 
+production_line_13: 107
+production_line_14: 8
+production_line_15: 
+production_line_16: 187->505->714->1440->1491->1632->1899
+production_line_17: 146
+production_line_18: 
+production_line_19: 
+-is_complete_solution: True

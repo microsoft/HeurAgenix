@@ -1,0 +1,17 @@
+-data: test_case_4
+-production_line_num: 10
+-product_num: 20
+-order_num: 100
+-fulfilled_order_num: 7
+-current_solution:
+production_line_0: 
+production_line_1: 
+production_line_2: 
+production_line_3: 3->6->9
+production_line_4: 
+production_line_5: 2->8
+production_line_6: 
+production_line_7: 5
+production_line_8: 0
+production_line_9: 
+-is_complete_solution: True

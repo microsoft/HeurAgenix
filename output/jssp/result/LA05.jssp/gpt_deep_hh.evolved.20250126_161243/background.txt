@@ -1,0 +1,110 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on jssp problem:
+Job Shop Scheduling Problem (JSSP) involves scheduling a series of jobs, each comprising a sequence of operations, across different machines to optimize production efficiency. In this variant, there is a one-to-one correspondence between machines and operation types, ensuring that each operation is carried out by a specific machine. Consequently, the number of operations (N) matches the number of machines, and each job includes these N operations precisely once.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the Job Shop Scheduling Problem (JSSP).
+A list of lists where each sublist represents the sequence of jobs scheduled on a machine, identified by its index in the outer list.
+Each job is represented by its integer identifier and is processed in the order specified within the sublist.
+Each sublist in 'job_sequences' corresponds to a machine's job processing sequence, with machines sorted by their identifier (index in the outer list).
+Each job within a sublist is sorted by its scheduled order of execution on that machine.
+Job matrix records the target operation(machine) sequence in job."""
+    def __init__(self, job_sequences: list[list[int]], job_operation_sequence: list[list[int]], job_operation_index: list[int]):
+        self.job_sequences = job_sequences
+        self.job_operation_sequence = job_operation_sequence
+        self.job_operation_index = job_operation_index
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AdvanceOperator(BaseOperator):
+    """AdvanceOperator is responsible for advancing the next operation in the job's processing sequence.
+This operator appends the next operation of the specified job to the processing queue of the machine that is scheduled to execute the operation.
+It identifies the appropriate machine based on the job's current operation index and the job matrix within the provided Solution instance."""
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        machine_id = solution.job_operation_sequence[self.job_id][solution.job_operation_index[self.job_id]]
+        new_job_sequences[machine_id].append(self.job_id)
+        job_operation_index = solution.job_operation_index
+        job_operation_index[self.job_id] += 1
+        return Solution(new_job_sequences, solution.job_operation_sequence, job_operation_index)
+class SwapOperator(BaseOperator):
+    """Swaps two operations in corresponding jobs in the same machine's."""
+    def __init__(self, machine_id: int, job_id1: int, job_id2: int):
+        self.machine_id = machine_id
+        self.job_id1 = job_id1
+        self.job_id2 = job_id2
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        index1 = new_job_sequences[self.machine_id].index(self.job_id1)
+        index2 = new_job_sequences[self.machine_id].index(self.job_id2)
+        (new_job_sequences[self.machine_id][index1], new_job_sequences[self.machine_id][index2]) = (new_job_sequences[self.machine_id][index2], new_job_sequences[self.machine_id][index1])
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ReverseSequenceOperator(BaseOperator):
+    """Reverses a sequence of operations in corresponding jobs within a machine's queue."""
+    def __init__(self, machine_id: int, start_position: int, end_position: int):
+        self.machine_id = machine_id
+        self.start_position = start_position
+        self.end_position = end_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        sequence = new_job_sequences[self.machine_id][self.start_position:self.end_position + 1]
+        new_job_sequences[self.machine_id][self.start_position:self.end_position + 1] = sequence[::-1]
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ShiftOperator(BaseOperator):
+    """Shifts an operation to a new position within the same machine's queue."""
+    def __init__(self, machine_id: int, job_id: int, new_position: int):
+        self.machine_id = machine_id
+        self.job_id = job_id
+        self.new_position = new_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        current_position = new_job_sequences[self.machine_id].index(self.job_id)
+        operation = new_job_sequences[self.machine_id].pop(current_position)
+        new_job_sequences[self.machine_id].insert(self.new_position, operation)
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
+    - "job_num" (int): The total number of jobs in the problem.
+    - "machine_num" (int): The total number of machines in the problem, also as operation num.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "finished_jobs" (list[int]): List of all finished jobs.
+    - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+    - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+    - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in current solution.
+    - "machine_operation_index" (list[int]): The index of the next operation to be scheduled for each machine.
+    - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+    - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is jssp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Job Shop Scheduling Problem (JSSP) is indeed a combinatorial operation problem. It involves making a sequence of decisions to optimize a certain objective, such as minimizing the makespan, which fits the definition of combinatorial optimization. Heuristics are commonly used to solve JSSP because the problem is NP-hard, meaning that exact solutions are computationally expensive for larger instances. The framework you've described, with its focus on solutions and operators, is a suitable approach for applying heuristic algorithms to tackle JSSP.
+------------------------------------------------------------------------------------
+
