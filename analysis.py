@@ -43,7 +43,7 @@ total_experiments = [
         "key_item": "current_cut_value",
         "data": ["g1.mc", "g2.mc", "g3.mc", "g4.mc", "g5.mc", "g6.mc", "g7.mc", "g8.mc", "g9.mc", "g10.mc"],
         "heuristics": ["most_weight_neighbors_320c", "most_weight_neighbors_d31b", "highest_weight_edge_eb0c", "highest_weight_edge_ca02", "balanced_cut_21d5", "balanced_cut_c0e6"],
-        "upper_bound": [11624, 11620, 11622, 11646, 11631, 2178, 2006, 2005, 2054, 2000]
+        "upper_bound": [11624, 11620, 11622, 11646, 11631, 2178, 2006, 2006, 2054, 2000]
     },
     {
         "problem": "mkp",
@@ -239,7 +239,7 @@ def get_hh_results(problem_dict: dict, data_index: int, test_dir: str, hh_name: 
             results.append(result)
     if upper_bound:
         gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in results]
-        mean_gap = np.mean(gap)
+        mean_gap = round(np.mean(gap), 2)
     else:
         gap = ["None" for value in results]
         mean_gap = "None"
