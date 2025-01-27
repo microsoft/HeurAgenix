@@ -1,0 +1,260 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on mkp problem:
+Multidimensional Knapsack Problem (MKP) is a combinatorial optimization problem where the objective is to maximize the total profit of selected items, each with a given profit value, subject to multiple constraints on the cumulative resource consumption of the items. The challenge lies in selecting the optimal combination of items that yields the highest profit without exceeding the available capacity for each resource dimension.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MKP.
+A list of boolean values where each boolean represents whether the corresponding item is included in the knapsack."""
+    def __init__(self, item_inclusion: list[bool]):
+        self.item_inclusion = item_inclusion
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class ToggleOperator(BaseOperator):
+    """Toggle the inclusion status of an item in the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = not new_item_inclusion[self.item_index]
+        return Solution(new_item_inclusion)
+class AddOperator(BaseOperator):
+    """Include an item in the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = True
+        return Solution(new_item_inclusion)
+class RemoveOperator(BaseOperator):
+    """Exclude an item from the knapsack."""
+    def __init__(self, item_index: int):
+        self.item_index = item_index
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        new_item_inclusion[self.item_index] = False
+        return Solution(new_item_inclusion)
+class SwapOperator(BaseOperator):
+    """Swap the inclusion status of two items."""
+    def __init__(self, item_index1: int, item_index2: int):
+        self.item_index1 = item_index1
+        self.item_index2 = item_index2
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        (new_item_inclusion[self.item_index1], new_item_inclusion[self.item_index2]) = (new_item_inclusion[self.item_index2], new_item_inclusion[self.item_index1])
+        return Solution(new_item_inclusion)
+class FlipBlockOperator(BaseOperator):
+    """Flip the a list of items."""
+    def __init__(self, index_list: list[int]):
+        self.index_list = index_list
+    def run(self, solution: Solution) -> Solution:
+        new_item_inclusion = solution.item_inclusion[:]
+        for i in self.index_list:
+            new_item_inclusion[i] = not new_item_inclusion[i]
+        return Solution(new_item_inclusion)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "item_num" (int): The total number of items available for selection.
+    - "resource_num" (int): The number of resource dimensions or constraints.
+    - "profits" (numpy.array): The profit value associated with each item.
+    - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions, so the shape is (resource_num, item_num)
+    - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "current_profit" (float): The total profit of the items included in the current solution.
+    - "current_weights" (numpy.array): The total resource consumption for each dimension in the current solution.
+    - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.
+    - "items_in_knapsack" (list[int]): A list of item indices that are currently included in the knapsack.
+    - "selected_item_num" (int): Number of items that have been selected.
+    - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
+    - "unselected_item_num" (int): Number of items that have not been selected.
+    - "feasible_items_to_add" (list[int]): A list of item indices that can be added to the knapsack without violating any resource constraints. 
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is mkp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Multidimensional Knapsack Problem (MKP) is indeed a combinatorial optimization problem, which can be addressed using heuristic approaches. Your framework for representing solutions and operators seems appropriate for implementing heuristic algorithms to solve MKP.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def greedy_by_density_bb0a(): Greedy by Density with Swapping heuristic for the Multidimensional Knapsack Problem. This heuristic first selects items based on their density (profit divided by total weight across all dimensions). After attempting to add high-density items, it considers swapping existing items in the knapsack with those outside to further improve the solution profitably.
+def greedy_by_profit_1597(max_k: int = 2, epsilon: float = 0.01): Greedy heuristic for the Multidimensional Knapsack Problem, enhanced with opportunity cost scoring, k-flip exploration, and swap optimization.
+def greedy_by_weight_e7f9(k_flip_range=(2, 3)): Greedy heuristic with profit-to-weight ratio, k-flip, and swap refinement for MKP.
+def greedy_by_cost_benefit_fd45(): Greedy by Cost-Benefit heuristic for the Multidimensional Knapsack Problem. This heuristic selects the item that provides the best trade-off between added profit and the opportunity cost of reduced remaining capacity for future items.
+def two_opt_8049(): Two-Opt heuristic that iteratively evaluates potential swaps of two items' inclusion statuses in the knapsack. It retains the swap if it leads to a solution with a higher profit without violating any resource constraints.
+def greedy_improvement_ccbf(): Greedy Improvement heuristic for the Multidimensional Knapsack Problem. This heuristic tries to improve the current solution by swapping an included item with an excluded item if it results in a higher profit without violating the resource constraints.
+def greedy_by_least_remaining_capacity_05f2(): Greedy by Least Remaining Capacity heuristic for the Multidimensional Knapsack Problem. This heuristic selects the item that, when added, leaves the least remaining capacity in the knapsack.
+def single_swap_heuristic_b3d6(): SingleSwapHeuristic tries to find the best single swap of items that increases the total profit of the knapsack without violating resource constraints.
+def greedy_by_resource_balance_52f0(): Greedy by Resource Balance heuristic for the Multidimensional Knapsack Problem. This heuristic selects items that help to balance the resource usage across all dimensions. It prefers items that use less of the more consumed resources and more of the less consumed ones.
+def k_flip_2f3e(k: int = 2) -> tuple[FlipBlockOperator, dict]:
+    """ K-flip heuristic that flips the inclusion status of k items.
+
+    Args): K-flip heuristic that flips the inclusion status of k items.
+def greedy_by_profitto_weight_ratio_3aad(): Greedy heuristic that selects items based on the highest profit-to-weight ratio without violating resource constraints.
+def random_4c25(): Random Heuristic for the Multidimensional Knapsack Problem. Randomly selects items to add to the knapsack until no further items can be added without violating resource constraints.
+def block_flip_d4f4(block_size: int = 2) -> tuple[FlipBlockOperator, dict]:
+    """
+    Block Flip Heuristic for Multidimensional Knapsack Problem.
+    Flips the inclusion status of a contiguous block of items to test for an improved solution.
+    
+    Args): Block Flip Heuristic for Multidimensional Knapsack Problem. Flips the inclusion status of a contiguous block of items to test for an improved solution.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios where each heuristic might be most applicable involves understanding the strengths and weaknesses of each approach in terms of problem characteristics and solution landscape:
+
+1. **greedy_by_density_bb0a**: 
+   - **Scenario**: Suitable for problems where items vary significantly in their profit-to-weight density, allowing for a straightforward initial selection. Swapping can help refine this selection.
+   - **Quantification**: High variance in profit-to-weight ratios, relatively balanced resource constraints.
+
+2. **greedy_by_profit_1597**:
+   - **Scenario**: Effective in scenarios where a few items have exceptionally high profits, and exploring combinations of items (k-flip) can yield significant improvements.
+   - **Quantification**: Presence of high-profit items and moderate variance in item profits.
+
+3. **greedy_by_weight_e7f9**:
+   - **Scenario**: Best when item weights vary significantly, and the aim is to efficiently utilize capacity while maintaining a good profit ratio.
+   - **Quantification**: High variance in item weights, critical capacity constraints.
+
+4. **greedy_by_cost_benefit_fd45**:
+   - **Scenario**: Optimal when it’s important to evaluate the trade-off between profit and future capacity usage, particularly in tightly constrained environments.
+   - **Quantification**: Tight capacity constraints, high opportunity costs for capacity consumption.
+
+5. **two_opt_8049**:
+   - **Scenario**: Useful in situations where a near-optimal solution is available, and small adjustments can lead to optimality.
+   - **Quantification**: Solutions close to optimal with few necessary changes for improvement.
+
+6. **greedy_improvement_ccbf**:
+   - **Scenario**: Suitable for refining solutions where initial selections can be improved by targeted swaps.
+   - **Quantification**: Initial greedy solutions, moderate opportunities for improvement via swaps.
+
+7. **greedy_by_least_remaining_capacity_05f2**:
+   - **Scenario**: Works well when capacity is the main constraint, and the goal is to maximize capacity utilization.
+   - **Quantification**: Critical capacity constraints, importance of maximizing capacity usage.
+
+8. **single_swap_heuristic_b3d6**:
+   - **Scenario**: Applicable when small, incremental improvements are needed and the solution space is rugged.
+   - **Quantification**: Incremental improvement opportunities, rugged solution landscape.
+
+9. **greedy_by_resource_balance_52f0**:
+   - **Scenario**: Effective in multidimensional resource scenarios where balanced resource usage is key.
+   - **Quantification**: Multidimensional constraints, need for balanced resource usage.
+
+10. **k_flip_2f3e**:
+    - **Scenario**: Useful for exploring combinations of item flips when multiple items need to change inclusion status to find improvements.
+    - **Quantification**: High interdependence among item selections, significant flip opportunities.
+
+11. **greedy_by_profitto_weight_ratio_3aad**:
+    - **Scenario**: Ideal for straightforward scenarios where profit-to-weight is the primary selection criterion.
+    - **Quantification**: Clear dominance of profit-to-weight ratio as a selection criterion.
+
+12. **random_4c25**:
+    - **Scenario**: Useful as a baseline or when the solution space is large and other heuristics fail to provide a good starting point.
+    - **Quantification**: Large, complex solution spaces, no clear heuristic superiority.
+
+13. **block_flip_d4f4**:
+    - **Scenario**: Effective when groups of items are interdependent, and block changes can reveal new optima.
+    - **Quantification**: High interdependence of item groups, potential for block improvements.
+
+These scenarios can be further analyzed and quantified through empirical testing and data analysis on the specific characteristics of the MKP instances you are solving.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+item_num:15
+resource_num:10
+profits:[100.0, 220.0, 90.0, 400.0, 300.0, 400.0, 205.0, 120.0, 160.0, 580.0, 400.0, 140.0, 100.0, 1300.0, 650.0]
+weights:[[8.0, 24.0, 13.0, 80.0, 70.0, 80.0, 45.0, 15.0, 28.0, 90.0, 130.0, 32.0, 20.0, 120.0, 40.0], [8.0, 44.0, 13.0, 100.0, 100.0, 90.0, 75.0, 25.0, 28.0, 120.0, 130.0, 32.0, 40.0, 160.0, 40.0], [3.0, 6.0, 4.0, 20.0, 20.0, 30.0, 8.0, 3.0, 12.0, 14.0, 40.0, 6.0, 3.0, 20.0, 5.0], [5.0, 9.0, 6.0, 40.0, 30.0, 40.0, 16.0, 5.0, 18.0, 24.0, 60.0, 16.0, 11.0, 30.0, 25.0], [5.0, 11.0, 7.0, 50.0, 40.0, 40.0, 19.0, 7.0, 18.0, 29.0, 70.0, 21.0, 17.0, 30.0, 25.0], [5.0, 11.0, 7.0, 55.0, 40.0, 40.0, 21.0, 9.0, 18.0, 29.0, 70.0, 21.0, 17.0, 35.0, 25.0], [0.0, 0.0, 1.0, 10.0, 4.0, 10.0, 0.0, 6.0, 0.0, 6.0, 32.0, 3.0, 0.0, 70.0, 10.0], [3.0, 4.0, 5.0, 20.0, 14.0, 20.0, 6.0, 12.0, 10.0, 18.0, 42.0, 9.0, 12.0, 100.0, 20.0], [3.0, 6.0, 9.0, 30.0, 29.0, 20.0, 12.0, 12.0, 10.0, 30.0, 42.0, 18.0, 18.0, 110.0, 20.0], [3.0, 8.0, 9.0, 35.0, 29.0, 20.0, 16.0, 15.0, 10.0, 30.0, 42.0, 20.0, 18.0, 120.0, 20.0]]
+capacities:[550.0, 700.0, 130.0, 240.0, 280.0, 310.0, 110.0, 205.0, 260.0, 275.0]
+average_profit:344.3333333333333
+profit_variance:94569.55555555556
+average_weight_per_resource:[4.3, 12.3, 7.4, 44.0, 37.6, 39.0, 21.8, 10.9, 15.2, 39.0, 65.8, 17.8, 15.6, 79.5, 23.0]
+weight_variance_per_resource:[5.409999999999999, 147.41000000000003, 12.84, 719.0, 715.6400000000001, 629.0, 445.5600000000001, 37.489999999999995, 67.36, 1190.4, 1181.96, 86.76, 106.63999999999999, 2162.25, 111.0]
+capacity_to_weight_ratio:[0.6918238993710691, 0.6965174129353234, 0.6701030927835051, 0.7164179104477612, 0.7197943444730077, 0.7692307692307693, 0.7236842105263158, 0.6949152542372882, 0.7046070460704607, 0.6962025316455697]
+profit_to_weight_ratio:[2.3255813953488373, 1.7886178861788617, 1.2162162162162162, 0.9090909090909091, 0.7978723404255319, 1.0256410256410255, 0.9403669724770642, 1.1009174311926606, 1.0526315789473684, 1.4871794871794872, 0.60790273556231, 0.7865168539325843, 0.6410256410256411, 1.6352201257861636, 2.8260869565217392]
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_solution:selected_items: 
+current_profit:0
+current_weights:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+remaining_capacity:[550.0, 700.0, 130.0, 240.0, 280.0, 310.0, 110.0, 205.0, 260.0, 275.0]
+items_in_knapsack:[]
+selected_item_num:0
+items_not_in_knapsack:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+unselected_item_num:15
+feasible_items_to_add:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+current_solution_value:0
+solution_density:0.0
+average_remaining_capacity:306.0
+remaining_capacity_variance:30249.0
+feasibility_ratio:1.0
+utilized_capacity_ratio:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+item_profitability_in_solution:0
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 0 rounds discuss and the summary are:
+None
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: None. How does None perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+***Run heuristic:
+selected heuristic: greedy_by_density_bb0a
+running steps: 5
+explanation: The initial state shows that no items have been selected yet, and all items are feasible to add. Given the current scenario and the high variance in profit values, starting with a heuristic that selects items based on profit-to-weight density is a strong initial strategy. This approach will help quickly identify high-value items, and swapping can further improve the solution.
+***
+------------------------------------------------------------------------------------
+

@@ -1,0 +1,22 @@
+-data: mknap1_3.mkp
+-current_solution:
+selected_items: 0,1,5,6,7,8,9,11,13,14
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 4015
+-item_num: 15
+-resource_num: 10
+-selected_item_num: [0, 1, 5, 6, 7, 8, 9, 11, 13, 14]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_bb0a	AddOperator(item_index=14)	selected_items: 14
+1	greedy_by_density_bb0a	AddOperator(item_index=0)	selected_items: 0,14
+2	greedy_by_density_bb0a	AddOperator(item_index=1)	selected_items: 0,1,14
+3	greedy_by_density_bb0a	AddOperator(item_index=13)	selected_items: 0,1,13,14
+4	greedy_by_density_bb0a	AddOperator(item_index=9)	selected_items: 0,1,9,13,14
+5	greedy_by_profit_1597	AddOperator(item_index=2)	selected_items: 0,1,2,9,13,14
+6	greedy_by_profit_1597	AddOperator(item_index=8)	selected_items: 0,1,2,8,9,13,14
+7	greedy_by_profit_1597	AddOperator(item_index=7)	selected_items: 0,1,2,7,8,9,13,14
+8	greedy_by_profit_1597	AddOperator(item_index=6)	selected_items: 0,1,2,6,7,8,9,13,14
+9	greedy_by_profit_1597	AddOperator(item_index=11)	selected_items: 0,1,2,6,7,8,9,11,13,14
+10	greedy_improvement_ccbf	SwapOperator(item_index1=2, item_index2=5)	selected_items: 0,1,5,6,7,8,9,11,13,14

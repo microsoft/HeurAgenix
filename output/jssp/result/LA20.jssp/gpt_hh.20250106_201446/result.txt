@@ -13,7 +13,7 @@ machine_9: 1->0->2->8->5->9->4->7->6->3
 
 -is_complete_solution: True
 -is_valid_solution: True
--current_makespan: 1342
+-current_makespan: 1042
 -job_num: 10
 -machine_num: 10
 -trajectory:

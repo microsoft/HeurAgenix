@@ -1,0 +1,14 @@
+-data: mknap1_2.mkp
+-current_solution:
+selected_items: 0,3,7
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 8650.1
+-item_num: 10
+-resource_num: 10
+-selected_item_num: [0, 3, 7]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_profit_8df3	AddOperator(item_index=7)	selected_items: 7
+1	greedy_by_profit_8df3	AddOperator(item_index=3)	selected_items: 3,7
+2	greedy_by_profit_8df3	AddOperator(item_index=0)	selected_items: 0,3,7

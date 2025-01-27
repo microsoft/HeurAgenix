@@ -1,0 +1,366 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on max_cut problem:
+MaxCut is a classical combinatorial optimization problem where the goal is to partition the vertices of a graph into two disjoint subsets such that the number (or total weight) of edges between the two sets is maximized.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MaxCut problem.
+Two sets of vertices representing the partition of the graph into two subsets."""
+    def __init__(self, set_a: set[int], set_b: set[int]):
+        self.set_a = set_a
+        self.set_b = set_b
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class InsertNodeOperator(BaseOperator):
+    """Insert a node into one of the sets for the MaxCut solution."""
+    def __init__(self, node: int, target_set: str):
+        self.node = node
+        self.target_set = target_set
+        assert target_set in ['A', 'B']
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.target_set == 'A':
+            assert self.node not in solution.set_b
+            new_set_a.add(self.node)
+        elif self.target_set == 'B':
+            assert self.node not in solution.set_a
+            new_set_b.add(self.node)
+        return Solution(new_set_a, new_set_b)
+class InsertEdgeOperator(BaseOperator):
+    """Insert an edge into the MaxCut solution with node_1 in set A and node_2 in set B."""
+    def __init__(self, node_1: int, node_2: int):
+        self.node_1 = node_1
+        self.node_2 = node_2
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        assert self.node_1 not in solution.set_b
+        assert self.node_2 not in solution.set_a
+        new_set_a.add(self.node_1)
+        new_set_b.add(self.node_2)
+        return Solution(new_set_a, new_set_b)
+class SwapOperator(BaseOperator):
+    """Swap a list of nodes from origin set to the opposite set in the MaxCut solution."""
+    def __init__(self, nodes: list[int]):
+        self.nodes = nodes
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        for node in self.nodes:
+            if node in solution.set_a:
+                assert node not in solution.set_b
+                new_set_a.remove(node)
+                new_set_b.add(node)
+            elif node in solution.set_b:
+                assert node not in solution.set_a
+                new_set_b.remove(node)
+                new_set_a.add(node)
+        return Solution(new_set_a, new_set_b)
+class DeleteOperator(BaseOperator):
+    """Delete a node from both sets in the MaxCut solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.node in solution.set_a:
+            new_set_a.remove(self.node)
+        elif self.node in solution.set_b:
+            new_set_b.remove(self.node)
+        return Solution(new_set_a, new_set_b)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of vertices in the graph.
+    - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "set_a_count" (int): The number of nodes in set A of the current partition.
+    - "set_b_count" (int): The number of nodes in set B of the current partition.
+    - "selected_nodes" (set[int]): The set of selected nodes.
+    - "selected_num" (int): The number of nodes have been selected.
+    - "unselected_nodes" (set[int]): The set of unselected nodes.
+    - "unselected_num" (int): The number of nodes have not been selected.
+    - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is max_cut a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def random_5c59(): Random node insertion heuristic for Max Cut.
+def highest_delta_node_b31b(): This heuristic selects the unselected node that, when added to one of the sets (A or B), would result in the largest increase in the total cut weight. The node is then inserted into that set which maximizes the cut weight.
+def balanced_cut_21d5(max_iterations: int = 100) -> tuple[InsertNodeOperator, dict]:
+    """
+    Balanced Cut heuristic for the Max Cut problem. This heuristic tries to balance the number of nodes in sets A and B
+    while maximizing the cut value. It iteratively adds nodes to the smaller set until a balanced state is reached or
+    the maximum number of iterations is exceeded.
+
+    Args): Balanced Cut heuristic for the Max Cut problem. This heuristic tries to balance the number of nodes in sets A and B while maximizing the cut value. It iteratively adds nodes to the smaller set until a balanced state is reached or the maximum number of iterations is exceeded.
+def highest_delta_edge_9f66(): Selects the unselected edge that maximizes the increase in cut weight when added to the solution.
+def highest_weight_edge_eb0c(): Selects an edge with the highest weight where both nodes are unselected and adds each node to opposite sets, choosing the set that maximizes the cut value increase for each node.
+def multi_swap_2_dbfe(): This heuristic evaluates all possible pairs of nodes for swapping between set A and set B. It performs the swap that leads to the highest increase in the cut value, considering the combined effect of swapping two nodes simultaneously rather than one at a time. It utilizes numpy operations for efficient computation.
+def simulated_annealing_ed14(): Simulated Annealing heuristic for the Max Cut problem. It probabilistically chooses to swap a node from one set to another, potentially accepting worse solutions early on to escape local optima, with the probability of accepting worse solutions decreasing over time.
+def greedy_swap_5bb5(): Greedy Swap Heuristic for the Max Cut problem. Iteratively evaluates the delta in cut value for all possible single-node swaps between set A and set B, and performs the swap that leads to the highest increase in the cut value. If no swap improves the cut value, no operator is returned.
+def most_weight_neighbors_320c(): This heuristic selects an unselected node that has the highest sum of weights connected to it and inserts it into one of the sets (A or B) in the Solution, aiming to maximize the cut value. It stores the sorted list of unselected nodes based on the sum of weights for future use.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios where each heuristic is applicable involves understanding the strengths and limitations of each approach and the specific characteristics of the Max Cut problem instances they are best suited for. Here’s a brief analysis of the scenarios for each heuristic:
+
+1. **random_5c59**:
+   - **Scenario**: Useful in scenarios where a quick and diverse exploration of the solution space is needed without any specific guidance.
+   - **Best Quantified**: Large graph instances where heuristic diversity is more valuable than precision, or as a starting point for more sophisticated algorithms.
+
+2. **highest_delta_node_b31b**:
+   - **Scenario**: Effective for graphs where individual node contributions significantly impact the overall cut value.
+   - **Best Quantified**: Graphs with highly variable edge weights or sparse graphs where specific node placements can make substantial differences.
+
+3. **balanced_cut_21d5**:
+   - **Scenario**: Suitable for graphs where a balanced partition is crucial for achieving a good solution.
+   - **Best Quantified**: Graphs with a relatively even distribution of weights across nodes and edges where balanced partitions often align with optimal cuts.
+
+4. **highest_delta_edge_9f66**:
+   - **Scenario**: Works well when the focus is on selecting edges that have the most significant impact on the cut value.
+   - **Best Quantified**: Graphs where edges have diverse weights, making it critical to select the most beneficial edges for inclusion.
+
+5. **highest_weight_edge_eb0c**:
+   - **Scenario**: Applicable in scenarios where high-weight edges dominate and should be prioritized.
+   - **Best Quantified**: Dense graphs with varying edge weights where capturing the largest weights in the cut is a priority.
+
+6. **multi_swap_2_dbfe**:
+   - **Scenario**: Useful for graphs where complex interactions between node swaps can lead to significant improvements in the cut value.
+   - **Best Quantified**: Graphs where local optima can be overcome by considering the combined effect of multiple swaps.
+
+7. **simulated_annealing_ed14**:
+   - **Scenario**: Suitable for escaping local optima in complex graphs where simple heuristics might get stuck.
+   - **Best Quantified**: Large, intricate graphs where exploration of the solution space is essential, and local minima are numerous.
+
+8. **greedy_swap_5bb5**:
+   - **Scenario**: Effective for incremental improvements in the cut value through local optimization.
+   - **Best Quantified**: Graphs where small, local adjustments can gradually improve the solution quality.
+
+9. **most_weight_neighbors_320c**:
+   - **Scenario**: Applicable when node connectivity and weight are critical in determining their placement in the partition.
+   - **Best Quantified**: Graphs with highly connected nodes where leveraging the node's neighborhood weight can lead to better cuts.
+
+Each heuristic has its strengths, and their applicability can often be quantified based on graph characteristics such as density, weight distribution, and the degree of node connectivity. These heuristics can also be used in combination or as part of a larger framework to capitalize on their individual strengths.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+node_num:800
+average_node_degree:47.94
+edge_density:0.06
+average_edge_weight:1.0
+max_edge_weight:1.0
+min_edge_weight:1.0
+standard_deviation_edge_weight:0.0
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+set_a_count:155
+set_b_count:155
+selected_num:310
+unselected_num:490
+current_cut_value:1465.0
+imbalance_ratio:0.0
+cut_value:1465.0
+average_cut_edge_weight:4.725806451612903
+selected_nodes_ratio:0.3875
+unselected_nodes_ratio:0.6125
+edge_weight_variance_within_sets:0.05594996918969513
+boundary_node_ratio:0.3875
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 18 rounds discuss and the summary are:
+---Round 0---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 10
+Explain: Starting with the highest_delta_node_b31b heuristic allows us to strategically place nodes to maximize the initial cut value, taking advantage of the uniform edge weights and starting from an empty partition.
+Delta of Selected Node: 10
+Delta of Cut Value: 16.0
+---Round 1---
+Heuristic: greedy_swap_5bb5
+Parameters: {}
+Running Steps: 10
+Explain: The greedy_swap_5bb5 heuristic will be used to explore potential local improvements in the current solution by evaluating and performing swaps that could increase the cut value, given the uniform edge weights and current partitioning.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 2---
+Heuristic: simulated_annealing_ed14
+Parameters: {}
+Running Steps: 50
+Explain: The simulated_annealing_ed14 heuristic is chosen to explore the solution space beyond local optima, especially given the uniform edge weights and the stalled progress with greedy swaps. It allows for a broader search by accepting non-improving moves with a decreasing probability, which can lead to discovering new, potentially better configurations.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 3---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Switching to multi_swap_2_dbfe to explore potential improvements through simultaneous node swaps, leveraging its ability to consider the combined effect of swapping multiple nodes in a graph with uniform weights.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 4---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 30
+Explain: Given the uniform edge weights and the current imbalance in node counts between sets A and B, the balanced_cut_21d5 heuristic can help achieve a more balanced partition while potentially increasing the cut value. This heuristic is suitable for addressing the current imbalance and exploring new partition configurations that may lead to improved solutions.
+Delta of Selected Node: 30
+Delta of Cut Value: 19.0
+---Round 5---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic showed promise in the last round with a notable increase in the cut value, indicating that it effectively addresses the current imbalance. Given the uniform edge weights and the need to further explore potential improvements, continuing with this heuristic for additional steps may lead to further optimization of the solution.
+Delta of Selected Node: 20
+Delta of Cut Value: 20.0
+---Round 6---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 30
+Explain: The balanced_cut_21d5 heuristic has shown positive results in the last two rounds, with a significant increase in the cut value. Given the uniform edge weights and the current balanced state of the sets, continuing with this heuristic for additional steps can further optimize the cut value by maintaining balance while exploring new partition configurations.
+Delta of Selected Node: 30
+Delta of Cut Value: 77.0
+---Round 7---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently shown positive results in the last three rounds, with a significant increase in the cut value. Given the uniform edge weights and the current balanced state of the sets, continuing with this heuristic for additional steps can further optimize the cut value by maintaining balance while exploring new partition configurations. Since the heuristic has been effective in recent iterations, applying it for another 20 steps is a prudent choice to further improve the solution.
+Delta of Selected Node: 20
+Delta of Cut Value: 73.0
+---Round 8---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently shown significant improvements in the cut value across the last few rounds, indicating that it effectively addresses the current problem state, especially given the uniform edge weights and balanced partitioning. Continuing with this heuristic for another 20 steps is a prudent choice to potentially further optimize the solution, as it is well-suited to the problem's characteristics and has been delivering positive results.
+Delta of Selected Node: 20
+Delta of Cut Value: 79.0
+---Round 9---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently shown significant improvements in the cut value over the last several rounds. Given the uniform edge weights and the current balanced partitioning, continuing with this heuristic for another 20 steps could further optimize the solution. It remains well-suited to the problem's characteristics and has been effective in increasing the cut value.
+Delta of Selected Node: 20
+Delta of Cut Value: 91.0
+---Round 10---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has demonstrated significant improvements in the cut value in recent iterations. Given the uniform edge weights and balanced partitioning, it remains well-suited for further optimizing the solution. Continuing for another 20 steps is likely to yield additional improvements.
+Delta of Selected Node: 20
+Delta of Cut Value: 94.0
+---Round 11---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently demonstrated significant improvements in the cut value, particularly evident in the last several rounds. Given the uniform edge weights and the effectiveness of maintaining a balanced partition, continuing with this heuristic for an additional 20 steps is likely to yield further optimization of the solution, as it remains well-aligned with the problem's characteristics and past performance.
+Delta of Selected Node: 20
+Delta of Cut Value: 118.0
+---Round 12---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently yielded significant improvements in the cut value across the last several rounds. Given the uniform edge weights and the effectiveness of maintaining a balanced partition, continuing for another 20 steps is likely to further enhance the solution. The heuristic is well-aligned with the problem's characteristics and has demonstrated strong performance in recent iterations.
+Delta of Selected Node: 20
+Delta of Cut Value: 126.0
+---Round 13---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently shown significant improvements in the cut value, particularly in the last several rounds. Given the uniform edge weights and the current balanced partitioning, continuing with this heuristic for another 20 steps is likely to yield further optimization. The pattern of improvement suggests that maintaining a balanced partition is effective, and additional steps will explore potential gains while preserving balance.
+Delta of Selected Node: 20
+Delta of Cut Value: 118.0
+---Round 14---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently demonstrated significant improvements in the cut value over the last several rounds. Given the uniform edge weights and the current balanced partitioning, continuing with this heuristic for another 20 steps is likely to yield further optimization. The pattern of improvement suggests that maintaining a balanced partition is effective, and additional steps will explore potential gains while preserving balance.
+Delta of Selected Node: 20
+Delta of Cut Value: 136.0
+---Round 15---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently demonstrated significant improvements in the cut value across multiple rounds. Given the uniform edge weights and the current balanced partitioning, continuing with this heuristic for another 20 steps is likely to yield further optimization. The previous rounds have shown a strong pattern of improvement, suggesting that maintaining balance while exploring new configurations remains an effective strategy.
+Delta of Selected Node: 20
+Delta of Cut Value: 140.0
+---Round 16---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has consistently improved the cut value across several rounds, indicating its effectiveness in maintaining a balanced partition while exploring new configurations. Continuing with it for another 20 steps is likely to yield further optimization, given the uniform edge weights and past performance.
+Delta of Selected Node: 20
+Delta of Cut Value: 176.0
+---Round 17---
+Heuristic: balanced_cut_21d5
+Parameters: {}
+Running Steps: 20
+Explain: The balanced_cut_21d5 heuristic has shown consistent improvements in the cut value over multiple rounds. The uniform edge weights and the current balanced partitioning suggest that continuing with this heuristic for another 20 steps is likely to yield further optimization. Given the past performance and the strategy of maintaining balance while exploring new configurations, it remains an effective approach.
+Delta of Selected Node: 20
+Delta of Cut Value: 182.0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: balanced_cut_21d5. How does balanced_cut_21d5 perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+***Run heuristic:
+selected heuristic: balanced_cut_21d5
+running steps: 20
+explanation: The balanced_cut_21d5 heuristic has consistently demonstrated significant improvements in the cut value over multiple rounds, particularly given the uniform edge weights and the balanced state of the partition. Continuing with another 20 steps is likely to yield further optimization. The pattern of improvement suggests that maintaining balance while exploring new configurations remains an effective strategy.
+***
+------------------------------------------------------------------------------------
+

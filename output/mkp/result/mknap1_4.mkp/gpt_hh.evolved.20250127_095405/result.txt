@@ -1,0 +1,16 @@
+-data: mknap1_4.mkp
+-current_solution:
+selected_items: 0,14,16,18,19
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 6120.0
+-item_num: 20
+-resource_num: 10
+-selected_item_num: [0, 14, 16, 18, 19]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_bb0a	AddOperator(item_index=18)	selected_items: 18
+1	greedy_by_density_bb0a	AddOperator(item_index=19)	selected_items: 18,19
+2	greedy_by_density_bb0a	AddOperator(item_index=14)	selected_items: 14,18,19
+3	greedy_by_density_bb0a	AddOperator(item_index=16)	selected_items: 14,16,18,19
+4	greedy_by_density_bb0a	AddOperator(item_index=0)	selected_items: 0,14,16,18,19

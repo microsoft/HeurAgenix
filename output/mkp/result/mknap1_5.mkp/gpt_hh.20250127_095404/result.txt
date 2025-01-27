@@ -1,0 +1,30 @@
+-data: mknap1_5.mkp
+-current_solution:
+selected_items: 0,2,9,13,14,16,18,19,20,21,22,23,26,27
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 12130.0
+-item_num: 28
+-resource_num: 10
+-selected_item_num: [0, 2, 9, 13, 14, 16, 18, 19, 20, 21, 22, 23, 26, 27]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=25)	selected_items: 25
+1	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=22)	selected_items: 22,25
+2	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=27)	selected_items: 22,25,27
+3	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=26)	selected_items: 22,25,26,27
+4	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=24)	selected_items: 22,24,25,26,27
+5	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=16)	selected_items: 16,22,24,25,26,27
+6	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=21)	selected_items: 16,21,22,24,25,26,27
+7	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=18)	selected_items: 16,18,21,22,24,25,26,27
+8	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=14)	selected_items: 14,16,18,21,22,24,25,26,27
+9	greedy_by_profitto_weight_ratio_3aad	AddOperator(item_index=19)	selected_items: 14,16,18,19,21,22,24,25,26,27
+10	greedy_improvement_ccbf	SwapOperator(item_index1=18, item_index2=20)	selected_items: 14,16,19,20,21,22,24,25,26,27
+11	greedy_improvement_ccbf	SwapOperator(item_index1=26, item_index2=13)	selected_items: 13,14,16,19,20,21,22,24,25,27
+12	greedy_improvement_ccbf	SwapOperator(item_index1=25, item_index2=9)	selected_items: 9,13,14,16,19,20,21,22,24,27
+13	greedy_improvement_ccbf	SwapOperator(item_index1=24, item_index2=23)	selected_items: 9,13,14,16,19,20,21,22,23,27
+14	greedy_by_density_9e8d	AddOperator(item_index=26)	selected_items: 9,13,14,16,19,20,21,22,23,26,27
+15	greedy_by_density_9e8d	AddOperator(item_index=18)	selected_items: 9,13,14,16,18,19,20,21,22,23,26,27
+16	greedy_by_density_9e8d	AddOperator(item_index=0)	selected_items: 0,9,13,14,16,18,19,20,21,22,23,26,27
+17	greedy_by_density_9e8d	AddOperator(item_index=17)	selected_items: 0,9,13,14,16,17,18,19,20,21,22,23,26,27
+18	single_swap_heuristic_b3d6	SwapOperator(item_index1=17, item_index2=2)	selected_items: 0,2,9,13,14,16,18,19,20,21,22,23,26,27

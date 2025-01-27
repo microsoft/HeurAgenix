@@ -1,0 +1,31 @@
+-data: mknapcb1_5.mkp
+-current_solution:
+selected_items: 8,21,23,28,32,37,43,56,67,84
+-is_complete_solution: True
+-is_valid_solution: True
+-current_profit: 10894.0
+-item_num: 100
+-resource_num: 5
+-selected_item_num: [8, 21, 23, 28, 32, 37, 43, 56, 67, 84]
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	greedy_by_density_9e8d	AddOperator(item_index=61)	selected_items: 61
+1	greedy_by_density_9e8d	AddOperator(item_index=54)	selected_items: 54,61
+2	greedy_by_density_9e8d	AddOperator(item_index=49)	selected_items: 49,54,61
+3	greedy_by_density_9e8d	AddOperator(item_index=99)	selected_items: 49,54,61,99
+4	greedy_by_density_9e8d	AddOperator(item_index=65)	selected_items: 49,54,61,65,99
+5	greedy_by_density_9e8d	AddOperator(item_index=79)	selected_items: 49,54,61,65,79,99
+6	greedy_by_density_9e8d	AddOperator(item_index=62)	selected_items: 49,54,61,62,65,79,99
+7	greedy_by_density_9e8d	AddOperator(item_index=81)	selected_items: 49,54,61,62,65,79,81,99
+8	greedy_by_density_9e8d	AddOperator(item_index=17)	selected_items: 17,49,54,61,62,65,79,81,99
+9	greedy_by_density_9e8d	AddOperator(item_index=46)	selected_items: 17,46,49,54,61,62,65,79,81,99
+10	greedy_improvement_ccbf	SwapOperator(item_index1=65, item_index2=43)	selected_items: 17,43,46,49,54,61,62,79,81,99
+11	greedy_improvement_ccbf	SwapOperator(item_index1=49, item_index2=67)	selected_items: 17,43,46,54,61,62,67,79,81,99
+12	greedy_improvement_ccbf	SwapOperator(item_index1=54, item_index2=37)	selected_items: 17,37,43,46,61,62,67,79,81,99
+13	greedy_improvement_ccbf	SwapOperator(item_index1=61, item_index2=28)	selected_items: 17,28,37,43,46,62,67,79,81,99
+14	greedy_improvement_ccbf	SwapOperator(item_index1=99, item_index2=32)	selected_items: 17,28,32,37,43,46,62,67,79,81
+15	greedy_improvement_ccbf	SwapOperator(item_index1=62, item_index2=23)	selected_items: 17,23,28,32,37,43,46,67,79,81
+16	greedy_improvement_ccbf	SwapOperator(item_index1=79, item_index2=21)	selected_items: 17,21,23,28,32,37,43,46,67,81
+17	greedy_improvement_ccbf	SwapOperator(item_index1=81, item_index2=84)	selected_items: 17,21,23,28,32,37,43,46,67,84
+18	greedy_improvement_ccbf	SwapOperator(item_index1=46, item_index2=8)	selected_items: 8,17,21,23,28,32,37,43,67,84
+19	greedy_improvement_ccbf	SwapOperator(item_index1=17, item_index2=56)	selected_items: 8,21,23,28,32,37,43,56,67,84

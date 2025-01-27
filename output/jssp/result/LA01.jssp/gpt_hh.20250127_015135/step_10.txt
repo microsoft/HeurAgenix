@@ -1,0 +1,353 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on jssp problem:
+Job Shop Scheduling Problem (JSSP) involves scheduling a series of jobs, each comprising a sequence of operations, across different machines to optimize production efficiency. In this variant, there is a one-to-one correspondence between machines and operation types, ensuring that each operation is carried out by a specific machine. Consequently, the number of operations (N) matches the number of machines, and each job includes these N operations precisely once.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the Job Shop Scheduling Problem (JSSP).
+A list of lists where each sublist represents the sequence of jobs scheduled on a machine, identified by its index in the outer list.
+Each job is represented by its integer identifier and is processed in the order specified within the sublist.
+Each sublist in 'job_sequences' corresponds to a machine's job processing sequence, with machines sorted by their identifier (index in the outer list).
+Each job within a sublist is sorted by its scheduled order of execution on that machine.
+Job matrix records the target operation(machine) sequence in job."""
+    def __init__(self, job_sequences: list[list[int]], job_operation_sequence: list[list[int]], job_operation_index: list[int]):
+        self.job_sequences = job_sequences
+        self.job_operation_sequence = job_operation_sequence
+        self.job_operation_index = job_operation_index
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AdvanceOperator(BaseOperator):
+    """AdvanceOperator is responsible for advancing the next operation in the job's processing sequence.
+This operator appends the next operation of the specified job to the processing queue of the machine that is scheduled to execute the operation.
+It identifies the appropriate machine based on the job's current operation index and the job matrix within the provided Solution instance."""
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        machine_id = solution.job_operation_sequence[self.job_id][solution.job_operation_index[self.job_id]]
+        new_job_sequences[machine_id].append(self.job_id)
+        job_operation_index = solution.job_operation_index
+        job_operation_index[self.job_id] += 1
+        return Solution(new_job_sequences, solution.job_operation_sequence, job_operation_index)
+class SwapOperator(BaseOperator):
+    """Swaps two operations in corresponding jobs in the same machine's."""
+    def __init__(self, machine_id: int, job_id1: int, job_id2: int):
+        self.machine_id = machine_id
+        self.job_id1 = job_id1
+        self.job_id2 = job_id2
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        index1 = new_job_sequences[self.machine_id].index(self.job_id1)
+        index2 = new_job_sequences[self.machine_id].index(self.job_id2)
+        new_job_sequences[self.machine_id][index1], new_job_sequences[self.machine_id][index2] = (new_job_sequences[self.machine_id][index2], new_job_sequences[self.machine_id][index1])
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ReverseSequenceOperator(BaseOperator):
+    """Reverses a sequence of operations in corresponding jobs within a machine's queue."""
+    def __init__(self, machine_id: int, start_position: int, end_position: int):
+        self.machine_id = machine_id
+        self.start_position = start_position
+        self.end_position = end_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        sequence = new_job_sequences[self.machine_id][self.start_position:self.end_position + 1]
+        new_job_sequences[self.machine_id][self.start_position:self.end_position + 1] = sequence[::-1]
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ShiftOperator(BaseOperator):
+    """Shifts an operation to a new position within the same machine's queue."""
+    def __init__(self, machine_id: int, job_id: int, new_position: int):
+        self.machine_id = machine_id
+        self.job_id = job_id
+        self.new_position = new_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        current_position = new_job_sequences[self.machine_id].index(self.job_id)
+        operation = new_job_sequences[self.machine_id].pop(current_position)
+        new_job_sequences[self.machine_id].insert(self.new_position, operation)
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
+    - "job_num" (int): The total number of jobs in the problem.
+    - "machine_num" (int): The total number of machines in the problem, also as operation num.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "finished_jobs" (list[int]): List of all finished jobs.
+    - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+    - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+    - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in current solution.
+    - "machine_operation_index" (list[int]): The index of the next operation to be scheduled for each machine.
+    - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+    - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is jssp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Job Shop Scheduling Problem (JSSP) is indeed a classic example of a combinatorial optimization problem. It involves finding an optimal sequence of operations to minimize some objective, such as makespan, while adhering to constraints like operation precedence and machine availability. Heuristics are commonly used to tackle JSSP due to its NP-hard nature, making it a suitable problem for hyper-heuristics and the framework you've described.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def shift_operator_109f(): This heuristic attempts to find a better schedule by shifting an operation within the same machine's queue. For each machine, it tries shifting each operation to all possible positions and evaluates the makespan. The shift that results in the best improvement (reduction in makespan) is selected.
+def shortest_processing_time_first_c374(): Implements the Shortest Processing Time first heuristic for the JSSP. This heuristic selects the unfinished job with the shortest next operation processing time and uses an AdvanceOperator to schedule it on the corresponding machine.
+def _3opt_6ee0(): 3-opt heuristic for Job Shop Scheduling Problem (JSSP). This function does not generate a complete 3-opt operator since JSSP requires operations within a job to be executed in sequence and does not allow reordering of these operations.The heuristic is adapted to generate a series of 2-opt swaps (using the SwapOperator) which approximate a 3-opt move.
+def longest_job_next_2e23(): Longest Job Next heuristic for JSSP. Prioritizes the job with the longest total processing time remaining. It uses the AdvanceOperator to schedule the next operation for the job with the maximum remaining processing time.
+def _2opt_f9c1(): Implements a 2-opt heuristic for the Job Shop Scheduling Problem (JSSP). This heuristic attempts to reduce the makespan by swapping two non-adjacent operations in the schedule. It iteratively checks all possible pairs of operations to determine if a shorter sequence can be found.
+def random_6512(): This heuristic randomly selects an unfinished job and advances its next operation in the job's processing sequence.
+def most_work_remaining_930e(): Most Work Remaining heuristic for JSSP. Selects the unfinished job with the maximum remaining work (total processing time of remaining operations) and returns an AdvanceOperator for that job to proceed with the next operation in sequence.
+def longest_processing_time_first_9dc9(): Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
+def least_work_remaining_66c9(): Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
+def shortest_job_next_5b42(): Implements the Shortest Job Next heuristic for the Job Shop Scheduling Problem. This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
+def first_come_first_served_6c4f(): Implement the First Come First Served (FCFS) heuristic for the JSSP. This heuristic schedules the jobs in the order they arrive, without considering their processing times or other characteristics.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios where each heuristic might be applicable can help determine their effectiveness in different contexts of the Job Shop Scheduling Problem (JSSP). Here’s a breakdown of scenarios for each heuristic:
+
+1. **shift_operator_109f**:
+   - **Scenario**: When the current solution has potential for improvement by minor reordering within a machine's queue.
+   - **Best Quantified By**: Evaluating the reduction in makespan after performing shifts within each machine.
+
+2. **shortest_processing_time_first_c374**:
+   - **Scenario**: When there is a need to quickly reduce the queue length on machines, particularly effective when operations have varying processing times.
+   - **Best Quantified By**: Comparing the overall processing time and load balancing across machines.
+
+3. **_3opt_6ee0**:
+   - **Scenario**: Suitable when there’s flexibility in operation sequences and the goal is to explore a more global optimization strategy by approximating 3-opt moves.
+   - **Best Quantified By**: Improvement in makespan after applying a series of 2-opt swaps.
+
+4. **longest_job_next_2e23**:
+   - **Scenario**: Useful when longer jobs dominate the schedule and need to be prioritized to avoid delays.
+   - **Best Quantified By**: Tracking the completion time of longest jobs and the overall balance in job completion times.
+
+5. **_2opt_f9c1**:
+   - **Scenario**: When the job sequence has non-adjacent operations that can be swapped to improve the schedule.
+   - **Best Quantified By**: Reduction in makespan and better load distribution after swaps.
+
+6. **random_6512**:
+   - **Scenario**: Effective for exploration in early stages or when the solution space is large and complex, providing diverse solutions.
+   - **Best Quantified By**: Variability in makespan and solution diversity over multiple runs.
+
+7. **most_work_remaining_930e**:
+   - **Scenario**: Applied when jobs with substantial remaining work tend to bottleneck the schedule, requiring prioritized advancement.
+   - **Best Quantified By**: Reduction in job queues and balancing workload distribution.
+
+8. **longest_processing_time_first_9dc9**:
+   - **Scenario**: Best used when operation times vary significantly and longer operations can cause bottlenecks if not scheduled early.
+   - **Best Quantified By**: Load balancing and reduction in idle times for critical machines.
+
+9. **least_work_remaining_66c9**:
+   - **Scenario**: Effective when the goal is to quickly clear shorter jobs and free up resources.
+   - **Best Quantified By**: Number of completed jobs over time and reduction in makespan.
+
+10. **shortest_job_next_5b42**:
+    - **Scenario**: Useful for minimizing the completion time of smaller jobs and maintaining throughput.
+    - **Best Quantified By**: Job completion rate and makespan reduction.
+
+11. **first_come_first_served_6c4f**:
+    - **Scenario**: Applicable in environments where fairness or order of arrival is critical, regardless of processing times.
+    - **Best Quantified By**: Adherence to arrival order and fairness in job scheduling.
+
+Understanding the problem context and specific constraints or goals will help in selecting the most appropriate heuristic. These scenarios and quantifications can guide the decision-making process in choosing which heuristic to apply for a given JSSP instance.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+job_num:10
+machine_num:5
+job_operation_sequence:[[1, 0, 4, 3, 2], [0, 3, 4, 2, 1], [3, 4, 1, 2, 0], [1, 0, 4, 2, 3], [0, 3, 2, 1, 4], [1, 2, 4, 0, 3], [3, 4, 1, 2, 0], [2, 0, 1, 3, 4], [3, 1, 4, 0, 2], [4, 3, 2, 1, 0]]
+job_operation_time:[[21, 53, 95, 55, 34], [21, 52, 16, 26, 71], [39, 98, 42, 31, 12], [77, 55, 79, 66, 77], [83, 34, 64, 19, 37], [54, 43, 79, 92, 62], [69, 77, 87, 87, 93], [38, 60, 41, 24, 83], [17, 49, 25, 44, 98], [77, 79, 43, 75, 96]]
+total_operation_num:50
+average_operation_time:56.98
+max_operation_time:98
+min_operation_time:12
+std_deviation_operation_time:25.40825849994446
+job_operation_time_range:86
+average_job_length:5.0
+max_job_length:5
+min_job_length:5
+machine_utilization:0.8
+job_diversity:5
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_solution:
+machine_0: 1->3->0->4->7->8->5->9->6
+machine_1: 0->3->5->6->8->7->4->9->2
+machine_2: 7->5->9->1->4->6->3->8->0
+machine_3: 8->2->6->9->4->7->1->0
+machine_4: 9->6->5->3->8->1->0->2->4
+
+finished_jobs:[0, 4, 6, 8, 9]
+unfinished_jobs:[1, 2, 3, 5, 7]
+job_operation_index:[5, 4, 3, 4, 5, 4, 5, 4, 5, 5]
+job_last_operation_end_times:[857, 508, 717, 725, 712, 521, 855, 414, 823, 762]
+machine_operation_index:[9, 9, 9, 8, 9]
+machine_last_operation_end_times:[855, 717, 857, 632, 712]
+finished_operation_num:44
+current_makespan:857
+num_finished_jobs:5
+num_unfinished_jobs:5
+average_job_completion:689.4
+max_job_completion_time:857
+min_job_completion_time:414
+std_dev_job_completion_time:147.74383235857937
+average_machine_completion:754.6
+max_machine_completion_time:857
+min_machine_completion_time:632
+std_dev_machine_completion_time:88.11946436514467
+average_idle_time_per_machine:102.4
+proportion_of_finished_jobs:0.5
+proportion_of_unfinished_jobs:0.5
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 10 rounds discuss and the summary are:
+---Round 0---
+Heuristic: shortest_processing_time_first_c374
+Parameters: {}
+Running Steps: 5
+Explain: This heuristic will prioritize operations with shorter processing times, helping to quickly reduce makespan and balance machine loads in the early stages of scheduling.
+Delta of current_makespan: 56
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 5
+---Round 1---
+Heuristic: most_work_remaining_930e
+Parameters: {}
+Running Steps: 5
+Explain: By prioritizing jobs with the most work remaining, this heuristic aims to balance the workload across machines, potentially reducing bottlenecks and improving the makespan.
+Delta of current_makespan: 146
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 5
+---Round 2---
+Heuristic: most_work_remaining_930e
+Parameters: {}
+Running Steps: 5
+Explain: Continuing with most_work_remaining_930e as it demonstrated significant reduction in makespan, indicating its potential to further optimize workload distribution and approach job completion.
+Delta of current_makespan: 87
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 5
+---Round 3---
+Heuristic: most_work_remaining_930e
+Parameters: {}
+Running Steps: 3
+Explain: The heuristic has shown a consistent reduction in makespan, indicating its effectiveness in workload distribution. Running for a few more steps will help determine if the trend persists and if further improvements can be achieved.
+Delta of current_makespan: 71
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 3
+---Round 4---
+Heuristic: most_work_remaining_930e
+Parameters: {}
+Running Steps: 3
+Explain: The "most_work_remaining_930e" heuristic has consistently demonstrated a reduction in makespan in previous rounds, indicating its effectiveness in balancing workload and optimizing job completion. Continuing with this heuristic for a few more steps will allow us to evaluate if the positive trend persists and if further improvements can be achieved before considering a switch to another heuristic.
+Delta of current_makespan: 0
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 3
+---Round 5---
+Heuristic: shortest_processing_time_first_c374
+Parameters: {}
+Running Steps: 5
+Explain: Switching to "shortest_processing_time_first_c374" to leverage its focus on minimizing processing times and balancing machine loads, aiming to achieve further reduction in makespan and improve job progression.
+Delta of current_makespan: 69
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 5
+---Round 6---
+Heuristic: shortest_processing_time_first_c374
+Parameters: {}
+Running Steps: 5
+Explain: Continuing with "shortest_processing_time_first_c374" to further balance machine loads and reduce makespan. This heuristic has shown effectiveness in previous rounds, and running it for additional steps may lead to job completion and improved schedule efficiency.
+Delta of current_makespan: 162
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 5
+---Round 7---
+Heuristic: most_work_remaining_930e
+Parameters: {}
+Running Steps: 5
+Explain: Although "shortest_processing_time_first_c374" showed some effectiveness, the last round resulted in an increased makespan. The "most_work_remaining_930e" heuristic previously demonstrated a consistent reduction in makespan and can help balance workload across machines. Running it for 5 steps may provide further improvements in the current solution state.
+Delta of current_makespan: 84
+Delta of Finished Job Num: 0
+Delta of Finished Operation Num: 5
+---Round 8---
+Heuristic: most_work_remaining_930e
+Parameters: {}
+Running Steps: 5
+Explain: The "most_work_remaining_930e" heuristic has consistently shown a reduction in makespan in previous rounds, indicating its effectiveness in balancing workload and optimizing job completion. Given the current state data, where no jobs are finished yet and the makespan is still relatively high, continuing with this heuristic for 5 more steps could further improve the distribution of workload across machines and reduce bottlenecks.
+Delta of current_makespan: 180
+Delta of Finished Job Num: 3
+Delta of Finished Operation Num: 5
+---Round 9---
+Heuristic: shortest_processing_time_first_c374
+Parameters: {}
+Running Steps: 3
+Explain: "Switching to 'shortest_processing_time_first_c374' to attempt to minimize processing times and potentially reduce makespan. This heuristic will be run for a limited number of steps to cautiously assess its impact on the current solution state, aiming to improve balance and efficiency."
+Delta of current_makespan: 2
+Delta of Finished Job Num: 2
+Delta of Finished Operation Num: 3
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: shortest_processing_time_first_c374. How does shortest_processing_time_first_c374 perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+Based on the data and past performance of the heuristics, particularly focusing on the recent performance of `shortest_processing_time_first_c374`, it appears that its impact on reducing makespan has been moderate and inconsistent. Given the current state where there are unfinished jobs and an average makespan that still has room for improvement, it might be beneficial to switch to a heuristic that has previously shown a consistent reduction in makespan.
+
+`most_work_remaining_930e` has demonstrated a reliable capability to reduce makespan and balance the workload across machines in past rounds. Therefore, it seems prudent to switch back to this heuristic, as it aligns well with the current problem state of having unfinished jobs and a need to optimize machine usage and job completion.
+
+Here's the recommended action:
+
+***Run heuristic:
+selected heuristic: most_work_remaining_930e
+running steps: 5
+explanation: Given the current problem state and the historical performance of the heuristics, switching back to `most_work_remaining_930e` is strategic. This heuristic has consistently shown effectiveness in reducing makespan by balancing workload across machines, which is crucial for the current unfinished jobs and workload distribution.
+***
+------------------------------------------------------------------------------------
+
