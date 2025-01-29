@@ -1,4 +1,3 @@
-Let's go future.
 Try to implement the get_state_data_feature function in python:
 def get_state_data_feature(global_data: dict, state_data: dict) -> dict
 
