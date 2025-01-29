@@ -41,10 +41,9 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
     # Initialize the tour if empty
     if not current_solution.tour:
         avg_distances = [np.mean([distance_matrix[i][j] for j in range(node_num) if i != j]) for i in range(node_num)]
-        sorted_nodes = np.argsort(avg_distances)
-        start_node = sorted_nodes[1]  # Second lowest average distance
-        nearest_node = min(unvisited_nodes, key=lambda node: distance_matrix[start_node][node])
-        return AppendOperator(nearest_node), {}
+        sub_central_nodes = np.argsort(avg_distances)[1]
+        start_node = min(unvisited_nodes, key=lambda node: distance_matrix[sub_central_nodes][node])
+        return AppendOperator(start_node), {}
 
     # Return if no unvisited nodes remain
     if not unvisited_nodes:
@@ -86,56 +85,31 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
 
     # Evaluate nodes with comparable distances
     comparable_nodes = [node for node in unvisited_nodes if distance_matrix[last_visited][node] <= (1 + percentage_range) * nearest_distance]
+    if len(comparable_nodes) <= 1:
+        comparable_nodes = unvisited_nodes
+    best_score = float('inf')
+    best_node = None
+    best_position = None
 
-    if len(comparable_nodes) > 1:
-        best_score = float('inf')
-        best_node = None
-        best_position = None
-
-        for node in comparable_nodes:
-            future_distance = sum([distance_matrix[node][unvisited] for unvisited in unvisited_nodes if unvisited != node])
-            for i in range(len(current_solution.tour) + 1):
-                if i == 0:
-                    next_node = current_solution.tour[0]
-                    cost_increase = distance_matrix[node][next_node]
-                elif i == len(current_solution.tour):
-                    prev_node = current_solution.tour[-1]
-                    cost_increase = distance_matrix[prev_node][node]
-                else:
-                    prev_node = current_solution.tour[i - 1]
-                    next_node = current_solution.tour[i]
-                    cost_increase = distance_matrix[prev_node][node] + distance_matrix[node][next_node] - distance_matrix[prev_node][next_node]
-
-                score = cost_increase + state_data["visited_num"] / node_num / node_num * future_distance
-                if score < best_score:
-                    best_score = score
-                    best_node = node
-                    best_position = i
-
-        if best_node is not None and best_position is not None:
-            return InsertOperator(node=best_node, position=best_position), {}
-
-    # Find the node with the cheapest cost increase for insertion
-    cheapest_cost_increase = float('inf')
-    cheapest_node = None
-    cheapest_position = None
-
-    for node in unvisited_nodes:
+    for node in comparable_nodes:
+        future_impact = sum([distance_matrix[node][unvisited] for unvisited in unvisited_nodes if unvisited != node])
         for i in range(len(current_solution.tour) + 1):
             if i == 0:
                 next_node = current_solution.tour[0]
-                cost_increase = distance_matrix[node][next_node]
+                immediate_impact = distance_matrix[node][next_node]
             elif i == len(current_solution.tour):
                 prev_node = current_solution.tour[-1]
-                cost_increase = distance_matrix[prev_node][node]
+                immediate_impact = distance_matrix[prev_node][node]
             else:
                 prev_node = current_solution.tour[i - 1]
                 next_node = current_solution.tour[i]
-                cost_increase = distance_matrix[prev_node][node] + distance_matrix[node][next_node] - distance_matrix[prev_node][next_node]
+                immediate_impact = distance_matrix[prev_node][node] + distance_matrix[node][next_node] - distance_matrix[prev_node][next_node]
 
-            if cost_increase < cheapest_cost_increase:
-                cheapest_cost_increase = cost_increase
-                cheapest_node = node
-                cheapest_position = i
+            score = immediate_impact + state_data["visited_num"] / node_num / node_num * future_impact
+            if score < best_score:
+                best_score = score
+                best_node = node
+                best_position = i
 
-    return InsertOperator(node=cheapest_node, position=cheapest_position), {}
+
+    return InsertOperator(node=best_node, position=best_position), {}
