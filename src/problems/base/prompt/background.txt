@@ -27,5 +27,5 @@ If you think this problem is not a combinatorial operation problem or the soluti
 
 The response format is very important. For better communication, please respond to me in this format:
 ***is_cop:yes/no***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

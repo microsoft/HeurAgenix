@@ -25,5 +25,5 @@ To make sure the suggestion is useful, please check in following aspects:
 The response format is very important. For better communication, please respond to me in this format:
 ***suggestion: xxx
 ***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

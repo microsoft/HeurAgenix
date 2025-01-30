@@ -33,5 +33,5 @@ The response format is very important. For better communication, please respond 
 application_scope: (optional) xxx
 rule: xxx
 ***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.
