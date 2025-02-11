@@ -45,10 +45,10 @@ def main():
         basic_heuristic_file += ".py"
     basic_heuristic_file = search_file(basic_heuristic_file, problem)
     if perturbation_heuristic_file is None:
-        perturbation_heuristic_file = [file_name for file_name in os.listdir(os.path.dirname(basic_heuristic_file)) if re.match( r"random_....\.py", file_name)]
+        perturbation_heuristic_file = [file_name for file_name in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if re.match( r"random_....\.py", file_name)]
         if perturbation_heuristic_file == []:
             raise Exception("No perturbation heuristics")
-        perturbation_heuristic_file = os.path.join(os.path.dirname(basic_heuristic_file), perturbation_heuristic_file[0])
+        perturbation_heuristic_file = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics", perturbation_heuristic_file[0])
     else:
         if not perturbation_heuristic_file.endswith(".py"):
             perturbation_heuristic_file += ".py"
