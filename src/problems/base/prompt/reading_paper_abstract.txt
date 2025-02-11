@@ -16,5 +16,5 @@ Also remember we just generate one heuristic for this paper, so keep focus on th
 
 The response format is very important. For better communication, please respond to me in this format:
 ***related_to_problem:yes/no***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you think no superior operation, simply respond with ***None***.

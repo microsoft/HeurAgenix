@@ -6,5 +6,5 @@ By the way, the last 4 digits after last '_' are identifiers and we can ignore i
 
 The response format is very important. For better communication, please respond to me in this format:
 ***heuristic:new_heuristic_name;description***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

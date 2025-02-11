@@ -16,7 +16,7 @@ def parse_arguments():
     parser.add_argument("-pe", "--perturbation_heuristic", type=str, default=None, help="Name or path of the perturbation heuristic.")
     parser.add_argument("-pr", "--perturbation_ratio", type=float, default=0.1, help="Ratio of perturbation.")
     parser.add_argument("-pt", "--perturbation_time", type=float, default=1000, help="Maximum number of perturbation times.")
-    parser.add_argument("-i", "--max_finetune_round", type=int, default=5, help="Number of finetune rounds.")
+    parser.add_argument("-i", "--max_refinement_round", type=int, default=5, help="Number of refinement rounds.")
     parser.add_argument("-f", "--filter_num", type=int, default=1, help="Number of heuristics to keep after each validation.")
     parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Number of evolution rounds.")
     parser.add_argument("-l", "--time_limit", type=int, default=None, help="Time limit for running.")
@@ -31,7 +31,7 @@ def main():
     perturbation_heuristic_file = args.perturbation_heuristic
     perturbation_ratio = args.perturbation_ratio
     perturbation_time = args.perturbation_time
-    max_finetune_round = args.max_finetune_round
+    max_refinement_round = args.max_refinement_round
     filter_num = args.filter_num
     evolution_rounds = args.evolution_rounds
     time_limitation = args.time_limit
@@ -61,7 +61,7 @@ def main():
         perturbation_heuristic_file,
         perturbation_ratio=perturbation_ratio,
         perturbation_time=perturbation_time,
-        max_finetune_round=max_finetune_round,
+        max_refinement_round=max_refinement_round,
         filtered_num=filter_num,
         evolution_round=evolution_rounds,
         time_limitation=time_limitation,

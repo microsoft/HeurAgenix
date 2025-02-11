@@ -47,6 +47,98 @@ def min_cost_insertion_3b2b(global_data: dict, state_data: dict, algorithm_data:
     if not unvisited_nodes:
         return None, {}
 
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            return ReverseSegmentOperator(best_vehicle, [(i, j - 1)]), {}
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+
     # Step 1: Prioritize nodes based on demands and distances
     best_score = float('inf')
     best_node = None
@@ -87,95 +179,6 @@ def min_cost_insertion_3b2b(global_data: dict, state_data: dict, algorithm_data:
                     best_position = position
     if best_node is not None and best_vehicle is not None and best_position is not None:
         return InsertOperator(best_vehicle, best_node, best_position), {}
-
-    # Step 2: Periodic greedy improvement
-    if len(unvisited_nodes) % apply_greedy_frequency == 0:
-        best_delta = 0
-        best_vehicle = None
-        best_segment = None
-
-        for vehicle_id, route in enumerate(current_solution.routes):
-            if len(route) < 2:
-                continue
-
-            # Evaluate all 2-opt swaps for compactness
-            for i in range(len(route) - 1):
-                for j in range(i + 2, len(route)):
-                    if j == len(route) - 1 and i == 0:
-                        continue
-
-                    before = distance_matrix[depot if i == 0 else route[i - 1]][route[i]]
-                    after = distance_matrix[depot if j == len(route) - 1 else route[j]][route[j - 1]]
-                    new_before = distance_matrix[depot if i == 0 else route[i - 1]][route[j - 1]]
-                    new_after = distance_matrix[depot if j == len(route) - 1 else route[j]][route[i]]
-                    delta = (new_before + new_after) - (before + after)
-
-                    if delta < best_delta:
-                        best_delta = delta
-                        best_vehicle = vehicle_id
-                        best_segment = (i, j)
-
-        if best_vehicle is not None and best_segment is not None:
-            i, j = best_segment
-            return ReverseSegmentOperator(best_vehicle, [(i, j - 1)]), {}
-
-    # Step 3: Periodic inter-vehicle swapping
-    if len(unvisited_nodes) % apply_swap_frequency == 0:
-        best_cost_reduction = float('-inf')
-        best_source_vehicle_id = None
-        best_source_position = None
-        best_target_vehicle_id = None
-        best_target_position = None
-
-        for source_vehicle_id, source_route in enumerate(current_solution.routes):
-            for source_position, node in enumerate(source_route):
-                if not source_route:
-                    continue
-
-                # Calculate the load after removing the node
-                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
-                if new_load_source > capacity:
-                    continue
-
-                # Check each target route to find the best shift
-                for target_vehicle_id, target_route in enumerate(current_solution.routes):
-                    if source_vehicle_id == target_vehicle_id:
-                        continue
-
-                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
-                    if new_load_target < 0:
-                        continue
-
-                    for target_position in range(len(target_route) + 1):
-                        source_previous_node = depot if source_position == 0 else source_route[source_position - 1]
-                        source_next_node = depot if source_position + 1 == len(source_route) else source_route[source_position + 1]
-                        target_previous_node = depot if target_position == 0 else target_route[target_position - 1]
-                        target_next_node = depot if target_position == len(target_route) else target_route[target_position]
-
-                        cost_increase = (
-                            -distance_matrix[source_previous_node][node]
-                            -distance_matrix[node][source_next_node]
-                            +distance_matrix[source_previous_node][source_next_node]
-                            +distance_matrix[target_previous_node][node]
-                            +distance_matrix[node][target_next_node]
-                            -distance_matrix[target_previous_node][target_next_node]
-                        )
-                        cost_reduction = -cost_increase
-
-                        if cost_reduction > best_cost_reduction:
-                            best_source_vehicle_id = source_vehicle_id
-                            best_source_position = source_position
-                            best_target_vehicle_id = target_vehicle_id
-                            best_target_position = target_position
-                            best_cost_reduction = cost_reduction
-
-        if best_cost_reduction > 0:
-            return RelocateOperator(
-                source_vehicle_id=best_source_vehicle_id,
-                source_position=best_source_position,
-                target_vehicle_id=best_target_vehicle_id,
-                target_position=best_target_position
-            ), {}
 
     # If no valid insertion was found
     return None, {}

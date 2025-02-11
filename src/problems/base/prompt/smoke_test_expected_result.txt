@@ -14,5 +14,5 @@ Now we run {function_name} once and think about what the expected output is.
 
 The response format is very important. For better communication, please respond to me in this format:
 ***expected_result:xxx***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

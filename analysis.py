@@ -7,44 +7,65 @@ total_experiments = [
     {
         "problem": "tsp",
         "key_item": "current_cost",
-        "data": ["tsp225.tsp", "a280.tsp", "pcb442.tsp", "pa561.tsp", "gr666.tsp", "pr1002.tsp", "pr2392.tsp"],
+        "data": [
+            "kroA100.tsp", "kroA150.tsp", "kroB100.tsp", "kroB200.tsp", "kroC100.tsp", "bier127.tsp",
+            "tsp225.tsp", "a280.tsp", "pcb442.tsp", "gr666.tsp", "pr1002.tsp", "pr2392.tsp"],
         "heuristics": ["nearest_neighbor_f91d", "nearest_neighbor_e8a4", "cheapest_insertion_605f", "cheapest_insertion_7a30", "farthest_insertion_b6d3", "farthest_insertion_54db"],
-        "upper_bound": [3919, 2579, 50788, 2763, 294358, 259045, 378032]
+        "upper_bound": [
+            21282, 26524, 22141, 29437, 20749, 118282,
+            3919, 2579, 50788, 294358, 259045, 378032]
     },
     {
         "problem": "cvrp",
         "key_item": "total_current_cost",
-        "data": ["A-n80-k10.vrp", "B-n78-k10.vrp", "E-n101-k14.vrp", "F-n135-k7.vrp", "M-n200-k17.vrp", "P-n101-k4.vrp", "X-n1001-k43.vrp"],
-        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_ce2b", "farthest_insertion_6308"],
-        "upper_bound": [1762, 1221, 1067, 1162, 1275, 681, 72355]
+        "data": ["A-n80-k10.vrp", "B-n78-k10.vrp", "E-n101-k14.vrp", "F-n135-k7.vrp", "M-n200-k17.vrp", "P-n101-k4.vrp"],
+        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_4e1d", "farthest_insertion_6308"],
+        "upper_bound": [1762, 1221, 1067, 1162, 1275, 681]
     },
     {
         "problem": "jssp",
         "key_item": "current_makespan",
-        "data": ["LA05.jssp", "LA10.jssp", "LA15.jssp", "LA20.jssp", "LA25.jssp", "LA30.jssp", "LA35.jssp"],
+        "data": [
+            "LA01.jssp", "LA02.jssp", "LA03.jssp", "LA04.jssp", "LA05.jssp",
+            "LA06.jssp", "LA07.jssp", "LA08.jssp", "LA09.jssp", "LA10.jssp",
+            "LA11.jssp", "LA12.jssp", "LA13.jssp", "LA14.jssp", "LA15.jssp",
+            "LA16.jssp", "LA17.jssp", "LA18.jssp", "LA19.jssp", "LA20.jssp",],
         "heuristics": ["most_work_remaining_930e", "most_work_remaining_df20", "first_come_first_served_6c4f", "first_come_first_served_af26", "shortest_processing_time_first_c374", "shortest_processing_time_first_d471"],
-        "upper_bound": [593, 958, 1207, 902, 977, 1355, 1888]
+        "upper_bound": [
+            666, 655, 597, 590, 593,
+            926, 890, 863, 951, 958,
+            1222, 1039, 1150, 1292, 1207, 
+            945, 784, 848, 842, 902,
+            ]
     },
     {
         "problem": "max_cut",
         "key_item": "current_cut_value",
-        "data": ["g10.mc", "g20.mc", "g30.mc", "toursg3-8.mc", "toursg3-15.mc", "tourspm3-8-50.mc", "tourspm3-15-50.mc"],
+        "data": ["g1.mc", "g2.mc", "g3.mc", "g4.mc", "g5.mc", "g6.mc", "g7.mc", "g8.mc", "g9.mc", "g10.mc"],
         "heuristics": ["most_weight_neighbors_320c", "most_weight_neighbors_d31b", "highest_weight_edge_eb0c", "highest_weight_edge_ca02", "balanced_cut_21d5", "balanced_cut_c0e6"],
-        "upper_bound": [1994, 941, 3403, 41684814, 281029888, 454, 2964]
+        "upper_bound": [11624, 11620, 11622, 11646, 11631, 2178, 2006, 2006, 2054, 2000]
     },
     {
         "problem": "mkp",
         "key_item": "current_profit",
-        "data": ["mknap1_1.mkp", "mknap1_7.mkp", "WEING1.DAT.mkp", "PB7.DAT.mkp", "mknapcb9-01.mkp", "mknapcb9-11.mkp", "mknapcb9-21.mkp"],
+        "data": [
+            "mknap1_1.mkp", "mknap1_2.mkp", "mknap1_3.mkp", "mknap1_4.mkp", "mknap1_5.mkp", "mknap1_6.mkp", "mknap1_7.mkp",
+            "mknapcb1_1.mkp", "mknapcb1_2.mkp", "mknapcb1_3.mkp", "mknapcb1_4.mkp", "mknapcb1_5.mkp",
+            "mknapcb4_1.mkp", "mknapcb4_2.mkp", "mknapcb4_3.mkp", "mknapcb4_4.mkp", "mknapcb4_5.mkp"
+        ],
         "heuristics": ["greedy_by_profit_8df3", "greedy_by_profit_1597", "greedy_by_weight_ece2", "greedy_by_weight_e7f9", "greedy_by_density_9e8d", "greedy_by_density_bb0a"],
-        "upper_bound": [3800, 16537, 141278, 1035, 115868, 217995, 301627]
+        "upper_bound": [
+            3800, 8706.1, 4015, 6120, 12400, 10618, 16537,
+            24381, 24274, 23551, 23534, 23991,
+            23064, 22801, 22131, 22772, 22571
+        ]
     },
     {
         "problem": "dposp",
         "key_item": "fulfilled_order_num",
-        "data": ["test_case_0", "test_case_1", "test_case_2", "test_case_3", "test_case_4", "test_case_5", "test_case_6"],
+        "data": ["test_case_1", "test_case_2", "test_case_3", "test_case_4", "test_case_5", "test_case_6", "test_case_7"],
         "heuristics": ["least_order_remaining_9c3c", "least_order_remaining_27ca", "shortest_operation_ff40", "shortest_operation_ae31", "greedy_by_order_density_c702", "greedy_by_order_density_de77"],
-        "upper_bound": [10, 46, 85, 52, 152, None, None]
+        "upper_bound": [None, None, None, None, None, None, None]
     }
 ]
 
@@ -201,6 +222,34 @@ def dump_all_image():
     dump_single_to_image()
     dump_hh_to_image()
 
+def get_hh_results(problem_dict: dict, data_index: int, test_dir: str, hh_name: str) -> str:
+    problem = problem_dict["problem"]
+    key_item = problem_dict["key_item"]
+    data = problem_dict["data"][data_index]
+    upper_bound = problem_dict["upper_bound"][data_index]
+    results = []
+    for file in os.listdir(test_dir):
+        if file.startswith(f"{hh_name}.20"):
+            if os.path.exists(os.path.join(test_dir, file, "result.txt")):
+                result = found_key(os.path.join(test_dir, file, "result.txt"), key_item)
+            elif os.path.exists(os.path.join(test_dir, file, "best_result.txt")):
+                result = found_key(os.path.join(test_dir, file, "best_result.txt"), key_item)
+            else:
+                continue
+            results.append(result)
+    if upper_bound:
+        gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in results]
+        mean_gap = round(np.mean(gap), 2)
+    else:
+        gap = ["None" for value in results]
+        mean_gap = "None"
+    gap_str = [f"{results[index]}({gap[index]}%)" for index in range(len(results))]
+    if results:
+        return(f"{problem}, {data}, {hh_name}, {gap_str}, {np.mean(results)}({mean_gap}%)")
+    else:
+        return(f"Missing {problem}, {data}, {hh_name}")
+    
+
 def dump_all_result():
     for problem_dict in total_experiments:
         problem = problem_dict["problem"]
@@ -219,27 +268,23 @@ def dump_all_result():
                         gap = "None" if upper_bound is None else round(abs(value - upper_bound) / upper_bound * 100, 2)
                         print(f"{problem}, {data}, {heuristic}, {value}({gap}%)")
                 else:
-                    print(F"Missing {result_file}")
-            gpt_hhs = [found_key(os.path.join(test_dir, file, "result.txt"), key_item) for file in os.listdir(test_dir) if file.startswith("gpt_hh.20")]
-            if upper_bound:
-                gpt_gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in gpt_hhs]
-                mean_gap = np.mean(gpt_gap)
-            else:
-                gpt_gap = ["None" for value in gpt_hhs]
-                mean_gap = "None"
-            gpt_hh_value_gap = [f"{gpt_hhs[index]}({gpt_gap[index]}%)" for index in range(len(gpt_hhs))]
-            print(f"{problem}, {data}, gpt_hh, {gpt_hh_value_gap}, {np.mean(gpt_hhs)}({mean_gap}%)")
+                    print(F"Missing {problem}, {data}, {heuristic}")
+            
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh")
+            print(result_str)
 
-            gpt_evo_hhs = [found_key(os.path.join(test_dir, file, "result.txt"), key_item) for file in os.listdir(test_dir) if file.startswith("gpt_hh.evolved.20")]
-            if upper_bound:
-                gpt_evo_gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in gpt_evo_hhs if upper_bound]
-                mean_evo_gap = np.mean(gpt_evo_gap)
-            else:
-                gpt_evo_gap = ["None" for value in gpt_hhs]
-                mean_evo_gap = "None"
-            gpt_evo_hh_value_gap = [f"{gpt_evo_hhs[index]}({gpt_evo_gap[index]}%)" for index in range(len(gpt_evo_hhs))]
-            print(f"{problem}, {data}, gpt_hh, {gpt_evo_hh_value_gap}, {np.mean(gpt_evo_hhs)}({mean_evo_gap}%)")
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh.evolved")
+            print(result_str)
 
-            print()
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh")
+            print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh.evolved")
+            print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_deep_hh.evolved")
+            print(result_str)
+
+
 
 dump_all_result()
