@@ -16,5 +16,5 @@ OperationID; reason
 OperationID; reason
 ....
 ***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

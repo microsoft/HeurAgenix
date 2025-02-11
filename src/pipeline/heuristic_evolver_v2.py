@@ -2,6 +2,7 @@ import os
 import importlib
 import re
 import pandas as pd
+import traceback
 from io import StringIO
 from src.problems.base.env import BaseEnv
 from src.pipeline.heuristic_generator import HeuristicGenerator
@@ -57,7 +58,7 @@ class HeuristicEvolver:
             perturbation_time: int=100,
             filtered_num: int=3,
             evolution_round: int=3,
-            max_finetune_round: int=5,
+            max_refinement_round: int=5,
             time_limitation: float=10,
             smoke_test: bool=True,
         ) -> None:
@@ -82,7 +83,7 @@ class HeuristicEvolver:
                         all_heuristic_docs=all_heuristic_docs,
                         perturbation_ratio=perturbation_ratio,
                         perturbation_time=perturbation_time,
-                        max_finetune_round=max_finetune_round,
+                        max_refinement_round=max_refinement_round,
                         time_limitation=time_limitation,
                         smoke_test=smoke_test
                     )
@@ -97,97 +98,104 @@ class HeuristicEvolver:
             all_heuristic_docs: str,
             perturbation_ratio: float=0.1,
             perturbation_time: int=100,
-            max_finetune_round: int=5,
+            max_refinement_round: int=5,
             time_limitation: float=10,
             smoke_test: bool=True
     ) -> list[tuple[str, list[float]]]:
-        data_name = train_data.split(os.sep)[-1]
-        env = Env(data_name=train_data)
-        basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
-        output_dir = os.path.join("output", self.problem, "evolution_result", data_name, f"{basic_heuristic_name}.evolution")
-        self.gpt_helper.reset(output_dir)
+        try:
+            data_name = train_data.split(os.sep)[-1]
+            env = Env(data_name=train_data)
+            basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
+            output_dir = os.path.join("output", self.problem, "evolution_result", data_name, f"{basic_heuristic_name}.evolution")
+            self.gpt_helper.reset(output_dir)
 
-        # Perturb for better solution
-        negative_result_file, positive_result_file = self.perturbation(
-            env,
-            basic_heuristic_file,
-            perturbation_heuristic_file,
-            output_dir,
-            perturbation_ratio,
-            perturbation_time,
-        )
-
-        finetuned_heuristic_benchmarks = []
-        if positive_result_file:
-            print(f"Evolution {basic_heuristic_name} on {data_name}")
-            # Get bassline 
-            basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
-
-            prompt_dict = self.gpt_helper.load_background(self.problem)
-            prompt_dict["all_heuristic_docs"] = all_heuristic_docs
-            self.load_heuristic_code(basic_heuristic_file, prompt_dict)
-
-            # Identity bottlenecks
-            bottlenecks = self.identity_bottlenecks(
-                prompt_dict=prompt_dict,
-                env=env,
-                positive_result_file=positive_result_file,
-                negative_result_file=negative_result_file,
-                heuristic_file=basic_heuristic_file
+            # Perturb for better solution
+            negative_result_file, positive_result_file = self.perturbation(
+                env,
+                basic_heuristic_file,
+                perturbation_heuristic_file,
+                output_dir,
+                perturbation_ratio,
+                perturbation_time,
             )
 
-            for bottleneck_index, (bottleneck_operation_id, proposed_operation, reason) in enumerate(bottlenecks):
-                # Raise suggestion and provide evolved heuristics
+            refined_heuristic_benchmarks = []
+            if positive_result_file:
+                print(f"Evolution {basic_heuristic_name} on {data_name}")
+                # Get bassline 
                 basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
-                suggestion_name = f"suggestion_{bottleneck_index}"
-                suggested_heuristic_file, suggestion, suggested_result = self.raise_suggestion(
+
+                prompt_dict = self.gpt_helper.load_background(self.problem)
+                prompt_dict["all_heuristic_docs"] = all_heuristic_docs
+                self.load_heuristic_code(basic_heuristic_file, prompt_dict)
+
+                # Identity bottlenecks
+                bottlenecks = self.identity_bottlenecks(
                     prompt_dict=prompt_dict,
                     env=env,
-                    bottleneck_operation_id=bottleneck_operation_id,
-                    proposed_operation=proposed_operation,
-                    reason=reason,
-                    suggestion_name=suggestion_name,
-                    smoke_test=smoke_test
+                    positive_result_file=positive_result_file,
+                    negative_result_file=negative_result_file,
+                    heuristic_file=basic_heuristic_file
                 )
-                if suggested_heuristic_file:
-                    suggested_improvement = sum(self.get_improvement(env, basic_heuristic_result, suggested_result)) / len(basic_heuristic_result)
-                    print(f"Improvement for {suggested_heuristic_file}: {suggested_improvement}")
-                    finetuned_heuristic_benchmarks.append([suggested_heuristic_file, suggested_improvement])
-                    # Fine tune the evolved heuristics
-                    previous_heuristic_name = basic_heuristic_name
-                    previous_heuristic_result = basic_heuristic_result
-                    last_heuristic_name = suggested_heuristic_file.split(os.sep)[-1].split(".")[0]
-                    last_heuristic_result = suggested_result
-                    last_suggestion = suggestion
-                    for finetune_index in range(max_finetune_round):
-                        suggestion_name = f"suggestion_{bottleneck_index}_finetune_{finetune_index}"
-                        finetuned_heuristic_file, suggestion, finetuned_result = self.finetune_heuristic(
-                            prompt_dict=prompt_dict,
-                            env=env,
-                            basic_heuristic_name=basic_heuristic_name,
-                            basic_heuristic_result=basic_heuristic_result,
-                            previous_heuristic_name=previous_heuristic_name,
-                            previous_heuristic_result=previous_heuristic_result,
-                            last_heuristic_name=last_heuristic_name,
-                            last_heuristic_result=last_heuristic_result,
-                            last_suggestion=last_suggestion,
-                            suggestion_name=suggestion_name,
-                            time_limitation=time_limitation,
-                            smoke_test=smoke_test
-                        )
-                        if finetuned_heuristic_file:
-                            finetuned_improvement = sum(self.get_improvement(env, basic_heuristic_result, finetuned_result)) / len(basic_heuristic_result)
-                            print(f"Improvement for {finetuned_heuristic_file}: {finetuned_improvement}")
-                            finetuned_heuristic_benchmarks.append([finetuned_heuristic_file, finetuned_improvement])
-                            if suggestion is None:
-                                break
-                            previous_heuristic_name = last_heuristic_name
-                            previous_heuristic_result = last_heuristic_result
-                            last_suggestion = suggestion
-                            last_heuristic_name = finetuned_heuristic_file.split(os.sep)[-1].split(".")[0]
-                            last_heuristic_result = finetuned_result
 
-        return finetuned_heuristic_benchmarks
+                for bottleneck_index, (bottleneck_operation_id, proposed_operation, reason) in enumerate(bottlenecks):
+                    # Raise suggestion and provide evolved heuristics
+                    basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
+                    suggestion_name = f"suggestion_{bottleneck_index}"
+                    suggested_heuristic_file, suggestion, suggested_result = self.raise_suggestion(
+                        prompt_dict=prompt_dict,
+                        env=env,
+                        bottleneck_operation_id=bottleneck_operation_id,
+                        proposed_operation=proposed_operation,
+                        reason=reason,
+                        suggestion_name=suggestion_name,
+                        smoke_test=smoke_test
+                    )
+                    if suggested_heuristic_file:
+                        suggested_improvement = sum(self.get_improvement(env, basic_heuristic_result, suggested_result)) / len(basic_heuristic_result)
+                        print(f"Improvement for {suggested_heuristic_file}: {suggested_improvement}")
+                        refined_heuristic_benchmarks.append([suggested_heuristic_file, suggested_improvement])
+                        # Fine tune the evolved heuristics
+                        previous_heuristic_name = basic_heuristic_name
+                        previous_heuristic_result = basic_heuristic_result
+                        last_heuristic_name = suggested_heuristic_file.split(os.sep)[-1].split(".")[0]
+                        last_heuristic_result = suggested_result
+                        last_suggestion = suggestion
+                        for refine_index in range(max_refinement_round):
+                            suggestion_name = f"suggestion_{bottleneck_index}_refine_{refine_index}"
+                            refined_heuristic_file, suggestion, refined_result = self.refine_heuristic(
+                                prompt_dict=prompt_dict,
+                                env=env,
+                                basic_heuristic_name=basic_heuristic_name,
+                                basic_heuristic_result=basic_heuristic_result,
+                                previous_heuristic_name=previous_heuristic_name,
+                                previous_heuristic_result=previous_heuristic_result,
+                                last_heuristic_name=last_heuristic_name,
+                                last_heuristic_result=last_heuristic_result,
+                                last_suggestion=last_suggestion,
+                                suggestion_name=suggestion_name,
+                                time_limitation=time_limitation,
+                                smoke_test=smoke_test
+                            )
+                            if None in refined_result:
+                                print("Error and skip")
+                                continue
+                            if refined_heuristic_file:
+                                refined_improvement = sum(self.get_improvement(env, basic_heuristic_result, refined_result)) / len(basic_heuristic_result)
+                                print(f"Improvement for {refined_heuristic_file}: {refined_improvement}")
+                                refined_heuristic_benchmarks.append([refined_heuristic_file, refined_improvement])
+                                if suggestion is None:
+                                    break
+                                previous_heuristic_name = last_heuristic_name
+                                previous_heuristic_result = last_heuristic_result
+                                last_suggestion = suggestion
+                                last_heuristic_name = refined_heuristic_file.split(os.sep)[-1].split(".")[0]
+                                last_heuristic_result = refined_result
+        except Exception as e:
+            trace_string = traceback.format_exc()
+            print(trace_string)
+
+        return refined_heuristic_benchmarks
 
     def perturbation(
             self,
@@ -309,7 +317,7 @@ class HeuristicEvolver:
                 return output_heuristic_file, suggestion, suggested_result
         return None, None, None
 
-    def finetune_heuristic(
+    def refine_heuristic(
             self,
             prompt_dict: dict,
             env: BaseEnv,
@@ -345,9 +353,9 @@ class HeuristicEvolver:
         prompt_dict["compare"] = compare
         prompt_dict["benchmark_result"] = df_to_str(benchmark_df)
 
-        self.gpt_helper.load("finetune", prompt_dict)
+        self.gpt_helper.load("refinement", prompt_dict)
         response = self.gpt_helper.chat()
-        analysis_results = extract(response, key="fine-tuning", sep="\n")
+        analysis_results = extract(response, key="refinement", sep="\n")
         self.gpt_helper.dump(suggestion_name)
         suggestion = None
         for analysis_result in analysis_results:
