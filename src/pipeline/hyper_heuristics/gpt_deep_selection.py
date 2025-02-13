@@ -18,17 +18,21 @@ class GPTDeepSelectionHyperHeuristic:
         gpt_helper: GPTHelper,
         heuristic_pool: list[str],
         problem: str,
+        search_interval: int=None,
+        search_time: int=None,
     ) -> None:
         self.gpt_helper = gpt_helper
         self.problem = problem
+        self.search_interval = search_interval
+        self.search_time = search_time
         self.heuristic_pool = [heuristic_name.split(os.sep)[-1].split(".")[0] for heuristic_name in heuristic_pool]
 
-    def run(self, env:BaseEnv, max_steps: int=None, data_feature_content_threshold: int=1000, search_interval: int=None, search_time: int=None, **kwargs) -> bool:
+    def run(self, env:BaseEnv, max_steps: int=None, data_feature_content_threshold: int=1000, **kwargs) -> bool:
         # Init parameters
         max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         running_max_steps = env.construction_steps * 2
-        search_interval = search_interval if search_interval is not None else math.floor(env.construction_steps / 20)
-        search_time = search_time if search_time is not None else math.floor(env.construction_steps / 10)
+        search_interval = self.search_interval if self.search_interval is not None else math.floor(env.construction_steps / 20)
+        search_time = self.search_time if self.search_time is not None else math.floor(env.construction_steps / 10)
 
         # Init feature function
         get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")

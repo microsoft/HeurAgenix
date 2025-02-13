@@ -15,6 +15,8 @@ def parse_arguments():
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
     parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'gpt_hh' / 'gpt_deep_hh' /'random_hh' for GPT/random selection from the heuristic directory, and 'or_solver' for OR result.")
     parser.add_argument("-d", "--heuristic_type", type=str, default="basic", choices=["basic", "evolved"], help="Directory containing heuristic functions.")
+    parser.add_argument("-si", "--search_interval", type=int, default=None, help="Search interval for deep hh mode.")
+    parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Path for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
     parser.add_argument("-r", "--dump_trajectory", action='store_true', help="Whether to dump trajectory.")
@@ -28,6 +30,8 @@ def main():
     heuristic = args.heuristic
     heuristic_type = args.heuristic_type
     test_case = args.test_case
+    search_interval = args.search_interval
+    search_time = args.search_time
     if test_case is None:
         test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
     test_cases = os.listdir(test_dir) if test_case is None else [test_case]
@@ -55,7 +59,13 @@ def main():
         output_dir = f"{heuristic_name}.{datetime_str}"
         if heuristic_type == "evolved":
             output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"
-        hyper_heuristic = GPTDeepSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_pool=heuristic_pool, problem=problem)
+        hyper_heuristic = GPTDeepSelectionHyperHeuristic(
+            gpt_helper=gpt_helper,
+            heuristic_pool=heuristic_pool,
+            problem=problem,
+            search_interval=search_interval,
+            search_time=search_time,
+        )
     elif heuristic == "random_hh":
         output_dir = f"{heuristic_name}.{datetime_str}"
         if heuristic_type == "evolved":
