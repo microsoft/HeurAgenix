@@ -45,6 +45,8 @@ class RoadCharging(Env):
 		self.ride_time_probs_data = pd.DataFrame(config["ride_time_probs_data"])
 		self.ride_scenario_probs = self.ride_time_probs_data[self.ride_data_type].values
 		self.config = config
+  
+		self.stoch_simulate = True
 
 		# Observation space: n agents, each with 4 state variables
 		self.observation_shape = (self.n, 4)
@@ -160,28 +162,34 @@ class RoadCharging(Env):
 		return 1 if x == 0 else 0
 
 
-	def generate_random_ride_times(self):
-     
-		ride_times = []
-		for i in range(self.n):
-			order_prob = self.rho[self.obs["TimeStep"][i]] 
-			
-			if np.random.random() < order_prob:  
-				row_index = np.random.choice(self.ride_time_probs_data.index, size=1, p=self.ride_scenario_probs)
-				
-				bin_range = self.ride_time_probs_data.loc[row_index, 'Ride Time Range (Minutes)'].iloc[0]  # Get the range as a string
-				
-				lower_bound, upper_bound = map(int, bin_range.split(' - '))  # Split and convert to integers
-			
-				x = np.random.uniform(lower_bound, upper_bound)
-		
-				ride_time = int(math.ceil(x / self.delta))
-			else:
-				ride_time = 0  # No order in this time step
-	
-			ride_times.append(int(ride_time)) 
-		
-		return ride_times
+	def simulate_future_rides(self, start_timepoint):
+		X = []  # Store simulated ride times
+
+		for t in range(start_timepoint, self.k):
+			x_t = np.zeros(self.n, dtype=int)  # Pre-allocate ride times for all vehicles at time t
+
+			order_probs = np.array([self.rho[self.obs["TimeStep"][i]] for i in range(self.n)])  # Get order probabilities
+			order_mask = np.random.random(self.n) < order_probs  # Boolean mask for accepted orders
+
+			if np.any(order_mask):  # Process only if there are orders
+				selected_indices = np.random.choice(
+					self.ride_time_probs_data.index, 
+					size=np.sum(order_mask), 
+					p=self.ride_scenario_probs
+				)
+
+				bin_ranges = self.ride_time_probs_data.loc[selected_indices, 'Ride Time Range (Minutes)'].values
+				lower_bounds, upper_bounds = np.array([
+					list(map(int, r.split(' - '))) for r in bin_ranges
+				]).T  # Extract lower and upper bounds
+
+				ride_durations = np.random.uniform(lower_bounds, upper_bounds)
+				x_t[order_mask] = np.ceil(ride_durations / self.delta_t).astype(int)
+
+			X.append(x_t.tolist())  # Store results for this time step
+
+		return X
+
 	
 	def get_agent_state(self, agent_index):
 
@@ -406,12 +414,12 @@ class ConstrainAction(gym.ActionWrapper):
 
 def main():
 	SoC_data_type = "high"
-	n_EVs = 10
+	n_EVs = 5
 	instance_num = 1
 
 	# data_file = "D://ORLLM//repo//road_charging//output//road_charging//data//test_data//configuration//"
 	test_case = f"all_days_negativePrices_{SoC_data_type}InitSoC_1for{n_EVs}"
-	test_cases_dir = os.path.join("test_cases", test_case)  
+	test_cases_dir = os.path.join("test_cases_updated", test_case)  
 	data_file = os.path.join(test_cases_dir, f"config{instance_num}_{n_EVs}EVs_1chargers.json")
  
 	env = ConstrainAction(RoadCharging(data_file))
@@ -435,6 +443,10 @@ def main():
 		obs, reward, done, info = env.step(action)
 		# print('next ride time', obs["RideTime"])
 		# print('next charging status', obs["ChargingStatus"])
+  
+		if step == 80:
+			future_rides = env.simulate_future_rides(step)
+			print("future_rides:", future_rides)
 
 		# If the episode has ended then we can reset to start a new episode
 		if done:
