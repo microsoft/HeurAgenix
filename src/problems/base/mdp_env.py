@@ -20,6 +20,8 @@ class MDPEnv(BaseEnv):
 
     def reset(self, experiment_name: str=None):
         self.gym_env.reset()
+        self.done = False
+        self.reward = 0
         super().reset(experiment_name)
 
     def load_data(self, data_path: str) -> None:

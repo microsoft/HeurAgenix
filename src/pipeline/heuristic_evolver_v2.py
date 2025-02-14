@@ -70,6 +70,11 @@ class HeuristicEvolver:
             for heuristic_file in os.listdir(heuristic_dir)
         ])
 
+        heuristic_introduction_docs = "\n".join([
+            extract_function_with_short_docstring(open(search_file(heuristic_file, self.problem)).read(), heuristic_file.split(".")[0])
+            for heuristic_file in os.listdir(heuristic_dir)
+        ])
+
         total_heuristic_benchmarks = [(basic_heuristic_file, 0)]
         for _ in range(evolution_round):
             # Filter the best heuristics
@@ -80,7 +85,8 @@ class HeuristicEvolver:
                         train_data=data_name,
                         basic_heuristic_file=basic_heuristic_file,
                         perturbation_heuristic_file=perturbation_heuristic_file,
-                        all_heuristic_docs=all_heuristic_docs,
+                        # all_heuristic_docs=all_heuristic_docs,
+                        all_heuristic_docs=heuristic_introduction_docs,
                         perturbation_ratio=perturbation_ratio,
                         perturbation_time=perturbation_time,
                         max_refinement_round=max_refinement_round,
@@ -123,7 +129,7 @@ class HeuristicEvolver:
             if positive_result_file:
                 print(f"Evolution {basic_heuristic_name} on {data_name}")
                 # Get bassline 
-                basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
+                basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file, dump_result=True)
 
                 prompt_dict = self.gpt_helper.load_background(self.problem)
                 prompt_dict["all_heuristic_docs"] = all_heuristic_docs
@@ -287,6 +293,7 @@ class HeuristicEvolver:
             smoke_test: bool,
     ) -> tuple[str, str]:
         env.reset()
+        self.gpt_helper.load_chat("bottleneck_operations")
         prompt_dict["bottleneck_operation_id"] = bottleneck_operation_id
         prompt_dict["proposed_operation"] = proposed_operation
         prompt_dict["reason"] = reason
