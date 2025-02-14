@@ -16,7 +16,7 @@ class Env(MDPEnv):
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, RoadCharging, "road_charging")
         self.key_item = "return"
-        self.compare = lambda x, y: y - x
+        self.compare = lambda x, y: x - y
         self.construction_steps = self.gym_env.k
 
     def get_global_data(self):
@@ -46,9 +46,15 @@ class Env(MDPEnv):
 
     def validation_solution(self, solution: Solution=None) -> bool:
         return True
+    
+    def get_observation(self) -> dict:
+        return {
+            "Sum Battery Soc": sum(self.gym_env.obs["SoC"]),
+            "Reward": self.reward
+        }
 
-    def dump_result(self, dump_trajectory = True):
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")
         data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.trajectory.items()}  
         json.dump(data_converted, output_file)
-        return super().dump_result(dump_trajectory)
+        return super().dump_result(dump_trajectory, result_file)

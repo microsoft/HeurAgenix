@@ -46,8 +46,8 @@ class RoadCharging(Env):
 		self.ride_scenario_probs = self.ride_time_probs_data[self.ride_data_type].values
 		self.config = config
   
-		self.stoch_simulate_future = True
-		self.stoch_step = True
+		self.stoch_simulate_future = False
+		self.stoch_step = False
 
 		# Observation space: n agents, each with 4 state variables
 		self.observation_shape = (self.n, 4)
@@ -62,7 +62,6 @@ class RoadCharging(Env):
 
 		# Action space: n agents, each can take a binary action (0 or 1)
 		self.action_space = spaces.MultiBinary(self.n)
-
 
 	def seed(self, seed_value=None):
 		"""Set the random seed for reproducibility."""
@@ -129,6 +128,7 @@ class RoadCharging(Env):
 
 	def reset(self):
 
+		self.done = False
 		# Reset the reward
 		self.ep_return  = 0
 
@@ -265,7 +265,7 @@ class RoadCharging(Env):
 			# print("ride_time_instance:", ride_time_instance)
    
 		else:
-			ride_time_instance = self.ride_time_instance[:, t]
+			ride_time_instance = self.ride_time_instance[:, self.obs["TimeStep"][0]]
 		
 
 		sum_rewards = 0

@@ -59,7 +59,7 @@ def get_global_data_feature(global_data: dict) -> dict:
         'average_order_price': average_order_price,
         'average_charging_price': average_charging_price,
         'peak_charging_price': peak_charging_price,
-        'average_assign_prob': average_assign_prob
+        'average_assign_prob': [round(prob, 2) for prob in average_assign_prob]
     }
 
 def get_state_data_feature(global_data: dict, state_data: dict) -> dict:
