@@ -1,0 +1,9 @@
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "current_item_size" (int): The size of current item to pack. None means no item left and algorithm should return None.
+    - "used_bin_num" (int): The number of bins that has been used.
+    - "used_capacity" (list[int]): List of used capacity for each bin.
+    - "remaining_capacity" (list[int]): List of remaining capacity for each bin.
+    - "num_items_in_box" (int): Total number of packed items.
+    - "num_items_not_in_box" (int): Total number of unpacked items.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.

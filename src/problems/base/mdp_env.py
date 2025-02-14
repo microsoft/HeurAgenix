@@ -14,6 +14,10 @@ class MDPEnv(BaseEnv):
     def is_complete_solution(self) -> bool:
         return self.done
 
+    @property
+    def continue_run(self) -> bool:
+        return not self.done
+
     def reset(self, experiment_name: str=None):
         self.gym_env.reset()
         super().reset(experiment_name)
@@ -49,9 +53,9 @@ class MDPEnv(BaseEnv):
             return True
         return False
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = self.get_state_data()
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content
     
     def summarize_env(self) -> str:

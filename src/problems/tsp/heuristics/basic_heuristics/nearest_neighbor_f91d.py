@@ -24,7 +24,8 @@ def nearest_neighbor_f91d(global_data: dict, state_data: dict, algorithm_data: d
 
     # If the current solution is empty, start from first unvisited node.
     if not current_solution.tour:
-        return AppendOperator(unvisited_nodes[0]), {}
+        start_node = unvisited_nodes[0]
+        return AppendOperator(start_node), {}
 
     # If there are no unvisited nodes, return an empty operator
     if not unvisited_nodes:

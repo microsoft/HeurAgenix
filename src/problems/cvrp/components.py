@@ -13,8 +13,10 @@ class Solution(BaseSolution):
     def __str__(self) -> str:
         route_string = ""
         for index, route in enumerate(self.routes):
+            depot_index = route.index(self.depot)
+            rotated_route = route[depot_index:] + route[:depot_index] + [self.depot]
             route = [self.depot] + route + [self.depot]
-            route_string += f"vehicle_{index}: " + "->".join(map(str, route)) + "\n"
+            route_string += f"vehicle_{index}: " + "->".join(map(str, rotated_route)) + "\n"
         return route_string
 
 
@@ -71,6 +73,7 @@ class ReverseSegmentOperator(BaseOperator):
 
     def run(self, solution: Solution) -> Solution:
         new_routes = [route[:] for route in solution.routes]
+        new_route = new_routes[self.vehicle_id][:]
 
         for segment in self.segments:
             start_index, end_index = segment
@@ -79,13 +82,14 @@ class ReverseSegmentOperator(BaseOperator):
             assert 0 <= start_index < len(new_routes[self.vehicle_id])
             assert 0 <= end_index < len(new_routes[self.vehicle_id])
 
-            # Ensure the start index comes before the end index
-            if start_index > end_index:
-                start_index, end_index = end_index, start_index
+            if start_index <= end_index:
+                # Reverse the segment between start_index and end_index (inclusive)
+                new_route[start_index:end_index + 1] = reversed(new_route[start_index:end_index + 1])
+            else:
+                # Reverse the segment outside start_index and end_index (inclusive)
+                new_route = list(reversed(new_route[start_index:])) + new_route[end_index + 1:start_index] + list(reversed(new_route[:end_index + 1]))
 
-            # Reverse the segment between start_index and end_index (inclusive)
-            new_routes[self.vehicle_id][start_index:end_index + 1] = reversed(new_routes[self.vehicle_id][start_index:end_index + 1])
-
+        new_routes = solution.routes[:self.vehicle_id] + [new_route] + solution.routes[self.vehicle_id + 1:]
         return Solution(new_routes, solution.depot)
 
 

@@ -27,6 +27,7 @@ class Env(BaseEnv):
     def init_solution(self) -> None:
         return Solution(tour=[])
 
+
     def get_global_data(self) -> dict:
         """Retrieve the global static information data as a dictionary.
 
@@ -34,11 +35,13 @@ class Env(BaseEnv):
             dict: A dictionary containing the global static information data with:
                 - "node_num" (int): The total number of nodes in the problem.
                 - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+                - "std_dev_distance" (float): The standard deviation of the distances.
         """
 
         global_data_dict = {
             "distance_matrix": self.distance_matrix,
-            "node_num": self.node_num
+            "node_num": self.node_num,
+            "std_dev_distance": np.std(self.distance_matrix)
         }
         return global_data_dict
 
@@ -122,10 +125,10 @@ class Env(BaseEnv):
             "Current Cost": self.state_data["current_cost"]
         }
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
             "visited_num": self.state_data["visited_num"]
         }
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content

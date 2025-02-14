@@ -7,40 +7,68 @@ total_experiments = [
     {
         "problem": "tsp",
         "key_item": "current_cost",
-        "data": [("tsp225.tsp", 3919), ("a280.tsp", 2579), ("pcb442.tsp", 50788), ("pa561.tsp", 2763), ("gr666.tsp", 294358), ("pr1002.tsp", 259045), ("pr2392.tsp", 378032)],
-        "experiments": ["nearest_neighbor_f91d", "cheapest_insertion_605f", "farthest_insertion_b6d3"],
+        "data": [
+            "kroA100.tsp", "kroA150.tsp", "kroB100.tsp", "kroB200.tsp", "kroC100.tsp", "bier127.tsp",
+            "tsp225.tsp", "a280.tsp", "pcb442.tsp", "gr666.tsp", "pr1002.tsp", "pr2392.tsp"],
+        "heuristics": ["nearest_neighbor_f91d", "nearest_neighbor_e8a4", "cheapest_insertion_605f", "cheapest_insertion_7a30", "farthest_insertion_b6d3", "farthest_insertion_54db"],
+        "upper_bound": [
+            21282, 26524, 22141, 29437, 20749, 118282,
+            3919, 2579, 50788, 294358, 259045, 378032]
     },
     {
         "problem": "cvrp",
         "key_item": "total_current_cost",
-        "data": [("A-n80-k10.vrp", 1762), ("B-n78-k10.vrp", 1221), ("E-n101-k14.vrp", 1067), ("F-n135-k7.vrp", 1162), ("M-n200-k17.vrp", 1275), ("P-n101-k4.vrp", 681), ("X-n1001-k43.vrp", 72355)],
-        "experiments": ["nearest_neighbor_99ba", "min_cost_insertion_7bfa", "farthest_insertion_ce2b"],
+        "data": ["A-n80-k10.vrp", "B-n78-k10.vrp", "E-n101-k14.vrp", "F-n135-k7.vrp", "M-n200-k17.vrp", "P-n101-k4.vrp"],
+        "heuristics": ["nearest_neighbor_99ba", "nearest_neighbor_54a9", "min_cost_insertion_7bfa", "min_cost_insertion_3b2b", "farthest_insertion_4e1d", "farthest_insertion_6308"],
+        "upper_bound": [1762, 1221, 1067, 1162, 1275, 681]
     },
     {
         "problem": "jssp",
         "key_item": "current_makespan",
-        "data": [("LA05.jssp", 593), ("LA10.jssp", 958), ("LA15.jssp", 1207), ("LA20.jssp", 902), ("LA25.jssp", 977), ("LA30.jssp", 1355), ("LA35.jssp", 1888)],
-        "experiments": ["most_work_remaining_930e", "first_come_first_served_6c4f", "shortest_processing_time_first_c374"],
+        "data": [
+            "LA01.jssp", "LA02.jssp", "LA03.jssp", "LA04.jssp", "LA05.jssp",
+            "LA06.jssp", "LA07.jssp", "LA08.jssp", "LA09.jssp", "LA10.jssp",
+            "LA11.jssp", "LA12.jssp", "LA13.jssp", "LA14.jssp", "LA15.jssp",
+            "LA16.jssp", "LA17.jssp", "LA18.jssp", "LA19.jssp", "LA20.jssp",],
+        "heuristics": ["most_work_remaining_930e", "most_work_remaining_df20", "first_come_first_served_6c4f", "first_come_first_served_af26", "shortest_processing_time_first_c374", "shortest_processing_time_first_d471"],
+        "upper_bound": [
+            666, 655, 597, 590, 593,
+            926, 890, 863, 951, 958,
+            1222, 1039, 1150, 1292, 1207, 
+            945, 784, 848, 842, 902,
+            ]
     },
     {
         "problem": "max_cut",
         "key_item": "current_cut_value",
-        "data": [("g10.rud", 1994), ("g20.rud", 941), ("g30.rud", 3403), ("toursg3-8.txt", 41684814), ("toursg3-15.txt", 281029888), ("tourspm3-8-50.txt", 454), ("tourspm3-15-50.txt", 2964)],
-        "experiments": ["most_weight_neighbors_320c", "highest_weight_edge_eb0c", "balanced_cut_21d5"],
+        "data": ["g1.mc", "g2.mc", "g3.mc", "g4.mc", "g5.mc", "g6.mc", "g7.mc", "g8.mc", "g9.mc", "g10.mc"],
+        "heuristics": ["most_weight_neighbors_320c", "most_weight_neighbors_d31b", "highest_weight_edge_eb0c", "highest_weight_edge_ca02", "balanced_cut_21d5", "balanced_cut_c0e6"],
+        "upper_bound": [11624, 11620, 11622, 11646, 11631, 2178, 2006, 2006, 2054, 2000]
     },
-    { 
+    {
         "problem": "mkp",
         "key_item": "current_profit",
-        "data": [("mknap1_1.mkp", 3800), ("mknap1_7.mkp", 16537), ("WEING1.DAT.mkp", 141278), ("PB7.DAT.mkp", 1035), ("mknapcb9-01.mkp", 115868), ("mknapcb9-11.mkp", 217995), ("mknapcb9-21.mkp", 301627)],
-        "experiments": ["greedy_by_profit_8df3", "greedy_by_weight_ece2", "greedy_by_density_9e8d"]
+        "data": [
+            "mknap1_1.mkp", "mknap1_2.mkp", "mknap1_3.mkp", "mknap1_4.mkp", "mknap1_5.mkp", "mknap1_6.mkp", "mknap1_7.mkp",
+            "mknapcb1_1.mkp", "mknapcb1_2.mkp", "mknapcb1_3.mkp", "mknapcb1_4.mkp", "mknapcb1_5.mkp",
+            "mknapcb4_1.mkp", "mknapcb4_2.mkp", "mknapcb4_3.mkp", "mknapcb4_4.mkp", "mknapcb4_5.mkp"
+        ],
+        "heuristics": ["greedy_by_profit_8df3", "greedy_by_profit_1597", "greedy_by_weight_ece2", "greedy_by_weight_e7f9", "greedy_by_density_9e8d", "greedy_by_density_bb0a"],
+        "upper_bound": [
+            3800, 8706.1, 4015, 6120, 12400, 10618, 16537,
+            24381, 24274, 23551, 23534, 23991,
+            23064, 22801, 22131, 22772, 22571
+        ]
     },
     {
         "problem": "dposp",
         "key_item": "fulfilled_order_num",
-        "data": [("test_case_1", 0), ("test_case_2", 0), ("test_case_3", 0), ("test_case_4", 0), ("test_case_5", 0), ("test_case_6", 0), ("test_case_7", 0)],
-        "experiments": ["nearest_order_scheduling_1a5e", "greedy_deadline_proximity_ac6e", "greedy_by_order_density_c702"]
+        "data": ["test_case_1", "test_case_2", "test_case_3", "test_case_4", "test_case_5", "test_case_6", "test_case_7"],
+        "heuristics": ["least_order_remaining_9c3c", "least_order_remaining_27ca", "shortest_operation_ff40", "shortest_operation_ae31", "greedy_by_order_density_c702", "greedy_by_order_density_de77"],
+        "upper_bound": [None, None, None, None, None, None, None]
     }
 ]
+
 
 def found_key(file_path: str, key_item: str) -> float:
     with open(file_path) as file:
@@ -194,18 +222,69 @@ def dump_all_image():
     dump_single_to_image()
     dump_hh_to_image()
 
+def get_hh_results(problem_dict: dict, data_index: int, test_dir: str, hh_name: str) -> str:
+    problem = problem_dict["problem"]
+    key_item = problem_dict["key_item"]
+    data = problem_dict["data"][data_index]
+    upper_bound = problem_dict["upper_bound"][data_index]
+    results = []
+    for file in os.listdir(test_dir):
+        if file.startswith(f"{hh_name}.20"):
+            if os.path.exists(os.path.join(test_dir, file, "result.txt")):
+                result = found_key(os.path.join(test_dir, file, "result.txt"), key_item)
+            elif os.path.exists(os.path.join(test_dir, file, "best_result.txt")):
+                result = found_key(os.path.join(test_dir, file, "best_result.txt"), key_item)
+            else:
+                continue
+            results.append(result)
+    if upper_bound:
+        gap = [round(abs(value - upper_bound) / upper_bound * 100, 2) for value in results]
+        mean_gap = round(np.mean(gap), 2)
+    else:
+        gap = ["None" for value in results]
+        mean_gap = "None"
+    gap_str = [f"{results[index]}({gap[index]}%)" for index in range(len(results))]
+    if results:
+        return(f"{problem}, {data}, {hh_name}, {gap_str}, {np.mean(results)}({mean_gap}%)")
+    else:
+        return(f"Missing {problem}, {data}, {hh_name}")
+    
+
 def dump_all_result():
     for problem_dict in total_experiments:
         problem = problem_dict["problem"]
         key_item = problem_dict["key_item"]
-        for data in os.listdir(os.path.join("output", problem, "result")):
-            for experiment in os.listdir(os.path.join("output", problem, "result", data)):
-                result_file = os.path.join("output", problem, "result", data, experiment, "result.txt")
+        data = problem_dict["data"]
+        heuristics = problem_dict["heuristics"]
+        upper_bounds = problem_dict["upper_bound"]
+        for data_index, data in enumerate(data):
+            upper_bound = upper_bounds[data_index]
+            test_dir = os.path.join("output", problem, "result", data)
+            for heuristic in heuristics:
+                result_file = os.path.join(test_dir, heuristic, "result.txt")
                 if os.path.exists(result_file):
                     value = found_key(result_file, key_item)
                     if value:
-                        print(problem, data, experiment, key_item, value)
+                        gap = "None" if upper_bound is None else round(abs(value - upper_bound) / upper_bound * 100, 2)
+                        print(f"{problem}, {data}, {heuristic}, {value}({gap}%)")
                 else:
-                    print(F"Missing {result_file}")
-                    
+                    print(F"Missing {problem}, {data}, {heuristic}")
+            
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh")
+            print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh.evolved")
+            print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh")
+            print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh.evolved")
+            print(result_str)
+
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_deep_hh.evolved")
+            print(result_str)
+
+
+
 dump_all_result()

@@ -34,19 +34,12 @@ def get_global_data_feature(global_data: dict) -> dict:
     # Calculate the standard deviation of the distances
     std_dev_distance = np.std(distance_matrix)
 
-    # Calculate the density of the graph
-    density = np.count_nonzero(distance_matrix) / (node_num * (node_num - 1))
-
-    # Find the centroid node
-    centroid = np.argmin(np.sum(distance_matrix, axis=0))
-
     return {
         "average_distance": average_distance,
         "min_distance": min_distance,
         "max_distance": max_distance,
         "std_dev_distance": std_dev_distance,
-        "density": density,
-        "centroid": centroid
+        "node_num": node_num
     }
 
 import numpy as np

@@ -1,0 +1,36 @@
+To assess the performance of the evolved heuristics, I have tested both the original heuristic {basic_heuristic_name} and the evolved heuristic {last_heuristic_name}.
+The following table presents a comparative analysis of these heuristics. The first {feature_num} columns represent the features of the testing data, while the remaining columns show the results.
+A {compare} result indicates better performance, and the improvement ratio (in brackets, positive means to improve and negative means decline) reflects the enhancement relative to {basic_heuristic_name}.
+
+{benchmark_result}
+
+It is evident that in some scenarios, the new heuristic performs well, although there is still room for improvement. Based on the results, please analyze the following:
+1. In which cases does the new heuristic perform well, and in which cases is it not satisfactory?
+2. What factors contribute to these differences in performance?
+3. Is the updated heuristic {last_heuristic_name} better than previous heuristic {previous_heuristic_name} and is the previous evolution suggestion {last_suggestion} works?
+4. How can we further refine the new heuristics?
+
+We believe that further refinement of the new heuristic is necessary.
+
+Please analyze the results and provide one executable code adjustment suggestion (in word, not code).
+
+To make sure the code adjustment suggestion is executable, here are some aspects to consider and you can provide more:
+1. This may involve changing default values or adopting dynamic values tailored to specific data.
+2. Implement checks to retain the original algorithm when the data does not favor heuristic updates.
+3. This includes aspects such as operation type, subject, location, and timing.
+4. Should we continue to deepen origin suggestion or weaken this suggestion: {last_suggestion}.
+5. Explore insights and strategies from other successful heuristics.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the code still need to be updated, please respond to me in this format:
+***refinement: 
+result analysis: xxx
+code adjustment suggestion: xxx
+***
+2. If you think current heuristic are good enough, please respond to me in this format:
+***refinement: 
+result analysis: None
+code adjustment suggestion: None
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

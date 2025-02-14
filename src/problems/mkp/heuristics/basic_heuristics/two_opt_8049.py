@@ -28,6 +28,7 @@ def two_opt_8049(global_data: dict, state_data: dict, algorithm_data: dict, get_
     best_profit = state_data["current_profit"]
     items_in_knapsack = state_data["items_in_knapsack"]
     items_not_in_knapsack = state_data["items_not_in_knapsack"]
+    validation_solution = state_data["validation_solution"]
     weights = global_data["weights"]
     capacities = global_data["capacities"]
 
@@ -40,12 +41,13 @@ def two_opt_8049(global_data: dict, state_data: dict, algorithm_data: dict, get_
             temp_solution = Solution(new_solution)
             
             # Get the state data for the new solution
-            new_state_data = get_state_data_function(temp_solution)
-            
-            # If the new solution is valid and has a higher profit, store it as the best solution
-            if new_state_data and new_state_data["current_profit"] > best_profit:
-                best_operator = SwapOperator(item_in, item_out)
-                best_profit = new_state_data["current_profit"]
+            if validation_solution(Solution(temp_solution)):
+                new_state_data = get_state_data_function(Solution(temp_solution))
+
+                # If the new solution is valid and has a higher profit, store it as the best solution
+                if new_state_data and new_state_data["current_profit"] > best_profit:
+                    best_operator = SwapOperator(item_in, item_out)
+                    best_profit = new_state_data["current_profit"]
     
     # Return the best swap operator found and an empty dictionary for algorithm data
     return (best_operator, {}) if best_operator else (None, {})

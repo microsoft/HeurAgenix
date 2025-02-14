@@ -284,11 +284,11 @@ class Env(BaseEnv):
             "Fulfilled Order Num": self.state_data["fulfilled_order_num"],
         }
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "production_line_num": self.production_line_num,
             "product_num": self.product_num,
             "order_num": self.order_num,
         }
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content

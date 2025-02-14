@@ -1,0 +1,28 @@
+Now, let review the global data with some heuristic values for this problem:
+{global_data_feature}
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already {discuss_round} rounds discuss and the summary are:
+{heuristic_traject}
+
+After the previous running, the state data some heuristic values for current stage:
+{state_data_feature}
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: {last_heuristic}({last_heuristic_category}). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: {category_names}
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx({category_names})
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

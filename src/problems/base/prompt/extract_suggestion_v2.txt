@@ -1,0 +1,29 @@
+Now focus on this operator {bottleneck_operation} in step {bottleneck_operation_id}.
+
+The state before {bottleneck_operation} is:
+{state_data}
+To aid your analysis, I extracted the following features from this state:
+{global_data_feature}
+
+You believe that {proposed_operation} is better with reason {reason}. So we hope to update {function_name} to output {proposed_operation} in this state.
+Try to provide suggestion to update the code using mathematical analysis.
+
+Please provide suggestion in following one or more aspects:
+1. Set the hyper-parameters or update the hyper-parameters' value for better control.
+2. Add more logic to this function for better control.
+3. Limit the application scope of certain logic with an if-check.
+4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
+5. Also consider learning from other heuristics:
+{all_heuristic_docs}
+
+To make sure the suggestion is useful, please check in following aspects:
+1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.
+2. Will the updated suggestion make the function output {proposed_operation} in this step?
+3. If we run the updated function on this data from beginning to end, will the result be better than {positive_solution} ({positive_result})?
+4. Is this a commonly useful update for all instances or states?
+
+The response format is very important. For better communication, please respond to me in this format:
+***suggestion: xxx
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

@@ -19,5 +19,5 @@ calculation_process: how this operation was derived.
 mathematical_analysis: why it represents an improvement.
 application_scope: under which circumstances it is most applicable, including global data's conditions or current state's conditions.
 ***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you think no superior operation, simply respond with ***None***.

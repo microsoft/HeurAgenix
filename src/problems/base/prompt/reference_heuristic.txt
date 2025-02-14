@@ -10,5 +10,5 @@ referenced_heuristic_name;introduction
 referenced_heuristic_name;introduction
 ...
 ***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

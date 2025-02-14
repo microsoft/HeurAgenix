@@ -38,7 +38,6 @@ def three_opt_e8d7(global_data: dict, state_data: dict, algorithm_data: dict, ge
                     if delta < best_delta:
                         best_delta = delta
                         best_move = (route_index, moves)
-                        return ReverseSegmentOperator(route_index, moves), algorithm_data
 
     # If a beneficial move is found, create and return the corresponding operator
     if best_move:
@@ -52,21 +51,22 @@ def calculate_3opt_moves(distance_matrix, route, i, j, k, depot):
     """
     Calculate the cost difference for all 3-opt reconnection moves for the given segments and return the best move.
     """
-    A = depot if i == 0 else route[i - 1]
-    B = depot if i == len(route) else route[i]
-    C = depot if j == 0 else route[j - 1]
-    D = depot if j == len(route) else route[j]
-    E = depot if k == 0 else route[k - 1]
-    F = depot if k == len(route) else route[k]
+    n = len(route)
+    A = route[(i - 1) % n]
+    B = route[i % n]
+    C = route[(j - 1) % n]
+    D = route[j % n]
+    E = route[(k - 1) % n]
+    F = route[k % n]
 
     # Calculate the cost of the original segments
     original_cost = distance_matrix[A][B] + distance_matrix[C][D] + distance_matrix[E][F]
 
     # Initialize the list of all possible new segments and their costs
     possible_moves = [
-        (distance_matrix[A][D] + distance_matrix[C][F] + distance_matrix[E][B], [(i, j), (j, k)]),  # Case 1: Two segments reversed
-        (distance_matrix[A][E] + distance_matrix[D][B] + distance_matrix[C][F], [(i, j - 1), (i, k - 1)]),
-        (distance_matrix[A][D] + distance_matrix[E][B] + distance_matrix[C][F], [(i, j), (j - 1, k - 1)]),
+        (distance_matrix[A][C] + distance_matrix[B][E] + distance_matrix[D][F], [(i % n, (j - 1) % n), (j % n, (k - 1) % n)]),
+        (distance_matrix[F][C] + distance_matrix[B][D] + distance_matrix[E][A], [(i % n, (j - 1) % n), (k % n, (i - 1) % n)]),
+        (distance_matrix[F][B] + distance_matrix[C][E] + distance_matrix[D][A], [(j % n, (k - 1) % n), (k % n, (i - 1) % n)]),
     ]
 
 

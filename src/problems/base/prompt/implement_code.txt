@@ -14,7 +14,8 @@ To implement this heuristic function in python, please note:
 8. No any omissions or placeholders, I'm just going to use the code.
 9. For the algorithm to update the algorithm_data, do not modify directly "algorithm_data["abc"] = 123", we should return operator, {"abc": 123}.For algorithm that do not update them, just return operator, {}
 10. For the circumstances that algorithm return empty operator, please return None, {}.
-11. Make the result must be valid.
+11. Do not forget to check whether the content is empty when calculating the min/max/average/std/..., such as when using min([distance[node][other] for other in nodes if other != node]).
+12. Make the result must be valid.
 
 For {problem} problem, take about following:
 {special_remind}
@@ -51,6 +52,5 @@ def {function_name}(global_data: dict, state_data: dict, algorithm_data: dict, g
         Description of updated algorithm data.
     """
     xxx
-***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

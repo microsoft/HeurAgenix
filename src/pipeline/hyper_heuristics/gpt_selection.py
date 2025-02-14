@@ -1,7 +1,7 @@
 import os
 import traceback
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str
+from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
 from src.util.gpt_helper import GPTHelper
 
 
@@ -9,17 +9,17 @@ class GPTSelectionHyperHeuristic:
     def __init__(
         self,
         gpt_helper: GPTHelper,
-        heuristic_dir: str,
+        heuristic_pool: list[str],
         problem: str,
     ) -> None:
         self.gpt_helper = gpt_helper
         self.problem = problem
         self.heuristic_docs = {
-            heuristic_file.split(".")[0]: extract_function_with_short_docstring(open(os.path.join(heuristic_dir, heuristic_file)).read(), heuristic_file.split(".")[0]) 
-            for heuristic_file in os.listdir(heuristic_dir)}
+            heuristic_file.split(".")[0]: extract_function_with_short_docstring(open(search_file(heuristic_file, problem)).read(), heuristic_file.split(".")[0]) 
+            for heuristic_file in heuristic_pool}
         self.heuristic_pools = {
             heuristic_file.split(".")[0]: load_heuristic(heuristic_file, problem=self.problem)
-            for heuristic_file in os.listdir(heuristic_dir)}
+            for heuristic_file in heuristic_pool}
         self.get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
         self.get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
 
@@ -28,7 +28,7 @@ class GPTSelectionHyperHeuristic:
         prompt_dict = self.gpt_helper.load_background(self.problem)
 
         # Load heuristic pool
-        max_steps = max_steps if max_steps is not None else env.construction_steps * 2
+        max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         prompt_dict["heuristic_pool_introduction"] = "\n".join(self.heuristic_docs.values())
         self.gpt_helper.load("heuristic_pool", prompt_dict)
         self.gpt_helper.chat()
@@ -41,8 +41,10 @@ class GPTSelectionHyperHeuristic:
 
         heuristic_traject = []
         current_steps = 0
-        while current_steps <= max_steps or not env.is_complete_solution:
+        while current_steps <= max_steps and env.continue_run:
             try:
+                if env.is_complete_solution:
+                    env.dump_result()
                 self.gpt_helper.load_chat("heuristic_pool")
 
                 # Generate state heuristic value
@@ -91,24 +93,23 @@ class GPTSelectionHyperHeuristic:
                     selected_heuristic = self.heuristic_pools[selected_heuristic_name]
 
                     pre_status = env.get_observation()
-                    for _ in range(running_step):
-                        env.run_heuristic(selected_heuristic, parameters=parameters)
-                    cur_status = env.get_observation()
-                    heuristic_dict = {
-                        "Heuristic": selected_heuristic_name,
-                        "Parameters": parameters,
-                        "Running Steps": running_step,
-                        "Explain": explain
-                    }
-                    for key in pre_status.keys():
-                        heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
+                    if pre_status:
+                        for _ in range(running_step):
+                            env.run_heuristic(selected_heuristic, parameters=parameters)
+                        cur_status = env.get_observation()
+                        heuristic_dict = {
+                            "Heuristic": selected_heuristic_name,
+                            "Parameters": parameters,
+                            "Running Steps": running_step,
+                            "Explain": explain
+                        }
+                        for key in pre_status.keys():
+                            heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
                     heuristic_traject.append(heuristic_dict)
                     current_steps += running_step
                 elif "Stop" in response or "None" in response:
                     if env.is_complete_solution:
                         break
-                    else:
-                        current_steps -= 1
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)

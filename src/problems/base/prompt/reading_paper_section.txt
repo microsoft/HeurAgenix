@@ -15,5 +15,5 @@ Also to avoid the content is too large, we can start from leaf section.
 
 The response format is very important. For better communication, please respond to me in this format:
 ***interested_section:section_name/your_heuristic_name/None***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you think no superior operation, simply respond with ***None***.

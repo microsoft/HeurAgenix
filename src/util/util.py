@@ -144,7 +144,8 @@ def extract_function_with_short_docstring(code_str, function_name):
         parameters = string.split("get_state_data_function: callable")[1].split(", **kwargs")[0].strip()
         if parameters[:2] == ", ":
             parameters = parameters[2:]
-        introduction = string.split("\"\"\"")[1].split("Args")[0].strip().replace("\n", " ")
+        introduction = string.split("\"\"\"")[1].split("Args")[0].strip()
+        introduction = re.sub(r'\s+', ' ', introduction)
         return f"{function_name}({parameters}): {introduction}"
     else:
         return None
@@ -198,9 +199,18 @@ def search_file(file_name: str, problem: str="base") -> str:
     if file_path:
         return file_path
 
+    file_path = find_file_in_folder(os.path.join("output", problem, "data"), file_name)
+    if file_path:
+        return file_path
+
+    file_path = find_file_in_folder(os.path.join("output", problem, "heuristics"), file_name)
+    if file_path:
+        return file_path
     file_path = find_file_in_folder(os.path.join("output", problem), file_name)
     if file_path:
         return file_path
+
+
     return None
 
 def df_to_str(df: pd.DataFrame) -> str:

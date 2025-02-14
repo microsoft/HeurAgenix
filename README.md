@@ -73,14 +73,14 @@ To generate heuristics for the Traveling Salesman Problem (TSP) using LLM with a
 python generate_heuristic.py -p TSP -s gpt -m
 ```
 
-To generate heuristics from a paper for a resource allocation problem:
+To generate heuristics from a paper:
 ```bash
-python generate_heuristic.py -p ResourceAllocation -s paper -pp "./papers/resource_allocation_paper.tex"
+python generate_heuristic.py -p TSP -s paper -pp "path_to_paper.tex"
 ```
 
-To transfer heuristics from related problems (e.g., Job Scheduling and Inventory Management) for a new problem:
+To transfer heuristics from related problems for a new problem:
 ```bash
-python generate_heuristic.py -p NewProblem -s related_problem -r "JobScheduling,InventoryManagement"
+python generate_heuristic.py -p NewProblem -s related_problem -r "CVRP,TSP,JSSP,..."
 ```
 
 ### Evolve Heuristic
@@ -93,28 +93,29 @@ python generate_heuristic.py -p NewProblem -s related_problem -r "JobScheduling,
 Run the heuristic evolution process using:
 
 ```bash
-python evolution_heuristic.py -p <problem> -be <basic_heuristic> [-t <train_dir>] [-v <validation_dir>] [-pe <perturbation_heuristic>] [-pr <perturbation_ratio>] [-pt <perturbation_time>] [-f <filter_num>] [-r <evolution_rounds>] [-l <time_limit>] [-m]
+python evolution_heuristic.py -p <problem> -be <basic_heuristic> [-t <train_dir>] [-v <validation_dir>] [-pe <perturbation_heuristic>] [-pr <perturbation_ratio>] [-pt <perturbation_time>] [-i <max_refinement_round>] [-f <filter_num>] [-r <evolution_rounds>] [-l <time_limit>] [-m]
 ```
 
 Parameters:
 - `-p`, `--problem`: Specifies the CO problem type to solve (required).
-- `-be`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
+- `-e`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
 - `-t`, `--train_dir`: Directory for training data.
 - `-v`, `--validation_dir`: Directory for validation data.
 - `-pe`, `--perturbation_heuristic`: Path or name of the heuristic used for perturbations.
 - `-pr`, `--perturbation_ratio`: Ratio for perturbation adjustments (default: 0.1).
 - `-pt`, `--perturbation_time`: Maximum perturbation count (default: 1000).
+- `-r`, `--max_refinement_round`: Number of refinement rounds (default: 5).
 - `-f`, `--filter_num`: Number of heuristics to retain after validation (default: 1).
 - `-r`, `--evolution_rounds`: Number of rounds for heuristic evolution (default: 3).
 - `-l`, `--time_limit`: Time limit for running the evolution (default: 10 seconds).
 - `-m`, `--smoke_test`: Optional flag to run a smoke test.
 
-The evolved heuristics are saved in the `output/{problem}/train_result` folder.
+The evolved heuristics are saved in the `output/{problem}/evolution_result` folder.
 
 ####  Example
 To evolve heuristics for a Traveling Salesman Problem (TSP) using a basic heuristic with smoke test:
 ```bash
-python evolution_heuristic.py -p TSP -b nearest_neighbor -m
+python evolution_heuristic.py -p TSP -e nearest_neighbor_f91d -m -t train_data -v validation_data
 ```
 
 ### Generate Feature Extractors
@@ -161,7 +162,8 @@ Parameters:
 - `-p`, `--problem`: Specifies the type of problem to solve (required).
 - `-e`, `--heuristic`: Specifies the heuristic function. Options include:
   - `<heuristic_function_name>`: Directly specify the name of a particular heuristic function.
-  - `'gpt_hh'`: LLM-based selection from heuristics in the specified directory.
+  - `'gpt_hh'`: LLM-based rapid selection from heuristics in the specified directory.
+  - `'gpt_deep_hh'`: LLM-based comprehensive selection from heuristics in the specified directory.
   - `'random_hh'`: Randomly selects a heuristic from the directory.
   - `'or_solver'`: Uses an exact OR solver (only applicable for specific problems like DPOSP).
 - `-d`, `--heuristic_dir`: Directory containing heuristic functions (if needed).
@@ -174,7 +176,14 @@ To run the nearest neighbor heuristic on a test case:
 ```bash
 python launch_hyper_heuristic.py -p TSP -e nearest_neighbor_f91d -c path/to/test_case
 ```
-
+To run the rapid heuristic selection on a test case:
+```bash
+python launch_hyper_heuristic.py -p TSP -e gpt_hh -c path/to/test_case
+```
+To run the comprehensive heuristic selection on a test case:
+```bash
+python launch_hyper_heuristic.py -p TSP -e gpt_gpt_hh -c path/to/test_case
+```
 
 ## Solving On New Problems
 HeurAgenix excels in addressing new problems. When faced with a new problem, the following steps are required:
@@ -187,21 +196,24 @@ HeurAgenix excels in addressing new problems. When faced with a new problem, the
     - `special_remind.txt` (optional) for specific reminders related to the problem during algorithm generation.
 - If an OR algorithm is needed as an upper bound, implement the `ORSolver` class in `src/problems/{problem}/or_solver.py`.
 
-## Solve TSP with GLS
-We leverage the GLS implementation from [EoH](https://github.com/FeiLiu36/EoH).
-- First, generate a solution using our framework. 
-- Then, modify the `def nearest_neighbor` function in [gls_evol.py](https://github.com/FeiLiu36/EoH/blob/7a0d7cf73cb3fbcd2cb9c2586e04c6969106fb92/examples/user_tsp_gls/gls/gls_evol.py) in EoH to return our solution as the initial solution. 
-- Finally, run the following command in the EoH project to get the results:
-```bash
-cd examples/user_tsp_gls
-python runEoH.py
-```
+## Run Baseline
+The baseline we provide are also implement in `baselines` folder, including:
+- GLS for TSP
+- GLS + EoH for TSP
+- GLS + ReEvo for TSP
+- ACO for TSP
+- ACO + ReEvo for TSP
+- EoH constructive for TSP
+- ReEvo constructive for TSP
+- Or-Tools for TSP
+- ACO for CVRP
+- ACO + ReEvo for CVRP
+- Or-Tools for CVRP
+- ACO for MKP
+- ACO + ReEvo for MKP
+Entry to corresponding folder, modify the 'heuristic' and run `python run.py` to get result.
 
 
 ## Future Work
-- Currently, some terminology and variable names in the code differ from those in the paper. In the future, we will standardize them according to the paper's descriptions, including:
-    - In the code: `global data feature`, `state data feature`, `mathematical analysis`, are referred to in the paper as `instance feature`, `solution feature`, `detailed heuristic design`.
-    - Control variables of heuristic algorithms are stored in `algorithm_data` and hyperparameters in `kwargs` in the code, but both are stored in `algorithm_data` in the paper.
-- Many parameters are hardcoded in the current implementation. In the future, we will provide a more flexible structure for the processes of generation, evolution, feature extraction, and heuristic utilization.
 - We will provide a unified interface to handle various types of data.
 - Support for key-based GPT and other LLMs will be added.

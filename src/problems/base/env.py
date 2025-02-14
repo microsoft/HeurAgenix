@@ -37,6 +37,10 @@ class BaseEnv:
         return self.validation_solution(self.current_solution)
 
     @property
+    def continue_run(self) -> bool:
+        return True
+
+    @property
     def key_value(self) -> float:
         return self.state_data[self.key_item]
 
@@ -119,7 +123,7 @@ class BaseEnv:
     def summarize_env(self) -> str:
         pass
 
-    def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True) -> str:
+    def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content = f"-data: {self.data_name}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
@@ -135,7 +139,7 @@ class BaseEnv:
             content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
 
         if self.output_dir != None:
-            output_file = os.path.join(self.output_dir, "result.txt")
+            output_file = os.path.join(self.output_dir, result_file)
             with open(output_file, "w") as file:  
                 file.write(content) 
         

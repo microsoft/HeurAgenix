@@ -23,6 +23,7 @@ def k_flip_2f3e(global_data: dict, state_data: dict, algorithm_data: dict, get_s
     # Extract necessary data from state_data
     current_solution = state_data['current_solution']
     current_profit = state_data['current_profit']
+    validation_solution = state_data['validation_solution']
 
     # Generate all possible combinations of k indices
     all_combinations = list(combinations(all_indices, k))
@@ -40,8 +41,8 @@ def k_flip_2f3e(global_data: dict, state_data: dict, algorithm_data: dict, get_s
             new_solution[index] = not new_solution[index]
 
         # Check if the new solution is valid and calculate its state data
-        new_state_data = get_state_data_function(Solution(new_solution))
-        if new_state_data is not None:  # Only proceed if the solution is valid
+        if validation_solution(Solution(new_solution)):  # Only proceed if the solution is valid
+            new_state_data = get_state_data_function(Solution(new_solution))
             new_profit = new_state_data['current_profit']
 
             # If the new solution is better, update best_operator and best_profit

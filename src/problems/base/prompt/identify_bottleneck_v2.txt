@@ -1,0 +1,43 @@
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external, which is better than negative solution.
+
+The function {function_name} is the heuristic function:
+{function_code}
+
+The global data for this problem:
+{global_data}
+To aid your analysis, I extracted the following features from this data:
+{global_data_feature}
+
+Negative solution from {function_name}:
+{negative_solution}
+The result is {negative_result}.
+The trajectory to get this solution:
+{negative_trajectory}
+
+Positive solution from external:
+{positive_solution}
+The result is {positive_result}.
+The trajectory to get this solution:
+{positive_trajectory}
+
+Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
+Please note:
+1. Some operations, although they appear different, are essentially the same.
+2. Some operations may lead to solutions that look different but are essentially the same.
+3. Some operations may cause changes to the solution but do not affect the final cost; these are not considered bottlenecks.
+4. When an operation A is performed poorly, leading to a series of subsequent operations experiencing issues, we consider the first operation A to be a bottleneck.
+5. If there is only one item, there is no need to force multiple answers.
+6. Try to propose a better operator than origin one and you can learn from positive solution or others.
+
+The response format is very important. For better communication, please respond to me in this format:
+***bottleneck_operations:
+negative_operator_id; proposed_better_operator; reason
+negative_operator_id; proposed_better_operator; reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
