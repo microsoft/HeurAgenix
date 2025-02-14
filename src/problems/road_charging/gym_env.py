@@ -262,7 +262,7 @@ class RoadCharging(Env):
 		
 		if self.stoch_step:
 			ride_time_instance = self.simulate_ride_requests()
-			print("ride_time_instance:", ride_time_instance)
+			# print("ride_time_instance:", ride_time_instance)
    
 		else:
 			ride_time_instance = self.ride_time_instance[:, t]
@@ -476,9 +476,9 @@ def main():
 		# print('next ride time', obs["RideTime"])
 		# print('next charging status', obs["ChargingStatus"])
   
-		if step == 80:
-			future_rides = env.simulate_future_rides(step)
-			print("future_rides:", future_rides)
+		# if step == 80:
+		# 	future_rides = env.simulate_future_rides(step)
+		# 	print("future_rides:", future_rides)
    
 
 		# If the episode has ended then we can reset to start a new episode
