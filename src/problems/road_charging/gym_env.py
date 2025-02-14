@@ -46,7 +46,8 @@ class RoadCharging(Env):
 		self.ride_scenario_probs = self.ride_time_probs_data[self.ride_data_type].values
 		self.config = config
   
-		self.stoch_simulate = True
+		self.stoch_simulate_future = True
+		self.stoch_step = True
 
 		# Observation space: n agents, each with 4 state variables
 		self.observation_shape = (self.n, 4)
@@ -190,6 +191,30 @@ class RoadCharging(Env):
 
 		return X
 
+
+	def simulate_ride_requests(self):
+     
+		x_t = np.zeros(self.n, dtype=int)  # Pre-allocate ride times for all vehicles at time t
+
+		order_probs = np.array([self.rho[self.obs["TimeStep"][i]] for i in range(self.n)])  # Get order probabilities
+		order_mask = np.random.random(self.n) < order_probs  # Boolean mask for accepted orders
+
+		if np.any(order_mask):  # Process only if there are orders
+			selected_indices = np.random.choice(
+				self.ride_time_probs_data.index, 
+				size=np.sum(order_mask), 
+				p=self.ride_scenario_probs
+			)
+
+			bin_ranges = self.ride_time_probs_data.loc[selected_indices, 'Ride Time Range (Minutes)'].values
+			lower_bounds, upper_bounds = np.array([
+				list(map(int, r.split(' - '))) for r in bin_ranges
+			]).T  # Extract lower and upper bounds
+
+			ride_durations = np.random.uniform(lower_bounds, upper_bounds)
+			x_t[order_mask] = np.ceil(ride_durations / self.delta_t).astype(int)
+
+		return x_t
 	
 	def get_agent_state(self, agent_index):
 
@@ -234,7 +259,13 @@ class RoadCharging(Env):
 			raise BaseException(feasible)
 
 		current_step = self.obs["TimeStep"][0]
-		# random_ride_times = self.generate_random_ride_times()
+		
+		if self.stoch_step:
+			ride_time_instance = self.simulate_ride_requests()
+			print("ride_time_instance:", ride_time_instance)
+   
+		else:
+			ride_time_instance = self.ride_time_instance[:, t]
 		
 
 		sum_rewards = 0
@@ -242,7 +273,7 @@ class RoadCharging(Env):
 
 			t, rt, ct, SoC = self.get_agent_state(i)
 			action = actions[i]
-			random_ride_times = self.ride_time_instance[i, t]
+			assigned_ride_time = ride_time_instance[i]
 
 			next_SoC = np.maximum(np.minimum(SoC + ct * self.c_rates[i] + (1-ct) * (-self.d_rates[i]), 1.0), 0.)
 
@@ -250,7 +281,7 @@ class RoadCharging(Env):
 				if SoC <= self.low_SoC:
 					order_time = 0
 				else:
-					order_time = np.minimum(random_ride_times, int(round(SoC/self.d_rates[i])))
+					order_time = np.minimum(assigned_ride_time, int(round(SoC/self.d_rates[i])))
 			
 			if rt >= 2 and ct == 0:
 				# Active ride scenario
@@ -428,6 +459,7 @@ def main():
 	env.seed(42)
 
 	# Number of steps you run the agent for
+
 	num_steps = env.k
 
 	# Reset the environment to generate the first observation
@@ -447,6 +479,7 @@ def main():
 		if step == 80:
 			future_rides = env.simulate_future_rides(step)
 			print("future_rides:", future_rides)
+   
 
 		# If the episode has ended then we can reset to start a new episode
 		if done:
