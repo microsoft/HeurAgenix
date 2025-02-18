@@ -119,10 +119,10 @@ class Env(BaseEnv):
             "Num Items Not In Box": self.state_data["num_items_not_in_box"]
         }
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "item_num": self.item_num,
             "num_items_in_box": self.state_data["num_items_in_box"]
         }
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content

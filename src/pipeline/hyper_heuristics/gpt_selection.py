@@ -110,8 +110,6 @@ class GPTSelectionHyperHeuristic:
                 elif "Stop" in response or "None" in response:
                     if env.is_complete_solution:
                         break
-                    else:
-                        current_steps -= 1
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)

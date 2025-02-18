@@ -9,8 +9,8 @@ class PerturbationHyperHeuristic:
         self,
         main_heuristic_file: str,
         perturbation_heuristic_file: str,
+        problem: str,
         perturbation_ratio: float=0.1,
-        problem: str="tsp"
     ) -> None:
         self.main_heuristic = load_heuristic(main_heuristic_file, problem=problem)
         self.perturbation_heuristic = load_heuristic(perturbation_heuristic_file, problem=problem)

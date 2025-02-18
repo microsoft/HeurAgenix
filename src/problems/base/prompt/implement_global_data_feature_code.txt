@@ -1,4 +1,3 @@
-Let's go future.
 Try to implement the get_global_data_feature function in python:
 def get_global_data_feature(global_data: dict) -> dict
 
@@ -31,5 +30,5 @@ def get_global_data_feature(global_data: dict) -> dict:
     """
     xxx
 ***
-Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

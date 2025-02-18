@@ -36,7 +36,7 @@ class Env(BaseEnv):
         return node_num, distance_matrix, depot, vehicle_num, capacity, demands
 
     def init_solution(self) -> Solution:
-        return Solution(routes=[[] for _ in range(self.vehicle_num)], depot=self.depot)
+        return Solution(routes=[[self.depot] for _ in range(self.vehicle_num)], depot=self.depot)
 
     def get_global_data(self) -> dict:
         """Retrieve the global static information data as a dictionary.
@@ -80,7 +80,7 @@ class Env(BaseEnv):
             solution = self.current_solution
 
         # A list of integers representing the IDs of nodes that have been visited.
-        visited_nodes = list(set([node for route in solution.routes for node in route] + [self.depot]))
+        visited_nodes = list(set([node for route in solution.routes for node in route]))
 
         # A list of integers representing the IDs of nodes that have not yet been visited.
         unvisited_nodes = [node for node in range(self.node_num) if node not in visited_nodes]
@@ -94,7 +94,7 @@ class Env(BaseEnv):
             # The cost of the current solution for each vehicle.
             cost_for_vehicle = sum([self.distance_matrix[route[index]][route[index + 1]] for index in range(len(route) - 1)])
             if len(route) > 0:
-                cost_for_vehicle += (self.distance_matrix[self.depot][route[0]] + self.distance_matrix[route[-1]][self.depot])
+                cost_for_vehicle += self.distance_matrix[route[-1]][route[0]]
             total_current_cost += cost_for_vehicle
             # The last visited node for each vehicle.
             if len(route) == 0:
@@ -125,7 +125,7 @@ class Env(BaseEnv):
         Check the validation of this solution in following items:
             1. Node existence: Each node in each route must be within the valid range.
             2. Uniqueness: Each node (except for the depot) must only be visited once across all routes.
-            3. Depot start and end: Each route must start and end at the depot.
+            3. Include depot: Each route must include at the depot.
             4. Capacity constraints: The load of each vehicle must not exceed its capacity.
         """
         if solution is None:
@@ -141,11 +141,15 @@ class Env(BaseEnv):
                     return False
 
         # Check uniqueness
-        all_nodes = [node for route in solution.routes for node in route]
+        all_nodes = [node for route in solution.routes for node in route if node != self.depot] + [self.depot]
         if len(all_nodes) != len(set(all_nodes)):
             return False
 
         for route in solution.routes:
+            # Check include depot
+            if self.depot not in route:
+                return False
+
             # Check vehicle load capacity constraints
             load = sum(self.demands[node] for node in route)
             if load > self.capacity:
@@ -160,10 +164,10 @@ class Env(BaseEnv):
             "Fulfilled Demands": sum([self.demands[node] for node in self.state_data["visited_nodes"]])
         }
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
             "visited_num": self.state_data["visited_num"]
         }
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content

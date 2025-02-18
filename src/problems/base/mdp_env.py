@@ -20,6 +20,8 @@ class MDPEnv(BaseEnv):
 
     def reset(self, experiment_name: str=None):
         self.gym_env.reset()
+        self.done = False
+        self.reward = 0
         super().reset(experiment_name)
 
     def load_data(self, data_path: str) -> None:
@@ -53,9 +55,9 @@ class MDPEnv(BaseEnv):
             return True
         return False
 
-    def dump_result(self, dump_trajectory: bool=True) -> str:
+    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
         content_dict = self.get_state_data()
-        content = super().dump_result(content_dict, dump_trajectory)
+        content = super().dump_result(content_dict, dump_trajectory, result_file)
         return content
     
     def summarize_env(self) -> str:

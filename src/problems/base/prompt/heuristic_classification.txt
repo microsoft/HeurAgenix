@@ -1,0 +1,19 @@
+We have already implement the following heuristics.
+These are the heuristics in format: heuristic_name(parameter=default_value, ..): introduction
+{heuristic_pool_introduction}
+
+Before we solve the actual problem, we hope to select useful algorithms and classify them so that we can use different algorithms in different scenarios. 
+We hope to classify algorithms and use different algorithms in different scenarios. 
+Please note:
+1. We only hope to sort useful and powerful heuristic, some heuristic are not powerful, such pure random heuristic;
+2. One heuristic can belong to multiple classification;
+3. Detailed classification is welcome.
+
+The response format is very important. For better communication, please respond to me in this format:
+***heuristic_classification:
+classification1:heuristic_name_1,heuristic_name_2,...;reason
+classification2:heuristic_name_3,heuristic_name_4,...;reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

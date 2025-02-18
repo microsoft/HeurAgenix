@@ -9,7 +9,7 @@ class SingleConstructiveSingleImproveHyperHeuristic:
         self,
         constructive_heuristic_file: str,
         improve_heuristic_file: str,
-        problem: str="tsp"
+        problem: str
     ) -> None:
         self.constructive_heuristic = load_heuristic(constructive_heuristic_file, problem=problem)
         self.improve_heuristic = load_heuristic(improve_heuristic_file, problem=problem)
