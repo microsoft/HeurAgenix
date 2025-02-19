@@ -1,8 +1,8 @@
+import os
 import math
+import traceback
 import multiprocessing
 import multiprocessing.managers
-import traceback
-import os
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
 from src.util.gpt_helper import GPTHelper
@@ -115,19 +115,31 @@ class GPTDeepSelectionHyperHeuristic:
                     assert selected_heuristic_category in classified_heuristic
                     candidate_heuristics = classified_heuristic[selected_heuristic_category]
                     
-                    # MCTS for best heuristic in target heuristic category
+                    # Evaluate each heuristics by sample
                     pre_status = env.get_observation()
-                    best_heuristic_name, env = compare_heuristics(
+                    total_results = compare_heuristics(
                         env,
                         candidate_heuristics,
                         running_heuristic_pool,
                         running_max_steps,
                         search_interval,
                         search_time,
-                        best_result_proxy,
                         self.problem,
+                        best_result_proxy,
                         True
                     )
+
+                    # Find the best heuristic
+                    best_heuristic_name = None
+                    best_average_score = None
+                    best_after_heuristic_env = None
+                    for heuristic, results, after_step_env, operators in total_results:
+                        average_score = None if len(results) <= 0 else sum(results) / len(results)
+                        if average_score is not None and best_average_score is None or env.compare(average_score, best_average_score) > 0:
+                            best_heuristic_name = heuristic
+                            best_average_score = average_score
+                            best_after_heuristic_env = after_step_env                    
+                    env = best_after_heuristic_env
 
                     # Record
                     cur_status = env.get_observation()

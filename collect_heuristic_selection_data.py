@@ -14,7 +14,6 @@ def parse_arguments():
     parser.add_argument("-d", "--heuristic_type", type=str, default="basic", choices=["basic", "evolved"], help="Directory containing heuristic functions.")
     parser.add_argument("-s", "--search_time", default=1000, type=int, help="Search times for each heuristic.")    
     parser.add_argument("-r", "--score_calculation", choices=["average_score", "a8t2"], default="average_score", help="Function to calculate score.")
-    parser.add_argument("-e", "--experiment_dir", default="output", help="Path of output dir")
 
     return parser.parse_args()
 
@@ -37,7 +36,6 @@ def main():
     heuristic_type = args.heuristic_type
     search_time = args.search_time
     score_calculation = eval(args.score_calculation)
-    experiment_dir = args.experiment_dir
 
     if heuristic_type == "basic":
         heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
@@ -49,11 +47,11 @@ def main():
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     os.makedirs(base_output_dir, exist_ok=True)
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = os.path.join(base_output_dir, problem, "heuristic_selection_data_collection", experiment_dir, f"{data_name}.{datetime_str}.result")
-
+    output_dir = os.path.join(base_output_dir, problem, "heuristic_selection_data_collection", f"{data_name}.{datetime_str}.result")
+    print(f"Collect data in {output_dir}")
     data_collector = HeuristicSelectionDataCollector(problem, data_name, score_calculation, heuristic_type, heuristic_pool, search_time, output_dir)
-
-    data_collector.collect()
+    data_collector.collect(1, search_time)
+    print(f"Done")
 
 if __name__ == "__main__":
     main()    
