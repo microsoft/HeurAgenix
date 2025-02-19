@@ -208,7 +208,7 @@ def evaluate_heuristic(
         average_score = sum(results) / len(results)
     else:
         average_score = None
-    return average_score, after_step_env_serialized
+    return heuristic_name, average_score, after_step_env_serialized
 
 def compare_heuristics(
         env: BaseEnv,
@@ -228,10 +228,10 @@ def compare_heuristics(
     with concurrent.futures.ProcessPoolExecutor() as executor:
         futures = [executor.submit(evaluate_heuristic, env_serialized, heuristic, all_useful_heuristics, max_steps, search_interval, search_time, best_result_proxy, problem) for heuristic in candidate_heuristics]
 
-    for heuristic_index, future in enumerate(concurrent.futures.as_completed(futures)):
-        average_score, after_step_env_serialized = future.result()
+    for future in concurrent.futures.as_completed(futures):
+        heuristic_name, average_score, after_step_env_serialized = future.result()
         if best_average_score is None or env.compare(average_score, best_average_score) > 0:
             best_average_score = average_score
             best_after_heuristic_env = after_step_env_serialized
-            best_heuristic = candidate_heuristics[heuristic_index]
+            best_heuristic = heuristic_name
     return best_heuristic, dill.loads(best_after_heuristic_env)
