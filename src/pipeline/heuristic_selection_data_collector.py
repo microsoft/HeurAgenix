@@ -122,6 +122,8 @@ class HeuristicSelectionDataCollector:
             performances = []
             for heuristic, results, after_step_env, operators in total_results:
                 score = None if len(results) <= 0 else self.score_calculation(results)
+                results = sorted(results) if env.compare(1, 2) > 0 else sorted(results, reverse=True)
+                results = sorted(results)
                 performances.append([heuristic, str(round(score, 2)), ",".join([str(round(result, 2)) for result in results])])
                 if score is not None and best_score is None or env.compare(score, best_score) > 0:
                     best_heuristic_name = heuristic
