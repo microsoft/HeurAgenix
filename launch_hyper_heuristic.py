@@ -17,10 +17,9 @@ def parse_arguments():
     parser.add_argument("-d", "--heuristic_type", type=str, default="basic", choices=["basic", "evolved"], help="Directory containing heuristic functions.")
     parser.add_argument("-si", "--search_interval", type=int, default=None, help="Search interval for deep hh mode.")
     parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
-    parser.add_argument("-c", "--test_case", type=str, default=None, help="Path for single test case.")
+    parser.add_argument("-c", "--test_case", type=str, default=None, help="Data name for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
     parser.add_argument("-r", "--dump_trajectory", action='store_true', help="Whether to dump trajectory.")
-    parser.add_argument("-o", "--output_dir", type=str, default=None, help="Output experiment name.")
 
     return parser.parse_args()
 
@@ -36,8 +35,7 @@ def main():
         test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
     test_cases = os.listdir(test_dir) if test_case is None else [test_case]
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    heuristic_name = heuristic.split(os.sep)[-1].split(".")[0]
-    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic_name}"
+    heuristic = heuristic.split(os.sep)[-1].split(".")[0]
 
     if heuristic_type == "basic":
         heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
@@ -51,14 +49,14 @@ def main():
 
     gpt_helper = GPTHelper(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
     if heuristic == "gpt_hh":
-        output_dir = f"{heuristic_name}.{datetime_str}"
+        output_dir = f"{heuristic}.{datetime_str}"
         if heuristic_type == "evolved":
-            output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"
+            output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "gpt_deep_hh":
-        output_dir = f"{heuristic_name}.{datetime_str}"
+        output_dir = f"{heuristic}.{datetime_str}"
         if heuristic_type == "evolved":
-            output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"
+            output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = GPTDeepSelectionHyperHeuristic(
             gpt_helper=gpt_helper,
             heuristic_pool=heuristic_pool,
@@ -67,15 +65,17 @@ def main():
             search_time=search_time,
         )
     elif heuristic == "random_hh":
-        output_dir = f"{heuristic_name}.{datetime_str}"
+        output_dir = f"{heuristic}.{datetime_str}"
         if heuristic_type == "evolved":
-            output_dir = f"{heuristic_name}.{heuristic_type}.{datetime_str}"
+            output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "or_solver":
+        output_dir = "or_solver"
         module = importlib.import_module(f"src.problems.{problem}.or_solver")
         globals()["ORSolver"] = getattr(module, "ORSolver")
         hyper_heuristic = ORSolver(problem=problem)
     else:
+        output_dir = heuristic
         hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
 
     for test_case in test_cases:
