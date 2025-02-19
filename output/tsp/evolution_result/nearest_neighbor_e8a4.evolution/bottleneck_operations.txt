@@ -1,0 +1,291 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of TSP.
+A list of integers where each integer represents a node (city) in the TSP tour.
+The order of the nodes in the list defines the order in which the cities are visited in the tour."""
+    def __init__(self, tour: list[int]):
+        self.tour = tour
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append the node at the end of the solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour + [self.node]
+        return Solution(new_tour)
+class InsertOperator(BaseOperator):
+    """Insert the node into the solution at the target position."""
+    def __init__(self, node: int, position: int):
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:self.position] + [self.node] + solution.tour[self.position:]
+        return Solution(new_tour)
+class SwapOperator(BaseOperator):
+    """Swap two nodes in the solution. swap_node_pairs is a list of tuples, each containing the two nodes to swap."""
+    def __init__(self, swap_node_pairs: list[tuple[int, int]]):
+        self.swap_node_pairs = swap_node_pairs
+    def run(self, solution: Solution) -> Solution:
+        node_to_index = {node: index for (index, node) in enumerate(solution.tour)}
+        new_tour = solution.tour.copy()
+        for (node_a, node_b) in self.swap_node_pairs:
+            index_a = node_to_index.get(node_a)
+            index_b = node_to_index.get(node_b)
+            assert index_a is not None
+            assert index_b is not None
+            (new_tour[index_a], new_tour[index_b]) = (new_tour[index_b], new_tour[index_a])
+        return Solution(new_tour)
+class ReplaceOperator(BaseOperator):
+    """Replace a node with another one in the solution."""
+    def __init__(self, node: int, new_node: int):
+        self.node = node
+        self.new_node = new_node
+    def run(self, solution: Solution) -> Solution:
+        index = solution.tour.index(self.node)
+        new_tour = solution.tour[:index] + [self.new_node] + solution.tour[index + 1:]
+        return Solution(new_tour)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, segments: list[tuple[int, int]]):
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_tour = solution.tour[:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_tour)
+            assert 0 <= end_index < len(new_tour)
+            if start_index <= end_index:
+                new_tour[start_index:end_index + 1] = reversed(new_tour[start_index:end_index + 1])
+            else:
+                new_tour = list(reversed(new_tour[start_index:])) + new_tour[end_index + 1:start_index] + list(reversed(new_tour[:end_index + 1]))
+        return Solution(new_tour)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "std_dev_distance" (float): The standard deviation of the distances.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
+    - "visited_num" (int): Number of nodes that have been visited.
+    - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
+    - "unvisited_num" (int): Number of nodes that have not been visited.
+    - "current_cost" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
+    - "last_visited" (int): The last visited node.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is tsp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Traveling Salesman Problem (TSP) is indeed a combinatorial optimization problem, which involves finding the most efficient route through a set of cities. Heuristics are commonly used to find good approximations to the optimal solution, especially when exact methods become computationally infeasible for large instances. Your framework with Solution, Operator classes, and heuristic function signatures seems appropriate for tackling TSP using hyper-heuristics, enabling flexible application and combination of different heuristic strategies.
+------------------------------------------------------------------------------------
+
+user
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external, which is better than negative solution.
+
+The function nearest_neighbor_e8a4 is the heuristic function:
+from src.problems.tsp.components import *
+import numpy as np
+
+def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """Enhanced nearest neighbor heuristic for the Traveling Salesman Problem (TSP).
+
+    This heuristic begins at a node with the second-lowest average distance to all other nodes if the tour is initially empty.
+    It extends the tour by employing nearest neighbor, nearest insertion, or cheapest insertion strategies based on specific criteria.
+    Additionally, it periodically applies the 2-opt heuristic to optimize the tour by reducing crossings.
+
+    Args:
+        global_data (dict): Contains essential global data:
+            - "distance_matrix" (numpy.ndarray): 2D array of distances between nodes.
+            - "node_num" (int): Total number of nodes.
+        state_data (dict): Contains current state information:
+            - "current_solution" (Solution): Current TSP solution.
+            - "unvisited_nodes" (list[int]): IDs of nodes not yet visited.
+            - "last_visited" (int or None): Last visited node, or None if the tour is empty.
+        get_state_data_function (callable): Function to generate state data for a new solution without modifying the original.
+        **kwargs: Optional parameters for the heuristic:
+            - "threshold_factor" (float, default=0.70): Determines if a node's distance is significantly shorter.
+            - "percentage_range" (float, default=0.20): Range within which distances are considered comparable.
+            - "apply_2opt_frequency" (int, default=5): Frequency for applying the 2-opt heuristic.
+
+    Returns:
+        InsertOperator: Operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data, if any.
+    """
+    # Extract necessary data
+    distance_matrix = global_data["distance_matrix"]
+    node_num = global_data["node_num"]
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+
+    # Set default hyper-parameters
+    threshold_factor = kwargs.get("threshold_factor", 0.70)
+    percentage_range = kwargs.get("percentage_range", 0.20)
+    apply_2opt_frequency = kwargs.get("apply_2opt_frequency", 5)
+
+    # Initialize the tour if empty
+    if not current_solution.tour:
+        avg_distances = [np.mean([distance_matrix[i][j] for j in range(node_num) if i != j]) for i in range(node_num)]
+        sub_central_nodes = np.argsort(avg_distances)[1]
+        start_node = min(unvisited_nodes, key=lambda node: distance_matrix[sub_central_nodes][node])
+        return AppendOperator(start_node), {}
+
+    # Return if no unvisited nodes remain
+    if not unvisited_nodes:
+        return None, {}
+
+    # Periodically apply 2-opt heuristic
+    if len(current_solution.tour) % apply_2opt_frequency == 0 and len(current_solution.tour) > 2:
+        best_delta = 0
+        best_pair = None
+
+        for i in range(len(current_solution.tour) - 1):
+            for j in range(i + 2, len(current_solution.tour)):
+                if j == len(current_solution.tour) - 1 and i == 0:
+                    continue
+
+                a, b = current_solution.tour[i], current_solution.tour[(i + 1) % len(current_solution.tour)]
+                c, d = current_solution.tour[j], current_solution.tour[(j + 1) % len(current_solution.tour)]
+                current_cost = distance_matrix[a][b] + distance_matrix[c][d]
+                new_cost = distance_matrix[a][c] + distance_matrix[b][d]
+                delta = new_cost - current_cost
+
+                if delta < best_delta:
+                    best_delta = delta
+                    best_pair = (i + 1, j)
+
+        if best_pair:
+            return ReverseSegmentOperator([best_pair]), {}
+
+    # Calculate average distance from the last visited node to unvisited nodes
+    avg_distance = np.mean([distance_matrix[last_visited][node] for node in unvisited_nodes])
+
+    # Find nearest unvisited node to the last visited node
+    nearest_node = min(unvisited_nodes, key=lambda node: distance_matrix[last_visited][node])
+    nearest_distance = distance_matrix[last_visited][nearest_node]
+
+    # Prioritize inserting the nearest node if its distance is significantly shorter
+    if nearest_distance < threshold_factor * avg_distance:
+        return InsertOperator(node=nearest_node, position=len(current_solution.tour)), {}
+
+    # Evaluate nodes with comparable distances
+    comparable_nodes = [node for node in unvisited_nodes if distance_matrix[last_visited][node] <= (1 + percentage_range) * nearest_distance]
+    if len(comparable_nodes) <= 1:
+        comparable_nodes = unvisited_nodes
+    best_score = float('inf')
+    best_node = None
+    best_position = None
+
+    for node in comparable_nodes:
+        future_impact = sum([distance_matrix[node][unvisited] for unvisited in unvisited_nodes if unvisited != node])
+        for i in range(len(current_solution.tour) + 1):
+            if i == 0:
+                next_node = current_solution.tour[0]
+                immediate_impact = distance_matrix[node][next_node]
+            elif i == len(current_solution.tour):
+                prev_node = current_solution.tour[-1]
+                immediate_impact = distance_matrix[prev_node][node]
+            else:
+                prev_node = current_solution.tour[i - 1]
+                next_node = current_solution.tour[i]
+                immediate_impact = distance_matrix[prev_node][node] + distance_matrix[node][next_node] - distance_matrix[prev_node][next_node]
+
+            score = immediate_impact + state_data["visited_num"] / node_num / node_num * future_impact
+            if score < best_score:
+                best_score = score
+                best_node = node
+                best_position = i
+
+
+    return InsertOperator(node=best_node, position=best_position), {}
+
+The global data for this problem:
+distance_matrix:[[1.0, 13558.0, 13038.0, 14211.0, 6392.0], [13558.0, 1.0, 3886.0, 1277.0, 7261.0], [13038.0, 3886.0, 1.0, 2863.0, 7314.0], [14211.0, 1277.0, 2863.0, 1.0, 7819.0], [6392.0, 7261.0, 7314.0, 7819.0, 1.0]]
+node_num:5
+std_dev_distance:4954.942474095941
+To aid your analysis, I extracted the following features from this data:
+average_distance:7762.15
+min_distance:1.0
+max_distance:14211.0
+std_dev_distance:4954.942474095941
+node_num:5
+
+Negative solution from nearest_neighbor_e8a4:
+tour: 3->1->2->4->0->3
+The result is 33080.0.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	nearest_neighbor_e8a4	AppendOperator(node=3)	tour: 3->3
+1	nearest_neighbor_e8a4	InsertOperator(node=1, position=1)	tour: 3->1->3
+2	nearest_neighbor_e8a4	InsertOperator(node=2, position=2)	tour: 3->1->2->3
+3	nearest_neighbor_e8a4	InsertOperator(node=4, position=3)	tour: 3->1->2->4->3
+4	nearest_neighbor_e8a4	InsertOperator(node=0, position=4)	tour: 3->1->2->4->0->3
+
+Positive solution from external:
+tour: 0->4->1->3->2->0
+The result is 30831.0.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	random_80a0	AppendOperator(node=1)	tour: 1->1
+1	nearest_neighbor_e8a4	InsertOperator(node=3, position=1)	tour: 1->3->1
+2	nearest_neighbor_e8a4	InsertOperator(node=2, position=2)	tour: 1->3->2->1
+3	nearest_neighbor_e8a4	InsertOperator(node=4, position=0)	tour: 4->1->3->2->4
+4	nearest_neighbor_e8a4	InsertOperator(node=0, position=0)	tour: 0->4->1->3->2->0
+
+Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
+Please note:
+1. Some operations, although they appear different, are essentially the same.
+2. Some operations may lead to solutions that look different but are essentially the same.
+3. Some operations may cause changes to the solution but do not affect the final cost; these are not considered bottlenecks.
+4. When an operation A is performed poorly, leading to a series of subsequent operations experiencing issues, we consider the first operation A to be a bottleneck.
+5. If there is only one item, there is no need to force multiple answers.
+6. Try to propose a better operator than origin one and you can learn from positive solution or others.
+
+The response format is very important. For better communication, please respond to me in this format:
+***bottleneck_operations:
+negative_operator_id; proposed_better_operator; reason
+negative_operator_id; proposed_better_operator; reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***bottleneck_operations:
+0; AppendOperator(node=1); Starting with node 1 could lead to a more optimal tour, as seen in the positive solution where node 1 is involved early, leading to a better path.
+1; InsertOperator(node=4, position=1); Inserting node 4 earlier could prevent suboptimal paths. The positive solution inserts node 4 early, leading to a more efficient sequence.
+***
+------------------------------------------------------------------------------------
+

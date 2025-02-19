@@ -1,0 +1,29 @@
+-data: output\cvrp\data\train_data\train_case_13.vrp
+-current_solution:
+vehicle_0: 0->12->9->10->7->8->0
+vehicle_1: 0->4->6->14->0
+vehicle_2: 0->3->2->11->0
+vehicle_3: 0->1->5->0
+vehicle_4: 0->13->0
+
+-is_complete_solution: True
+-is_valid_solution: True
+-total_current_cost: 10131.0
+-node_num: 15
+-visited_num: 15
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	nearest_neighbor_54a9	InsertOperator(vehicle_id=0, node=8, position=0)	vehicle_0: 0->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+1	nearest_neighbor_54a9	InsertOperator(vehicle_id=0, node=7, position=0)	vehicle_0: 0->7->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+2	nearest_neighbor_54a9	InsertOperator(vehicle_id=0, node=12, position=0)	vehicle_0: 0->12->7->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+3	nearest_neighbor_54a9	InsertOperator(vehicle_id=0, node=9, position=1)	vehicle_0: 0->12->9->7->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+4	nearest_neighbor_54a9	InsertOperator(vehicle_id=0, node=10, position=2)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+5	nearest_neighbor_54a9	InsertOperator(vehicle_id=1, node=14, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->14->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+6	nearest_neighbor_54a9	InsertOperator(vehicle_id=1, node=6, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->6->14->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+7	nearest_neighbor_54a9	InsertOperator(vehicle_id=1, node=4, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+8	nearest_neighbor_54a9	InsertOperator(vehicle_id=2, node=11, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->11->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+9	nearest_neighbor_54a9	InsertOperator(vehicle_id=2, node=2, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->2->11->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+10	nearest_neighbor_54a9	InsertOperator(vehicle_id=2, node=3, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->3->2->11->0\nvehicle_3: 0->0\nvehicle_4: 0->0\n
+11	nearest_neighbor_54a9	InsertOperator(vehicle_id=3, node=5, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->3->2->11->0\nvehicle_3: 0->5->0\nvehicle_4: 0->0\n
+12	nearest_neighbor_54a9	InsertOperator(vehicle_id=3, node=1, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->3->2->11->0\nvehicle_3: 0->1->5->0\nvehicle_4: 0->0\n
+13	nearest_neighbor_54a9	InsertOperator(vehicle_id=4, node=13, position=0)	vehicle_0: 0->12->9->10->7->8->0\nvehicle_1: 0->4->6->14->0\nvehicle_2: 0->3->2->11->0\nvehicle_3: 0->1->5->0\nvehicle_4: 0->13->0\n

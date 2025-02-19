@@ -1,0 +1,20 @@
+-data: output/tsp/data/train_data/case_2.tsp
+-current_solution:
+tour: 8->4->5->6->3->1->2->0->7->8
+-is_complete_solution: True
+-is_valid_solution: True
+-current_cost: 514.0
+-node_num: 9
+-visited_num: 9
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	cheapest_insertion_7a30	AppendOperator(node=1)	tour: 1->1
+1	cheapest_insertion_7a30	InsertOperator(node=3, position=0)	tour: 3->1->3
+2	cheapest_insertion_7a30	InsertOperator(node=6, position=0)	tour: 6->3->1->6
+3	cheapest_insertion_7a30	InsertOperator(node=0, position=3)	tour: 6->3->1->0->6
+4	cheapest_insertion_7a30	InsertOperator(node=2, position=4)	tour: 6->3->1->0->2->6
+5	cheapest_insertion_7a30	ReverseSegmentOperator(segments=[(3, 4)])	tour: 6->3->1->2->0->6
+6	cheapest_insertion_7a30	InsertOperator(node=7, position=5)	tour: 6->3->1->2->0->7->6
+7	cheapest_insertion_7a30	InsertOperator(node=5, position=0)	tour: 5->6->3->1->2->0->7->5
+8	cheapest_insertion_7a30	InsertOperator(node=4, position=0)	tour: 4->5->6->3->1->2->0->7->4
+9	cheapest_insertion_7a30	InsertOperator(node=8, position=0)	tour: 8->4->5->6->3->1->2->0->7->8

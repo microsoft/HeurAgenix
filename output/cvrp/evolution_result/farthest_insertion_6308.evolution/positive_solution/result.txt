@@ -1,0 +1,22 @@
+-data: output/cvrp/data/train_data/case_1.vrp
+-current_solution:
+vehicle_0: 0->1->7->6->3->2->4->8->0
+vehicle_1: 0->9->5->0
+vehicle_2: 0->0
+
+-is_complete_solution: True
+-is_valid_solution: True
+-total_current_cost: 443.0
+-node_num: 10
+-visited_num: 10
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	random_bfdc	AppendOperator(vehicle_id=0, node=4)	vehicle_0: 0->4->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+1	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=6, position=1)	vehicle_0: 0->6->4->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+2	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=8, position=3)	vehicle_0: 0->6->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+3	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=3, position=2)	vehicle_0: 0->6->3->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+4	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=2, position=3)	vehicle_0: 0->6->3->2->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+5	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=7, position=1)	vehicle_0: 0->7->6->3->2->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+6	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=1, position=1)	vehicle_0: 0->1->7->6->3->2->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+7	farthest_insertion_6308	InsertOperator(vehicle_id=1, node=5, position=0)	vehicle_0: 0->1->7->6->3->2->4->8->0\nvehicle_1: 0->5->0\nvehicle_2: 0->0\n
+8	farthest_insertion_6308	InsertOperator(vehicle_id=1, node=9, position=0)	vehicle_0: 0->1->7->6->3->2->4->8->0\nvehicle_1: 0->9->5->0\nvehicle_2: 0->0\n

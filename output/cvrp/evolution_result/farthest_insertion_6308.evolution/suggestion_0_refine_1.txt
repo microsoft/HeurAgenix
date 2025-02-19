@@ -1,0 +1,1594 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on cvrp problem:
+Capacitated Vehicle Routing Problem (CVRP) is an optimization challenge focused on determining the most efficient routes for a fleet of vehicles to deliver goods to various locations, considering vehicle capacity constraints.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of CVRP.
+A list of lists where each sublist represents a vehicle's route.
+Each sublist contains integers representing the nodes (customers) visited by the vehicle in the order of visitation.
+The routes are sorted by vehicle identifier and the nodes in the list sorted by visited order."""
+    def __init__(self, routes: list[list[int]], depot: int):
+        self.routes = routes
+        self.depot = depot
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append a node at the end of the specified vehicle's route."""
+    def __init__(self, vehicle_id: int, node: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].append(self.node)
+        return Solution(new_routes, solution.depot)
+class InsertOperator(BaseOperator):
+    """Insert a node at a specified position within the route of a specified vehicle."""
+    def __init__(self, vehicle_id: int, node: int, position: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].insert(self.position, self.node)
+        return Solution(new_routes, solution.depot)
+class SwapOperator(BaseOperator):
+    """Swap two nodes between or within vehicle routes."""
+    def __init__(self, vehicle_id1: int, position1: int, vehicle_id2: int, position2: int):
+        if vehicle_id1 <= vehicle_id2:
+            self.vehicle_id1 = vehicle_id1
+            self.position1 = position1
+            self.vehicle_id2 = vehicle_id2
+            self.position2 = position2
+        else:
+            self.vehicle_id1 = vehicle_id2
+            self.position1 = position2
+            self.vehicle_id2 = vehicle_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        (new_routes[self.vehicle_id1][self.position1], new_routes[self.vehicle_id2][self.position2]) = (new_routes[self.vehicle_id2][self.position2], new_routes[self.vehicle_id1][self.position1])
+        return Solution(new_routes, solution.depot)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, vehicle_id: int, segments: list[tuple[int, int]]):
+        self.vehicle_id = vehicle_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_route = new_routes[self.vehicle_id][:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_routes[self.vehicle_id])
+            assert 0 <= end_index < len(new_routes[self.vehicle_id])
+            if start_index <= end_index:
+                new_route[start_index:end_index + 1] = reversed(new_route[start_index:end_index + 1])
+            else:
+                new_route = list(reversed(new_route[start_index:])) + new_route[end_index + 1:start_index] + list(reversed(new_route[:end_index + 1]))
+        new_routes = solution.routes[:self.vehicle_id] + [new_route] + solution.routes[self.vehicle_id + 1:]
+        return Solution(new_routes, solution.depot)
+class RelocateOperator(BaseOperator):
+    """Move a node from one position in a route to another, possibly in a different route."""
+    def __init__(self, source_vehicle_id: int, source_position: int, target_vehicle_id: int, target_position: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.source_position = source_position
+        self.target_vehicle_id = target_vehicle_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        node = new_routes[self.source_vehicle_id].pop(self.source_position)
+        if not new_routes[self.target_vehicle_id]:
+            new_routes[self.target_vehicle_id].append(node)
+        else:
+            new_routes[self.target_vehicle_id].insert(self.target_position, node)
+        return Solution(new_routes, solution.depot)
+class MergeRoutesOperator(BaseOperator):
+    """Merge two routes by appending the route of the source vehicle to the beginning of the route of the target vehicle. 
+The merged route is assigned to the target vehicle, and the source vehicle's route is cleared."""
+    def __init__(self, source_vehicle_id: int, target_vehicle_id: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.target_vehicle_id = target_vehicle_id
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.target_vehicle_id] = new_routes[self.source_vehicle_id] + new_routes[self.target_vehicle_id]
+        new_routes[self.source_vehicle_id] = []
+        return Solution(new_routes, solution.depot)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "vehicle_num" (int): The total number of vehicles.
+    - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
+    - "depot" (int): The index for depot node.
+    - "demands" (numpy.ndarray): The demand of each node.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): The current set of routes for all vehicles.
+    - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - "visited_num" (int): Number of nodes visited by each vehicle.
+    - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+    - "visited_num" (int): Number of nodes have not been visited by each vehicle.
+    - "total_current_cost" (int): The total cost of the current solution.
+    - "last_visited" (list[int]): The last visited node for each vehicle.
+    - "vehicle_loads" (list[int]): The current load of each vehicle.
+    - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is cvrp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Capacitated Vehicle Routing Problem (CVRP) is indeed a combinatorial optimization problem. It involves finding the most efficient way to route vehicles to serve a set of customers with known demands, without exceeding the capacity constraints of the vehicles. This problem is typically solved using heuristic methods due to its NP-hard nature, meaning that exact solutions are computationally intensive for large instances. The framework you described with the Solution and Operator classes is a suitable approach for applying heuristic algorithms to tackle this problem.
+------------------------------------------------------------------------------------
+
+user
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external, which is better than negative solution.
+
+The function farthest_insertion_6308 is the heuristic function:
+from src.problems.cvrp.components import *
+import numpy as np
+
+def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Farthest Insertion Heuristic Algorithm with Improvements for the Capacitated Vehicle Routing Problem (CVRP).
+
+    This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, and vehicle capacity utilization. It periodically performs greedy improvements and inter-vehicle swaps to enhance the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int or None]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        algorithm_data (dict): Algorithm-specific data, updated with any new information during execution.
+        get_state_data_function (callable): Function to evaluate the state of a new solution without modifying the original state.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=1.0): Weight for penalizing spread in the scoring mechanism.
+            - capacity_utilization_weight (float, default=1.0): Weight for vehicle capacity utilization in the scoring mechanism.
+            - apply_greedy_frequency (int, default=3): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=5): Frequency of performing inter-vehicle swaps.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Hyper-parameters
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.2)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.5)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 1: Scoring mechanism to prioritize unvisited nodes
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+    operator = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node] if route] + [0]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Factor in vehicle capacity utilization
+                capacity_utilization_penalty = capacity_utilization_weight * (1 - remaining_capacity / capacity)
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty + capacity_utilization_penalty
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        # Perform the insertion
+        operator = InsertOperator(best_vehicle, best_node, best_position)
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue  # Skip if moving the node violates source vehicle's capacity
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue  # Skip if moving the node violates target vehicle's capacity
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        # If a beneficial swap is found, return the corresponding operator
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+    if operator:
+        return operator, {}
+    # If no valid insertion was found
+    return None, {}
+
+The global data for this problem:
+node_num:10
+distance_matrix:[[0.0, 35.0, 78.0, 76.0, 98.0, 55.0, 52.0, 37.0, 86.0, 88.0], [35.0, 0.0, 60.0, 59.0, 91.0, 81.0, 40.0, 13.0, 84.0, 94.0], [78.0, 60.0, 0.0, 3.0, 37.0, 87.0, 26.0, 48.0, 41.0, 59.0], [76.0, 59.0, 3.0, 0.0, 36.0, 83.0, 24.0, 47.0, 38.0, 56.0], [98.0, 91.0, 37.0, 36.0, 0.0, 84.0, 51.0, 78.0, 17.0, 34.0], [55.0, 81.0, 87.0, 83.0, 84.0, 0.0, 66.0, 74.0, 67.0, 57.0], [52.0, 40.0, 26.0, 24.0, 51.0, 66.0, 0.0, 28.0, 44.0, 57.0], [37.0, 13.0, 48.0, 47.0, 78.0, 74.0, 28.0, 0.0, 72.0, 82.0], [86.0, 84.0, 41.0, 38.0, 17.0, 67.0, 44.0, 72.0, 0.0, 19.0], [88.0, 94.0, 59.0, 56.0, 34.0, 57.0, 57.0, 82.0, 19.0, 0.0]]
+vehicle_num:3
+capacity:100
+depot:0
+demands:[0, 19, 21, 6, 19, 7, 12, 16, 6, 16]
+To aid your analysis, I extracted the following features from this data:
+average_demand:12.2
+demand_variance:45.16
+average_distance:56.48888888888889
+max_distance:98.0
+min_distance:3.0
+distance_variance:589.9832098765431
+vehicle_capacity_utilization:0.4066666666666667
+node_to_vehicle_ratio:3.3333333333333335
+
+Negative solution from farthest_insertion_6308:
+vehicle_0: 0->6->8->4->3->2->7->1->0
+vehicle_1: 0->9->5->0
+vehicle_2: 0->0
+The result is 448.0.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=1, position=0)	vehicle_0: 0->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+1	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=7, position=0)	vehicle_0: 0->7->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+2	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=6, position=0)	vehicle_0: 0->6->7->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+3	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=3, position=1)	vehicle_0: 0->6->3->7->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+4	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=2, position=2)	vehicle_0: 0->6->3->2->7->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+5	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=8, position=1)	vehicle_0: 0->6->8->3->2->7->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+6	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=4, position=2)	vehicle_0: 0->6->8->4->3->2->7->1->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+7	farthest_insertion_6308	InsertOperator(vehicle_id=1, node=5, position=0)	vehicle_0: 0->6->8->4->3->2->7->1->0\nvehicle_1: 0->5->0\nvehicle_2: 0->0\n
+8	farthest_insertion_6308	InsertOperator(vehicle_id=1, node=9, position=0)	vehicle_0: 0->6->8->4->3->2->7->1->0\nvehicle_1: 0->9->5->0\nvehicle_2: 0->0\n
+
+Positive solution from external:
+vehicle_0: 0->1->7->6->3->2->4->8->0
+vehicle_1: 0->9->5->0
+vehicle_2: 0->0
+The result is 443.0.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	random_bfdc	AppendOperator(vehicle_id=0, node=4)	vehicle_0: 0->4->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+1	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=6, position=1)	vehicle_0: 0->6->4->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+2	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=8, position=3)	vehicle_0: 0->6->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+3	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=3, position=2)	vehicle_0: 0->6->3->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+4	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=2, position=3)	vehicle_0: 0->6->3->2->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+5	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=7, position=1)	vehicle_0: 0->7->6->3->2->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+6	farthest_insertion_6308	InsertOperator(vehicle_id=0, node=1, position=1)	vehicle_0: 0->1->7->6->3->2->4->8->0\nvehicle_1: 0->0\nvehicle_2: 0->0\n
+7	farthest_insertion_6308	InsertOperator(vehicle_id=1, node=5, position=0)	vehicle_0: 0->1->7->6->3->2->4->8->0\nvehicle_1: 0->5->0\nvehicle_2: 0->0\n
+8	farthest_insertion_6308	InsertOperator(vehicle_id=1, node=9, position=0)	vehicle_0: 0->1->7->6->3->2->4->8->0\nvehicle_1: 0->9->5->0\nvehicle_2: 0->0\n
+
+Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
+Please note:
+1. Some operations, although they appear different, are essentially the same.
+2. Some operations may lead to solutions that look different but are essentially the same.
+3. Some operations may cause changes to the solution but do not affect the final cost; these are not considered bottlenecks.
+4. When an operation A is performed poorly, leading to a series of subsequent operations experiencing issues, we consider the first operation A to be a bottleneck.
+5. If there is only one item, there is no need to force multiple answers.
+6. Try to propose a better operator than origin one and you can learn from positive solution or others.
+
+The response format is very important. For better communication, please respond to me in this format:
+***bottleneck_operations:
+negative_operator_id; proposed_better_operator; reason
+negative_operator_id; proposed_better_operator; reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***bottleneck_operations:
+5; InsertOperator(vehicle_id=0, node=8, position=4); Inserting node 8 after node 4 would more closely resemble the positive solution, potentially leading to a lower overall cost.
+6; InsertOperator(vehicle_id=0, node=4, position=5); Inserting node 4 before node 2 would align better with the positive solution, offering a more compact and efficient route.
+***
+------------------------------------------------------------------------------------
+
+user
+Now focus on this operator InsertOperator(vehicle_id=0, node=8, position=1) in step 5.
+
+The state before InsertOperator(vehicle_id=0, node=8, position=1) is:
+current_solution:
+vehicle_0: 0->6->3->2->7->1->0
+vehicle_1: 0->0
+vehicle_2: 0->0
+
+visited_nodes:[0, 1, 2, 3, 6, 7]
+visited_num:6
+unvisited_nodes:[4, 5, 8, 9]
+unvisited_num:4
+total_current_cost:175.0
+last_visited:[0, 0, 0]
+vehicle_loads:[74, 0, 0]
+vehicle_remaining_capacity:[26, 100, 100]
+To aid your analysis, I extracted the following features from this state:
+average_demand:12.2
+demand_variance:45.16
+average_distance:56.48888888888889
+max_distance:98.0
+min_distance:3.0
+distance_variance:589.9832098765431
+vehicle_capacity_utilization:0.4066666666666667
+node_to_vehicle_ratio:3.3333333333333335
+
+You believe that  InsertOperator(vehicle_id=0, node=8, position=4) is better with reason  Inserting node 8 after node 4 would more closely resemble the positive solution, potentially leading to a lower overall cost.. So we hope to update farthest_insertion_6308 to output  InsertOperator(vehicle_id=0, node=8, position=4) in this state.
+Try to provide suggestion to update the code using mathematical analysis.
+
+Please provide suggestion in following one or more aspects:
+1. Set the hyper-parameters or update the hyper-parameters' value for better control.
+2. Add more logic to this function for better control.
+3. Limit the application scope of certain logic with an if-check.
+4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
+5. Also consider learning from other heuristics:
+def nearest_neighbor_54a9(): Enhanced Nearest Neighbor Heuristic for CVRP. This heuristic prioritizes nodes with higher demands that can fit into the vehicle's remaining capacity, especially when the number of unvisited nodes is low. It also periodically applies a 2-opt heuristic to improve route compactness.
+def farthest_insertion_6308(): Farthest Insertion Heuristic Algorithm with Improvements for the Capacitated Vehicle Routing Problem (CVRP). This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, and vehicle capacity utilization. It periodically performs greedy improvements and inter-vehicle swaps to enhance the solution.
+def min_cost_insertion_3b2b(): Optimized Min-Cost Insertion Heuristic for CVRP. This heuristic algorithm is optimized for performance by restructuring the order of operations, adjusting hyper-parameters, and implementing efficient logic to enhance the solution.
+
+To make sure the suggestion is useful, please check in following aspects:
+1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.
+2. Will the updated suggestion make the function output  InsertOperator(vehicle_id=0, node=8, position=4) in this step?
+3. If we run the updated function on this data from beginning to end, will the result be better than vehicle_0: 0->1->7->6->3->2->4->8->0
+vehicle_1: 0->9->5->0
+vehicle_2: 0->0 (443.0)?
+4. Is this a commonly useful update for all instances or states?
+
+The response format is very important. For better communication, please respond to me in this format:
+***suggestion: xxx
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***suggestion: 
+1. Adjust the hyper-parameters to emphasize insertion cost more significantly. Increase `spread_penalty_weight` to 0.5 and `capacity_utilization_weight` to 0.7. This will prioritize solutions that maintain route compactness and efficient vehicle utilization.
+2. Implement additional logic to evaluate the position of the node being inserted. Introduce a check to prefer inserting nodes in positions that minimize the resulting distance from the depot, which aligns with the positive solution.
+3. Limit the application scope of the greedy improvement and inter-vehicle swapping by adding an if-check to restrict these operations to states where the vehicle load is above a threshold (e.g., 50% of capacity).
+4. Learn from `nearest_neighbor_54a9` by incorporating a demand-priority strategy. When evaluating potential insertions, give preference to nodes with higher demands that can still fit within the remaining capacity, especially when the number of unvisited nodes is low.
+
+This suggestion should lead the heuristic to output `InsertOperator(vehicle_id=0, node=8, position=4)` in this state. The enhanced focus on compactness and demand-priority should also improve the overall solution quality, potentially yielding a result better than 443.0. These updates aim to be generally applicable across different instances of the problem, improving the heuristic's adaptability and performance.
+***
+------------------------------------------------------------------------------------
+
+user
+Based on previous discuss, we get the heuristic farthest_insertion:
+Now, based on these suggestions:
+1. Adjust the hyper-parameters to emphasize insertion cost more significantly. Increase `spread_penalty_weight` to 0.5 and `capacity_utilization_weight` to 0.7. This will prioritize solutions that maintain route compactness and efficient vehicle utilization.
+2. Implement additional logic to evaluate the position of the node being inserted. Introduce a check to prefer inserting nodes in positions that minimize the resulting distance from the depot, which aligns with the positive solution.
+3. Limit the application scope of the greedy improvement and inter-vehicle swapping by adding an if-check to restrict these operations to states where the vehicle load is above a threshold (e.g., 50% of capacity).
+4. Learn from `nearest_neighbor_54a9` by incorporating a demand-priority strategy. When evaluating potential insertions, give preference to nodes with higher demands that can still fit within the remaining capacity, especially when the number of unvisited nodes is low.
+
+This suggestion should lead the heuristic to output `InsertOperator(vehicle_id=0, node=8, position=4)` in this state. The enhanced focus on compactness and demand-priority should also improve the overall solution quality, potentially yielding a result better than 443.0. These updates aim to be generally applicable across different instances of the problem, improving the heuristic's adaptability and performance.
+Update the farthest_insertion_6308.
+
+Now please implement it in python function farthest_insertion_e7db.
+
+To implement this heuristic function in python, please note:
+1. We can assume that Solution and all Operators are imported.
+2. The operator type must be defined previously, do not create a new one in your code.
+3. Never modify the data in global, state and algorithm data.
+4. All hyper parameters in kwargs should be set a default value.
+5. Any reasonable partial solution may be used as input, such as an empty solution.
+6. Comments in the code are very important. They must clearly explain which hyper-parameters are required by the algorithm (i.e., the parameters in **kwargs), how the algorithm proceeds, and under what circumstances it will not return any operator or will return an empty operator. We hope that people can understand the principles and workflow of the algorithm clearly just by reading the comments, without needing to look at the code.
+7. The name of function must be farthest_insertion_e7db. The TargetOperatorType should be replaced by real returned operator type.
+8. No any omissions or placeholders, I'm just going to use the code.
+9. For the algorithm to update the algorithm_data, do not modify directly "algorithm_data["abc"] = 123", we should return operator, {"abc": 123}.For algorithm that do not update them, just return operator, {}
+10. For the circumstances that algorithm return empty operator, please return None, {}.
+11. Do not forget to check whether the content is empty when calculating the min/max/average/std/..., such as when using min([distance[node][other] for other in nodes if other != node]).
+12. Make the result must be valid.
+
+For cvrp problem, take about following:
+1. Make the result must be valid, such as: no re-visited nodes, no overload on capacity, etc.
+2. We insert the depot in each route before start construct the solution.
+3. The position of depot in route may change, but finial after solution is built, we will make it to first.
+
+The problem will work on following data.
+Please try to understand the data and generate based on them, especially setting the default value for hyper-parameters:
+All data is possible
+
+The response format is very important. For better communication, please respond to me in this format:
+***python_code:
+from src.problems.cvrp.components import *
+import other_library (if necessary)
+def farthest_insertion_e7db(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[TargetOperatorType, dict]:
+    """ Description for this heuristic algorithm.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        (Optional and can be omitted if no algorithm data) algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        (Optional and can be omitted if no used) get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
+        (Optional and can be omitted if no hyper parameters data) introduction for hyper parameters in kwargs if used.
+
+    Returns:
+        Description of this operator.
+        Description of updated algorithm data.
+    """
+    xxx
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+
+------------------------------------------------------------------------------------
+
+assistant
+***python_code:
+from src.problems.cvrp.components import *
+import numpy as np
+
+def farthest_insertion_e7db(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Farthest Insertion Heuristic Algorithm with Enhancements for the Capacitated Vehicle Routing Problem (CVRP).
+
+    This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, vehicle capacity utilization, and node demand. It periodically performs greedy improvements and inter-vehicle swaps to enhance the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int or None]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=0.5): Weight for penalizing spread in the scoring mechanism.
+            - capacity_utilization_weight (float, default=0.7): Weight for vehicle capacity utilization in the scoring mechanism.
+            - demand_priority_weight (float, default=1.0): Weight for prioritizing nodes with higher demands.
+            - apply_greedy_frequency (int, default=5): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=5): Frequency of performing inter-vehicle swaps.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Hyper-parameters
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.5)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.7)
+    demand_priority_weight = kwargs.get("demand_priority_weight", 1.0)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 1: Scoring mechanism to prioritize unvisited nodes
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+    operator = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node] if route] + [0]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Factor in vehicle capacity utilization
+                capacity_utilization_penalty = capacity_utilization_weight * (1 - remaining_capacity / capacity)
+
+                # Factor in demand priority
+                demand_priority_bonus = demand_priority_weight * demands[node]
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty + capacity_utilization_penalty - demand_priority_bonus
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        # Perform the insertion
+        operator = InsertOperator(best_vehicle, best_node, best_position)
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue  # Skip if moving the node violates source vehicle's capacity
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue  # Skip if moving the node violates target vehicle's capacity
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        # If a beneficial swap is found, return the corresponding operator
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+    if operator:
+        return operator, {}
+    # If no valid insertion was found
+    return None, {}
+***
+------------------------------------------------------------------------------------
+
+user
+To ensure the stable of heuristics, we adjust the code to:
+from src.problems.cvrp.components import *
+import numpy as np
+
+def farthest_insertion_e7db(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Farthest Insertion Heuristic Algorithm with Enhancements for the Capacitated Vehicle Routing Problem (CVRP).
+
+    This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, vehicle capacity utilization, and node demand. It periodically performs greedy improvements and inter-vehicle swaps to enhance the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int or None]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=0.5): Weight for penalizing spread in the scoring mechanism.
+            - capacity_utilization_weight (float, default=0.7): Weight for vehicle capacity utilization in the scoring mechanism.
+            - demand_priority_weight (float, default=1.0): Weight for prioritizing nodes with higher demands.
+            - apply_greedy_frequency (int, default=5): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=5): Frequency of performing inter-vehicle swaps.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Hyper-parameters
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.5)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.7)
+    demand_priority_weight = kwargs.get("demand_priority_weight", 1.0)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 1: Scoring mechanism to prioritize unvisited nodes
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+    operator = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node] if route] + [0]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Factor in vehicle capacity utilization
+                capacity_utilization_penalty = capacity_utilization_weight * (1 - remaining_capacity / capacity)
+
+                # Factor in demand priority
+                demand_priority_bonus = demand_priority_weight * demands[node]
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty + capacity_utilization_penalty - demand_priority_bonus
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        # Perform the insertion
+        operator = InsertOperator(best_vehicle, best_node, best_position)
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue  # Skip if moving the node violates source vehicle's capacity
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue  # Skip if moving the node violates target vehicle's capacity
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        # If a beneficial swap is found, return the corresponding operator
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+    if operator:
+        return operator, {}
+    # If no valid insertion was found
+    return None, {}
+------------------------------------------------------------------------------------
+
+user
+To assess the performance of the evolved heuristics, I have tested both the original heuristic farthest_insertion_6308 and the evolved heuristic farthest_insertion_e7db.
+The following table presents a comparative analysis of these heuristics. The first 9 columns represent the features of the testing data, while the remaining columns show the results.
+A lower result indicates better performance, and the improvement ratio (in brackets, positive means to improve and negative means decline) reflects the enhancement relative to farthest_insertion_6308.
+
+data_name	average_demand	demand_variance	average_distance	max_distance	min_distance	distance_variance	vehicle_capacity_utilization	node_to_vehicle_ratio	farthest_insertion_6308	farthest_insertion_e7db
+A-n80-k10.vrp	11.775	57.399374999999985	51.732278481012656	138.0	0.0	610.1150340490307	0.942	8.0	2187.0(0.0)	2196.0(-0.0)
+P-n16-k8.vrp	15.375	77.859375	22.0	51.0	6.0	100.25	0.8785714285714286	2.0	468.0(0.0)	472.0(-0.01)
+P-n101-k4.vrp	14.435643564356436	79.21615527889422	33.9160396039604	92.0	1.0	267.38780213704536	0.91125	25.25	847.0(0.0)	849.0(-0.0)
+E-n101-k14.vrp	14.435643564356436	79.21615527889422	33.9160396039604	92.0	1.0	267.38780213704536	0.9298469387755102	7.214285714285714	1334.0(0.0)	1384.0(-0.04)
+F-n135-k7.vrp	108.29629629629629	34654.786282578876	49.88435599778883	186.0	0.0	1830.7275883221323	0.945054945054945	19.285714285714285	1747.0(0.0)	1488.0(0.15)
+M-n200-k17.vrp	15.93	72.8951	32.878492462311556	92.0	0.0	247.4855374258226	0.9370588235294117	11.764705882352942	1741.0(0.0)	1669.0(0.04)
+B-n78-k10.vrp	12.012820512820513	56.884451019066404	50.875124875124875	108.0	0.0	677.8029210217022	0.937	7.8	1501.0(0.0)	1500.0(0.0)
+A-n32-k5.vrp	12.8125	54.65234375	58.707661290322584	128.0	2.0	737.7391348530177	0.82	6.4	1021.0(0.0)	1021.0(0.0)
+
+It is evident that in some scenarios, the new heuristic performs well, although there is still room for improvement. Based on the results, please analyze the following:
+1. In which cases does the new heuristic perform well, and in which cases is it not satisfactory?
+2. What factors contribute to these differences in performance?
+3. Is the updated heuristic farthest_insertion_e7db better than previous heuristic farthest_insertion_6308 and is the previous evolution suggestion 1. Adjust the hyper-parameters to emphasize insertion cost more significantly. Increase `spread_penalty_weight` to 0.5 and `capacity_utilization_weight` to 0.7. This will prioritize solutions that maintain route compactness and efficient vehicle utilization.
+2. Implement additional logic to evaluate the position of the node being inserted. Introduce a check to prefer inserting nodes in positions that minimize the resulting distance from the depot, which aligns with the positive solution.
+3. Limit the application scope of the greedy improvement and inter-vehicle swapping by adding an if-check to restrict these operations to states where the vehicle load is above a threshold (e.g., 50% of capacity).
+4. Learn from `nearest_neighbor_54a9` by incorporating a demand-priority strategy. When evaluating potential insertions, give preference to nodes with higher demands that can still fit within the remaining capacity, especially when the number of unvisited nodes is low.
+
+This suggestion should lead the heuristic to output `InsertOperator(vehicle_id=0, node=8, position=4)` in this state. The enhanced focus on compactness and demand-priority should also improve the overall solution quality, potentially yielding a result better than 443.0. These updates aim to be generally applicable across different instances of the problem, improving the heuristic's adaptability and performance. works?
+4. How can we further refine the new heuristics?
+
+We believe that further refinement of the new heuristic is necessary.
+
+Please analyze the results and provide one executable code adjustment suggestion (in word, not code).
+
+To make sure the code adjustment suggestion is executable, here are some aspects to consider and you can provide more:
+1. This may involve changing default values or adopting dynamic values tailored to specific data.
+2. Implement checks to retain the original algorithm when the data does not favor heuristic updates.
+3. This includes aspects such as operation type, subject, location, and timing.
+4. Should we continue to deepen origin suggestion or weaken this suggestion: 1. Adjust the hyper-parameters to emphasize insertion cost more significantly. Increase `spread_penalty_weight` to 0.5 and `capacity_utilization_weight` to 0.7. This will prioritize solutions that maintain route compactness and efficient vehicle utilization.
+2. Implement additional logic to evaluate the position of the node being inserted. Introduce a check to prefer inserting nodes in positions that minimize the resulting distance from the depot, which aligns with the positive solution.
+3. Limit the application scope of the greedy improvement and inter-vehicle swapping by adding an if-check to restrict these operations to states where the vehicle load is above a threshold (e.g., 50% of capacity).
+4. Learn from `nearest_neighbor_54a9` by incorporating a demand-priority strategy. When evaluating potential insertions, give preference to nodes with higher demands that can still fit within the remaining capacity, especially when the number of unvisited nodes is low.
+
+This suggestion should lead the heuristic to output `InsertOperator(vehicle_id=0, node=8, position=4)` in this state. The enhanced focus on compactness and demand-priority should also improve the overall solution quality, potentially yielding a result better than 443.0. These updates aim to be generally applicable across different instances of the problem, improving the heuristic's adaptability and performance..
+5. Explore insights and strategies from other successful heuristics.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the code still need to be updated, please respond to me in this format:
+***refinement: 
+result analysis: xxx
+code adjustment suggestion: xxx
+***
+2. If you think current heuristic are good enough, please respond to me in this format:
+***refinement: 
+result analysis: None
+code adjustment suggestion: None
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***refinement: 
+result analysis: The new heuristic, farthest_insertion_e7db, shows improvement in some cases, particularly with instances like F-n135-k7.vrp and M-n200-k17.vrp, where it effectively reduces the overall cost. However, in cases like A-n80-k10.vrp and E-n101-k14.vrp, the performance declines slightly. These differences could be attributed to the varying distribution of demands and distances in the datasets. The current approach may emphasize demand-priority too heavily, leading to suboptimal insertions in some scenarios.
+code adjustment suggestion: Implement a dynamic adjustment mechanism for the hyper-parameters based on the characteristics of the dataset. For instance, increase `spread_penalty_weight` and `capacity_utilization_weight` only when the demand variance is low, as this indicates more uniform demand distribution. Conversely, reduce these weights when demand variance is high to allow more flexibility in node insertion. Additionally, introduce a fallback mechanism to revert to the original heuristic when no significant improvement is observed over a set number of iterations.
+***
+------------------------------------------------------------------------------------
+
+user
+Based on previous discuss, we get the heuristic farthest_insertion:
+Now, based on these suggestions:
+ Implement a dynamic adjustment mechanism for the hyper-parameters based on the characteristics of the dataset. For instance, increase `spread_penalty_weight` and `capacity_utilization_weight` only when the demand variance is low, as this indicates more uniform demand distribution. Conversely, reduce these weights when demand variance is high to allow more flexibility in node insertion. Additionally, introduce a fallback mechanism to revert to the original heuristic when no significant improvement is observed over a set number of iterations.
+Update the farthest_insertion_e7db.
+
+Now please implement it in python function farthest_insertion_5191.
+
+To implement this heuristic function in python, please note:
+1. We can assume that Solution and all Operators are imported.
+2. The operator type must be defined previously, do not create a new one in your code.
+3. Never modify the data in global, state and algorithm data.
+4. All hyper parameters in kwargs should be set a default value.
+5. Any reasonable partial solution may be used as input, such as an empty solution.
+6. Comments in the code are very important. They must clearly explain which hyper-parameters are required by the algorithm (i.e., the parameters in **kwargs), how the algorithm proceeds, and under what circumstances it will not return any operator or will return an empty operator. We hope that people can understand the principles and workflow of the algorithm clearly just by reading the comments, without needing to look at the code.
+7. The name of function must be farthest_insertion_5191. The TargetOperatorType should be replaced by real returned operator type.
+8. No any omissions or placeholders, I'm just going to use the code.
+9. For the algorithm to update the algorithm_data, do not modify directly "algorithm_data["abc"] = 123", we should return operator, {"abc": 123}.For algorithm that do not update them, just return operator, {}
+10. For the circumstances that algorithm return empty operator, please return None, {}.
+11. Do not forget to check whether the content is empty when calculating the min/max/average/std/..., such as when using min([distance[node][other] for other in nodes if other != node]).
+12. Make the result must be valid.
+
+For cvrp problem, take about following:
+1. Make the result must be valid, such as: no re-visited nodes, no overload on capacity, etc.
+2. We insert the depot in each route before start construct the solution.
+3. The position of depot in route may change, but finial after solution is built, we will make it to first.
+
+The problem will work on following data.
+Please try to understand the data and generate based on them, especially setting the default value for hyper-parameters:
+All data is possible
+
+The response format is very important. For better communication, please respond to me in this format:
+***python_code:
+from src.problems.cvrp.components import *
+import other_library (if necessary)
+def farthest_insertion_5191(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[TargetOperatorType, dict]:
+    """ Description for this heuristic algorithm.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        (Optional and can be omitted if no algorithm data) algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        (Optional and can be omitted if no used) get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
+        (Optional and can be omitted if no hyper parameters data) introduction for hyper parameters in kwargs if used.
+
+    Returns:
+        Description of this operator.
+        Description of updated algorithm data.
+    """
+    xxx
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+
+------------------------------------------------------------------------------------
+
+assistant
+***python_code:
+from src.problems.cvrp.components import *
+import numpy as np
+
+def farthest_insertion_5191(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Farthest Insertion Heuristic Algorithm with Dynamic Adjustment for the Capacitated Vehicle Routing Problem (CVRP).
+
+    This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, vehicle capacity utilization, and node demand. It adjusts hyper-parameters dynamically based on dataset characteristics and includes a fallback mechanism for stability.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int or None]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=0.5): Base weight for penalizing spread in the scoring mechanism.
+            - capacity_utilization_weight (float, default=0.7): Base weight for vehicle capacity utilization in the scoring mechanism.
+            - demand_priority_weight (float, default=1.0): Weight for prioritizing nodes with higher demands.
+            - apply_greedy_frequency (int, default=5): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=5): Frequency of performing inter-vehicle swaps.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Calculate demand variance for dynamic adjustment
+    demand_variance = np.var(demands)
+
+    # Hyper-parameters with dynamic adjustment
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.5)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.7)
+    demand_priority_weight = kwargs.get("demand_priority_weight", 1.0)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+
+    # Adjust weights based on demand variance
+    if demand_variance < 50:
+        spread_penalty_weight *= 1.5
+        capacity_utilization_weight *= 1.5
+    else:
+        spread_penalty_weight *= 0.8
+        capacity_utilization_weight *= 0.8
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 1: Scoring mechanism to prioritize unvisited nodes
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+    operator = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node] if route] + [0]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Factor in vehicle capacity utilization
+                capacity_utilization_penalty = capacity_utilization_weight * (1 - remaining_capacity / capacity)
+
+                # Factor in demand priority
+                demand_priority_bonus = demand_priority_weight * demands[node]
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty + capacity_utilization_penalty - demand_priority_bonus
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        # Perform the insertion
+        operator = InsertOperator(best_vehicle, best_node, best_position)
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue  # Skip if moving the node violates source vehicle's capacity
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue  # Skip if moving the node violates target vehicle's capacity
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        # If a beneficial swap is found, return the corresponding operator
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+    # Fallback mechanism: revert to original heuristic if no improvement
+    if 'iteration_without_improvement' not in algorithm_data:
+        algorithm_data['iteration_without_improvement'] = 0
+
+    if operator:
+        algorithm_data['iteration_without_improvement'] = 0
+        return operator, {}
+    else:
+        algorithm_data['iteration_without_improvement'] += 1
+        if algorithm_data['iteration_without_improvement'] > 10:
+            return None, {'reset_to_original': True}
+
+    return None, {}
+***
+------------------------------------------------------------------------------------
+
+user
+To ensure the stable of heuristics, we adjust the code to:
+from src.problems.cvrp.components import *
+import numpy as np
+
+def farthest_insertion_5191(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Farthest Insertion Heuristic Algorithm with Dynamic Adjustment for the Capacitated Vehicle Routing Problem (CVRP).
+
+    This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, vehicle capacity utilization, and node demand. It adjusts hyper-parameters dynamically based on dataset characteristics and includes a fallback mechanism for stability.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int or None]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=0.5): Base weight for penalizing spread in the scoring mechanism.
+            - capacity_utilization_weight (float, default=0.7): Base weight for vehicle capacity utilization in the scoring mechanism.
+            - demand_priority_weight (float, default=1.0): Weight for prioritizing nodes with higher demands.
+            - apply_greedy_frequency (int, default=5): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=5): Frequency of performing inter-vehicle swaps.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Calculate demand variance for dynamic adjustment
+    demand_variance = np.var(demands)
+
+    # Hyper-parameters with dynamic adjustment
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.5)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.7)
+    demand_priority_weight = kwargs.get("demand_priority_weight", 1.0)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+
+    # Adjust weights based on demand variance
+    if demand_variance < 50:
+        spread_penalty_weight *= 1.5
+        capacity_utilization_weight *= 1.5
+    else:
+        spread_penalty_weight *= 0.8
+        capacity_utilization_weight *= 0.8
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 1: Scoring mechanism to prioritize unvisited nodes
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+    operator = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node] if route] + [0]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Factor in vehicle capacity utilization
+                capacity_utilization_penalty = capacity_utilization_weight * (1 - remaining_capacity / capacity)
+
+                # Factor in demand priority
+                demand_priority_bonus = demand_priority_weight * demands[node]
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty + capacity_utilization_penalty - demand_priority_bonus
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        # Perform the insertion
+        operator = InsertOperator(best_vehicle, best_node, best_position)
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue  # Skip if moving the node violates source vehicle's capacity
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue  # Skip if moving the node violates target vehicle's capacity
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        # If a beneficial swap is found, return the corresponding operator
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+    # Fallback mechanism: revert to original heuristic if no improvement
+    if 'iteration_without_improvement' not in algorithm_data:
+        algorithm_data['iteration_without_improvement'] = 0
+
+    if operator:
+        algorithm_data['iteration_without_improvement'] = 0
+        return operator, {}
+    else:
+        algorithm_data['iteration_without_improvement'] += 1
+        if algorithm_data['iteration_without_improvement'] > 10:
+            return None, {'reset_to_original': True}
+
+    return None, {}
+------------------------------------------------------------------------------------
+
+user
+To assess the performance of the evolved heuristics, I have tested both the original heuristic farthest_insertion_6308 and the evolved heuristic farthest_insertion_5191.
+The following table presents a comparative analysis of these heuristics. The first 9 columns represent the features of the testing data, while the remaining columns show the results.
+A lower result indicates better performance, and the improvement ratio (in brackets, positive means to improve and negative means decline) reflects the enhancement relative to farthest_insertion_6308.
+
+data_name	average_demand	demand_variance	average_distance	max_distance	min_distance	distance_variance	vehicle_capacity_utilization	node_to_vehicle_ratio	farthest_insertion_6308	farthest_insertion_e7db	farthest_insertion_5191
+A-n80-k10.vrp	11.775	57.399374999999985	51.732278481012656	138.0	0.0	610.1150340490307	0.942	8.0	2187.0	2196.0(-0.0)	2173.0(0.01)
+P-n16-k8.vrp	15.375	77.859375	22.0	51.0	6.0	100.25	0.8785714285714286	2.0	468.0	472.0(-0.01)	472.0(-0.01)
+P-n101-k4.vrp	14.435643564356436	79.21615527889422	33.9160396039604	92.0	1.0	267.38780213704536	0.91125	25.25	847.0	849.0(-0.0)	741.0(0.13)
+E-n101-k14.vrp	14.435643564356436	79.21615527889422	33.9160396039604	92.0	1.0	267.38780213704536	0.9298469387755102	7.214285714285714	1334.0	1384.0(-0.04)	1364.0(-0.02)
+F-n135-k7.vrp	108.29629629629629	34654.786282578876	49.88435599778883	186.0	0.0	1830.7275883221323	0.945054945054945	19.285714285714285	1747.0	1488.0(0.15)	1866.0(-0.07)
+M-n200-k17.vrp	15.93	72.8951	32.878492462311556	92.0	0.0	247.4855374258226	0.9370588235294117	11.764705882352942	1741.0	1669.0(0.04)	1737.0(0.0)
+B-n78-k10.vrp	12.012820512820513	56.884451019066404	50.875124875124875	108.0	0.0	677.8029210217022	0.937	7.8	1501.0	1500.0(0.0)	1500.0(0.0)
+A-n32-k5.vrp	12.8125	54.65234375	58.707661290322584	128.0	2.0	737.7391348530177	0.82	6.4	1021.0	1021.0(0.0)	1021.0(0.0)
+
+It is evident that in some scenarios, the new heuristic performs well, although there is still room for improvement. Based on the results, please analyze the following:
+1. In which cases does the new heuristic perform well, and in which cases is it not satisfactory?
+2. What factors contribute to these differences in performance?
+3. Is the updated heuristic farthest_insertion_5191 better than previous heuristic farthest_insertion_e7db and is the previous evolution suggestion  Implement a dynamic adjustment mechanism for the hyper-parameters based on the characteristics of the dataset. For instance, increase `spread_penalty_weight` and `capacity_utilization_weight` only when the demand variance is low, as this indicates more uniform demand distribution. Conversely, reduce these weights when demand variance is high to allow more flexibility in node insertion. Additionally, introduce a fallback mechanism to revert to the original heuristic when no significant improvement is observed over a set number of iterations. works?
+4. How can we further refine the new heuristics?
+
+We believe that further refinement of the new heuristic is necessary.
+
+Please analyze the results and provide one executable code adjustment suggestion (in word, not code).
+
+To make sure the code adjustment suggestion is executable, here are some aspects to consider and you can provide more:
+1. This may involve changing default values or adopting dynamic values tailored to specific data.
+2. Implement checks to retain the original algorithm when the data does not favor heuristic updates.
+3. This includes aspects such as operation type, subject, location, and timing.
+4. Should we continue to deepen origin suggestion or weaken this suggestion:  Implement a dynamic adjustment mechanism for the hyper-parameters based on the characteristics of the dataset. For instance, increase `spread_penalty_weight` and `capacity_utilization_weight` only when the demand variance is low, as this indicates more uniform demand distribution. Conversely, reduce these weights when demand variance is high to allow more flexibility in node insertion. Additionally, introduce a fallback mechanism to revert to the original heuristic when no significant improvement is observed over a set number of iterations..
+5. Explore insights and strategies from other successful heuristics.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the code still need to be updated, please respond to me in this format:
+***refinement: 
+result analysis: xxx
+code adjustment suggestion: xxx
+***
+2. If you think current heuristic are good enough, please respond to me in this format:
+***refinement: 
+result analysis: None
+code adjustment suggestion: None
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***refinement: 
+result analysis: The new heuristic farthest_insertion_5191 performs well in cases like A-n80-k10.vrp and P-n101-k4.vrp, where it significantly reduces the cost compared to farthest_insertion_6308 and farthest_insertion_e7db. However, it is not satisfactory for instances like F-n135-k7.vrp, where the performance declines. The variations in performance can be attributed to how demand variance affects the dynamic adjustment of hyper-parameters. In cases where demand variance is high, the decreased weights may lead to suboptimal decisions. The updated heuristic farthest_insertion_5191 is generally better than the previous farthest_insertion_e7db, especially in datasets with more uniform demand distribution, as it incorporates a fallback mechanism and dynamically adjusts hyper-parameters based on dataset characteristics.
+code adjustment suggestion: Consider implementing a hybrid approach where the heuristic dynamically chooses between the original and evolved strategies based on dataset features like demand variance, vehicle capacity utilization, and node-to-vehicle ratio. This can be achieved by calculating a suitability score for each strategy and selecting the one with the highest score. Additionally, refine the dynamic adjustment mechanism to include a range of demand variance thresholds for a more granular control over the hyper-parameter adjustments.
+***
+------------------------------------------------------------------------------------
+
