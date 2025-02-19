@@ -96,12 +96,12 @@ class HeuristicSelectionDataCollector:
             output_file = open(output_file_path, "w")
             record_str = "\n".join([f"{record[0]}\t{record[1]}" for record in records])
             output_file.write(f"selected_previous_heuristics\toperators\n{record_str}")
-            output_file.write("---------------\n")
+            output_file.write("\n---------------\n")
             output_file.write(f"current_solution: \n{env.current_solution}\n")
             output_file.write(f"is_complete_solution\t{env.is_complete_solution}\n")
             if env.is_complete_solution:
-                output_file.write(f"key_value\t{env.key_value}\n")
-            output_file.write("---------------\n")
+                output_file.write(f"key_value\t{env.key_value}")
+            output_file.write("\n---------------\n")
             
             # Evaluate the performance of each heuristics
             total_results = compare_heuristics(
@@ -136,6 +136,7 @@ class HeuristicSelectionDataCollector:
             output_file.write("\n".join(["\t".join([item for item in performance]) for performance in performances]))
             output_file.write("\n---------------\n")
             output_file.write(f"selected_heuristics\t{best_heuristic_name}\n")
-            output_file.write(f"next_operator\t{best_operator}\n")
+            output_file.write(f"next_operator\t{best_operator}")
+            output_file.write("\n---------------\n")
             output_file.close()
         env.dump_result(True, "finished.txt")

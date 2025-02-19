@@ -56,7 +56,7 @@ def evaluate_heuristic(
         result = future.result()
         if result:
             results.append(result)
-    return results, after_step_env_serialized, operators
+    return heuristic_name, results, after_step_env_serialized, operators
 
 def compare_heuristics(
         env: BaseEnv,
@@ -87,7 +87,7 @@ def compare_heuristics(
             ))
 
     total_results = []
-    for heuristic_index, future in enumerate(concurrent.futures.as_completed(futures)):
-        results, after_step_env_serialized, operators = future.result()
-        total_results.append([candidate_heuristics[heuristic_index], results, dill.loads(after_step_env_serialized), operators])
+    for future in concurrent.futures.as_completed(futures):
+        heuristic_name, results, after_step_env_serialized, operators = future.result()
+        total_results.append([heuristic_name, results, dill.loads(after_step_env_serialized), operators])
     return total_results
