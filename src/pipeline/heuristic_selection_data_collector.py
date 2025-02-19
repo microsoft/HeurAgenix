@@ -89,7 +89,8 @@ class HeuristicSelectionDataCollector:
         manager = multiprocessing.Manager()
         best_result_proxy = manager.Value('d', float('-inf'))
         records = []
-        for round_index in range(max_steps):
+        round_index = 0
+        while env.continue_run and round_index <= max_steps:
             output_file_path = os.path.join(self.output_dir, f"round_{round_index}.txt")
             print(f"Search round {round_index} in {output_file_path}")
             # Dump necessary previous information
@@ -123,7 +124,6 @@ class HeuristicSelectionDataCollector:
             for heuristic, results, after_step_env, operators in total_results:
                 score = None if len(results) <= 0 else self.score_calculation(results)
                 results = sorted(results) if env.compare(1, 2) > 0 else sorted(results, reverse=True)
-                results = sorted(results)
                 performances.append([heuristic, str(round(score, 2)), ",".join([str(round(result, 2)) for result in results])])
                 if score is not None and best_score is None or env.compare(score, best_score) > 0:
                     best_heuristic_name = heuristic
@@ -139,4 +139,5 @@ class HeuristicSelectionDataCollector:
             output_file.write(f"next_operator\t{best_operator}")
             output_file.write("\n---------------\n")
             output_file.close()
+            round_index += 1
         env.dump_result(True, "finished.txt")
