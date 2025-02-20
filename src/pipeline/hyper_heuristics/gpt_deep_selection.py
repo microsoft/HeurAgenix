@@ -138,8 +138,10 @@ class GPTDeepSelectionHyperHeuristic:
                         if average_score is not None and best_average_score is None or env.compare(average_score, best_average_score) > 0:
                             best_heuristic_name = heuristic
                             best_average_score = average_score
-                            best_after_heuristic_env = after_step_env                    
-                    env = best_after_heuristic_env
+                            best_after_heuristic_env = after_step_env
+                    
+                    for attr in vars(env):
+                        setattr(env, attr, getattr(best_after_heuristic_env, attr))
 
                     # Record
                     cur_status = env.get_observation()
