@@ -49,7 +49,7 @@ def get_global_data_feature(global_data: dict) -> dict:
     peak_charging_price = max(global_data['charging_price'])
     
     # Assign the probability of receiving a ride order when idle
-    average_assign_prob = global_data['assign_prob']
+    average_assign_prob = sum(global_data['assign_prob']) / len(['assign_prob'])
     
     return {
         'average_consume_rate': average_consume_rate,
@@ -59,7 +59,7 @@ def get_global_data_feature(global_data: dict) -> dict:
         'average_order_price': average_order_price,
         'average_charging_price': average_charging_price,
         'peak_charging_price': peak_charging_price,
-        'average_assign_prob': [round(prob, 2) for prob in average_assign_prob]
+        'average_assign_prob': average_assign_prob
     }
 
 def get_state_data_feature(global_data: dict, state_data: dict) -> dict:

@@ -420,14 +420,14 @@ class ConstrainAction(gym.ActionWrapper):
 		total_continue_charging = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 1 and a == 1)
 
 		if total_charging_requests + total_continue_charging > self.m: # limit charging requests to available charging capacity
-			print('Exceed charger capacity!')
+			# print('Exceed charger capacity!')
 			continue_agents = [i for i, (a, s) in enumerate(zip(action, self.obs["ChargingStatus"])) if s == 1 and a == 1]
 			requesting_agents = [i for i, (a, s) in enumerate(zip(action, self.obs["ChargingStatus"])) if s == 0 and a == 1]
 
 			available_capacity = self.m - total_continue_charging
 
 			if available_capacity <= 0:
-				print('No charger available now.')
+				# print('No charger available now.')
 
 				to_flip = requesting_agents
 				for i in to_flip:
