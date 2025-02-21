@@ -239,7 +239,7 @@ class HeuristicEvolver:
             heuristic_work = BaseOperator()
             while isinstance(heuristic_work, BaseOperator):
                 heuristic_work = env.run_heuristic(heuristic)
-            proposed_result = env.dump_result(dump_trajectory=True)
+            proposed_result = env.dump_result(dump_trajectory=True, compress_trajectory=True)
             proposed_result = parse_text_to_dict(proposed_result)
             prompt_dict["proposed_solution"] = proposed_result["current_solution"]
             prompt_dict["proposed_result"] = proposed_result[env.key_item]

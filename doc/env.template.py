@@ -114,10 +114,10 @@ class Env(BaseEnv):
         }
         return state_data_dict
 
-    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         content_dict = {
             # The data name, current solution, complete flag, validation flag and trajectory will be added by super().dump_result(content_dict)
             # add other information to dump.
         }
-        content = super().dump_result(content_dict)
+        content = super().dump_result(content_dict=content, dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
         return content

@@ -169,7 +169,6 @@ Parameters:
 - `-d`, `--heuristic_dir`: Directory containing heuristic functions (if needed).
 - `-c`, `--test_case`: Path to a single test case.
 - `-t`, `--test_dir`: Directory containing the entire test set.
-- `-r`, `--dump_trajectory`: Flag to save the heuristic application trajectory.
 
 #### Example
 To run the nearest neighbor heuristic on a test case:

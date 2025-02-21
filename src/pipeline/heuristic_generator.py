@@ -188,7 +188,7 @@ class HeuristicGenerator:
                 heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
         return heuristic_files
 
-    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None) -> str:
+    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None, compress=False) -> str:
         # Special remind
         special_remind_file = os.path.join("src", "problems", self.problem, "prompt", "special_remind.txt")
         special_remind = "None"
@@ -206,7 +206,10 @@ class HeuristicGenerator:
             prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
         else:
             prompt_dict["components_file"] = f"src.problems.base.mdp_components"
-        self.gpt_helper.load("implement_code", prompt_dict)
+        if compress:
+            self.gpt_helper.load("implement_code_compress", prompt_dict)
+        else:
+            self.gpt_helper.load("implement_code", prompt_dict)
         response = self.gpt_helper.chat()
         code = extract(response, "python_code")
 

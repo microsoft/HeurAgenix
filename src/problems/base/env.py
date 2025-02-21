@@ -123,7 +123,7 @@ class BaseEnv:
     def summarize_env(self) -> str:
         pass
 
-    def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         content = f"-data: {self.data_name}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
@@ -132,11 +132,18 @@ class BaseEnv:
         for item, value in content_dict.items():
             content += f"-{item}: {value}\n"
         if dump_trajectory:
-            trajectory_str = "\n".join([
-                str(index) + "\t" + heuristic_name + "\t" + str(operator) + "\t" + solution_str.replace("\n", r"\n")
-                for index, (heuristic_name, operator, solution_str) in enumerate(self.recording)
-            ])
-            content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
+            if compress_trajectory:
+                trajectory_str = "\n".join([
+                    str(index) + "\t" + str(operator)
+                    for index, (heuristic_name, operator, solution_str) in enumerate(self.recording)
+                ])
+                content += f"-trajectory:\noperation_id\toperator(parameter)\n{trajectory_str}\n"
+            else:
+                trajectory_str = "\n".join([
+                    str(index) + "\t" + heuristic_name + "\t" + str(operator) + "\t" + solution_str.replace("\n", r"\n")
+                    for index, (heuristic_name, operator, solution_str) in enumerate(self.recording)
+                ])
+                content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
 
         if self.output_dir != None:
             output_file = os.path.join(self.output_dir, result_file)

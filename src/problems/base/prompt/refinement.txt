@@ -14,12 +14,11 @@ We believe that further refinement of the new heuristic is necessary.
 
 Please analyze the results and provide one executable code adjustment suggestion (in word, not code).
 
-To make sure the code adjustment suggestion is executable, here are some aspects to consider and you can provide more:
+We believe the idea is correct: {last_suggestion}.
+While we need detailed refinement, such as:
 1. This may involve changing default values or adopting dynamic values tailored to specific data.
-2. Implement checks to retain the original algorithm when the data does not favor heuristic updates.
-3. This includes aspects such as operation type, subject, location, and timing.
-4. Should we continue to deepen origin suggestion or weaken this suggestion: {last_suggestion}.
-5. Explore insights and strategies from other successful heuristics.
+2. This includes aspects such as operation type, subject, location, and timing.
+3. Should we continue to deepen origin suggestion or weaken this suggestion.
 
 The response format is very important. For better communication, please respond to me in this format:
 1. If you believe the code still need to be updated, please respond to me in this format:

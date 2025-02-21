@@ -20,7 +20,7 @@ class PerturbationHyperHeuristic:
         max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         current_steps = 0
         heuristic_work = BaseOperator()
-        while current_steps<= max_steps and isinstance(heuristic_work, BaseOperator) and env.continue_run:
+        while current_steps <= max_steps and isinstance(heuristic_work, BaseOperator) and env.continue_run:
             if random.random() < self.perturbation_ratio:
                 heuristic = self.perturbation_heuristic
             else:

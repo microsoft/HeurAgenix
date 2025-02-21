@@ -140,4 +140,4 @@ class HeuristicSelectionDataCollector:
             output_file.write("\n---------------\n")
             output_file.close()
             round_index += 1
-        env.dump_result(True, "finished.txt")
+        env.dump_result(dump_trajectory=True, compress_trajectory=False, result_file="finished.txt")

@@ -6,7 +6,7 @@ import importlib
 from openai import AzureOpenAI
 from time import sleep
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from src.util.util import extract, load_framework_description
+from src.util.util import compress_numbers, extract, load_framework_description
 
 
 class GPTHelper:
@@ -150,7 +150,7 @@ class GPTHelper:
             else:
                 current_message.append({
                     "type": "text",
-                    "text": texts[i]
+                    "text": compress_numbers(texts[i])
                 })
         self.messages.append({"role": "user", "content": current_message})
 

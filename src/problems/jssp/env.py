@@ -160,10 +160,10 @@ class Env(BaseEnv):
             "Finished Operation Num": self.state_data["finished_operation_num"],
         }
 
-    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         content_dict = {
             "job_num": self.job_num,
             "machine_num": self.machine_num
         }
-        content = super().dump_result(content_dict, dump_trajectory, result_file)
+        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
         return content
