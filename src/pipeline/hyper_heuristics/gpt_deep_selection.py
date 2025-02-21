@@ -28,8 +28,8 @@ class GPTDeepSelectionHyperHeuristic:
         # Init parameters
         max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         running_max_steps = env.construction_steps * 2
-        search_interval = self.search_interval if self.search_interval is not None else math.floor(env.construction_steps / 20)
-        search_time = self.search_time if self.search_time is not None else math.floor(env.construction_steps / 10)
+        search_interval = self.search_interval if self.search_interval is not None else math.ceil(env.construction_steps / 20)
+        search_time = self.search_time if self.search_time is not None else math.ceil(env.construction_steps / 10)
 
         # Init feature function
         get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")

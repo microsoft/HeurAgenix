@@ -105,11 +105,11 @@ class Env(BaseEnv):
             "Cut Value": self.state_data["current_cut_value"],
         }
 
-    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
             "set_a_count": self.state_data["set_a_count"],
             "set_b_count": self.state_data["set_b_count"]
         }
-        content = super().dump_result(content_dict, dump_trajectory, result_file)
+        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
         return content
