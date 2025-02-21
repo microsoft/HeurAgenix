@@ -26,7 +26,7 @@ def run_random_hh(
         if dump_best_result and best_result_proxy:
             if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) >= 0:
                 best_result_proxy.value = env.key_value
-                env.dump_result(True, f"best_result_{env.key_value}.txt")
+                env.dump_result(dump_trajectory=True, result_file=f"best_result_{env.key_value}.txt")
         return env.key_value
     else:
         return None

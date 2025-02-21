@@ -217,7 +217,7 @@ class HeuristicEvolver:
         # Generate negative result from basic heuristic
         hyper_heuristic = SingleHyperHeuristic(basic_heuristic_file, problem=self.problem)
         hyper_heuristic.run(env)
-        env.dump_result(dump_trajectory=True)
+        env.dump_result(dump_trajectory=True, compress_trajectory=True)
         negative_result_file = os.path.join(env.output_dir, "result.txt")
         negative_value = env.key_value
 
@@ -228,7 +228,7 @@ class HeuristicEvolver:
             hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, self.problem, perturbation_ratio)
             hyper_heuristic.run(env)
             if env.compare(env.key_value, negative_value) > 0:
-                env.dump_result(dump_trajectory=True)
+                env.dump_result(dump_trajectory=True, compress_trajectory=True)
                 positive_result_file = os.path.join(env.output_dir, "result.txt")
                 break
         return negative_result_file, positive_result_file
@@ -375,7 +375,7 @@ class HeuristicEvolver:
             prompt_dict["suggestion"] = suggestion
             description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the {last_heuristic_name}."
             env_summarize = prompt_dict["env_summarize"]
-            output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, env_summarize, smoke_test)
+            output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, env_summarize, smoke_test, compress=True)
             if output_heuristic_file:
                 suggested_heuristic_result = self.validation(self.validation_cases, output_heuristic_file)
                 return output_heuristic_file, suggestion, suggested_heuristic_result

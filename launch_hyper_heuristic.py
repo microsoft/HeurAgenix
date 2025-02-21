@@ -19,7 +19,6 @@ def parse_arguments():
     parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Data name for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
-    parser.add_argument("-r", "--dump_trajectory", action='store_true', help="Whether to dump trajectory.")
 
     return parser.parse_args()
 
@@ -84,7 +83,7 @@ def main():
         gpt_helper.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
-            env.dump_result(args.dump_trajectory)
+            env.dump_result()
             print(os.path.join(env.output_dir, "result.txt"), heuristic, test_case, env.key_item, env.key_value)
         else:
             print("Invalid solution", heuristic, test_case)

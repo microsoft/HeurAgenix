@@ -215,7 +215,6 @@ def search_file(file_name: str, problem: str="base") -> str:
     file_path = find_file_in_folder(os.path.join(output_dir, problem), file_name)
     if file_path:
         return file_path
-    
     return None
 
 def df_to_str(df: pd.DataFrame) -> str:
@@ -223,6 +222,14 @@ def df_to_str(df: pd.DataFrame) -> str:
 
 def str_to_df(string: str) -> pd.DataFrame:
     return pd.read_csv(io.StringIO(string), sep="\t")
+
+def compress_numbers(s):
+    def format_float(match):
+        number = match.group()
+        if '.' in number and len(number.split('.')[1]) > 2:
+            return "{:.2f}".format(float(number))
+        return number
+    return re.sub(r'\d+\.\d{3,}', format_float, s)
 
 def sanitize_function_name(name: str, id_str: str="None"):
     s1 = re.sub('(.)([A-Z][a-z]+)', r"\1_\2", name)

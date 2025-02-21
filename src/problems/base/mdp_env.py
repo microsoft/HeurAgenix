@@ -55,9 +55,9 @@ class MDPEnv(BaseEnv):
             return True
         return False
 
-    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         content_dict = self.get_state_data()
-        content = super().dump_result(content_dict, dump_trajectory, result_file)
+        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
         return content
     
     def summarize_env(self) -> str:
