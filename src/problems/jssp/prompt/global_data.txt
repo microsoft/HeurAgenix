@@ -1,5 +1,0 @@
-global_data (dict): The global data dict containing the global instance data with:
-    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
-    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
-    - "job_num" (int): The total number of jobs in the problem.
-    - "machine_num" (int): The total number of machines in the problem, also as operation num.

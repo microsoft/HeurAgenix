@@ -1,3 +1,0 @@
-global_data (dict): The global data dict containing the global instance data with:
-    - "node_num" (int): The total number of vertices in the graph.
-    - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.

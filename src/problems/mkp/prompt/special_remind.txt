@@ -1,2 +1,0 @@
-1. Make the result must be valid, such as: no-repeat included item, no violate constraints.
-2. Please remember weight is A 2D list where each sublist represents the resource consumption of an item across all dimensions. So it should be used as weight[resource][item]

@@ -1,9 +1,0 @@
-state_data (dict): The state data dict containing the solution state data with:
-    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
-    - "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
-    - "visited_num" (int): Number of nodes that have been visited.
-    - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
-    - "unvisited_num" (int): Number of nodes that have not been visited.
-    - "current_cost" (int): The total cost of current solution. The cost to return to the starting point is not included until the path is fully constructed.
-    - "last_visited" (int): The last visited node.
-    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
