@@ -425,8 +425,6 @@ class ConstrainAction(gym.ActionWrapper):
 				action[i] = 0
 			elif self.obs["SoC"][i] > 1-self.c_rates[i]: # if full capacity, not charge
 				action[i] = 0
-			elif self.obs["SoC"][i] <= self.low_SoC: # if low capacity has to charge
-				action[i] = 1
 
 		total_charging_requests = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 0 and a == 1)
 		total_continue_charging = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 1 and a == 1)

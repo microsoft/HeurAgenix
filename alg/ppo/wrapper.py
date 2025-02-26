@@ -10,9 +10,6 @@ class RoadChargingWrapper(gym.Wrapper):
     def __init__(self, config_fname, mode="train", penalty=-100):
         self.mode = mode
         self.penalty = penalty
-        self.reward_mean = 0
-        self.reward_std = 1
-        self.eps = 1e-6
         env = RoadCharging(config_fname=config_fname)
         env.stoch_step = True
 
@@ -34,8 +31,5 @@ class RoadChargingWrapper(gym.Wrapper):
             reward = self.penalty
             done = False
             info = {'error': str(e)}
-            
-        self.reward_mean = 0.99 * self.reward_mean + 0.01 * reward
-        self.reward_std = 0.99 * self.reward_std + 0.01 * ((reward - self.reward_mean) ** 2)
-        reward = (reward - self.reward_mean) / (self.reward_std + self.eps)
+
         return state, reward, done, info

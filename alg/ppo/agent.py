@@ -23,24 +23,17 @@ class PPOAgent:
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=config.value_lr)
 
     def state_shaping(self, state: dict):
-        # Extract and flatten the state components
         time_step = state['TimeStep']
         ride_time = state['RideTime']
         charging_status = state['ChargingStatus']
         soc = state['SoC']
         flat_state = np.concatenate([time_step, ride_time, charging_status, soc])
-
         return flat_state
 
-    def action_shaping(self, action, num_agents):
-        actions = np.zeros((num_agents), dtype=int)
-        actions[action] = 1
-        return actions
-
     def select_action_with_explorer(self, state: dict):
-        state = torch.tensor(self.state_shaping(state), dtype=torch.float32).to(self.device)
+        state = torch.tensor(self.state_shaping(state), dtype=torch.float32, device=self.device)
         probs = self.policy_net(state)
-        action = torch.zeros_like(probs, dtype=int)
+        action = torch.zeros_like(probs, dtype=torch.int64, device=self.device)
         indices_above_threshold = torch.where(probs > 0.5)[0]
         
         if len(indices_above_threshold) > 0:
@@ -51,22 +44,22 @@ class PPOAgent:
 
         # ε-greedy exploration
         if random.random() < self.exploration_epsilon:
-            action = torch.tensor(np.random.choice([0, 1], size=action.shape), dtype=torch.float32)
-            log_prob = torch.tensor(0.0)
+            action = torch.randint(0, 2, action.shape, dtype=torch.float32, device=self.device)
+            log_prob = torch.tensor(0.0, device=self.device)
 
-        return action.numpy().astype(int), log_prob
+        return action.cpu().numpy().astype(int), log_prob
 
     def select_action(self, state: dict):
-        state = torch.tensor(self.state_shaping(state), dtype=torch.float32).to(self.device)
+        state = torch.tensor(self.state_shaping(state), dtype=torch.float32, device=self.device)
         probs = self.policy_net(state)
-        action = torch.zeros_like(probs, dtype=int)
+        action = torch.zeros_like(probs, dtype=torch.int64, device=self.device)
         indices_above_threshold = torch.where(probs > 0.5)[0]
         
         if len(indices_above_threshold) > 0:
             sorted_indices = indices_above_threshold[probs[indices_above_threshold].argsort(descending=True)]
             top_k_indices = sorted_indices[:self.charger_num]
             action[top_k_indices] = 1
-        return action.numpy().astype(int)
+        return action.cpu().numpy().astype(int)
 
     def compute_advantages(self, rewards, values, next_values, dones):
         advantages = []
@@ -75,22 +68,21 @@ class PPOAgent:
             delta = rewards[i] + self.gamma * next_values[i] * (1 - dones[i]) - values[i]
             gae = delta + self.gamma * 0.95 * (1 - dones[i]) * gae
             advantages.insert(0, gae)
-        return advantages
+        return torch.tensor(advantages, dtype=torch.float32, device=self.device)
 
     def update(self, trajectories):
-        states = torch.tensor(np.array([self.state_shaping(t['state']) for t in trajectories]), dtype=torch.float32).to(self.device)
-        actions = torch.tensor(np.array([t['action'] for t in trajectories]), dtype=torch.int64).to(self.device)
-        rewards = torch.tensor(np.array([t['reward'] for t in trajectories]), dtype=torch.float32).to(self.device)
-        dones = torch.tensor(np.array([t['done'] for t in trajectories]), dtype=torch.float32).to(self.device)
-        log_probs = torch.tensor(np.array([t['log_prob'].detach().numpy() for t in trajectories]), dtype=torch.float32).to(self.device)
+        states = torch.tensor([self.state_shaping(t['state']) for t in trajectories], dtype=torch.float32, device=self.device)
+        actions = torch.tensor([t['action'] for t in trajectories], dtype=torch.int64, device=self.device)
+        rewards = torch.tensor([t['reward'] for t in trajectories], dtype=torch.float32, device=self.device)
+        dones = torch.tensor([t['done'] for t in trajectories], dtype=torch.float32, device=self.device)
+        log_probs = torch.tensor([t['log_prob'] for t in trajectories], dtype=torch.float32, device=self.device)
 
         # Compute values and next values
         values = self.value_net(states).squeeze(-1)
-        next_values = torch.cat((values[1:], torch.tensor([0], dtype=torch.float32)))
+        next_values = torch.cat((values[1:], torch.tensor([0.0], dtype=torch.float32, device=self.device)))
 
         # Compute advantages
         advantages = self.compute_advantages(rewards, values, next_values, dones)
-        advantages = torch.tensor(advantages, dtype=torch.float32)
 
         # Compute policy loss
         policy_output = self.policy_net(states)
@@ -123,6 +115,6 @@ class PPOAgent:
         }, model_path)
 
     def load_model(self, model_path: str):
-        checkpoint = torch.load(model_path)
+        checkpoint = torch.load(model_path, map_location=self.device)
         self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
         self.value_net.load_state_dict(checkpoint['value_net_state_dict'])
