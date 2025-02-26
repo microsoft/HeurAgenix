@@ -110,6 +110,5 @@ if __name__ == "__main__":
     dataset = ExpertDataset(config)
     dataset.collect_expert_data()
 
-    # pretrained_model_path = train_sl(config, dataset)
-    pretrained_model_path = os.path.join("results", "bc_best.pkl")
+    pretrained_model_path = train_sl(config, dataset)
     train_rl(config, pretrained_model_path)
