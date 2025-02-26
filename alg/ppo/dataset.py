@@ -28,6 +28,7 @@ class ExpertDataset(Dataset):
         return self.states[idx], self.actions[idx]
 
     def collect_expert_data(self):
+        print(f"Start collect data by {self.expert_policy.__name__}")
         env = RoadCharging(self.demo_data_file)
         env.stoch_step = True
         state = env.reset(stoch_step=True)
@@ -39,7 +40,7 @@ class ExpertDataset(Dataset):
             if done:
                 state = env.reset()
                 collected_data = len(self.actions)
-                print(f"{collected_data} data collected")
+        print(f"{collected_data} data collected")
         self.save_data("expert_data.pkl")
 
     def save_data(self, data_name: str):

@@ -1,10 +1,9 @@
 import os
 import sys
-import random
-import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 from agent import PPOAgent
 from dataset import ExpertDataset
 from config import Config
@@ -36,10 +35,10 @@ def train_sl(config: Config, dataset: ExpertDataset):
 
     num_ones = sum(sum(action) for _, action in dataset)
     num_zeros = len(dataset) * config.ev_num - num_ones
-    pos_weight = torch.tensor([num_zeros / (num_ones + 1e-5)], dtype=torch.float32)
+    pos_weight = torch.tensor([num_zeros / (num_ones + 1e-5)], dtype=torch.float32, device=config.device)
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
-    best_result = 0
+    best_loss = np.inf
     losses = []
     agent = PPOAgent(config)
     for episode in range(config.bc_train_episodes):
@@ -52,24 +51,29 @@ def train_sl(config: Config, dataset: ExpertDataset):
             loss.backward()
             losses.append(loss.item())
             optimizer.step()
-        if episode % config.bc_test_frequency == 0:            
+        if episode % config.bc_test_frequency == 0:
             agent.policy_net = bc_net.to(config.device)
             result = test(agent, config)
-            print(f"episode: {episode}, average train loss: {sum(losses) / len(losses)}, average test return: {result}")
+            average_loss = sum(losses) / len(losses)
             agent.save_model(f"bc_{episode}.pkl")
-            if result > best_result:
+            print(f"episode: {episode}, average train loss: {average_loss}, average test return: {result}")
+            if average_loss < best_loss:
+                best_loss = average_loss
+                best_model_path = os.path.join(config.output_dir, "bc_best.pkl")
+                print(f"Save best bc model to {best_model_path}")
                 agent.save_model("bc_best.pkl")
-    return os.path.join(config, "bc_best.pkl")
+    return best_model_path
 
 
 def train_rl(config: Config, pretrained_model_path: str=None):
-    env = RoadCharging(config.demo_data_file)
+    env = RoadChargingWrapper(config.demo_data_file)
     agent = PPOAgent(config)
     if pretrained_model_path:
         agent.load_model(pretrained_model_path)
 
     expert_prob = config.init_expert_prob
     experience_buffer = []
+    best_return = 0
     for episode in range(config.rl_train_episodes):
         state = env.reset()
         done = False
@@ -90,7 +94,15 @@ def train_rl(config: Config, pretrained_model_path: str=None):
             expert_prob *= config.expert_prob_decay
             result = test(agent, config)
             agent.save_model(f"ppo_{episode}.pkl")
-            print(f"episode: {episode}, train return: {sum(train_returns) / len(train_returns)}, average test return: {result}")
+            average_return = sum(train_returns) / len(train_returns)
+            print(f"episode: {episode}, train return: {average_return}, average test return: {result}")
+            if average_return > best_return:
+                best_return = average_return
+                best_model_path = os.path.join(config.output_dir, "ppo_best.pkl")
+                print(f"Save best ppo model to {best_model_path}")
+                agent.save_model(f"ppo_best.pkl")
+    return best_model_path
+
 
 if __name__ == "__main__":
     config = Config()
@@ -98,5 +110,6 @@ if __name__ == "__main__":
     dataset = ExpertDataset(config)
     dataset.collect_expert_data()
 
-    pretrained_model_path = train_sl(config, dataset)
+    # pretrained_model_path = train_sl(config, dataset)
+    pretrained_model_path = os.path.join("results", "bc_best.pkl")
     train_rl(config, pretrained_model_path)

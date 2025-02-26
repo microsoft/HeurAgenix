@@ -26,12 +26,12 @@ class Config:
         self.state_length = len(self.state_shaping(env.reset()))
         self.charging_threshold = 0.5
 
-        self.rl_train_episodes = 20000
-        self.policy_lr = 1e-6
-        self.value_lr = 1e-6
+        self.rl_train_episodes = 10000
+        self.policy_lr = 1e-4
+        self.value_lr = 1e-4
         self.gamma = 0.99
         self.clip_epsilon = 0.2
-        self.exploration_epsilon = 0.2
+        self.exploration_epsilon = 0.3
         self.buffer_size = 500
         self.rl_test_frequency = 100
 

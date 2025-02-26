@@ -103,14 +103,12 @@ class PPOAgent:
 
     def save_model(self, model_name: str):
         output_path = os.path.join(self.output_dir, model_name)
-        print(f"Save model to {output_path}")
         torch.save({
             'policy_net_state_dict': self.policy_net.state_dict(),
             'value_net_state_dict': self.value_net.state_dict()
         }, output_path)
 
     def load_model(self, model_path: str):
-        print(f"Load model to {model_path}")
         checkpoint = torch.load(model_path, map_location=self.device)
         self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
         self.value_net.load_state_dict(checkpoint['value_net_state_dict'])
