@@ -47,9 +47,7 @@ class RoadCharging(Env):
 		self.config = config
 		self.config_fname = config_fname.split(os.sep)[-1]
   
-		self.stoch_simulate_future = False
 		self.stoch_step = False
-		# self.stoch_step = True
 
 
 		# Observation space: n agents, each with 4 state variables
@@ -133,7 +131,7 @@ class RoadCharging(Env):
 		return operational_status
 
 
-	def reset(self):
+	def reset(self, stoch_step: bool=False):
 
 		self.done = False
 		# Reset the reward
@@ -148,8 +146,11 @@ class RoadCharging(Env):
 		}
 
 		# Initialize battery SoC randomly
-		# state["SoC"] = np.random.uniform(0, 1, size=self.n).round(3)
-		state["SoC"] = self.initial_SoCs
+		if stoch_step:
+			state["SoC"] = np.random.uniform(0, 1, size=self.n).round(3)
+		else:
+			state["SoC"] = self.initial_SoCs
+		self.stoch_step = stoch_step
 
 		self.obs = state  # Store it as the environment's state
 

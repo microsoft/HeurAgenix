@@ -1,65 +1,58 @@
+
+import os
 import random
 import torch
 import torch.optim as optim
 import numpy as np
-from torch.distributions import Categorical
-from network import PolicyNetwork, ValueNetwork
 from config import Config
 
 class PPOAgent:
-    def __init__(self, env, config: Config):
-        self.env = env
+    def __init__(self, config: Config):
         self.device = config.device
         self.gamma = config.gamma
         self.clip_epsilon = config.clip_epsilon
         self.exploration_epsilon = config.exploration_epsilon
         self.charger_num = config.charger_num
+        self.ev_num = config.ev_num
+        self.output_dir = config.output_dir
+        self.action_mask = config.action_mask
+        self.c_rates = config.c_rates
+        self.state_shaping = config.state_shaping
+        self.charging_threshold = config.charging_threshold
 
-        input_dim = sum(space.shape[0] for space in env.observation_space.spaces.values())
-        output_dim = env.action_space.shape[0]
-        self.policy_net = PolicyNetwork(input_dim, output_dim).to(self.device)
-        self.value_net = ValueNetwork(input_dim).to(self.device)
+        self.policy_net = config.policy_net(config.state_length, config.ev_num).to(self.device)
+        self.value_net = config.value_net(config.state_length).to(self.device)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=config.policy_lr)
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=config.value_lr)
 
-    def state_shaping(self, state: dict):
-        time_step = state['TimeStep']
-        ride_time = state['RideTime']
-        charging_status = state['ChargingStatus']
-        soc = state['SoC']
-        flat_state = np.concatenate([time_step, ride_time, charging_status, soc])
-        return flat_state
-
-    def select_action_with_explorer(self, state: dict):
-        state = torch.tensor(self.state_shaping(state), dtype=torch.float32, device=self.device)
-        probs = self.policy_net(state)
-        action = torch.zeros_like(probs, dtype=torch.int64, device=self.device)
-        indices_above_threshold = torch.where(probs > 0.5)[0]
-        
-        if len(indices_above_threshold) > 0:
-            sorted_indices = indices_above_threshold[probs[indices_above_threshold].argsort(descending=True)]
-            top_k_indices = sorted_indices[:self.charger_num]
-            action[top_k_indices] = 1
-        log_prob = torch.log(probs).sum()
-
-        # ε-greedy exploration
-        if random.random() < self.exploration_epsilon:
-            action = torch.randint(0, 2, action.shape, dtype=torch.float32, device=self.device)
+    def select_action_with_exploring(self, state: dict):
+        if random.random() <= self.exploration_epsilon:
+            action = torch.zeros(self.ev_num, dtype=torch.int64, device=self.device)
+            action_mask = self.action_mask(state)
+            feasible_indices = [i for i, m in enumerate(action_mask) if m == 1]
+            if len(feasible_indices) > 0:
+                selected_indices = random.sample(feasible_indices, min(self.charger_num, len(feasible_indices)))
+                action[selected_indices] = 1
             log_prob = torch.tensor(0.0, device=self.device)
-
-        return action.cpu().numpy().astype(int), log_prob
+            return action.cpu().numpy().astype(int), log_prob
+        return self.select_action(state)
 
     def select_action(self, state: dict):
+        mask = self.action_mask(state)
         state = torch.tensor(self.state_shaping(state), dtype=torch.float32, device=self.device)
         probs = self.policy_net(state)
+        masked_probs = probs * torch.tensor(mask, device=self.device)
+
         action = torch.zeros_like(probs, dtype=torch.int64, device=self.device)
-        indices_above_threshold = torch.where(probs > 0.5)[0]
-        
-        if len(indices_above_threshold) > 0:
+        log_prob = torch.log(masked_probs[masked_probs > 0]).sum() if masked_probs.sum() > 0 else torch.tensor(0.0, device=self.device)
+        indices_above_threshold = torch.where(masked_probs > self.charging_threshold)[0]
+
+        if sum(masked_probs) > 0 and len(indices_above_threshold) > 0:
             sorted_indices = indices_above_threshold[probs[indices_above_threshold].argsort(descending=True)]
             top_k_indices = sorted_indices[:self.charger_num]
             action[top_k_indices] = 1
-        return action.cpu().numpy().astype(int)
+
+        return action.cpu().numpy().astype(int), log_prob
 
     def compute_advantages(self, rewards, values, next_values, dones):
         advantages = []
@@ -108,13 +101,16 @@ class PPOAgent:
 
         return policy_loss, value_loss
 
-    def save_model(self, model_path: str):
+    def save_model(self, model_name: str):
+        output_path = os.path.join(self.output_dir, model_name)
+        print(f"Save model to {output_path}")
         torch.save({
             'policy_net_state_dict': self.policy_net.state_dict(),
             'value_net_state_dict': self.value_net.state_dict()
-        }, model_path)
+        }, output_path)
 
     def load_model(self, model_path: str):
+        print(f"Load model to {model_path}")
         checkpoint = torch.load(model_path, map_location=self.device)
         self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
         self.value_net.load_state_dict(checkpoint['value_net_state_dict'])

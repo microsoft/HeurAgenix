@@ -7,8 +7,7 @@ sys.path.insert(0, env_dir)
 from env.gym_env import RoadCharging, ConstrainAction
 
 class RoadChargingWrapper(gym.Wrapper):
-    def __init__(self, config_fname, mode="train", penalty=-100):
-        self.mode = mode
+    def __init__(self, config_fname, penalty=-100):
         self.penalty = penalty
         env = RoadCharging(config_fname=config_fname)
         env.stoch_step = True
