@@ -32,7 +32,7 @@ def main():
     search_time = args.search_time
     if test_case is None:
         test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
-    test_cases = os.listdir(test_dir) if test_case is None else [test_case]
+    test_cases = [os.path.join(test_dir, test_case) for test_case in os.listdir(test_dir)] if test_case is None else [test_case]
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
 
