@@ -53,8 +53,9 @@ class Env(MDPEnv):
             "Reward": self.reward
         }
 
-    def dump_result(self, dump_trajectory: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")
         data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.trajectory.items()}  
         json.dump(data_converted, output_file)
-        return super().dump_result(dump_trajectory, result_file)
+        content = super().dump_result(dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
+        return content
