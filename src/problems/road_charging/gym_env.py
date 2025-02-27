@@ -45,9 +45,10 @@ class RoadCharging(Env):
 		self.ride_time_probs_data = pd.DataFrame(config["ride_time_probs_data"])
 		self.ride_scenario_probs = self.ride_time_probs_data[self.ride_data_type].values
 		self.config = config
+		self.config_fname = config_fname.split(os.sep)[-1]
   
-		self.stoch_simulate_future = False
 		self.stoch_step = False
+
 
 		# Observation space: n agents, each with 4 state variables
 		self.observation_shape = (self.n, 4)
@@ -62,6 +63,10 @@ class RoadCharging(Env):
 
 		# Action space: n agents, each can take a binary action (0 or 1)
 		self.action_space = spaces.MultiBinary(self.n)
+
+		self.observation_space_dim = sum(np.prod(space.shape) for key, space in self.observation_space.spaces.items() if key != "TimeStep")
+		# self.observation_space_dim = sum(np.prod(space.shape) for key, space in self.observation_space.spaces.items())
+
 
 	def seed(self, seed_value=None):
 		"""Set the random seed for reproducibility."""
@@ -126,7 +131,7 @@ class RoadCharging(Env):
 		return operational_status
 
 
-	def reset(self):
+	def reset(self, stoch_step: bool=False):
 
 		self.done = False
 		# Reset the reward
@@ -141,8 +146,11 @@ class RoadCharging(Env):
 		}
 
 		# Initialize battery SoC randomly
-		# state["SoC"] = np.random.uniform(0, 1, size=self.n).round(3)
-		state["SoC"] = self.initial_SoCs
+		if stoch_step:
+			state["SoC"] = np.random.uniform(0, 1, size=self.n).round(3)
+		else:
+			state["SoC"] = self.initial_SoCs
+		self.stoch_step = stoch_step
 
 		self.obs = state  # Store it as the environment's state
 
@@ -337,11 +345,6 @@ class RoadCharging(Env):
 			self.obs["SoC"][i] = next_state[2]
 			sum_rewards += reward
 
-			# print(f'state, action {(rt, ct, SoC), action}')
-			# print(f'next state {next_state}')
-			# print(f"agent {i} has reward {reward}.")
-			# print("\n")
-
 		# Increment the episodic return: no discount factor for now
 		self.ep_return += sum_rewards
 
@@ -356,7 +359,7 @@ class RoadCharging(Env):
 		# If all values in the first column are equal to k, terminate the episode
 		done = np.all(self.obs["TimeStep"] == self.k)
 
-		return self.obs, reward, done, []
+		return self.obs, sum_rewards, done, []
 
 
 	def render(self):
@@ -399,13 +402,23 @@ class RoadCharging(Env):
 			plt.tight_layout()
 			plt.show()
 
+	def dump_json_result(self, output_folder):
+		solution = {
+			"actions": self.trajectory['actions'].tolist(),
+			"RideTime": self.trajectory['RideTime'].tolist(),
+			"ChargingStatus": self.trajectory['ChargingStatus'].tolist(),
+			"SoC": self.trajectory['SoC'].tolist(),
+			"final_return": self.ep_return
+		}
+		os.makedirs(output_folder, exist_ok=True)
+		with open(os.path.join(output_folder, f"{self.config_fname}_solution.json"), "w") as f:
+			json.dump(solution, f, indent=4)
+
 
 class ConstrainAction(gym.ActionWrapper):
 	def __init__(self, config_fname: str):
 		self.env = RoadCharging(config_fname)
 		super().__init__(self.env)
-	# def __init__(self, env):
-	# 	super().__init__(env)
 
 	def action(self, action):
 		for i in range(self.n):
@@ -413,8 +426,6 @@ class ConstrainAction(gym.ActionWrapper):
 				action[i] = 0
 			elif self.obs["SoC"][i] > 1-self.c_rates[i]: # if full capacity, not charge
 				action[i] = 0
-			elif self.obs["SoC"][i] <= self.low_SoC: # if low capacity has to charge
-				action[i] = 1
 
 		total_charging_requests = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 0 and a == 1)
 		total_continue_charging = sum(1 for a, s in zip(action, self.obs["ChargingStatus"]) if s == 1 and a == 1)
@@ -441,7 +452,6 @@ class ConstrainAction(gym.ActionWrapper):
 					action[to_flip] = 0
 
 		return action
-
 
 def main():
 	SoC_data_type = "high"
