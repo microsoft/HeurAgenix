@@ -46,7 +46,8 @@ def evaluate_heuristic(
     heuristic = load_heuristic(heuristic_name, problem)
     operators = []
     for _ in range(search_interval):
-        operators.append(env.run_heuristic(heuristic))
+        if env.continue_run:
+            operators.append(env.run_heuristic(heuristic))
     after_step_env_serialized = dill.dumps(env)
     # MCTS to evaluate heuristic performance
     results = []
