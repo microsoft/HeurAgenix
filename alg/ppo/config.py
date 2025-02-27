@@ -23,7 +23,7 @@ class Config:
 
         self.policy_net = PolicyNetwork
         self.value_net = ValueNetwork
-        self.state_length = len(self.state_shaping(env.reset()))
+        self.state_length = len(self.state_shaping(env.reset(stoch_step=False)))
         self.charging_threshold = 0.5
 
         self.rl_train_episodes = 10000

@@ -38,7 +38,7 @@ class ExpertDataset(Dataset):
             self.actions.append(action)
             state, _, done, _ = env.step(action)
             if done:
-                state = env.reset()
+                state = env.reset(stoch_step=True)
                 collected_data = len(self.actions)
         print(f"{collected_data} data collected")
         self.save_data("expert_data.pkl")

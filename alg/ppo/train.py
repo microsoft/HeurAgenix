@@ -18,7 +18,7 @@ def test(agent: PPOAgent, config: Config) -> list[float]:
     results = []
     for data_file in os.listdir(config.test_dir):
         env = RoadCharging(config_fname=os.path.join(config.test_dir, data_file))
-        state = env.reset()
+        state = env.reset(stoch_step=False)
         done = False
         while not done:
             action, _ = agent.select_action(state)
@@ -75,7 +75,7 @@ def train_rl(config: Config, pretrained_model_path: str=None):
     experience_buffer = []
     best_return = 0
     for episode in range(config.rl_train_episodes):
-        state = env.reset()
+        state = env.reset(stoch_step=True)
         done = False
         train_returns = []
 
