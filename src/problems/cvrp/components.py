@@ -124,5 +124,5 @@ class MergeRoutesOperator(BaseOperator):
         new_routes = [route[:] for route in solution.routes]
         # Append source route to target route, then clear the source route
         new_routes[self.target_vehicle_id] = new_routes[self.source_vehicle_id] + new_routes[self.target_vehicle_id]
-        new_routes[self.source_vehicle_id] = []
+        new_routes[self.source_vehicle_id] = [solution.depot]
         return Solution(new_routes, solution.depot)
