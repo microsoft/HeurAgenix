@@ -1,0 +1,2 @@
+InsertNodeOperator(node=1, target_set='A')
+InsertNodeOperator(node=0, target_set='B')

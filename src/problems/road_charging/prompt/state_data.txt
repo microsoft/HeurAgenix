@@ -1,0 +1,7 @@
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_step": The index of current time step. (0 <= current_step < max_time_steps)
+    - "ride_lead_time": Ride leading time and length is number of fleet_size.
+    - "charging_lead_time": Charging leading time and length is number of fleet_size.
+    - "battery_soc": Soc of battery of each feet and length is number of fleet_size.
+    - "reward": The total reward for all fleets for this time step.
+    - "return": The sum of total reward for all fleets from beginning to current time step.

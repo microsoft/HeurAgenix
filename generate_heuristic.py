@@ -1,5 +1,8 @@
 import argparse
 import os
+import os
+# 设置环境变量，强制修改缓存目录
+os.environ["TRANSFORMERS_CACHE"] = "/Data/haolong/model_deploy/models_cache/"
 from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.util.gpt_helper import GPTHelper
 

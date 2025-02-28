@@ -1,0 +1,114 @@
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+The global data with some heuristic values for this problem:
+{global_data_feature}
+
+The state data some heuristic values for current stage:
+{state_data_feature}
+
+Before this discuss, we have already {discuss_round} rounds discuss and the summary are:
+{heuristic_traject}
+
+"Delta of Visited Node" indicates the newly visited node, "Delta of Current Cost" indicates the additional cost introduced by the heuristic applied in that round. A smaller or more negative value is better.
+
+# Heuristic Algorithm Understanding and Scenario Analysis
+
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def _2opt_89aa():
+def random_80a0():
+def greedy_algorithm_3ca7():
+def nearest_neighbor_f91d():
+def _3opt_e75b():
+def farthest_insertion_b6d3():
+def nearest_insertion_c1f0():
+def simulated_annealing_e625():
+def random_pairwise_insertion_7493():
+def k_nearest_neighbors_insertion_9e8b(k: int = 1):
+def random_successive_insertion_57b4():
+def cheapest_insertion_605f():
+def insertion_heuristics_050b(insertion_strategy: str = 'cheapest'):
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3): 
+
+Please make sure to use the heuristic_name I provided for the invocation, for example: "simulated_annealing_e625".
+
+This analysis dives into the inherent characteristics, applicability, parameter impacts, quantifiable scenarios, and differentiating factors for each heuristic algorithm implemented for the Traveling Salesman Problem (TSP).
+1. Algorithm Characteristics
+
+Construction-Type Heuristics
+    - nearest_neighbor_f91d: Starts with an arbitrary city and incrementally adds the nearest unvisited neighbor. Simple and computationally efficient but may lead to suboptimal tours due to local decision-making.
+    - random_80a0: Randomly selects unvisited nodes to build the solution. Provides high diversity but lacks deterministic progress toward optimization.
+    - cheapest_insertion_605f: Adds the city causing the least increase in cost. Efficient for sparse graphs or when gradual cost management is essential.
+    - farthest_insertion_b6d3: Selects the city farthest from the tour and inserts it optimally. Useful for spreading coverage early in the process.
+    - nearest_insertion_c1f0: Inserts the nearest non-tour city at the least-cost position. Balances locality with minimal cost increase.
+    - k_nearest_neighbors_insertion_9e8b: Considers k nearest unvisited neighbors, balancing exploration and computational overhead based on the k parameter.
+
+Optimization-Type Heuristics
+    - _2opt_89aa: Refines an existing solution by swapping two non-adjacent edges to eliminate crossings. Effective for moderate-sized problems with tangled tours.
+    - _3opt_e75b: Similar to 2-opt but uses three segments for optimization, allowing for deeper improvements at higher computational costs.
+    - random_pairwise_insertion_7493: Randomly swaps pairs of nodes, inserting them at optimal positions. Suitable for diversification during intermediate optimization stages.
+
+Metaheuristics
+    - simulated_annealing_e625: Randomly modifies the solution and accepts changes probabilistically, based on temperature and cost difference. Balances global exploration with convergence control.
+    - ant_colony_d4f7: Models pheromone-laying ants choosing probabilistic paths, favoring exploration-exploitation trade-offs in highly variable solution spaces.
+    - greedy_randomized_adaptive_search_procedure_grasp_5a6a: Combines a randomized greedy construction phase with a local search phase, leveraging the alpha parameter to tune greediness vs. randomness.
+2. Applicability Scenarios
+Initial Solution Construction
+Algorithms like nearest_neighbor_f91d, random_80a0, and cheapest_insertion_605f are effective for quickly generating initial feasible solutions with minimal computational overhead.
+random_successive_insertion_57b4 and greedy_algorithm_3ca7 can be used when high diversity or deterministic cost minimization is desired.
+Intermediate Optimization
+Algorithms like _2opt_89aa, _3opt_e75b, and random_pairwise_insertion_7493 are ideal for refining solutions by removing inefficiencies or improving structural coherence.
+k_nearest_neighbors_insertion_9e8b adds control over exploration through the k parameter, making it useful for balancing diversity and optimization.
+Advanced Optimization
+simulated_annealing_e625 and ant_colony_d4f7 are suitable for large solution spaces requiring robust global optimization capabilities.
+greedy_randomized_adaptive_search_procedure_grasp_5a6a provides a hybrid approach, leveraging construction and local search phases for a well-rounded solution.
+3. Parameter Impact
+alpha (GRASP): Determines the balance between greedy and random choices in construction. Lower alpha leads to deterministic greedy solutions, while higher alpha encourages exploration.
+k (k_nearest_neighbors): Controls the breadth of neighbor consideration. Higher k increases solution diversity but adds computational complexity.
+Temperature (Simulated Annealing): Regulates the probability of accepting worse solutions. High temperature favors exploration; low temperature ensures convergence.
+4. Quantification of Scenarios
+Key Metrics
+Graph Density: High density favors algorithms like nearest_neighbor_f91d for efficiency. Sparse graphs may benefit from cheapest_insertion_605f or farthest_insertion_b6d3.
+Average Distance: Low average distance suggests nearest-based algorithms; high average distance requires probabilistic methods like simulated annealing or ant colony optimization.
+Solution Variability: Large, unpredictable spaces are better handled with metaheuristics.
+Problem Scale (Nodes): For small-scale problems, simple heuristics like _2opt_89aa are sufficient. Larger problems demand metaheuristics like ant_colony_d4f7.
+5. Comparison and Differentiation
+Similar Heuristics with Different Mechanisms
+cheapest_insertion_605f vs. farthest_insertion_b6d3:
+Cheapest focuses on minimizing incremental cost; Farthest aims for strategic coverage, spreading out early.
+_2opt_89aa vs. _3opt_e75b:
+2-opt is faster and simpler, suitable for moderately sized problems; 3-opt offers deeper optimization at the cost of computational time.
+random_80a0 vs. random_successive_insertion_57b4:
+Random appending builds a tour entirely randomly, while random successive insertion adds elements strategically to minimize insertion cost.
+
+# Heuristic Analysis and Scenario Quantification
+
+Data Characteristics: Evaluate the key features of the problem's data (e.g., node_num, average_distance, density, current_solution, std_dev_distance, etc.) to identify patterns or trends that influence algorithm selection.
+Scenario Mapping: Based on the current problem state, determine whether a construction-type heuristic (focused on expanding the solution) or an optimization-type heuristic (focused on improving the existing solution) is most suitable.
+Algorithm Selection Criteria: Quantify and analyze the potential suitability of each heuristic based on:
+    - Cost Efficiency: Whether the algorithm effectively reduces the current_cost.
+    - Node Progress: How well the heuristic improves visited_num while balancing current_cost.
+    - Execution Trade-offs: Evaluate the progress achieved per execution step, considering metrics such as the Delta of Visited Node, Delta of Current Cost, and computation time.
+Avoid Historical Bias: Focus solely on the current problem's intrinsic data and the characteristics of the available heuristics, rather than relying on past outcomes or specific heuristics used in previous rounds.
+Strategic Basis for Selection: Align the next heuristic choice with the problem's data features, ensuring each step progresses towards an optimal solution.
+
+The following are some consensus points:
+
+1. When both the "Delta of Visited Node" and the "Delta of Current Cost" are zero, it implies that the previous round of the Solution optimization algorithm had no actual effect.
+2. Make greater use of the characteristics of different algorithms of different types in the algorithm pool, and strongly avoid frequently repeating only a few algorithms.
+3. After using construction-type algorithms, different types of optimization-type algorithms can be applied to reduce the overall cost. In a single round, a negative "Delta of Current Cost" indicates the better the optimization effect.
+4. Optimization-type algorithms require more cost than others, and have slower solving speeds when the visited_nodes is large. Therefore, the number of steps should be reduced accordingly.
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution in a smallest costs. Please familiarize yourself with the available heuristic algorithms I mentioned and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+Please try to explore the decision-making logic. Please select an appropriate running steps based on the dimensions of the problem. Strongly avoid frequentlyusing only a few algorithms!
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***

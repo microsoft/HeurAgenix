@@ -1,7 +1,7 @@
 from src.problems.tsp.components import *
 
 def _3opt_e75b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
-    """ The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
+    """ The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. 
  
     Args:
         global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:

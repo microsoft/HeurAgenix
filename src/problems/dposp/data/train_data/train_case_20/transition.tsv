@@ -1,0 +1,3 @@
+ProductionLine	SourceProduct	DestinationProduct	TransitionTime
+0	3	0	Forbidden
+0	0	3	Forbidden

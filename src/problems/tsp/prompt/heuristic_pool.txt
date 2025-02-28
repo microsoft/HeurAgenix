@@ -1,0 +1,137 @@
+Currently, I am working on tsp problem:
+Traveling Salesman Problem (TSP) is the challenge of finding the shortest possible route that visits a given list of cities exactly once and returns to the origin city, based on the distances between each pair of cities.
+
+The global data with some heuristic values for this problem:
+{global_data_feature}
+
+The state data some heuristic values for current stage:
+{state_data_feature}
+
+Before this discuss, we have already {discuss_round} rounds discuss and the summary are:
+{heuristic_traject}
+
+"Delta of Visited Node" indicates the newly visited node, "Delta of Current Cost" indicates the additional cost introduced by the heuristic applied in that round. A smaller or more negative value is better.
+
+## Heuristic Algorithm Understanding
+
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def _2opt_89aa():
+def random_80a0():
+def greedy_algorithm_3ca7():
+def nearest_neighbor_f91d():
+def _3opt_e75b():
+def farthest_insertion_b6d3():
+def nearest_insertion_c1f0():
+def simulated_annealing_e625():
+def random_pairwise_insertion_7493():
+def k_nearest_neighbors_insertion_9e8b(k: int = 1):
+def random_successive_insertion_57b4():
+def cheapest_insertion_605f():
+def insertion_heuristics_050b(insertion_strategy: str = 'cheapest'):
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(alpha: float = 0.3): 
+def ant_colony_d4f7():
+
+Please make sure to use the heuristic_name I provided for the invocation, for example: "simulated_annealing_e625".
+
+## Detailed Algorithm Evaluation Summary
+
+1. _2opt_89aa (2-opt Local Improvement)
+   - Function Description: Optimizes the route by swapping two non-adjacent edges to eliminate crossings.
+   - Advantages: Simple implementation and effective cost reduction.
+
+2. random_80a0 (Random Append)
+   - Function Description: Randomly selects an unvisited node and appends it to the current solution.
+   - Advantages: Fast construction and straightforward, ideal for initial solution building.
+
+3. greedy_algorithm_3ca7 (Greedy Construction)
+   - Function Description: Extends the tour by choosing the shortest edge at each step.
+   - Advantages: Quickly forms a low-cost initial solution.
+
+4. nearest_neighbor_f91d (Nearest Neighbor Construction)
+   - Function Description: From the current node, selects the nearest unvisited node to extend the tour.
+   - Advantages: Low computational overhead and simple to implement, suitable for constructing an initial solution.
+
+5. _3opt_e75b (3-opt Local Improvement)
+   - Function Description: Achieves deeper local optimization by breaking the tour into three segments and reconnecting them.
+   - Advantages: Provides stronger improvements when 2-opt is insufficient.
+
+6. farthest_insertion_b6d3 (Farthest Insertion Construction)
+   - Function Description: Selects the unvisited node farthest from the current solution and inserts it with minimal cost increase.
+   - Advantages: Promotes a balanced tour and is effective for initial construction.
+
+7. nearest_insertion_c1f0 (Nearest Insertion Construction)
+   - Function Description: Chooses the unvisited node closest to the current solution and inserts it at the optimal position.
+   - Advantages: Maintains cost control while expanding the solution.
+
+8. simulated_annealing_e625 (Simulated Annealing)
+   - Function Description: Performs local optimization by randomly swapping nodes and accepting changes based on a temperature criterion.
+   - Advantages: Capable of escaping local optima, making it ideal for fine-tuning.
+
+9. random_pairwise_insertion_7493 (Random Pairwise Insertion)
+   - Function Description: Randomly selects two unvisited nodes and inserts them at positions that minimize the cost increase.
+   - Advantages: Enhances solution diversity and helps break out of local optima.
+
+10. k_nearest_neighbors_insertion_9e8b (k-Nearest Neighbors Insertion)
+    - Function Description: Among the k nearest unvisited nodes, selects the most suitable one for insertion.
+    - Advantages: Balances exploration and exploitation, offering flexible insertion options.
+
+11. random_successive_insertion_57b4 (Random Successive Insertion)
+    - Function Description: Randomly selects an unvisited node and determines the insertion position with the smallest cost increase.
+    - Advantages: Combines randomness with cost optimization, suitable for both initial construction and local improvement.
+
+12. cheapest_insertion_605f (Cheapest Insertion)
+    - Function Description: Identifies the unvisited node that, when inserted, results in the smallest cost increase and finds the optimal position.
+    - Advantages: Targets minimal incremental cost at each step, ideal for cost-sensitive scenarios.
+
+13. insertion_heuristics_050b (Comprehensive Insertion Strategy)
+    - Function Description: Supports "cheapest," "farthest," and "nearest" insertion strategies to select the best insertion operation.
+    - Advantages: Offers flexible strategies adaptable to different phases.
+
+14. greedy_randomized_adaptive_search_procedure_grasp_5a6a (GRASP)
+    - Function Description: Combines greedy randomized construction with local search using a restricted candidate list for iterative improvement.
+    - Advantages: Enhances solution diversity and global optimality, particularly in large-scale problems.
+
+15. ant_colony_d4f7 (Ant Colony Optimization)
+    - Function Description: Simulates the behavior of ants by probabilistically selecting the next node based on pheromone intensities and heuristic desirability, while updating pheromone levels through evaporation and deposit.
+    - Advantages: Balances exploration and exploitation, dynamically adapts to the problem landscape, and effectively guides the search towards high-quality solutions.
+
+## Decision making
+
+### Pre-Decision Evaluation
+
+Assess Historical Performance: Before each decision, evaluate the previous rounds’ results (e.g., “Delta of Visited Node” and “Delta of Current Cost”) along with current state parameters such as current_solution, visited_nodes, visited_num, unvisited_nodes, unvisited_num, current_cost, last_edge_cost, average_edge_cost, etc.
+Data-Driven Selection: Use these metrics to determine the most promising heuristic for the next step.
+
+### Combined Constructive and Local Improvement Heuristics
+
+Constructive Phase:
+Low Incremental Cost Insertion: Prefer methods like nearest_insertion_c1f0, cheapest_insertion_605f, or insertion_heuristics_050b (set to “cheapest”) to incrementally build the tour while keeping cost increases minimal.
+Enhance Diversity: Optionally incorporate randomness through heuristics such as k_nearest_neighbors_insertion_9e8b or random_successive_insertion_57b4 to avoid premature convergence.
+Local Improvement Phase:
+Concurrent Optimization: Even during the construction process, apply local improvement methods such as _2opt_89aa and _3opt_e75b to refine partial tours and eliminate high-cost edges.
+Escaping Local Optima: Use simulated_annealing_e625 periodically to allow occasional cost increases for the sake of escaping local optima.
+
+Dynamic Evaluation and Switching Mechanism
+Real-Time Adjustment: Based on ongoing feedback from the evaluation phase, dynamically adjust the frequency of each heuristic:
+If a heuristic (e.g., farthest_insertion_b6d3) results in a high “Delta of Current Cost,” reduce its usage.
+Increase the invocation of effective local improvements when significant cost reductions are observed.
+Hybrid Global Search: When the overall search shows signs of stagnation, apply the hybrid method greedy_randomized_adaptive_search_procedure_grasp_5a6a to balance greedy construction with randomized exploration.
+
+### Termination Strategy
+
+Continued Local Improvement: Even after the tour is fully constructed (i.e., when unvisited_num is 0), continue to apply local improvement methods.
+Stagnation Detection: Terminate the algorithm only when, after full construction, multiple consecutive rounds of local improvement produce no further reduction in current_cost (i.e., the "Delta of Current Cost" remains non-negative over several iterations), indicating that no new improvements can be achieved.
+
+## Output 
+
+After you finished your decision, please ignore the intermediate steps and output as required. The response format is very important. Please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***

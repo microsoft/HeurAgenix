@@ -58,7 +58,6 @@ class Env(BaseEnv):
         """
         if solution is None:
             solution = self.current_solution
-
         # A list of integers representing the IDs of nodes that have been visited.
         visited_nodes = solution.tour
 

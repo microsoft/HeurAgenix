@@ -9,21 +9,24 @@ Note: Some data are omitted due to space constraints.
 Before this discuss, we have already {discuss_round} rounds discuss and the summary are:
 {heuristic_traject}
 
-Considerations for Next Steps
-- Is the current data sufficient for decision-making?
+"Delta of Visited Node" indicates the newly visited node, "Delta of Current Cost" indicates the additional cost introduced by the heuristic applied in that round. A smaller or more negative value is better.
+
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Considerations for Next Steps
 - Is there a need to construct or refine the solution further?
 - The last heuristic is: {last_heuristic}. How does {last_heuristic} perform, and should we continue with it?
 - How much steps should we run for next heuristic?
 
-Decision Options:
-We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
-1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
-2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
-    - Continue with the same heuristic algorithm to further develop the current solution, or
-    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+Please make strategic decisions based on the characteristics of different algorithms and the current data features, and you can reduce the number of steps executed by each algorithm in a single round. Additionally, try to explore the decision-making logic.
+
+The following are some consensus points:
+
+1. There are two types of algorithms: construction-type algorithms constructs a Solution, resulting in both the "Delta of Visited Node" and the "Delta of Current Cost" being non-zero; the other type optimizes the current Solution, where the "Delta of Visited Node" is zero, but the "Delta of Current Cost" may not be zero. Please combine and utilize these two types of algorithms. 
+2. When both the "Delta of Visited Node" and the "Delta of Current Cost" are zero, it implies that the previous round of the Solution optimization algorithm had no actual effect.
+3. Make greater use of the characteristics of different algorithms of different types in the algorithm pool, and strongly avoid frequently repeating only a few algorithms in both types.
+4. After using construction-type algorithms, different types of optimization-type algorithms can be applied to reduce the overall cost. In a single round, a negative "Delta of Current Cost" indicates the better the optimization effect.
 
 As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
-
+Please use the heuristic names of the algorithms I have implemented and mentioned, without including any symbols other than the names.
 The response format is very important. For better communication, please respond to me in this format:
 1. If you believe the we should continue to build or improve solution, please respond to me in this format:
 ***Run heuristic:

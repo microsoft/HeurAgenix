@@ -1,3 +1,7 @@
+import os
+# 设置环境变量，强制修改缓存目录
+os.environ["TRANSFORMERS_CACHE"] = "/Data/haolong/model_deploy/models_cache/"
+
 import argparse
 import os
 import importlib
@@ -7,6 +11,7 @@ from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.single_construct_single_improve import SingleConstructiveSingleImproveHyperHeuristic
 from src.pipeline.hyper_heuristics.gpt_selection import GPTSelectionHyperHeuristic
 from src.util.gpt_helper import GPTHelper
+import json
 
 def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
@@ -28,10 +33,25 @@ def main():
     heuristic = args.heuristic
     heuristic_dir = args.heuristic_dir
     test_case = args.test_case
-    test_dir = args.test_dir if test_case is None else [test_case] 
+    if test_case is None:
+        test_dir = [os.path.join(args.test_dir,i) for i in os.listdir(args.test_dir)]
+    else:
+        test_dir = [test_case]
+    # test_dir = args.test_dir if test_case is None else [test_case] 
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{datetime_str}"
 
+    gpt_setting = json.load(open("gpt_setting.json"))
+
+    api_type = gpt_setting.get("api_type", "azure")
+
+    model = gpt_setting["model"]
+
+    local_model = gpt_setting["local_model"]
+    local_model_name = local_model.split('/')[-1]
+    if api_type == "azure":
+        output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{model}.{datetime_str}"
+    else:
+        output_dir = args.output_dir if args.output_dir is not None else f"{heuristic}.{local_model_name}.{datetime_str}"
     if heuristic_dir is None:
         heuristic_dir = os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")
 
