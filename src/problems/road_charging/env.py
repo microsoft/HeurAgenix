@@ -8,16 +8,12 @@ from src.problems.road_charging.gym_env import RoadCharging
 
 class Env(MDPEnv):
     """RoadCharging env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
-    # def __init__(self, data_name: str, constrain: bool = False, **kwargs):
-    #     if constrain:
-    #         super().__init__(data_name, ConstrainAction, "constrained_road_charging")
-    #     else:
-    #         super().__init__(data_name, RoadCharging, "road_charging")
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, RoadCharging, "road_charging")
         self.key_item = "return"
         self.compare = lambda x, y: x - y
         self.construction_steps = self.gym_env.k
+        self.online_problem = True
 
     def get_global_data(self):
         return {
@@ -46,6 +42,10 @@ class Env(MDPEnv):
 
     def validation_solution(self, solution: Solution=None) -> bool:
         return True
+
+    def set_online_mode(self, online_mode: bool):
+        self.gym_env.stoch_step = online_mode
+
     
     def get_observation(self) -> dict:
         return {

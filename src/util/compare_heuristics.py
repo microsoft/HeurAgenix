@@ -19,11 +19,13 @@ def run_random_hh(
     
     random_hh = RandomHyperHeuristic(running_heuristic_pool, problem)
     env = dill.loads(env_serialized)
+    if env.online_problem:
+        env.set_online_mode(True)
     complete_and_valid_solution = random_hh.run(env, max_steps=max_steps)
 
     if complete_and_valid_solution:
         # If found best, save it
-        if dump_best_result and best_result_proxy:
+        if dump_best_result and best_result_proxy and not env.online_problem:
             if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) >= 0:
                 best_result_proxy.value = env.key_value
                 env.dump_result(dump_trajectory=True, result_file=f"best_result_{env.key_value}.txt")

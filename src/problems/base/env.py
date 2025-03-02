@@ -10,6 +10,7 @@ class BaseEnv:
     def __init__(self, data_name: str, problem: str, **kwargs):
         self.data_name = data_name
         self.problem = problem
+        self.online_problem = False
         self.data_path = search_file(data_name, problem)
         assert self.data_path is not None
         self.data: tuple = self.load_data(self.data_path)
