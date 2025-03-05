@@ -1,0 +1,9 @@
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "vehicle_num" (int): The total number of vehicles.
+    - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
+    - "depot" (int): The index for depot node.
+    - "time_windows" (N * 2 numpy.ndarray): The ready and due time for each node.
+    - "service_times" (numpy.ndarray): The service time cost of each node.
+    - "demands" (numpy.ndarray): The demand of each node.

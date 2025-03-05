@@ -1,0 +1,23 @@
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): The current set of routes for all vehicles.
+    - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - "visited_num" (int): Number of nodes visited by each vehicle.
+    - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+    - "visited_num" (int): Number of nodes have not been visited by each vehicle.
+    - "distance_for_vehicle(list[int])": The distance cost for each vehicle.
+    - "total_distance_cost" (int): The total cost of the current solution.
+    - "detailed_time" (list[list[list]]): A detailed list to record all time-related information for each vehicle and its tasks:  
+        - The outermost list corresponds to each vehicle, where `len(detailed_time)` equals the total number of vehicles.  
+        - The second-level list corresponds to the sequence of tasks (or nodes) visited by a vehicle. For example, `len(detailed_time[i])` represents the number of tasks completed by vehicle `i`.  
+        - The innermost list contains 6 elements that describe the detailed time information for a specific task:  
+            1. **Task ID** (int): The unique identifier of the task or node.  
+            2. **Arrival Time** (float): The time when the vehicle arrives at the task location.  
+            3. **Start Time** (float): The time when the vehicle starts servicing the task.  
+            4. **Finish Time** (float): The time when the vehicle finishes servicing the task.  
+            5. **Ready Time** (float): The earliest allowable start time for servicing the task (from the problem definition).  
+            6. **Due Time** (float): The latest allowable time by which the task must be serviced (from the problem definition).  
+    - "validation_single_route" (callable): def validation_single_route(route: list[int]) -> bool: function to check whether the single route is valid, including capacity check and time window check. If this route is valid, will return detailed_time for this route only(list of list), otherwise will return False.
+    - "last_visited" (list[int]): The last visited node for each vehicle.
+    - "vehicle_loads" (list[int]): The current load of each vehicle.
+    - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.

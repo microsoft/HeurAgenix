@@ -1,0 +1,5 @@
+1. Make the result must be valid, such as: no re-visited nodes, no overload on capacity, etc.
+2. We insert the depot as start and end in each route before start construct the solution.
+3. The detailed_time information might be information, consider to use it.
+4. If vehicle arrives before the task's ready time, vehicle will wait until task's ready time (in other word, arrive before task's ready time is OK)
+5. If vehicle arrives after the task's due time, It will cost error. So if insert into some routes, the following task's arrive time will be influenced. Please check by validation_single_route(new_route) for this line.
