@@ -90,6 +90,7 @@ class HeuristicSelectionDataCollector:
         best_result_proxy = manager.Value('d', float('-inf'))
         records = []
         round_index = 0
+        previous_score = None
         while env.continue_run and round_index <= max_steps:
             output_file_path = os.path.join(self.output_dir, f"round_{round_index}.txt")
             print(f"Search round {round_index} in {output_file_path}")
@@ -99,9 +100,10 @@ class HeuristicSelectionDataCollector:
             output_file.write(f"selected_previous_heuristics\toperators\n{record_str}\n")
             output_file.write("---------------\n")
             output_file.write(f"previous_solution: \n{env.current_solution}\n")
-            output_file.write(f"is_complete_solution\t{env.is_complete_solution}\n")
+            output_file.write(f"previous_score: {previous_score}\n")
+            output_file.write(f"is_complete_solution: {env.is_complete_solution}\n")
             if env.is_complete_solution:
-                output_file.write(f"key_value\t{env.key_value}\n")
+                output_file.write(f"key_value: {env.key_value}\n")
             output_file.write("---------------\n")
             
             # Evaluate the performance of each heuristics
@@ -134,19 +136,21 @@ class HeuristicSelectionDataCollector:
             output_file.write(f"heuristic\t{self.score_calculation.__name__}\tresults\n")
             output_file.write("\n".join(["\t".join([item for item in performance]) for performance in performances]) + "\n")
             output_file.write("---------------\n")
-            output_file.write(f"selected_heuristics\t{best_heuristic_name}\n")
-            output_file.write(f"running_operator\t{best_operator}\n")
-            output_file.write(f"after_solution: \n{env.current_solution}\n")
-            output_file.write(f"is_complete_solution\t{env.is_complete_solution}\n")
+            output_file.write(f"selected_heuristics: {best_heuristic_name}\n")
+            output_file.write(f"running_operator: {best_operator}\n")
+            output_file.write(f"after_solution: \n{best_after_heuristic_env.current_solution}\n")
+            output_file.write(f"after_score: {best_score}\n")
+            output_file.write(f"is_complete_solution: {best_after_heuristic_env.is_complete_solution}\n")
             if env.is_complete_solution:
-                output_file.write(f"key_value\t{env.key_value}\n")
+                output_file.write(f"key_value: {best_after_heuristic_env.key_value}\n")
             output_file.write("---------------\n")
             output_file.close()
 
-            if env.is_complete_solution and best_after_heuristic_env.is_complete_solution and env.compare(env.key_value, best_score) >= 0:
-                print(f"Stop as round {round_index}")
-                break
-
+            if env.is_complete_solution and best_after_heuristic_env.is_complete_solution:
+                if env.compare(previous_score, best_score) >= 0 or best_operator == "None":
+                    print(f"Stop as round {round_index}")
+                    break
+            previous_score = best_score
             env = best_after_heuristic_env
             round_index += 1
         env.dump_result(dump_trajectory=True, compress_trajectory=False, result_file="finished.txt")
