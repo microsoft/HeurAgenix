@@ -17,30 +17,26 @@ class Env(MDPEnv):
 
     def get_global_data(self):
         return {
-            "fleet_size": self.gym_env.N,
-            "max_time_steps": self.gym_env.T,
-            "time_resolution": self.gym_env.dt,
-            "total_chargers": self.gym_env.charging_stations.total_chargers,
-            "max_cap": self.gym_env.evs.b_cap,
-            "consume_rate": self.gym_env.evs.energy_consumption,
-            "charging_rate": self.gym_env.evs.charge_rate,
-            # "assign_prob": self.gym_env.rho,
-            "customer_arrivals": self.gym_env.trip_requests.customer_arrivals,
-            "order_price": self.gym_env.trip_requests.per_minute_rates,
-            "charging_price": self.gym_env.charging_stations.real_time_prices,
-            "initial_charging_cost": 0
+            "fleet_size": self.gym_env.n,
+            "max_time_steps": self.gym_env.k,
+            "total_chargers": self.gym_env.m,
+            "max_cap": self.gym_env.max_cap,
+            "consume_rate": self.gym_env.d_rates,
+            "charging_rate": self.gym_env.c_rates,
+            "assign_prob": self.gym_env.rho,
+            "order_price": self.gym_env.w,
+            "charging_price": self.gym_env.p,
+            "initial_charging_cost": self.gym_env.h
         }
     
     def get_state_data(self):
         return {
-            "current_step": self.gym_env.current_timepoint,
-            "operational_status":  self.gym_env.states["OperationalStatus"],
-            "time_to_next_availability": self.gym_env.states["TimeToNextAvailability"],
-            # "ride_lead_time": self.gym_env.obs["RideTime"],
-            # "charging_lead_time": self.gym_env.states["ChargingStatus"],
-            "battery_soc": self.gym_env.states["SoC"],
+            "current_step": self.gym_env.obs["TimeStep"][0],
+            "ride_lead_time": self.gym_env.obs["RideTime"],
+            "charging_lead_time": self.gym_env.obs["ChargingStatus"],
+            "battery_soc": self.gym_env.obs["SoC"],
             "reward": self.reward,
-            "return": self.gym_env.ep_returns,
+            "return": self.gym_env.ep_return,
             "current_solution": self.current_solution
         }
 
@@ -53,7 +49,7 @@ class Env(MDPEnv):
     
     def get_observation(self) -> dict:
         return {
-            "Sum Battery Soc": sum(self.gym_env.states["SoC"]),
+            "Sum Battery Soc": sum(self.gym_env.obs["SoC"]),
             "Reward": self.reward
         }
 

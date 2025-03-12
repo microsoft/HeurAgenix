@@ -2,6 +2,7 @@ import gym
 from gym import spaces
 import numpy as np
 import json
+import random
 import pickle
 import os
 from collections import deque
@@ -12,7 +13,7 @@ from TripRequests import TripRequests
 from EVFleet import EVFleet
 
 
-class RoadCharging(gym.Env):
+class EVChargingEnv(gym.Env):
 	def __init__(self, config_fname: str):
 	
 		config = load_file(config_fname)
@@ -35,12 +36,14 @@ class RoadCharging(gym.Env):
 		self.action_space = spaces.MultiBinary(self.N)
 
 		# State space: For each EV, (operational-status, time-to-next-availability, SoC, location)
-		self.observation_space = spaces.Dict({
+
+		self.state_space = spaces.Dict({
 			"OperationalStatus": spaces.MultiDiscrete([3] * self.N),  # 3 states: 0 (idle), 1 (serving), 2 (charging)
 			"TimeToNextAvailability": spaces.MultiDiscrete([101] * self.N),  # Values from 0 to 100
 			"SoC": spaces.Box(low=0.0, high=1.0, shape=(self.N,), dtype=np.float32) # SoC in range [0, 1]
 		})
-  
+
+
 	def reset(self, stoch_step: bool=False):
 	
 		if stoch_step:
@@ -58,7 +61,6 @@ class RoadCharging(gym.Env):
 		self.states = self.evs.get_all_states()
   
 		self.trip_requests.customer_arrivals = [int(np.ceil(x/200*self.N)) for x in self.trip_requests.customer_arrivals]
-		
 		if stoch_step: # if stoch_step, resample init SoCs and real time prices for each episode
 			self.evs.reset_init_SoCs()
 			self.charging_stations.update_real_time_prices() 
@@ -117,35 +119,20 @@ class RoadCharging(gym.Env):
 
 		for i in range(self.N):
 			o_t_i, tau_t_i, SoC_i = self.evs.get_state(i)  # Get EV state
-			# remaining_cap = max(self.evs.max_SoC - SoC_i, 0)
+			remaining_cap = max(self.evs.max_SoC - SoC_i, 0)
 
 			if actions[i] == 1:  # Charging action
 				if tau_t_i >= 1:
 					penalty[i] += 100  # Penalize charging while already busy (serving or charging)
-				# Since this case does not reject any action, we don't need to enforce the penalty.
-				# A poor decision will already result in a low return.
 					print("Warning: Charging while already busy (serving or charging).")
 
 				else:
-					SoC_i = self.evs.get_state(i)[2]
-					remaining_cap = max(self.evs.max_SoC - SoC_i, 0)
 					session_added_SoC = self.evs.charge_rate[i] * (
 						self.renew_ct if o_t_i == 2 else self.min_ct
 					)
-					session_added_SoC = min(session_added_SoC, remaining_cap)
-
-					# if remaining_cap < session_added_SoC:
-					# 	penalty[i] += 100  # Penalize charging when SoC is already high
-					actual_charging_time = session_added_SoC / self.evs.charge_rate[i]
-					session_time = self.renew_ct if o_t_i == 2 else self.min_ct
-					idle_time = session_time  - actual_charging_time
-					idle_time = max(idle_time, 0)  # Ensure no negative idle time
-					SoC_drop = self.evs.energy_consumption[i] *idle_time
-		
-					actual_added_SoC = session_added_SoC - SoC_drop 
-					if actual_added_SoC <= 0:
-						penalty[i] += 100
-						print("Warning: Charging failed to increase SoC.")
+					if remaining_cap < session_added_SoC:
+						penalty[i] += 100  # Penalize charging when SoC is already high
+						print("Warning: Insufficient SoC drop for recharge.")
 
 		# Apply system-level penalty if charging demand exceeds available slots
 		if sum(actions) > self.charging_stations.get_dynamic_resource_level():
@@ -224,7 +211,6 @@ class RoadCharging(gym.Env):
 				SoC_i = self.evs.get_state(i)[2]
 				remaining_cap = max(self.evs.max_SoC - SoC_i, 0)
 				session_added_SoC = self.evs.charge_rate[i] * self.renew_ct
-				session_added_SoC = min(session_added_SoC, remaining_cap)
 
 				# Check if EV has an active charging session
 				if i not in self.dispatch_results or self.dispatch_results[i]['cs'] is None:
@@ -232,32 +218,23 @@ class RoadCharging(gym.Env):
 					continue  # Skip this EV
 
 				charging_session = self.dispatch_results[i]['cs']
-				
-				actual_charging_time = session_added_SoC / self.evs.charge_rate[i]
-				idle_time = self.renew_ct - actual_charging_time
-				idle_time = max(idle_time, 0)  # Ensure no negative idle time
-				SoC_drop = self.evs.energy_consumption[i] *idle_time
-				# actual_added_SoC = max(session_added_SoC - SoC_drop, 0)  # Prevent negative SoC gain
-				# session added SoC can be 0 if remaining SoC is 0
-				# then actual_added_SoC is negative. should not apply max(,0)
-				actual_added_SoC = session_added_SoC - SoC_drop
 	
-				if actual_added_SoC <= 0:
-					# reject charging action, release charger
-					charger_id = self.dispatch_results[i]['cs']['station_id']
-					self.charging_stations.adjust_occupancy(charger_id, 1)  # Free up a slot
-					self.dispatch_results[i]['cs'] = None  # Remove charging record
-					continue
+				if remaining_cap >= session_added_SoC:
+					# Renew charging session
+					charging_price = charging_session.get("price")
+					charging_session["session_added_SoC"] = session_added_SoC
+					charging_session["session_cost"] = (
+						session_added_SoC * self.evs.b_cap[i] * charging_price
+					)
+					charging_session["session_time"] = self.renew_ct
+					charging_session["per_step_added_SoC"] = session_added_SoC / np.ceil(self.renew_ct / self.dt)
+				else:
+					# Stop charging if remaining capacity is insufficient
+					charger_id = charging_session.get("station_id")
+					if charger_id is not None:
+						self.charging_stations.adjust_occupancy(charger_id, 1)  # Free up slot
 
-				# Renew charging session
-				charging_price = charging_session.get("price")
-				charging_session["session_added_SoC"] = session_added_SoC
-				charging_session["session_cost"] = (
-					session_added_SoC * self.evs.b_cap[i] * charging_price +\
-					idle_time * self.evs.idle_cost
-				)
-				charging_session["session_time"] = self.renew_ct
-				charging_session["per_step_added_SoC"] = actual_added_SoC / np.ceil(self.renew_ct / self.dt)
+					self.dispatch_results[i]['cs'] = None  # Remove charging record
 
 				# Debugging output before assertion
 				if self.dispatch_results[i]['order'] is not None:
@@ -265,7 +242,6 @@ class RoadCharging(gym.Env):
 
 				assert self.dispatch_results[i]['order'] is None, "To stay charge: serving records should be None"
 
-		# Should process stay_charge_evs first, in case any charger is freed up
 		if go_charge_evs:
 			self.relocate_to_charge(go_charge_evs)
 
@@ -280,11 +256,11 @@ class RoadCharging(gym.Env):
 
 			rewards.append(reward)
 			next_states.append(next_state)
-
+   
 		self.agents_trajectory['Reward'][:, self.current_timepoint] = rewards
 		self.ep_returns += sum(rewards)
 		self.states = self.evs.get_all_states()
-  
+
 		# Step 5: Update global states, and metrics
 		for i in range(self.N):
 			if i in go_charge_evs+stay_charge_evs and self.dispatch_results[i]['cs']:
@@ -294,15 +270,15 @@ class RoadCharging(gym.Env):
 			if i in dispatch_evs and self.dispatch_results[i]['order']:
 				self.total_successful_dispatches += 1
 				self.total_trip_fare_earned += self.dispatch_results[i]['order']['trip_fare']
-	
+		
 		self.update_acceptance_rate()
 		self.total_trip_requests = len(self.trip_requests.trip_queue)
-		
+
 		self.current_timepoint += 1
+		
 
 		done = False
 		# if self.current_timepoint >= self.T or all(self.states['SoC'][i] == 0.0 for i in range(self.N)):
-		num_requests = int(self.trip_requests.customer_arrivals[self.current_timepoint]) 
 		if self.current_timepoint >= self.T:
 			done = True
    			# Store final state
@@ -359,7 +335,7 @@ class RoadCharging(gym.Env):
 
 		# theta_t1_i = 0.8
 
-		return o_t1_i, tau_t1_i, round(theta_t1_i, 4)
+		return o_t1_i, tau_t1_i, theta_t1_i
 
 	def compute_reward(self, ev_i, s_t_i, action_i):
 		o_t_i, tau_t_i, _ = s_t_i
@@ -408,8 +384,8 @@ class RoadCharging(gym.Env):
 		charging_evs = [i for i, status in enumerate(op_status) if status == 2]
   
 		report = {
-			"current_hour": (self.start_hour*60+self.current_timepoint*self.dt)//60,
-			"current_minute": (self.start_hour*60+self.current_timepoint*self.dt)%60,
+			"current_hour": (6*60+self.current_timepoint*self.dt)//60,
+			"current_minute": (6*60+self.current_timepoint*self.dt)%60,
 			"open_requests": open_requests,
 			"open_charging_stations": open_stations,
 			"total_available_chargers_slots": total_available_chargers,
@@ -501,7 +477,7 @@ class RoadCharging(gym.Env):
 	def relocate_to_charge(self, go_charge_evs):
 
 		open_stations = self.charging_stations.update_open_stations()
-
+  
 		if not open_stations:
 			for ev in go_charge_evs:
 				self.dispatch_results[ev]['cs'] = None
@@ -514,56 +490,43 @@ class RoadCharging(gym.Env):
 		station_info = self.charging_stations.stations[station_id]
 		resource_level = self.charging_stations.get_dynamic_resource_level()
 
-		if resource_level == 0:
-			print("Warning: Check the code for open stations—`open_stations` should be empty when `resource_level` is 0.")
-			for ev in go_charge_evs:
-				self.dispatch_results[ev]['cs'] = None
-			return
-
 		self.rng.shuffle(go_charge_evs)
 		evs_to_assign = go_charge_evs[:min(resource_level, len(go_charge_evs))]
 		# total_assign = len(evs_to_assign)
 
 		for ev in go_charge_evs:
-			# print("ev:", ev)
 			self.dispatch_results[ev]['cs'] = None  # Default to no charging assignment
 
 			if ev not in evs_to_assign:
-				continue  # Skip EVs that were not selected
+				continue  # Skip EVs that were not assigned to charge
 
 			SoC_i = self.states["SoC"][ev]
 			remaining_cap = max(self.evs.max_SoC - SoC_i, 0)
 			session_added_SoC = self.evs.charge_rate[ev] * self.min_ct
-			session_added_SoC = min(session_added_SoC, remaining_cap)
 
-			actual_charging_time = session_added_SoC / self.evs.charge_rate[ev]
+			if remaining_cap < session_added_SoC:
+				# total_assign = max(total_assign - 1, 0) 
+				continue  # Skip this EV since it doesn't have enough capacity to charge
 
-			# Compute session timing
-			# transition_time = self.dt  # Default to 1 time step for travel time; actual travel time can be used if needed
+			# Compute session timing and energy changes
+			# transition_time = self.dt  # Set travel time to 1 time step by default; if using actual travel time, round to the nearest integer multiple of the time step
+			# so there will not be any idle time in this setting
 			transition_time = 0
-			session_time = transition_time + self.min_ct  # Total session time including transition and charging
+			# you can keep this in case transition time is not 0
+			actual_session_time = transition_time + self.min_ct
+			# idle_time = (self.dt - (actual_session_time % self.dt)) % self.dt
+			idle_time = 0
+			session_time = actual_session_time + idle_time  # Ensure it's an integer multiple of self.dt
 
-			# Idle time is the remaining time after actual charging
-			idle_time = session_time - actual_charging_time
-
-			# Energy consumption during transition and idle time
 			SoC_drop = self.evs.energy_consumption[ev] * (transition_time + idle_time)
-			# actual_added_SoC = max(session_added_SoC - SoC_drop, 0)  # Prevent negative SoC gain
 			actual_added_SoC = session_added_SoC - SoC_drop
 
 			if actual_added_SoC <= 0:
-				# total_assign = max(total_assign - 1, 0) 
 				continue
-				# print(SoC_i)
-				# print(session_added_SoC)
-				# print(SoC_drop)
-				# raise ValueError(f"Error: EV {ev} did not add any SoC during the charging session. Please check the parameters or conditions.")
 
-			# Get the real-time charging price
 			price_index = int((self.start_hour*60 + self.current_timepoint * self.dt) // 30)
 			charging_price = station_info["real_time_prices"][price_index]
 
-			# Update dispatch results for the charging session
 			self.dispatch_results[ev]['cs'] = {
 				"station_id": station_id,
 				"session_added_SoC": session_added_SoC,
@@ -575,9 +538,8 @@ class RoadCharging(gym.Env):
 					transition_time * self.evs.travel_cost +
 					idle_time * self.evs.idle_cost
 				)
-			}
+				}
 			self.charging_stations.adjust_occupancy(station_id, -1)
-			
 		# Update charging station occupancy
 		# self.charging_stations.adjust_occupancy(station_id, -total_assign)
 
@@ -617,3 +579,130 @@ class RoadCharging(gym.Env):
   
 		return self.memory
 
+def main():
+	# example_config = {
+	# 	"total_time_steps": 216,
+	# 	"time_step_minutes":5,
+	# 	"total_evs": 5,
+	# 	"committed_charging_block_minutes": 15,
+	# 	"renewed_charging_block_minutes": 5, 
+	# 	"ev_params": None,
+	# 	"trip_params": None,
+	# 	"charging_params": None,
+	# 	"other_env_params": None
+	# }
+	total_evs = 3
+	total_chargers = 1
+	resolution = 15
+	start_hour = 6
+
+	price_type = 1
+	demand_type = 1
+	SoC_type = 1
+ 
+	test_instance_num=1
+
+	# Define paths
+	input_path = "input"
+	type_path = f"price{price_type}_demand{demand_type}_SoC{SoC_type}_{total_chargers}for{total_evs}_{start_hour}to24_{resolution}min"
+ 
+	config_filename = os.path.join(os.path.join(input_path, type_path, "train_config.json"))
+	
+	env = EVChargingEnv(config_filename)  # 3 EVs, total 10 sessions, charging holds 2 sessions
+	
+	total_episodes = 1
+	ep_pay = []
+	ep_cost = []
+	ep_returns = []
+	ep_penalty = []
+	for ep in range(total_episodes):
+		env.reset()
+		env.show_config()
+
+		for _ in range(env.T):
+			# Get current state of taxi 0
+			o_t_i, tau_t_i, SoC_i = env.evs.get_state(0)
+			# Sample an action from the action space
+			actions = env.action_space.sample()
+			action = actions[0]
+			
+			# Print the current timepoint and state information
+			print(f"--- Timepoint {env.current_timepoint} ---")
+			print(f"State: o_t = {o_t_i}, tau_t = {tau_t_i}, SoC_t = {SoC_i:.4f}")
+			print(f"Action taken: a_t = {action} (EV 1: a_t = {actions[1]}, EV 2: a_t = {actions[2]})")
+			
+			# Take a simulation step
+			_, _, done, info = env.step(actions)
+   
+			op_status = env.states["OperationalStatus"]
+			idle_evs = [i for i, status in enumerate(op_status) if status == 0]
+			serving_evs = [i for i, status in enumerate(op_status) if status == 1]
+			charging_evs = [i for i, status in enumerate(op_status) if status == 2]
+			total_available_chargers = env.charging_stations.get_dynamic_resource_level()
+			open_stations = env.charging_stations.update_open_stations()
+			newly_requested_trips = [(key,value['raised_time'],value['trip_duration'],value['status']) for key, value in env.trip_requests.trip_queue.items() 
+                     if value['raised_time'] == env.current_timepoint-1]
+
+			print(f"After step(): Idle EVs: {idle_evs}, Serving EVs: {serving_evs}, Charging EVs: {charging_evs}, "
+      		f"Available Chargers: {total_available_chargers}, Open Stations: {open_stations}")
+			print(f"Newly requested trips: {newly_requested_trips}")
+
+			# Interpret the action
+			if action == 0:
+				print("Dispatch order:")
+			else:
+				print("Relocate to charge:")
+			
+			# Check for charging session info
+			cs_result = env.dispatch_results[0].get("cs")
+			if cs_result:
+				print(f"  Session added SoC: {cs_result.get('session_added_SoC'):.4f}")
+			
+			# Check for order (trip) info
+			order_result = env.dispatch_results[0].get("order")
+			if order_result:
+				print(f"  Trip duration: {order_result.get('trip_duration')} minutes, "
+					f"Trip fare: {order_result.get('trip_fare')}")
+			
+			print("=" * 40)
+
+			
+			# if ep % 5 == 0:
+			# 	env.report_progress()
+	
+			if done:
+				break
+
+		ep_pay.append(env.total_trip_fare_earned)
+		ep_cost.append(env.total_charging_cost)
+		ep_returns.append(env.ep_returns)
+		ep_penalty.append(env.total_penalty)
+  
+	visualize_trajectory(env.agents_trajectory)
+ 
+	serializable_data = {key: value.tolist() for key, value in env.agents_trajectory.items()}
+	with open("agents_trajectory.json", "w") as f:
+		json.dump(serializable_data, f, indent=4)
+	
+ 
+	ep_pay = [round(float(r), 2) for r in ep_pay]
+	print("total pay:", ep_pay)
+	print("average total pay is:", sum(ep_pay)/total_episodes)	
+ 
+	ep_cost = [round(float(r), 2) for r in ep_cost]
+	print("total costs:", ep_cost)
+	print("average total costs is:", sum(ep_cost)/total_episodes)	
+ 
+	ep_returns = [round(float(r), 2) for r in ep_returns]
+	print("total returns:", ep_returns)
+	print("average total returns is:", sum(ep_returns)/total_episodes)	
+ 
+	ep_penalty = [round(float(r), 2) for r in ep_penalty]
+	print("total penalty:", ep_penalty)
+	print("average total penlaty is:", sum(ep_penalty)/total_episodes)	
+
+	env.close()
+
+
+if __name__ == "__main__":
+	main()

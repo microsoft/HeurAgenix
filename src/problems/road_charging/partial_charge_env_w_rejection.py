@@ -12,7 +12,7 @@ from TripRequests import TripRequests
 from EVFleet import EVFleet
 
 
-class RoadCharging(gym.Env):
+class EVChargingEnv(gym.Env):
 	def __init__(self, config_fname: str):
 	
 		config = load_file(config_fname)
@@ -35,12 +35,14 @@ class RoadCharging(gym.Env):
 		self.action_space = spaces.MultiBinary(self.N)
 
 		# State space: For each EV, (operational-status, time-to-next-availability, SoC, location)
-		self.observation_space = spaces.Dict({
+
+		self.state_space = spaces.Dict({
 			"OperationalStatus": spaces.MultiDiscrete([3] * self.N),  # 3 states: 0 (idle), 1 (serving), 2 (charging)
 			"TimeToNextAvailability": spaces.MultiDiscrete([101] * self.N),  # Values from 0 to 100
 			"SoC": spaces.Box(low=0.0, high=1.0, shape=(self.N,), dtype=np.float32) # SoC in range [0, 1]
 		})
-  
+
+
 	def reset(self, stoch_step: bool=False):
 	
 		if stoch_step:
@@ -617,3 +619,131 @@ class RoadCharging(gym.Env):
   
 		return self.memory
 
+def main():
+	# example_config = {
+	# 	"total_time_steps": 216,
+	# 	"time_step_minutes":5,
+	# 	"total_evs": 5,
+	# 	"committed_charging_block_minutes": 15,
+	# 	"renewed_charging_block_minutes": 5, 
+	# 	"ev_params": None,
+	# 	"trip_params": None,
+	# 	"charging_params": None,
+	# 	"other_env_params": None
+	# }
+	total_evs = 3
+	total_chargers = 1
+	resolution = 15
+	start_hour = 6
+
+	price_type = 1
+	demand_type = 1
+	SoC_type = 1
+ 
+	test_instance_num=1
+
+	# Define paths
+	input_path = "input"
+	type_path = f"price{price_type}_demand{demand_type}_SoC{SoC_type}_{total_chargers}for{total_evs}_{start_hour}to24_{resolution}min"
+ 
+
+	config_filename = os.path.join(os.path.join(input_path, type_path, "train_config.json"))
+	
+	env = EVChargingEnv(config_filename)  # 3 EVs, total 10 sessions, charging holds 2 sessions
+	
+	total_episodes = 1
+	ep_pay = []
+	ep_cost = []
+	ep_returns = []
+	ep_penalty = []
+	for ep in range(total_episodes):
+		env.reset()
+		env.show_config()
+
+		for _ in range(env.T):
+			# Get current state of taxi 0
+			o_t_i, tau_t_i, SoC_i = env.evs.get_state(0)
+			# Sample an action from the action space
+			actions = env.action_space.sample()
+			action = actions[0]
+			
+			# Print the current timepoint and state information
+			print(f"--- Timepoint {env.current_timepoint} ---")
+			print(f"State: o_t = {o_t_i}, tau_t = {tau_t_i}, SoC_t = {SoC_i:.4f}")
+			print(f"Action taken: a_t = {action} (EV 1: a_t = {actions[1]}, EV 2: a_t = {actions[2]})")
+			
+			# Take a simulation step
+			_, _, done, info = env.step(actions)
+   
+			op_status = env.states["OperationalStatus"]
+			idle_evs = [i for i, status in enumerate(op_status) if status == 0]
+			serving_evs = [i for i, status in enumerate(op_status) if status == 1]
+			charging_evs = [i for i, status in enumerate(op_status) if status == 2]
+			total_available_chargers = env.charging_stations.get_dynamic_resource_level()
+			open_stations = env.charging_stations.update_open_stations()
+			newly_requested_trips = [(key,value['raised_time'],value['trip_duration'],value['status']) for key, value in env.trip_requests.trip_queue.items() 
+					 if value['raised_time'] == env.current_timepoint-1]
+
+			print(f"After step(): Idle EVs: {idle_evs}, Serving EVs: {serving_evs}, Charging EVs: {charging_evs}, "
+	  		f"Available Chargers: {total_available_chargers}, Open Stations: {open_stations}")
+			print(f"Newly requested trips: {newly_requested_trips}")
+
+			# Interpret the action
+			if action == 0:
+				print("Dispatch order:")
+			else:
+				print("Relocate to charge:")
+			
+			# Check for charging session info
+			cs_result = env.dispatch_results[0].get("cs")
+			if cs_result:
+				print(f"  Session added SoC: {cs_result.get('session_added_SoC'):.4f}")
+			
+			# Check for order (trip) info
+			order_result = env.dispatch_results[0].get("order")
+			if order_result:
+				print(f"  Trip duration: {order_result.get('trip_duration')} minutes, "
+					f"Trip fare: {order_result.get('trip_fare')}")
+			
+			print("=" * 40)
+
+			
+			# if ep % 5 == 0:
+			# 	env.report_progress()
+	
+			if done:
+				break
+
+		ep_pay.append(env.total_trip_fare_earned)
+		ep_cost.append(env.total_charging_cost)
+		ep_returns.append(env.ep_returns)
+		ep_penalty.append(env.total_penalty)
+  
+	visualize_trajectory(env.agents_trajectory)
+ 
+	serializable_data = {key: value.tolist() for key, value in env.agents_trajectory.items()}
+	with open("agents_trajectory.json", "w") as f:
+		json.dump(serializable_data, f, indent=4)
+	
+ 
+	ep_pay = [round(float(r), 2) for r in ep_pay]
+	print("total pay:", ep_pay)
+	print("average total pay is:", sum(ep_pay)/total_episodes)	
+ 
+	ep_cost = [round(float(r), 2) for r in ep_cost]
+	print("total costs:", ep_cost)
+	print("average total costs is:", sum(ep_cost)/total_episodes)	
+ 
+	ep_returns = [round(float(r), 2) for r in ep_returns]
+	print("total returns:", ep_returns)
+	print("average total returns is:", sum(ep_returns)/total_episodes)	
+ 
+	ep_penalty = [round(float(r), 2) for r in ep_penalty]
+	print("total penalty:", ep_penalty)
+	print("average total penlaty is:", sum(ep_penalty)/total_episodes)	
+
+	env.close()
+
+
+if __name__ == "__main__":
+	main()
