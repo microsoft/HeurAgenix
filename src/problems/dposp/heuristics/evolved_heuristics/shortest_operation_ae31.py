@@ -108,7 +108,7 @@ def shortest_operation_ae31(global_data: dict, state_data: dict, algorithm_data:
 
                         # Calculate time cost
                         delta_time_cost = get_time_cost_delta(target_line_id, order_id, position)
-                        if delta_time_cost < min_time_cost:
+                        if delta_time_cost < min_time_cost and current_solution.routes[source_line_id][source_schedule.index(order_id)] != current_solution.depot:
                             min_time_cost = delta_time_cost
                             best_operator = RelocateOperator(
                                 source_production_line_id=source_line_id,

@@ -123,7 +123,7 @@ def min_cost_insertion_3b2b(global_data: dict, state_data: dict, algorithm_data:
                             cost_reduction = -cost_increase
 
                             # Update best shift if this shift is better
-                            if cost_reduction > best_cost_reduction:
+                            if cost_reduction > best_cost_reduction and current_solution.routes[source_vehicle_id][source_position] != depot:
                                 best_source_vehicle_id = source_vehicle_id
                                 best_source_position = source_position
                                 best_target_vehicle_id = target_vehicle_id
