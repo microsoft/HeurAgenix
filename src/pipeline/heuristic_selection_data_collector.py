@@ -19,6 +19,7 @@ class HeuristicSelectionDataCollector:
         heuristic_type: str,
         heuristic_pool: list[str],
         search_time: int=1000,
+        save_best: bool=False,
         collection_mode: str="best",
         output_dir: str=None,
     ) -> None:
@@ -27,8 +28,9 @@ class HeuristicSelectionDataCollector:
         self.heuristic_pool = heuristic_pool
         self.score_calculation = score_calculation
         self.search_time = search_time
-        self.output_dir = output_dir
+        self.save_best = save_best
         self.collection_mode = collection_mode
+        self.output_dir = output_dir
 
         module = importlib.import_module(f"src.problems.{problem}.env")
         globals()["Env"] = getattr(module, "Env")
@@ -118,7 +120,8 @@ class HeuristicSelectionDataCollector:
                 search_interval,
                 search_time,
                 self.problem,
-                best_result_proxy
+                best_result_proxy,
+                self.save_best
             )
 
             # Record and best best for next search
