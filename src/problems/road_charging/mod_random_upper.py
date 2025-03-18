@@ -1,11 +1,9 @@
 import gym
-from gym import spaces
 import numpy as np
 import json
 import os
 import matplotlib.pyplot as plt
-from utils import visualize_trajectory, get_data_type_meanings
-from gym_env import RoadCharging
+from src.problems.road_charging.gym_env import RoadCharging
 
 def policy(env, charge_lb=0.1, charge_ub=0.8,):
 	actions = env.action_space.sample()

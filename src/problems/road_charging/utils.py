@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
-import random
 import json
 import os
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 
 def csv_to_list(fname=None):

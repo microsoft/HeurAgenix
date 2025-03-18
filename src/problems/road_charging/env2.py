@@ -16,7 +16,7 @@ class Env(MDPEnv):
 		self.compare = lambda x, y: x - y
 		self.construction_steps = self.gym_env.T
 		self.online_problem = True
-		# self.output_dir = "src/problems/road_charging"
+		self.output_dir = "src/problems/road_charging"
 
 	def get_global_data(self):
 		return {
@@ -99,3 +99,26 @@ class Env(MDPEnv):
 			plt.legend(loc='upper right')
 
 		plt.savefig(fname, dpi=300)
+
+  
+def main():
+	config_filename = "train_config.json"
+	
+	env = Env(config_filename) 
+	env.gym_env.reset(stoch_step=True)
+
+	for _ in range(env.gym_env.T):
+			
+		actions = env.gym_env.action_space.sample()
+		_, _, done, _ = env.gym_env.step(actions)
+  
+  
+	# env.dump_result()
+	env.show_trajectory()
+  
+	print(env.get_global_data())
+	print(env.get_state_data())
+	env.gym_env.close()
+
+if __name__ == "__main__":
+	main()

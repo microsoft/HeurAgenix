@@ -6,11 +6,10 @@ import pickle
 import os
 from collections import deque
 import matplotlib.pyplot as plt
-from utils import load_file, csv_to_list, visualize_trajectory
-from ChargingStations import ChargingStations
-from TripRequests import TripRequests
-from EVFleet import EVFleet
-
+from src.problems.road_charging.utils import load_file, visualize_trajectory
+from src.problems.road_charging.ChargingStations import ChargingStations
+from src.problems.road_charging.TripRequests import TripRequests
+from src.problems.road_charging.EVFleet import EVFleet
 
 class RoadCharging(gym.Env):
 	def __init__(self, config_fname: str):

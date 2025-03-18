@@ -1,8 +1,6 @@
-import random
 import pandas as pd
 import numpy as np
-import os
-from utils import csv_to_list
+
 
 class ChargingStations:
 	def __init__(self, config=None):

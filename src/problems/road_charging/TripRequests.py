@@ -1,9 +1,6 @@
 import numpy as np
 import pandas as pd
-import datetime
-import json
-from utils import csv_to_list, load_file
-from collections import defaultdict
+from src.problems.road_charging.utils import csv_to_list, load_file
 
 class TripRequests:
 	def __init__(self, config=None):
