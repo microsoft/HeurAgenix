@@ -1,7 +1,11 @@
-state_data (dict): The state data dict containing the solution state data with:
-    - "current_step": The index of current time step. (0 <= current_step < max_time_steps)
-    - "ride_lead_time": Ride leading time and length is number of fleet_size.
-    - "charging_lead_time": Charging leading time and length is number of fleet_size.
-    - "battery_soc": Soc of battery of each feet and length is number of fleet_size.
-    - "reward": The total reward for all fleets for this time step.
-    - "return": The sum of total reward for all fleets from beginning to current time step.
+state_data (dict): A dictionary containing the solution state data with the following keys:
+
+- "current_step": The index of the current time step, where (0 <= current_step < max_time_steps).
+- "operational_status": A 2D array of size (fleet_size, max_time_steps + 1), where:
+  - 0 represents idle,
+  - 1 represents serving a trip, and
+  - 2 represents charging.
+- "time_to_next_availability": A 2D array of size (fleet_size, max_time_steps + 1), indicating the lead time until the fleet becomes available (after completing a trip or finishing charging).
+- "battery_soc": A 2D array of size (fleet_size, max_time_steps + 1), representing the battery state of charge in percentage.
+- "reward": The total reward for the entire fleet at the current time step.
+- "return": The accumulated reward for the entire fleet from time step 0 to the current time step.
