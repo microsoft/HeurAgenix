@@ -111,7 +111,6 @@ if __name__ == "__main__":
 	resolution = 15
 	start_hour = 0
 	total_time_steps = int((24-start_hour)*60//resolution)
-	
 
 	price_types = {
 		"nyiso":1,
@@ -126,19 +125,18 @@ if __name__ == "__main__":
 	SoC_types = {
 		"0.75-0.8": 1,
 		"0.2-0.8": 2,
-		"0.2": 3,
-		"1.0": 4,
-		
+		"1.0": 3,
+		"0.2": 4
 	}
 	price_type = 1
 	demand_type = 1
 	SoC_type = 1
 	demand_scaling = {1: 0.95, 2: 0.9, 3: 0.8}.get(demand_type, 1.0)
  
-	test_instance_num = 20
+	validation_num = 20
 
 	env_data_path = "env_data"
-	input_path = "input" 
+	input_path = "validation" 
 	type_path = f"price{price_type}_demand{demand_type}_SoC{SoC_type}_{total_chargers}for{total_evs}_{start_hour}to24_{resolution}min"
  
 	base_price_fname = f"nyiso_rescaled_lmp_30min_2020-06-01.csv"
@@ -146,7 +144,6 @@ if __name__ == "__main__":
 		base_price_fname = f"caiso_rescaled_lmp_30min_2023-04-20.csv"
 	
 	os.makedirs(os.path.join(input_path, type_path), exist_ok=True)
-	
 	
 	train_config = generate_config(
 		op_start_hour = start_hour,
@@ -165,19 +162,19 @@ if __name__ == "__main__":
 		trip_records_fname=os.path.join(env_data_path,"finalize_uber_trips2019-04.csv"),
 		saved_trips_fname=None,
 	)
-	save_config(train_config, os.path.join(input_path, type_path, "train_config.json"))
 
 
-	test_instances_path = os.path.join(input_path, type_path)
+	validation_path = os.path.join(input_path, type_path)
 
-	for i in range(1, 1 + test_instance_num):
-		os.makedirs(os.path.join(test_instances_path, f"instance{i}"), exist_ok=True)
-		saved_trips_fname = os.path.join(test_instances_path, f"instance{i}", f"trip_data{i}.json")
-		charging_prices_fname = os.path.join(test_instances_path, f"instance{i}", f"price_data{i}.csv")
+	for i in range(1, 1 + validation_num):
+		os.makedirs(os.path.join(validation_path, f"instance{i}"), exist_ok=True)
+		saved_trips_fname = os.path.join(validation_path, f"instance{i}", f"trip_data{i}.json")
+		charging_prices_fname = os.path.join(validation_path, f"instance{i}", f"price_data{i}.csv")
 
 		# ----------------- generate trip data ----------------- 
 		trip_requests = TripRequests(train_config["trip_params"])
 		trip_requests.reset(np.random)
+		# trip_requests.customer_arrivals = [int(np.ceil(x/200*total_evs)) for x in trip_requests.customer_arrivals]
 		trip_requests.rescale_customer_arrivals(int(total_evs*demand_scaling))
 
 		for current_timepoint in range(total_time_steps):
@@ -217,7 +214,7 @@ if __name__ == "__main__":
 			init_SoCs = list(np.round(np.random.uniform(0.2, 0.8, size=total_evs), decimals=4))
   		# print("init_SoCs:", init_SoCs)
 
-		eval_config = generate_config(
+		validation_config = generate_config(
 			op_start_hour=start_hour,
 			total_time_steps=total_time_steps,
 			time_step_minutes=resolution,
@@ -226,7 +223,7 @@ if __name__ == "__main__":
 			committed_charging_block_minutes=resolution,
 			renewed_charging_block_minutes=resolution,
 			demand_scaling=demand_scaling,
-			baseline_prices_fname=charging_prices_fname,  # No baseline prices needed for evaluation.
+			baseline_prices_fname=charging_prices_fname,  # No baseline prices needed for validationuation.
 			real_time_prices_fname=None,
 			init_SoCs=init_SoCs,
 			customer_arrivals_fname=os.path.join(env_data_path,f"customer_arrivals_most_trips_{resolution}min.csv"),
@@ -235,6 +232,6 @@ if __name__ == "__main__":
 			saved_trips_fname=saved_trips_fname,
 		)
 
-		eval_config_fname = os.path.join(test_instances_path, f"instance{i}", f"eval_config{i}.json")
-		save_config(eval_config, eval_config_fname)
+		validation_config_fname = os.path.join(validation_path, f"instance{i}", f"validation_config{i}.json")
+		save_config(validation_config, validation_config_fname)
 

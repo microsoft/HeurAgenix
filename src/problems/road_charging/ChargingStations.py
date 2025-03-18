@@ -17,9 +17,7 @@ class ChargingStations:
 				}
 			}
 		self.stations = config
-		self.total_chargers = sum(charger["maximum_capacity"] for charger in config.values())
-		self.real_time_prices = list(self.stations[k]["real_time_prices"] 
-                       for k in self.stations)[0]
+		self.max_charging_capacity = sum(charger["maximum_capacity"] for charger in config.values())
 
 	def reset(self, rng):
     
@@ -32,11 +30,20 @@ class ChargingStations:
 		# reset open stations
 		self.open_stations = list(self.stations.keys())  # List of charger IDs with available slots >= 1
 
+
+	def get_real_time_prices(self):
+     
+		first_station = next(iter(self.stations.values()))  # Get the first station
+
+		return first_station["real_time_prices"]
+
+
 	def reset_cap(self, cap):
      
 		for station_id in self.stations.keys():
 			self.stations[station_id]["maximum_capacity"] = cap
 			self.stations[station_id]["available_chargers"] = cap
+		self.max_charging_capacity = sum(charger["maximum_capacity"] for charger in self.stations.values())
 
 	def update_real_time_prices(self):
 		for station_id in self.stations.keys():
@@ -51,6 +58,8 @@ class ChargingStations:
 
 			# Clip the new prices between lb and ub, then store them
 			self.stations[station_id]["real_time_prices"] = np.round(np.clip(baseline_prices + noise, lb, ub), decimals=4).tolist()
+
+
 
 	def adjust_occupancy(self, station_id, increment):
 		if station_id in self.stations:

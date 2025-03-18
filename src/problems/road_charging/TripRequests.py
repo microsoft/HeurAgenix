@@ -9,11 +9,11 @@ class TripRequests:
 	def __init__(self, config=None):
 		if config is None:
 			config = {
-				"customer_arrivals_fname": "customer_arrivals_5min_5evs_2019-04.csv",
-				"per_minute_rates_fname": "per_minute_rates_5min_2019-04.csv",
-				"saved_trips_fname": "saved_trips2019-04.json",
-				"trip_records_fname": "ready_trip_data2019-04.csv",
-				"operation_start_hour": 6,
+				"customer_arrivals_fname": "env_data\\customer_arrivals_most_trips_15min.csv",
+				"per_minute_rates_fname": None,
+				"saved_trips_fname": None,
+				"trip_records_fname": None,
+				"operation_start_hour": 0,
 				"dt": 15
 			}
 	 
@@ -30,6 +30,15 @@ class TripRequests:
 		self.max_id = 0
   
 		self.rng = rng
+  
+	def rescale_customer_arrivals(self, target):
+		# Find the maximum value in customer_arrivals
+		max_arrival = max(self.customer_arrivals)
+
+		# Rescale the values so that the largest value becomes self.N
+		self.customer_arrivals = [
+			int(np.ceil(x / max_arrival * target)) for x in self.customer_arrivals]
+
 
 	def load_saved_trip_data(self):
 		if not self.saved_data:
@@ -62,7 +71,7 @@ class TripRequests:
 	def update_open_requests(self, current_timepoint):
 		
 		self.open_requests = [key for key, value in self.trip_queue.items() 
-                     if value['raised_time'] == current_timepoint and value['status'] == 'open']
+					 if value['raised_time'] == current_timepoint and value['status'] == 'open']
 		return self.open_requests
 
 	def sample_requests(self, num_requests, raised_time):
@@ -112,4 +121,3 @@ class TripRequests:
 				completed_count += 1
 		
 		return open_count, completed_count
-

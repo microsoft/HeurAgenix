@@ -45,6 +45,8 @@ class EVFleet:
 
 	def reset_init_SoCs(self):
 		self.init_SoCs = np.round(self.rng.uniform(0.75, 0.8, size=self.N), decimals=4)
+		self.all_states["SoC"] = self.init_SoCs.copy()
+  
 
 	def update_state(self, ev_index, new_state):
 	

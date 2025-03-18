@@ -3,12 +3,9 @@ from gym import spaces
 import numpy as np
 import json
 import os
+import matplotlib.pyplot as plt
 from utils import visualize_trajectory, get_data_type_meanings
 from gym_env import RoadCharging
-# from partial_charge_env_w_rejection import EVChargingEnv
-# from env_flexible import EVChargingEnv
-# from env_min_added_soc import EVChargingEnv
-
 
 
 def policy(env):
@@ -19,19 +16,9 @@ def policy(env):
 
 
 def main():
-	# example_config = {
-	# 	"total_time_steps": 216,
-	# 	"time_step_minutes":5,
-	# 	"total_evs": 5,
-	# 	"committed_charging_block_minutes": 15,
-	# 	"renewed_charging_block_minutes": 5, 
-	# 	"ev_params": None,
-	# 	"trip_params": None,
-	# 	"charging_params": None,
-	# 	"other_env_params": None
-	# }
-	total_evs = 10
-	total_chargers = 1
+	
+	total_evs = 200
+	total_chargers = 10
 	resolution = 15
 	start_hour = 0
 
@@ -39,7 +26,7 @@ def main():
 	demand_type = 1
 	SoC_type = 1
  
-	test_instance_num=20
+	num_test_instance = 20
 	policy_name = "random"
  
 	debug = False
@@ -50,7 +37,10 @@ def main():
  
 	results = []
 
-	for i in range(1, test_instance_num + 1):
+	step_complete_rates = []
+	step_trip_times = []
+
+	for i in range(1, num_test_instance + 1):
 		output_path = os.path.join("output", type_path, policy_name, f"instance{i}")
 		eval_config_fname = os.path.join("input", type_path, f"instance{i}", 
 										 f"eval_config{i}.json")
@@ -67,11 +57,19 @@ def main():
 				# print(f"Instance {i}, Episode {ep}")
 				print(f"--- Timepoint {env.current_timepoint} ---")
 				print("Initial SoCs:", env.evs.init_SoCs)
+				current_index = env.current_timepoint * env.dt // 30
+				# Print charging prices at the current time point
 				for k in env.charging_stations.stations.keys():
-					print("Charging Prices (first 5):", env.charging_stations.stations[k]["real_time_prices"][:5])
-				print("Trip Requests (first 5):")
-				first_5_trip_requests = dict(list(env.trip_requests.trip_queue.items())[:5])
-				print(first_5_trip_requests)
+					print(f"Charging Price at Step {env.current_timepoint} for Station {k}:",
+						env.charging_stations.stations[k]["real_time_prices"][current_index])
+
+				# Print trip requests raised at the current time point
+				current_trip_requests = {trip_id: details for trip_id, details in env.trip_requests.trip_queue.items()
+										if details["raised_time"] == env.current_timepoint}
+
+				print(f"Trip Requests at Step {env.current_timepoint}:")
+				print(current_trip_requests)
+
 				print("-" * 40)
 
 			for _ in range(env.T):
@@ -144,6 +142,20 @@ def main():
 		
 				if done:
 					break
+ 
+		# Store episode metrics
+		# ep_returns_list.append(env.ep_returns)
+		# charging_cost_list.append(env.charging_cost)
+		# added_soc_list.append(env.added_soc)
+		# fare_earned_list.append(env.fare_earned)
+		# complete_rate_list.append(env.complete_rate)
+
+		# driver_earnings_list.append(env.driver_earnings)
+		# driver_trip_time_list.append(env.driver_trip_time)
+		# driver_idle_time_list.append(env.driver_idle_time)
+
+		step_complete_rates.append(env.step_complete_rate)
+		step_trip_times.append(env.step_trip_time)
 
 		# visualize_trajectory(env.agents_trajectory)
 		
@@ -171,21 +183,81 @@ def main():
 		env.close()
 
 	# After running all test instances
+	# Initialize dictionaries for averaging scalars and lists
 	avg_result = {key: 0 for key, v in results[0].items() if not isinstance(v, list)}
+	list_result = {key: [] for key, v in results[0].items() if isinstance(v, list)}
 
+	# Accumulate values
 	for res in results:
 		for k, v in res.items():
-			if not isinstance(v, list):  # Exclude items where v is a list
-				avg_result[k] += v
+			if isinstance(v, list):  
+				list_result[k].append(v)  # Store lists separately
+			else:  
+				avg_result[k] += v  # Sum scalar values
 
 	num_instances = len(results)
-	for k, v in avg_result.items():
-		avg_result[k] = v / num_instances
 
-	print(avg_result)
+	# Compute average for scalar values
+	for k in avg_result:
+		avg_result[k] /= num_instances
+
+	# Compute element-wise average for list values
+	for k in list_result:
+		avg_result[k] = np.mean(list_result[k], axis=0).tolist()  # Convert back to list
+
+	# Now avg_result contains both averaged scalars and averaged lists
+
+	# print(avg_result)
 	if not debug:
 		with open(os.path.join("output", type_path, policy_name, "avg_result.json"), "w") as f:
 				json.dump(avg_result, f, indent=4)
+	
+	
+	# # Compute average statistics
+	# avg_ep_returns = np.mean(ep_returns_list)
+	# avg_charging_cost = np.mean(charging_cost_list)
+	# avg_added_soc = np.mean(added_soc_list)
+	# avg_fare_earned = np.mean(fare_earned_list)
+	# avg_complete_rate = np.mean(complete_rate_list)
+
+	# avg_driver_earnings = np.mean(driver_earnings_list, axis=0)
+	# avg_driver_trip_time = np.mean(driver_trip_time_list, axis=0)
+	# avg_driver_idle_time = np.mean(driver_idle_time_list, axis=0)
+
+	avg_step_complete_rate = np.mean(step_complete_rates, axis=0)
+	avg_step_trip_time = np.mean(step_trip_times, axis=0)
+
+	# Print averaged results
+	# print(f"Avg Ep Returns: {avg_ep_returns}, Avg Charging Cost: {avg_charging_cost}, Avg Added SoC: {avg_added_soc},")
+	# print(f"Avg Fare Earned: {avg_fare_earned}, Avg Complete Rate: {avg_complete_rate}")
+
+	# print(f"Avg Driver Earnings: {avg_driver_earnings}, Sum: {sum(avg_driver_earnings)}")
+	# print(f"Avg Driver Trip Time: {avg_driver_trip_time}, Sum: {sum(avg_driver_trip_time)}")
+	# print(f"Avg Driver Idle Time: {avg_driver_idle_time}, Sum: {sum(avg_driver_idle_time)}")
+
+	# Plot averaged step metrics
+	fig, ax1 = plt.subplots(figsize=(10,6))
+
+	# ax1.plot(avg_step_complete_rate, label="Avg Step Complete Rate", color="tab:blue")
+	ax1.step(range(len(avg_step_complete_rate)), avg_step_complete_rate, 
+	     label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1.5, where="post")
+	# ax1.plot(avg_step_complete_rate, label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1, )
+	ax1.set_xlabel("Time Steps")
+	ax1.set_ylabel("Complete Rate", color="tab:orange")
+	ax1.tick_params(axis="y", labelcolor="tab:orange")
+
+	ax2 = ax1.twinx()
+	# ax2.plot(avg_step_trip_time, label="Avg Step Trip Time", color="tab:orange")
+	ax2.step(range(len(avg_step_trip_time)), avg_step_trip_time, linestyle="dashed", linewidth=1.5, label="Avg Step Trip Time", color="tab:blue", where="post")
+	ax2.set_ylabel("Trip Time", color="tab:blue")
+	ax2.tick_params(axis="y", labelcolor="tab:blue")
+
+	plt.title(f"Averaged Step Metrics Over {num_test_instance} Instances")
+	fig.tight_layout()
+	plt.savefig(os.path.join("output", type_path, policy_name, "avg_step_metrics.png"), dpi=300)
+	plt.show()
+
+
    
    
 if __name__ == "__main__":

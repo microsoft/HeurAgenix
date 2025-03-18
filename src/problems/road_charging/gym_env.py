@@ -23,6 +23,7 @@ class RoadCharging(gym.Env):
 		self.min_ct = config.get("committed_charging_block_minutes")
 		self.renew_ct = config.get("renewed_charging_block_minutes")
 		self.start_hour = config.get("operation_start_hour")
+		self.demand_scaling = config.get("demand_scaling")
 		
 		self.evs = EVFleet(config["ev_params"])
 		self.trip_requests = TripRequests(config["trip_params"])
@@ -59,7 +60,7 @@ class RoadCharging(gym.Env):
 		self.current_timepoint = 0
 		self.states = self.evs.get_all_states()
   
-		self.trip_requests.rescale_customer_arrivals(self.N)
+		self.trip_requests.rescale_customer_arrivals(int(self.N*self.demand_scaling))
 		# self.trip_requests.customer_arrivals = [int(np.ceil(x/200*self.N)) for x in self.trip_requests.customer_arrivals]
 		
 		if stoch_step: # if stoch_step, resample init SoCs and real time prices for each episode
@@ -128,7 +129,7 @@ class RoadCharging(gym.Env):
 			if actions[i] == 1:  # Charging action
 				if tau_t_i >= 1:
 					
-					error_message += f"Step {self.current_timepoint}: EV{i} charging while busy.\n"
+					error_message += f"Step {self.current_timepoint}: EV{i} is requesting charging while busy.\n"
 				
 		max_charging_cap = self.charging_stations.max_charging_capacity
 		if sum(actions) > max_charging_cap:
@@ -213,7 +214,9 @@ class RoadCharging(gym.Env):
 
 				# Check if EV has an active charging session
 				if i not in self.dispatch_results or self.dispatch_results[i]['cs'] is None:
-					print(f"Warning: EV {i} has no active charging session.")
+					raise Exception(f"Warning: Step {self.current_timepoint}: EV {i} has no active charging session but is requesting to renew charging.\n")
+					# print(f"Warning: EV {i} has no active charging session.")
+					# error_message += f"Warning: Step {self.current_timepoint}: EV {i} has no active charging session but is requesting to renew charging.\n"
 					continue  # Skip this EV
 
 				charging_session = self.dispatch_results[i]['cs']
@@ -235,9 +238,10 @@ class RoadCharging(gym.Env):
 
 				# Debugging output before assertion
 				if self.dispatch_results[i]['order'] is not None:
-					print(f"Error: EV {i} is charging but has an active order: {self.dispatch_results[i]['order']}")
-
-				assert self.dispatch_results[i]['order'] is None, "To stay charge: serving records should be None"
+					raise Exception(f"Error: Step {self.current_timepoint}: EV {i} is charging but has an active order: {self.dispatch_results[i]['order']}")
+					# print(f"Error: EV {i} is charging but has an active order: {self.dispatch_results[i]['order']}")
+					# error_message += f"Error: Step {self.current_timepoint}: EV {i} is charging but has an active order: {self.dispatch_results[i]['order']}"
+				# assert self.dispatch_results[i]['order'] is None, "To stay charge: serving records should be None"
 
 		# Should process stay_charge_evs first, in case any charger is freed up
 		if go_charge_evs:
@@ -423,6 +427,7 @@ class RoadCharging(gym.Env):
 				"driver_idle_time": list(self.driver_idle_time),
 				"driver_trip_time": list(self.driver_trip_time),
 				"step_completion_rate": list(self.step_complete_rate),
+				"step_trip_time": list(self.step_trip_time)
 			}
 
 		return summary
@@ -612,14 +617,23 @@ def main():
  
 	config_filename = os.path.join(os.path.join(input_path, type_path, "train_config.json"))
 	
-	env = EVChargingEnv(config_filename)  # 3 EVs, total 10 sessions, charging holds 2 sessions
+	env = RoadCharging(config_filename)  # 3 EVs, total 10 sessions, charging holds 2 sessions
 	
-	total_episodes = 1
-	ep_pay = []
-	ep_cost = []
-	ep_returns = []
+	num_episodes = 20
+	ep_returns_list = []
+	charging_cost_list = []
+	added_soc_list = []
+	fare_earned_list = []
+	complete_rate_list = []
+
+	driver_earnings_list = []
+	driver_trip_time_list = []
+	driver_idle_time_list = []
+
+	step_complete_rates = []
+	step_trip_times = []
  
-	for ep in range(total_episodes):
+	for ep in range(num_episodes):
 		env.reset(stoch_step=True)
 		# env.show_config()
 
@@ -690,27 +704,70 @@ def main():
 			if done:
 				break
 
-		ep_pay.append(env.fare_earned)
-		ep_cost.append(env.charging_cost)
-		ep_returns.append(env.ep_returns)
+		# Store episode metrics
+		ep_returns_list.append(env.ep_returns)
+		charging_cost_list.append(env.charging_cost)
+		added_soc_list.append(env.added_soc)
+		fare_earned_list.append(env.fare_earned)
+		complete_rate_list.append(env.complete_rate)
+
+		driver_earnings_list.append(env.driver_earnings)
+		driver_trip_time_list.append(env.driver_trip_time)
+		driver_idle_time_list.append(env.driver_idle_time)
+
+		step_complete_rates.append(env.step_complete_rate)
+		step_trip_times.append(env.step_trip_time)
+
+	# Compute average statistics
+	avg_ep_returns = np.mean(ep_returns_list)
+	avg_charging_cost = np.mean(charging_cost_list)
+	avg_added_soc = np.mean(added_soc_list)
+	avg_fare_earned = np.mean(fare_earned_list)
+	avg_complete_rate = np.mean(complete_rate_list)
+
+	avg_driver_earnings = np.mean(driver_earnings_list, axis=0)
+	avg_driver_trip_time = np.mean(driver_trip_time_list, axis=0)
+	avg_driver_idle_time = np.mean(driver_idle_time_list, axis=0)
+
+	avg_step_complete_rate = np.mean(step_complete_rates, axis=0)
+	avg_step_trip_time = np.mean(step_trip_times, axis=0)
+ 
+	# Print averaged results
+	print(f"Avg Ep Returns: {avg_ep_returns}, Avg Charging Cost: {avg_charging_cost}, Avg Added SoC: {avg_added_soc},")
+	print(f"Avg Fare Earned: {avg_fare_earned}, Avg Complete Rate: {avg_complete_rate}")
+
+	print(f"Avg Driver Earnings: {avg_driver_earnings}, Sum: {sum(avg_driver_earnings)}")
+	print(f"Avg Driver Trip Time: {avg_driver_trip_time}, Sum: {sum(avg_driver_trip_time)}")
+	print(f"Avg Driver Idle Time: {avg_driver_idle_time}, Sum: {sum(avg_driver_idle_time)}")
+
+	# Plot averaged step metrics
+	fig, ax1 = plt.subplots()
+
+	# ax1.plot(avg_step_complete_rate, label="Avg Step Complete Rate", color="tab:blue")
+	# ax1.step(range(len(avg_step_complete_rate)), avg_step_complete_rate, 
+	#      label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1, where="post")
+	ax1.plot(avg_step_complete_rate, label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1, )
+	ax1.set_xlabel("Time Steps")
+	ax1.set_ylabel("Complete Rate", color="tab:orange")
+	ax1.tick_params(axis="y", labelcolor="tab:orange")
+
+	ax2 = ax1.twinx()
+	# ax2.plot(avg_step_trip_time, label="Avg Step Trip Time", color="tab:orange")
+	ax2.step(range(len(avg_step_trip_time)), avg_step_trip_time, linestyle="dashed", linewidth=1, label="Avg Step Trip Time", color="tab:blue", where="post")
+	ax2.set_ylabel("Trip Time", color="tab:blue")
+	ax2.tick_params(axis="y", labelcolor="tab:blue")
+
+	plt.title(f"Averaged Step Metrics Over {num_episodes} Episodes")
+	fig.tight_layout()
+	plt.show()
+
+	
 	visualize_trajectory(env.agents_trajectory)
  
 	serializable_data = {key: value.tolist() for key, value in env.agents_trajectory.items()}
 	with open("agents_trajectory.json", "w") as f:
 		json.dump(serializable_data, f, indent=4)
 	
- 
-	ep_pay = [round(float(r), 2) for r in ep_pay]
-	print("total pay:", ep_pay)
-	print("average total pay is:", sum(ep_pay)/total_episodes)	
- 
-	ep_cost = [round(float(r), 2) for r in ep_cost]
-	print("total costs:", ep_cost)
-	print("average total costs is:", sum(ep_cost)/total_episodes)	
- 
-	ep_returns = [round(float(r), 2) for r in ep_returns]
-	print("total returns:", ep_returns)
-	print("average total returns is:", sum(ep_returns)/total_episodes)	
  
 
 	env.close()

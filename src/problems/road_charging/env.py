@@ -20,14 +20,14 @@ class Env(MDPEnv):
             "fleet_size": self.gym_env.N,
             "max_time_steps": self.gym_env.T,
             "time_resolution": self.gym_env.dt,
-            "total_chargers": self.gym_env.charging_stations.total_chargers,
+            "total_chargers": self.gym_env.charging_stations.max_charging_capacity,
             "max_cap": self.gym_env.evs.b_cap,
             "consume_rate": self.gym_env.evs.energy_consumption,
             "charging_rate": self.gym_env.evs.charge_rate,
             # "assign_prob": self.gym_env.rho,
             "customer_arrivals": self.gym_env.trip_requests.customer_arrivals,
             "order_price": self.gym_env.trip_requests.per_minute_rates,
-            "charging_price": self.gym_env.charging_stations.real_time_prices,
+            "charging_price": self.gym_env.charging_stations.get_real_time_prices(),
             "initial_charging_cost": 0
         }
     
@@ -62,4 +62,8 @@ class Env(MDPEnv):
         data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.trajectory.items()}  
         json.dump(data_converted, output_file)
         content = super().dump_result(dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
+        
+        
+        
+        
         return content
