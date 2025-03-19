@@ -1,7 +1,6 @@
-1. For the circumstances that algorithm return empty operator, please return Action with all 0, not None.
-2. Please do not modify the past actions since it is already happened.
-3. For any fleet that on ride where `time_to_next_availability[i] >= 2`, the action `actions[i]` must be 0, meaning the vehicle cannot charge while completing a ride.       
-4. The sum of actions must not exceed the total number of chargers available, i.e., `sum(actions) <= global_data["total_chargers"]`.
-5. Vehicles that are fully charged (`battery_soc[i] >= 1`) should not be scheduled for charging again, so `actions[i]` must be 0 for such vehicles.
-These are hard constraints and please double check when generation heuristic.
+1. If the algorithm returns an empty operator, please return an Action with all zeros, not None.
+2. Do not modify past actions, as they have already occurred.
+3. At any time step, for any EV i that is on a ride (i.e., `time_to_next_availability[i][t] >= 1`), the action at that time step `actions[i][t]` must be 0, meaning the vehicle cannot charge while completing a ride.
+4. The sum of actions must not exceed the maximum number of chargers available, i.e., `sum(actions) <= global_data["total_chargers"]`.
 
+These are hard constraints, so please double-check when generating the heuristic.
