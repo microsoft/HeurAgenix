@@ -87,3 +87,5 @@ EVs that will be charged are chosen at random.
 
 5. Specifically, if an EV is currently serving a trip, it cannot initiate a charging action
 and is restricted to taking action 0.
+
+
