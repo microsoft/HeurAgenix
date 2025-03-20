@@ -9,4 +9,4 @@ global_data (dict): A dictionary containing global instance data with the follow
 - "charging_rate" (list[float]): A list representing the battery charging rate (as a percentage) per time step for each vehicle in the fleet. The list has a length equal to the fleet size.
 - "customer_arrivals" (list[int]): A list representing the number of customer arrivals at each time step. The length of the list is equal to max_time_steps.
 - "order_price" (list[float]): A list representing the payment (in dollars) received per minute when a vehicle is on a ride. The payment is assumed to be the same for all vehicles. The length of the list is equal to the number of time steps (max_time_steps).
-- "charging_price" (list[float]): A list representing the charging price (in dollars per kilowatt-hour, $/kWh) at each time step. The price is assumed to be the same for all vehicles. The length of the list corresponds to 30-minute intervals in a day (e.g., 24*60/30).
+- "charging_price" (list[float]): A list representing the charging price (in dollars per kilowatt-hour, $/kWh) at each time step.  The list has a length equal to the max time steps.

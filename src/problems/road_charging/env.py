@@ -19,6 +19,8 @@ class Env(MDPEnv):
 		# self.output_dir = "src/problems/road_charging"
 
 	def get_global_data(self):
+		base_charging_price = self.gym_env.charging_stations.get_real_time_prices()
+		charging_price = [item for item in base_charging_price for _ in range(int(self.gym_env.T / len(base_charging_price)))]
 		return {
 			"fleet_size": self.gym_env.N,
 			"max_time_steps": self.gym_env.T,
@@ -29,7 +31,7 @@ class Env(MDPEnv):
 			"charging_rate": self.gym_env.evs.charge_rate,
 			"customer_arrivals": self.gym_env.trip_requests.customer_arrivals,
 			"order_price": self.gym_env.trip_requests.per_minute_rates,
-			"charging_price": self.gym_env.charging_stations.get_real_time_prices(),
+			"charging_price": charging_price,
 			# "initial_charging_cost": 0
 		}
 	
