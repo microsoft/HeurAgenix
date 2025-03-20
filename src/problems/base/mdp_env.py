@@ -50,7 +50,10 @@ class MDPEnv(BaseEnv):
                 self.current_solution = solution
                 self.recording.append((str(heuristic_name), operator, str(solution)))
             _, reward, self.done, _ = self.gym_env.step(operator.actions)
-            self.reward += reward
+            if isinstance(reward, int) or isinstance(reward, float):
+                self.reward += reward
+            elif isinstance(reward, list):
+                self.reward += sum(reward)
             self.state_data = self.get_state_data()
             return True
         return False

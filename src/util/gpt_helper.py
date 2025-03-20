@@ -104,9 +104,9 @@ class GPTHelper:
 
         prompt_dict = {
             "problem": problem,
-            "problem_description": open(os.path.join(problem_dir, "problem_description.txt")).read(),
-            "global_data_introduction": open(os.path.join(problem_dir, "global_data.txt")).read(),
-            "state_data_introduction": open(os.path.join(problem_dir, "state_data.txt")).read(),
+            "problem_description": open(os.path.join(problem_dir, "problem_description.txt"), encoding="utf-8").read(),
+            "global_data_introduction": open(os.path.join(problem_dir, "global_data.txt"), encoding="utf-8").read(),
+            "state_data_introduction": open(os.path.join(problem_dir, "state_data.txt"), encoding="utf-8").read(),
             "solution_class": solution_class_str,
             "operator_class": operator_class_str,
             "env_summarize": env_summarize

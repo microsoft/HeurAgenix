@@ -1,14 +1,12 @@
-global_data (dict): The global data dict containing the global instance data with:
-    - "fleet_size" (int): Number of EVs in the fleet.
-    - "max_time_steps" (int): Maximum number of time steps, e.g., 5 minutes as a time step, 24 hours corresponds to 288 time steps.
-    - "total_chargers" (int): Total number of chargers.
-    - "max_cap" (int): Max battery capacity in kWh.
-    - "consume_rate" (list[float]): Battery consumption rate (as a percentage) per time step for each vehicle in the fleet. Length is fleet_size.
-    - "charging_rate" (list[float]): Battery charging rate (as a percentage) per time step for each vehicle in the fleet. Length is fleet_size.
-    - "assign_prob" (list[float]): Probability of receiving a ride order when the vehicle is in idle status.
-    - "average_assign_prob" (float): Average of assign probability.
-    - "order_price" (list[float]): Payments (in dollars) received per time step when a vehicle is on a ride. The payment is assumed to be the same for all vehicles. The length of the list is max_time_steps.
-    - "charging_price" (list[float]): Charging price in dollars per kilowatt-hour ($/kWh) at each time step. The price is assumed to be the same for all vehicles. The length of the list is max_time_steps.
-    - "peak_charging_price" (float): Max charging price.
-    - "average_charging_price" (float): Average charging price,
-    - "total_energy_demand" (float): Total battery capacity of all fleets. Equal to fleet_size * max_cap.
+global_data (dict): A dictionary containing global instance data with the following keys:
+
+- "fleet_size" (int): The number of electric vehicles (EVs) in the fleet.
+- "max_time_steps" (int): The maximum number of time steps. For example, with a 15-minute time step, 24 hours would correspond to 96 time steps.
+- "time_resolution" (int): The duration of one time step in minutes.
+- "total_chargers" (int): The maximum number of available chargers.
+- "max_cap" (int): The maximum battery capacity in kilowatt-hours (kWh).
+- "consume_rate" (list[float]): A list representing the battery consumption rate (as a percentage) per time step for each vehicle in the fleet. The list has a length equal to the fleet size.
+- "charging_rate" (list[float]): A list representing the battery charging rate (as a percentage) per time step for each vehicle in the fleet. The list has a length equal to the fleet size.
+- "customer_arrivals" (list[int]): A list representing the number of customer arrivals at each time step. The length of the list is equal to max_time_steps.
+- "order_price" (list[float]): A list representing the payment (in dollars) received per minute when a vehicle is on a ride. The payment is assumed to be the same for all vehicles. The length of the list is equal to the number of time steps (max_time_steps).
+- "charging_price" (list[float]): A list representing the charging price (in dollars per kilowatt-hour, $/kWh) at each time step. The price is assumed to be the same for all vehicles. The length of the list corresponds to 30-minute intervals in a day (e.g., 24*60/30).

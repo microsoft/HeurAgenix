@@ -6,10 +6,12 @@ import pickle
 import os
 from collections import deque
 import matplotlib.pyplot as plt
+from src.util.util import search_file
 from src.problems.road_charging.utils import load_file, visualize_trajectory
 from src.problems.road_charging.ChargingStations import ChargingStations
 from src.problems.road_charging.TripRequests import TripRequests
 from src.problems.road_charging.EVFleet import EVFleet
+
 
 class RoadCharging(gym.Env):
 	def __init__(self, config_fname: str):
@@ -25,7 +27,23 @@ class RoadCharging(gym.Env):
 		self.demand_scaling = config.get("demand_scaling")
 		
 		self.evs = EVFleet(config["ev_params"])
-		self.trip_requests = TripRequests(config["trip_params"])
+		env_data = search_file("env_data", "road_charging")
+		trip_params = config.get("trip_params")
+		if trip_params is None:
+			trip_params = {
+				"customer_arrivals_fname": os.path.join(env_data, "customer_arrivals_most_trips_15min.csv"),
+				"per_minute_rates_fname": None,
+				"saved_trips_fname": None,
+				"trip_records_fname": None,
+				"operation_start_hour": 0,
+				"dt": 15
+			}
+		else:
+			trip_params["customer_arrivals_fname"] = os.path.join(env_data, trip_params["customer_arrivals_fname"])
+			trip_params["per_minute_rates_fname"] = os.path.join(env_data, trip_params["per_minute_rates_fname"])
+			trip_params["saved_trips_fname"] = os.path.join(os.path.dirname(config_fname), trip_params["saved_trips_fname"])
+			trip_params["trip_records_fname"] = os.path.join(env_data, trip_params["trip_records_fname"])
+		self.trip_requests = TripRequests(trip_params)
 		self.charging_stations = ChargingStations(config["charging_params"])
 		
 		self.other_env_params = config.get("env_params", {})

@@ -27,11 +27,10 @@ class Env(MDPEnv):
 			"max_cap": self.gym_env.evs.b_cap,
 			"consume_rate": self.gym_env.evs.energy_consumption,
 			"charging_rate": self.gym_env.evs.charge_rate,
-			# "assign_prob": self.gym_env.rho,
 			"customer_arrivals": self.gym_env.trip_requests.customer_arrivals,
 			"order_price": self.gym_env.trip_requests.per_minute_rates,
 			"charging_price": self.gym_env.charging_stations.get_real_time_prices(),
-			"initial_charging_cost": 0
+			# "initial_charging_cost": 0
 		}
 	
 	def get_state_data(self):
@@ -39,8 +38,6 @@ class Env(MDPEnv):
 			"current_step": self.gym_env.current_timepoint,
 			"operational_status":  self.gym_env.states["OperationalStatus"],
 			"time_to_next_availability": self.gym_env.states["TimeToNextAvailability"],
-			# "ride_lead_time": self.gym_env.obs["RideTime"],
-			# "charging_lead_time": self.gym_env.states["ChargingStatus"],
 			"battery_soc": self.gym_env.states["SoC"],
 			"reward": self.reward,
 			"return": self.gym_env.ep_returns,
@@ -64,6 +61,7 @@ class Env(MDPEnv):
 		output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")
 		data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.agents_trajectory.items()}  
 		json.dump(data_converted, output_file)
+		self.show_trajectory()
 		content = super().dump_result(dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
 		
 		return content

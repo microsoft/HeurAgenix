@@ -1,19 +1,11 @@
+import os
 import numpy as np
 import pandas as pd
 from src.problems.road_charging.utils import csv_to_list, load_file
 
+
 class TripRequests:
 	def __init__(self, config=None):
-		if config is None:
-			config = {
-				"customer_arrivals_fname": "env_data\\customer_arrivals_most_trips_15min.csv",
-				"per_minute_rates_fname": None,
-				"saved_trips_fname": None,
-				"trip_records_fname": None,
-				"operation_start_hour": 0,
-				"dt": 15
-			}
-	 
 		self.customer_arrivals = csv_to_list(config.get("customer_arrivals_fname"))
 		self.per_minute_rates = csv_to_list(config.get("per_minute_rates_fname"))
 		self.saved_data = load_file(config.get("saved_trips_fname"))

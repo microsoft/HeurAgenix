@@ -1,13 +1,13 @@
 EV Fleet Charging Optimization for Ride-Sharing
 
-We study the problem of optimally scheduling the charging of an electric vehicle (EV) fleet
+We study the problem of optimally scheduling the charging of an electric vehicle(EV)fleet
 used in ride-sharing services. The challenge arises from:
 1. Dynamic Demand Patterns: Trip request arrival rates and durations vary over time.
 2. Charger Resource Constraints: The number of available chargers is highly limited relative
 to fleet size.
 
 Problem Formulation
-We model this as a multi-agent Markov Decision Process (MDP), where each EV is an agent making
+We model this as a multi-agent Markov Decision Process(MDP), where each EV is an agent making
 independent charging decisions based on its state. However, these individual decisions are
 constrained by the global availability of chargers. The objective is to maximize the overall
 completion rate of customer trip requests, ensuring sufficient EVs have adequate battery levels
@@ -16,14 +16,14 @@ to meet peak demand.
 MDP Components
 State Space
 Each EV’s state is defined by:
-- Operational Status: 0 (idle), 1 (serving a trip), or 2 (charging).
+- Operational Status: 0(idle), 1(serving a trip), or 2(charging).
 - Time to Next Availability: Minutes remaining until the EV is available.
 - Battery SoC: State of charge as a percentage.
 
 Action Space
 Each EV has two possible actions:
-- Remain Available (a_i = 0): Stay in service for order dispatch. 
-- Go to Charge (a_i = 1): Attempt to access a charging station.
+- Remain Available(a_i = 0): Stay in service for order dispatch. 
+- Go to Charge(a_i = 1): Attempt to access a charging station.
 
 Transition Dynamics
 Time is discretized into Δt-minute steps, and each charging decision applies to one step.
@@ -39,20 +39,20 @@ The decision-making process is outlined as follows:
 
 
 State Transitions
-- If an EV is available (time_to_next_availability == 0):
-  - If action = 0 (stay available):
+- If an EV is available(time_to_next_availability == 0):
+  - If action = 0(stay available):
     - If assigned an order → status = 1, time_to_next_availability = trip_time, SoC = max(SoC - consume_rate, 0).
     - Otherwise → Remains idle: status = 0, time_to_next_availability = 0, SoC = max(SoC - consume_rate, 0).
-  - If action = 1 (go to charge):
+  - If action = 1(go to charge):
     - If assigned a charger → status = 2, time_to_next_availability = charging_session_time, SoC = min(SoC + charge_rate, 1).
     - Otherwise → Remains idle: status = 0, time_to_next_availability = 0, SoC = max(SoC - consume_rate, 0).
 
-- If an EV is serving an order (status = 1, time_to_next_availability >= 1):
+- If an EV is serving an order(status = 1, time_to_next_availability >= 1):
   - status remains 1.
   - time_to_next_availability = max(time_to_next_availability - Δt, 0).
   - SoC = max(SoC - consume_rate, 0).
 
-- If an EV is charging (status = 2, time_to_next_availability >= 1):
+- If an EV is charging(status = 2, time_to_next_availability >= 1):
   - status remains 2.
   - time_to_next_availability = max(time_to_next_availability - Δt, 0).
   - SoC = min(SoC + charge_rate, 1).
@@ -63,19 +63,19 @@ the charging cost. The charging cost is determined by multiplying the real-time 
 by the charging quantity. The trip fare is computed as the minimum of the preset minimum
 fare and the product of the trip duration and the real-time per-minute rate.
 
-Both the charging cost and trip fare are accounted for at the start of the respective session (charging or serving).
+Both the charging cost and trip fare are accounted for at the start of the respective session(charging or serving).
 
 
 Remarks:
 1. The variable time_to_next_availability is always constrained to be ≥ 0.
-The battery state of charge (SoC) is always within the range 0 ≤ SoC ≤ 1,
+The battery state of charge(SoC)is always within the range 0 ≤ SoC ≤ 1,
 preventing overcharging or depletion below zero.
 
-2. If the charging session time is set to one time step (Δt),
-then the state (status = 2, time_to_next_availability ≥ 1) will never occur.
+2. If the charging session time is set to one time step(Δt),
+then the state(status = 2, time_to_next_availability ≥ 1)will never occur.
 Instead, after a charging action—where time_to_next_availability is initialized
 to Δt—the transition rule, time_to_next_availability = max(time_to_next_availability - Δt, 0),
-always results in (status = 2, time_to_next_availability = 0).
+always results in(status = 2, time_to_next_availability = 0).
 
 3. The likelihood of receiving an order depends on the current demand-supply balance and
 the EV's battery SoC. When demand is lower than supply, all EVs with sufficient SoC have
