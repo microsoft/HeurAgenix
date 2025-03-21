@@ -1,5 +1,4 @@
 global_data (dict): A dictionary containing global instance data with the following keys:
-
 - "fleet_size" (int): The number of electric vehicles (EVs) in the fleet.
 - "max_time_steps" (int): The maximum number of time steps. For example, with a 15-minute time step, 24 hours would correspond to 96 time steps.
 - "time_resolution" (int): The length of a single time step in minutes.  

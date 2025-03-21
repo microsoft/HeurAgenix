@@ -1,7 +1,7 @@
 from src.problems.base.mdp_components import Solution, ActionOperator
 import random
 
-def random_selection_c849(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
+def random_c849(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
     """ Randomly selects an action for each EV without considering the current state or future implications.
 
     Args:

@@ -6,12 +6,13 @@ import matplotlib.pyplot as plt
 from src.problems.base.mdp_env import MDPEnv
 from src.problems.base.mdp_components import Solution
 from src.problems.road_charging.gym_env import RoadCharging
+from src.util.util import filter_dict_to_str
 
 
 class Env(MDPEnv):
 	"""RoadCharging env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
 	def __init__(self, data_name: str, **kwargs):
-		super().__init__(data_name, RoadCharging, "road_charging")
+		super().__init__(os.path.join(data_name, "config.json"), RoadCharging, "road_charging")
 		self.key_item = "return"
 		self.compare = lambda x, y: x - y
 		self.construction_steps = self.gym_env.T
@@ -61,6 +62,9 @@ class Env(MDPEnv):
 			"Sum Battery Soc": sum(self.gym_env.states["SoC"]),
 			"Reward": self.reward
 		}
+
+	def summarize_env(self):
+		return filter_dict_to_str(self.get_global_data())
 
 	def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
 		output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")

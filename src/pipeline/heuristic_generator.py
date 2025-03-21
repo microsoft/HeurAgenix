@@ -40,7 +40,7 @@ class HeuristicGenerator:
 
         return heuristic_files
 
-    def generate_from_paper(self, paper_path: str,  reference_data: str=None, smoke_test: bool=False) -> str:
+    def generate_from_paper(self, paper_path: str, reference_data: str=None, smoke_test: bool=False) -> str:
         heuristic_file = None
         # Load background
         prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
