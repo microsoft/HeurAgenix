@@ -81,6 +81,7 @@ always results in(status = 2, time_to_next_availability = 0).
 the EV's battery SoC. When demand is lower than supply, all EVs with sufficient SoC have
 an equal chance of receiving an order; however, the final assignment remains uncertain.
 Note that an EV without enough SoC for a trip will not be assigned this order.
+Additionally, any EV whose SoC falls below the min_SoC threshold will not be considered for any order dispatch.
 
 4. When the number of EVs requesting charging exceeds the number of available chargers, the
 EVs that will be charged are chosen at random.
