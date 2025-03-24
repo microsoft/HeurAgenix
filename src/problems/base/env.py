@@ -86,8 +86,7 @@ class BaseEnv:
         pass
 
     def run_heuristic(self, heuristic: callable, parameters:dict={}, inplace: bool=True) -> BaseOperator:
-        #try:
-        if True:
+        try:
             start_time = time.time()
             operator, delta = heuristic(
                 global_data=self.global_data,
@@ -104,8 +103,7 @@ class BaseEnv:
                     self.time_cost += end_time - start_time
                     return operator
             return None
-        else:
-        # except Exception as e:
+        except Exception as e:
             trace_string = traceback.format_exc()
             print(trace_string)
             return trace_string
