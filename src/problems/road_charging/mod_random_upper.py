@@ -4,10 +4,14 @@ import json
 import os
 import matplotlib.pyplot as plt
 from src.problems.road_charging.gym_env import RoadCharging
+from my_rng import MyRNG
+
+my_rng = MyRNG().rng
 
 def policy(env, charge_lb=0.1, charge_ub=0.8,):
-	actions = env.action_space.sample()
+	# actions = env.action_space.sample()
 	# actions = env.rng.choice([0, 1], size=env.N)   
+	actions = my_rng.choice([0, 1], size=env.N) 
 
 	future_free_chargers = 0
 	for i in range(env.N):

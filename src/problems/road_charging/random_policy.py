@@ -4,11 +4,14 @@ import json
 import os
 import matplotlib.pyplot as plt
 from src.problems.road_charging.gym_env import RoadCharging
+from my_rng import MyRNG
 
+my_rng = MyRNG().rng
 
 def policy(env):
-	actions = env.action_space.sample()
+	# actions = env.action_space.sample()
 	# actions = env.rng.choice([0, 1], size=env.N)   
+	actions = my_rng.choice([0, 1], size=env.N) 
 
 	return actions
 
