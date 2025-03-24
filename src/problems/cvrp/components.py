@@ -104,6 +104,7 @@ class RelocateOperator(BaseOperator):
     def run(self, solution: Solution) -> Solution:
         new_routes = [route[:] for route in solution.routes]
         node = new_routes[self.source_vehicle_id].pop(self.source_position)
+        assert node != solution.depot
         # If target route is empty, append the node directly
         if not new_routes[self.target_vehicle_id]:
             new_routes[self.target_vehicle_id].append(node)
@@ -122,7 +123,12 @@ class MergeRoutesOperator(BaseOperator):
 
     def run(self, solution: Solution) -> Solution:
         new_routes = [route[:] for route in solution.routes]
+        depot_index1 = new_routes[self.source_vehicle_id].index(solution.depot)
+        rotated_route1 = new_routes[self.source_vehicle_id][depot_index1 + 1:] + new_routes[self.source_vehicle_id][:depot_index1]
+        depot_index2 = new_routes[self.target_vehicle_id].index(solution.depot)
+        rotated_route2 = new_routes[self.target_vehicle_id][depot_index2 + 1:] + new_routes[self.target_vehicle_id][:depot_index2]
+
         # Append source route to target route, then clear the source route
-        new_routes[self.target_vehicle_id] = new_routes[self.source_vehicle_id] + new_routes[self.target_vehicle_id]
-        new_routes[self.source_vehicle_id] = []
+        new_routes[self.target_vehicle_id] = [solution.depot] + rotated_route1 + rotated_route2
+        new_routes[self.source_vehicle_id] = [solution.depot]
         return Solution(new_routes, solution.depot)

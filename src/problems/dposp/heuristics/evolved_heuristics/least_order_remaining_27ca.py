@@ -102,7 +102,7 @@ def least_order_remaining_27ca(global_data: dict, state_data: dict, algorithm_da
 
                         # Calculate time cost
                         delta_time_cost = get_time_cost_delta(target_line_id, order_id, position)
-                        if delta_time_cost < 0:  # Improvement
+                        if delta_time_cost < 0 and current_solution.routes[source_line_id][source_schedule.index(order_id)] != current_solution.depot:  # Improvement
                             best_operator = RelocateOperator(
                                 source_production_line_id=source_line_id,
                                 source_position=source_schedule.index(order_id),

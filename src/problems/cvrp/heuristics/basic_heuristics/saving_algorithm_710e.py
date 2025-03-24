@@ -30,12 +30,16 @@ def saving_algorithm_710e(global_data: dict, state_data: dict, algorithm_data: d
     best_operator = None
 
     for i, route1 in enumerate(current_solution.routes):
-        if not route1:
+        if len(route1) <= 1:
             continue
         for j, route2 in enumerate(current_solution.routes):
-            if i == j or not route2:
+            if i == j or not len(route2) <= 1:
                 continue
-            saving = (distance_matrix[route1[-1]][depot] + distance_matrix[depot][route2[0]]) - distance_matrix[route1[-1]][route2[0]]
+            depot_index1 = route1.index(depot)
+            rotated_route1 = route1[depot_index1:] + route1[:depot_index1]
+            depot_index2 = route2.index(depot)
+            rotated_route2 = route1[depot_index2:] + route1[:depot_index2]
+            saving = (distance_matrix[rotated_route1[-1]][depot] + distance_matrix[depot][rotated_route2[1]]) - distance_matrix[rotated_route1[-1]][rotated_route2[1]]
             if saving > best_saving and vehicle_loads[i] + vehicle_loads[j] <= vehicle_capacity:
                 best_saving = saving
                 best_operator = MergeRoutesOperator(source_vehicle_id=i, target_vehicle_id=j)

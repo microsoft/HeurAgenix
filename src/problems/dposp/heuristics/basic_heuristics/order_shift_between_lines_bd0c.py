@@ -60,7 +60,7 @@ def order_shift_between_lines_bd0c(global_data: dict, state_data: dict, algorith
                     delta_time_cost = state_data_for_trial["total_time_cost_per_production_line"][target_line_id] + state_data_for_trial["total_time_cost_per_production_line"][source_line_id] - state_data["total_time_cost_per_production_line"][target_line_id] - state_data["total_time_cost_per_production_line"][source_line_id]
 
                     # Check if this shift leads to a better solution
-                    if delta_time_cost < best_delta_time_cost:
+                    if delta_time_cost < best_delta_time_cost and current_solution.routes[source_line_id][position] != current_solution.depot:
                         best_order_id = order_id
                         best_source_line_id = source_line_id
                         best_target_line_id = target_line_id

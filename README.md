@@ -23,7 +23,7 @@ python chat.py
 ```
 
 ### Prepare Data
-
+#### Data for Classical CO Problem
 Data sources and formatting requirements for TSP, CVRP, JSSP, MaxCut, and MKP are detailed in the respective readme files.
 
 | Problem                             | Data Source                                                                                     | Readme Link                                           |
@@ -34,6 +34,7 @@ Data sources and formatting requirements for TSP, CVRP, JSSP, MaxCut, and MKP ar
 | Maximum Cut Problem (MaxCut)        | [OPTSICOM](https://grafo.etsii.urjc.es/optsicom/maxcut.html#instances)                          | [MaxCut data readme](src/problems/max_cut/data/README.md) |
 | Multidimensional Knapsack Problem (MKP) | [OR-library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/)                            | [MKP data readme](src/problems/mkp/data/README.md)    |
 
+#### Data For DPOSP
 To generate the data for the Dynamic Production Order Scheduling Problem (DPOSP, new in paper):
 1. Modify the parameters (production line num, order num, production rate distribution, etc.) in `src/problems/dposp/data/generate_data.py` file.
 2. Run the following command:
@@ -41,6 +42,25 @@ To generate the data for the Dynamic Production Order Scheduling Problem (DPOSP,
     python src/problems/dposp/data/generate_data.py
     ```
 3. Refer to the [DPOSP data readme](src/problems/dposp/data/README.md).
+
+#### Data Structure
+By default, data is stored in `output/{problem}/data/(train_data, validation_data, test_data, smoke_data)`. If data is stored elsewhere, specify the path when running the framework.  
+  
+- **Train Data**: Used by LLM to analyze problems during heuristic evolution. Typically consists of small instances either manually designed or sampled from the data.  
+- **Validation Data**: Used for evaluating and filtering heuristics during evolution.  
+- **Test Data**: Used for testing heuristics or heuristic selection.  
+- **Smoke Data**: Used for quick testing of generated or evolved heuristics to check for obvious bugs. Usually consists of small, manually designed instances and includes `previous_operations.txt` (pre-operations for the test) and `smoke_data` (test data).  
+  
+For example, a common TSP data structure is as follows:  
+output/
+tsp/
+data/
+smoke_data/: previous_operations.txt, smoke_data.tsp
+test_data/: a280.tsp, bier127.tsp, ...
+train_data/: case_1.tsp, case_2.tsp, ...
+validation_data/: kroA100.tsp, kroA150.tsp, ...
+
+Our built-in data reading interface can handle the standard data format above. If your data is in a new format, you need to override the `load_data` function in `env.py`.  
 
 ## Run on Current Problems (TSP, CVRP, JSSP, MaxCut, MKP, and DPOSP)
 
@@ -99,8 +119,8 @@ python evolution_heuristic.py -p <problem> -be <basic_heuristic> [-t <train_dir>
 Parameters:
 - `-p`, `--problem`: Specifies the CO problem type to solve (required).
 - `-e`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
-- `-t`, `--train_dir`: Directory for training data.
-- `-v`, `--validation_dir`: Directory for validation data.
+- `-t`, `--train_dir`: Directory for training data (default: output/{problem}/data/train_data).
+- `-v`, `--validation_dir`: Directory for validation data (default: output/{problem}/data/validation_data).
 - `-pe`, `--perturbation_heuristic`: Path or name of the heuristic used for perturbations.
 - `-pr`, `--perturbation_ratio`: Ratio for perturbation adjustments (default: 0.1).
 - `-pt`, `--perturbation_time`: Maximum perturbation count (default: 1000).
@@ -168,7 +188,7 @@ Parameters:
   - `'or_solver'`: Uses an exact OR solver (only applicable for specific problems like DPOSP).
 - `-d`, `--heuristic_dir`: Directory containing heuristic functions (if needed).
 - `-c`, `--test_case`: Path to a single test case.
-- `-t`, `--test_dir`: Directory containing the entire test set.
+- `-t`, `--test_dir`: Directory containing the entire test set (Optional, default: output/{problem}/data/test_data).
 
 #### Example
 To run the nearest neighbor heuristic on a test case:
@@ -194,6 +214,18 @@ HeurAgenix excels in addressing new problems. When faced with a new problem, the
     - `state_data.txt` to describe the format of the solution for the problem.
     - `special_remind.txt` (optional) for specific reminders related to the problem during algorithm generation.
 - If an OR algorithm is needed as an upper bound, implement the `ORSolver` class in `src/problems/{problem}/or_solver.py`.
+
+## Visualize the Project Workflow  
+  
+To explore the project's workflow visually without executing the actual processes, you can use the Streamlit application. This tool provides an interactive way to understand the framework's components and flow.  
+  
+To launch the visualization interface, run the following command:  
+  
+```bash  
+streamlit run doc/app.py
+```
+ 
+This command will open a web-based interface where you can visually navigate through the project's architecture and processes. Please note that this visualization is for demonstration purposes only and does not perform any actual optimization tasks.
 
 ## Run Baseline
 The baseline we provide are also implement in `baselines` folder, including:

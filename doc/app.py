@@ -445,7 +445,7 @@ def run_heuristic():
         st.session_state.selected_checkboxes = {}
     col1, col2 = st.columns([1, 3])
     with col1:
-        for heuristic in heuristic_list + ["LLM Selection", "Random Selection"]:
+        for heuristic in heuristic_list + ["LLM Rapid Selection", "LLM Comprehensive Selection", "Random Selection"]:
             col3, col4 = st.columns([1, 3])
             with col3:
                 st.session_state.selected_checkboxes[heuristic] = st.checkbox("", key=f"checkbox_{heuristic}")
@@ -457,8 +457,10 @@ def run_heuristic():
         selected_heuristic = st.session_state.selected_heuristic
         if selected_heuristic in heuristic_list:
             heuristic_code = open(os.path.join("src", "problems", st.session_state.problem_choice, "heuristics", "basic_heuristics", selected_heuristic)).read()
-        elif selected_heuristic == "LLM Selection":
-            heuristic_code = "Dynamic select heuristics from llm"
+        elif selected_heuristic == "LLM Rapid Selection":
+            heuristic_code = "Dynamic select heuristics directly from llm"
+        elif selected_heuristic == "LLM Comprehensive Selection":
+            heuristic_code = "Dynamic select heuristics with mcts search from llm"
         elif selected_heuristic == "Random Selection":
             heuristic_code = "Dynamic random select heuristics"
         st.code(heuristic_code, language="python")

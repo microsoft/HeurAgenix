@@ -1,6 +1,7 @@
 import os
 import inspect
 import importlib
+import random
 import multiprocessing
 import multiprocessing.managers
 from copy import deepcopy
@@ -18,13 +19,17 @@ class HeuristicSelectionDataCollector:
         heuristic_type: str,
         heuristic_pool: list[str],
         search_time: int=1000,
-        output_dir: str=None
+        save_best: bool=False,
+        collection_mode: str="best",
+        output_dir: str=None,
     ) -> None:
         self.problem = problem
         self.data_name = data_name
         self.heuristic_pool = heuristic_pool
         self.score_calculation = score_calculation
         self.search_time = search_time
+        self.save_best = save_best
+        self.collection_mode = collection_mode
         self.output_dir = output_dir
 
         module = importlib.import_module(f"src.problems.{problem}.env")
@@ -46,6 +51,8 @@ class HeuristicSelectionDataCollector:
         information_file.write(f"deterministic_heuristics: {deterministic_heuristic_name_str}\n")
         information_file.write(f"random_heuristics: {random_heuristic_name_str}\n")
         information_file.write(f"search_time: {search_time}\n")
+        information_file.write(f"collection_mode: {collection_mode}\n")
+        
         information_file.close()
     
     def filter_deterministic_heuristics(self, problem: str, heuristic_pool: list[str], data_name: str) -> list[str]:
@@ -113,7 +120,8 @@ class HeuristicSelectionDataCollector:
                 search_interval,
                 search_time,
                 self.problem,
-                best_result_proxy
+                best_result_proxy,
+                self.save_best
             )
 
             # Record and best best for next search
@@ -130,6 +138,9 @@ class HeuristicSelectionDataCollector:
                     best_operator = str(operators[0])
                     best_score = score
                     best_after_heuristic_env = after_step_env
+            if self.collection_mode == "random":
+                best_heuristic_name, _, best_after_heuristic_env, operators = random.choice(total_results)
+                best_operator = str(operators[0])
             records.append([best_heuristic_name, best_operator])
             output_file.write(f"heuristic\t{self.score_calculation.__name__}\tresults\n")
             output_file.write("\n".join(["\t".join([item for item in performance]) for performance in performances]) + "\n")
