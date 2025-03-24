@@ -44,13 +44,18 @@ class MDPEnv(BaseEnv):
         pass
 
     def run_operator(self, operator: ActionOperator, inplace: bool=True, heuristic_name: str=None) -> bool:
-        if isinstance(operator, ActionOperator):
+        if isinstance(operator, ActionOperator) and not self.done:
             solution = operator.run(self.current_solution)
             if inplace:
                 self.current_solution = solution
                 self.recording.append((str(heuristic_name), operator, str(solution)))
-            _, reward, self.done, _ = self.gym_env.step(operator.actions)
-            self.reward += reward
+            _, reward, self.done, error_message = self.gym_env.step(operator.actions)
+            if error_message:
+                raise Exception(error_message)
+            if isinstance(reward, int) or isinstance(reward, float):
+                self.reward += reward
+            elif isinstance(reward, list):
+                self.reward += sum(reward)
             self.state_data = self.get_state_data()
             return True
         return False
