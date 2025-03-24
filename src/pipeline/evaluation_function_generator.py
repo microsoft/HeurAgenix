@@ -48,17 +48,16 @@ class EvaluationFunctionGenerator:
         # Verify and revision code
         if smoke_test:
             global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
-        while smoke_test and global_error_message is not None:
-            self.gpt_helper.load(global_error_message)
-            self.gpt_helper.chat()
-            global_data_feature_code = extract(response, "python_code")
-            self.gpt_helper.dump(f"global_data_feature")
-
-        while smoke_test and state_error_message is not None:
-            self.gpt_helper.load(state_error_message)
-            self.gpt_helper.chat()
-            state_data_feature_code = extract(response, "python_code")
-            self.gpt_helper.dump(f"state_data_feature")
+            while global_error_message or state_error_message:
+                if global_error_message:
+                    self.gpt_helper.load(global_error_message)
+                    response = self.gpt_helper.chat()
+                    global_data_feature_code = extract(response, "python_code")
+                if state_error_message:
+                    self.gpt_helper.load(state_error_message)
+                    response = self.gpt_helper.chat()
+                    state_data_feature_code = extract(response, "python_code")
+                global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
 
         # Save the code
         evaluation_function_file = os.path.join(self.output_dir, "evaluation_function.py")
