@@ -8,33 +8,33 @@ from src.problems.road_charging.gym_env import RoadCharging
 
 
 def policy(env, charge_lb=0.1,):
-    # Default to taking orders (action 0), only charge when SoC drops to env.evs.min_SoC
-    actions = [0] * env.N  
+	# Default to taking orders (action 0), only charge when SoC drops to env.evs.min_SoC
+	actions = [0] * env.N  
 
-    # **Step 1: Predict which EVs will release chargers**
-    future_free_chargers = 0
-    for i in range(env.N):
-        o_t_i, tau_t_i, SoC_i = env.evs.get_state(i)
-        if o_t_i == 2 and (tau_t_i == 0 or SoC_i > charge_lb):
-            future_free_chargers += 1  # Predict charger release based on SoC and status
+	# **Step 1: Predict which EVs will release chargers**
+	future_free_chargers = 0
+	for i in range(env.N):
+		o_t_i, tau_t_i, SoC_i = env.evs.get_state(i)
+		if o_t_i == 2 and (tau_t_i == 0 or SoC_i > charge_lb):
+			future_free_chargers += 1  # Predict charger release based on SoC and status
 
-        if tau_t_i == 0 and SoC_i <= charge_lb:
-            actions[i] = 1  # Mark EV for charging if SoC is below the threshold
+		if tau_t_i == 0 and SoC_i <= charge_lb:
+			actions[i] = 1  # Mark EV for charging if SoC is below the threshold
 
-    charging_candidates = [i for i, a in enumerate(actions) if a == 1]
+	charging_candidates = [i for i, a in enumerate(actions) if a == 1]
 
-    # Enforce charging station capacity limit
-    # The predicted maximum available chargers are the currently free chargers + the dynamic resource level
-    predicted_max_resource_limit = future_free_chargers + env.charging_stations.get_dynamic_resource_level()
+	# Enforce charging station capacity limit
+	# The predicted maximum available chargers are the currently free chargers + the dynamic resource level
+	predicted_max_resource_limit = future_free_chargers + env.charging_stations.get_dynamic_resource_level()
 
-    # If there are more charging candidates than available chargers, select a subset
-    if len(charging_candidates) > predicted_max_resource_limit:
-        # Randomly select EVs to charge based on the predicted max resource limit
-        selected_charging = env.rng.choice(charging_candidates, predicted_max_resource_limit, replace=False)
-        # Set selected EVs to charge (action 1), others revert to action 0
-        actions = [1 if i in selected_charging else 0 for i in range(env.N)]
+	# If there are more charging candidates than available chargers, select a subset
+	if len(charging_candidates) > predicted_max_resource_limit:
+		# Randomly select EVs to charge based on the predicted max resource limit
+		selected_charging = env.rng.choice(charging_candidates, predicted_max_resource_limit, replace=False)
+		# Set selected EVs to charge (action 1), others revert to action 0
+		actions = [1 if i in selected_charging else 0 for i in range(env.N)]
 
-    return actions
+	return actions
 
 
 def main():
@@ -43,12 +43,19 @@ def main():
 	total_chargers = 10
 	resolution = 15
 	start_hour = 0
-	charge_lb_val = 0.95
-
 	price_type = 1
 	demand_type = 1
 	SoC_type = 1
  
+	# Define the params table
+	params_table = {
+		1: {5: 0.4, 8: 0.5, 10: 0.8, 12: 0.95, 15: 0.95, 20: 0.95,
+			50: 0.8, 80: 0.9, 100: 0.95, 120: 0.95, 150: 0.95, 200: 0.95},
+		2: {50: 0.3, 80: 0.4, 100: 0.7, 120: 0.96, 150: 0.95, 200: 0.95}
+	}
+	charge_lb_val = params_table[SoC_type][total_evs]
+
+	
 	num_test_instance = 20
 	policy_name = "mod_can_prophet"
  
@@ -232,7 +239,7 @@ def main():
 
 	# ax1.plot(avg_step_complete_rate, label="Avg Step Complete Rate", color="tab:blue")
 	ax1.step(range(len(avg_step_complete_rate)), avg_step_complete_rate, 
-	     label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1.5, where="post")
+		 label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1.5, where="post")
 	# ax1.plot(avg_step_complete_rate, label="Avg Step Complete Rate", color="tab:orange", alpha=0.5, linewidth=1, )
 	ax1.set_xlabel("Time Steps")
 	ax1.set_ylabel("Complete Rate", color="tab:orange")

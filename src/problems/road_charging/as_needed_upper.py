@@ -44,11 +44,18 @@ def main():
 	total_chargers = 10
 	resolution = 15
 	start_hour = 0
-	charge_lb_val = 0.95
-
 	price_type = 1
 	demand_type = 1
 	SoC_type = 1
+ 
+	# Define the params table
+	params_table = {
+		1: {5: 0.4, 8: 0.5, 10: 0.8, 12: 0.95, 15: 0.95, 20: 0.95,
+			50: 0.8, 80: 0.9, 100: 0.95, 120: 0.95, 150: 0.95, 200: 0.95},
+		2: {50: 0.3, 80: 0.4, 100: 0.7, 120: 0.96, 150: 0.95, 200: 0.95}
+	}
+	charge_lb_val = params_table[SoC_type][total_evs]
+
  
 	num_test_instance = 20
 	policy_name = "as_needed_upper"

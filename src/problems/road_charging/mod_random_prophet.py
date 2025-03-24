@@ -39,16 +39,21 @@ def policy(env, charge_lb=0.1, charge_ub=0.8,):
 	return actions
 
 def main():
-	total_evs = 50
+	total_evs = 200
 	total_chargers = 10
 	resolution = 15
 	start_hour = 0
-	charge_lb_val = 0.7
-	charge_ub_val = 0.8
-
 	price_type = 1
 	demand_type = 1
 	SoC_type = 1
+ 
+	# Define the params table
+	params_table = {
+		1: {5: (0.3, 0.4), 8: (0.3, 0.4), 10: (0.3, 0.8), 12: (0.3, 0.8), 15: (0.7, 0.8), 20: (0.7, 0.8),
+			50: (0.3, 0.4), 80: (0.3, 0.4), 100: (0.3, 0.8), 120: (0.3, 0.8), 150: (0.7, 0.8), 200: (0.7, 0.8)},
+		2: {50: (0.1, 0.2), 80: (0.1, 0.2), 100: (0.3, 0.4), 120: (0.7, 0.8), 150: (0.7, 0.95), 200: (0.9, 0.95)}
+	}
+	charge_lb_val, charge_ub_val = params_table[SoC_type][total_evs]
  
 	num_test_instance = 20
 	policy_name = "mod_random_prophet"
