@@ -77,16 +77,20 @@ def main():
         output_dir = heuristic
         hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
 
+    results = []
     for test_case in test_cases:
         env = Env(data_name=test_case)
         env.reset(output_dir)
+        
         gpt_helper.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result()
+            results.append(env.key_value)
             print(os.path.join(env.output_dir, "result.txt"), heuristic, test_case, env.key_item, env.key_value)
         else:
             print("Invalid solution", heuristic, test_case)
+    print(sum(results) / len(results))
 
 
 if __name__ == "__main__":

@@ -1,22 +1,6 @@
-Now focus on this operator {bottleneck_operation} in step {bottleneck_operation_id}.
+from src.problems.base.mdp_components import Solution, ActionOperator
+import numpy as np
 
-The state before {bottleneck_operation} is:
-{state_data}
-To aid your analysis, I extracted the following features from this state:
-{global_data_feature}
-
-You believe that {proposed_operation} is better with reason {reason}. So we hope to update {function_name} to output {proposed_operation} in this state.
-Try to provide suggestion to update the code using mathematical analysis.
-
-The origin heuristic is suitable when ev number is not high, while the ev increases and charge num not increases(leading to competition)
-peak_customer_arrivals is not used.
-
-Please provide suggestion in following one or more aspects:
-1. Set the hyper-parameters or update the hyper-parameters' value for better control.
-2. Add more logic to this function for better control.
-3. Limit the application scope of certain logic with an if-check.
-4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
-5. Also learn from this heuristic, which performance's is very good:
 def basic_threshold_heuristic_62bb(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
     """ Enhanced Dynamic Threshold Heuristic for EV Fleet Charging Optimization.
 
@@ -96,14 +80,3 @@ def basic_threshold_heuristic_62bb(global_data: dict, state_data: dict, algorith
 
     # Return the operator and empty algorithm data
     return ActionOperator(actions), {}
-To make sure the suggestion is useful, please check in following aspects:
-1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.
-2. Will the updated suggestion make the function output {proposed_operation} in this step?
-3. If we run the updated function on this data from beginning to end, will the result be better than {positive_result}?
-4. Is this a commonly useful update for all instances or states?
-
-The response format is very important. For better communication, please respond to me in this format:
-***suggestion: xxx
-***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.

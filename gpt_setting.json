@@ -9,5 +9,5 @@
     "max_tokens": 3200,
 
     "max_attempts": 50,
-    "sleep_time": 10
+    "sleep_time": 360
 }

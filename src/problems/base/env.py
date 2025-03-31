@@ -126,7 +126,7 @@ class BaseEnv:
 
     def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
         content = f"-data: {self.data_name}\n"
-        content += f"-current_solution:\n{self.current_solution}\n"
+        # content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
         content += f"-is_valid_solution: {self.is_valid_solution}\n"
         content += f"-{self.key_item}: {self.key_value}\n"

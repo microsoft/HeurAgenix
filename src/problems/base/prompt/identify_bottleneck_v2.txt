@@ -13,16 +13,13 @@ To aid your analysis, I extracted the following features from this data:
 {global_data_feature}
 
 Negative solution from {function_name}:
-{negative_solution}
-The result is {negative_result}.
-The trajectory to get this solution:
 {negative_trajectory}
+The result is {negative_result}.
 
 Positive solution from external:
-{positive_solution}
-The result is {positive_result}.
-The trajectory to get this solution:
 {positive_trajectory}
+The result is {positive_result}.
+
 
 Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
 Please note:
