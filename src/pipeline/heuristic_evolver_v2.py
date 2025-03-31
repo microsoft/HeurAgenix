@@ -109,8 +109,8 @@ class HeuristicEvolver:
             smoke_test: bool=True
     ) -> list[tuple[str, list[float]]]:
         try:
-            data_name = train_data.split(os.sep)[-1]
             env = Env(data_name=train_data)
+            data_name = env.data_name
             basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
             output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", data_name)
             self.gpt_helper.reset(output_dir)
