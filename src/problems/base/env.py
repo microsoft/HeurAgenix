@@ -8,10 +8,10 @@ from src.util.util import search_file
 class BaseEnv:
     """Base env that stores the static global data, current solution, dynamic state and provide necessary to support algorithm."""
     def __init__(self, data_name: str, problem: str, **kwargs):
-        self.data_name = data_name
         self.problem = problem
         self.online_problem = False
         self.data_path = search_file(data_name, problem)
+        self.data_ref_name = data_name.split(os.sep)[-1]
         assert self.data_path is not None
         self.data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = None
@@ -56,7 +56,7 @@ class BaseEnv:
             if os.sep in experiment_name:
                 self.output_dir = experiment_name
             else:
-                self.output_dir = os.path.join("output", self.problem, "result", self.data_name.split(os.sep)[-1], experiment_name)
+                self.output_dir = os.path.join("output", self.problem, "result", self.data_ref_name, experiment_name)
             os.makedirs(self.output_dir, exist_ok=True)
 
     def load_data(self, data_path: str) -> None:
@@ -125,7 +125,7 @@ class BaseEnv:
         pass
 
     def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
-        content = f"-data: {self.data_name}\n"
+        content = f"-data: {self.data_path}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
         content += f"-is_valid_solution: {self.is_valid_solution}\n"
