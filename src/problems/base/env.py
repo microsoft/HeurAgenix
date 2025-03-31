@@ -146,7 +146,7 @@ class BaseEnv:
                 ])
                 content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
 
-        if self.output_dir != None:
+        if self.output_dir != None and result_file != None:
             output_file = os.path.join(self.output_dir, result_file)
             with open(output_file, "w") as file:  
                 file.write(content) 

@@ -85,8 +85,8 @@ class HeuristicEvolver:
                         train_data=data_name,
                         basic_heuristic_file=basic_heuristic_file,
                         perturbation_heuristic_file=perturbation_heuristic_file,
-                        # all_heuristic_docs=all_heuristic_docs,
-                        all_heuristic_docs=heuristic_introduction_docs,
+                        all_heuristic_docs=all_heuristic_docs,
+                        # all_heuristic_docs=heuristic_introduction_docs,
                         perturbation_ratio=perturbation_ratio,
                         perturbation_time=perturbation_time,
                         max_refinement_round=max_refinement_round,
@@ -109,14 +109,14 @@ class HeuristicEvolver:
             smoke_test: bool=True
     ) -> list[tuple[str, list[float]]]:
         try:
-            data_name = train_data.split(os.sep)[-1]
             env = Env(data_name=train_data)
+            data_name = env.data_name
             basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
-            output_dir = os.path.join("output", self.problem, "evolution_result", data_name, f"{basic_heuristic_name}.evolution")
+            output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", data_name)
             self.gpt_helper.reset(output_dir)
 
             # Perturb for better solution
-            negative_result_file, positive_result_file = self.perturbation(
+            negative_result, positive_result = self.perturbation(
                 env,
                 basic_heuristic_file,
                 perturbation_heuristic_file,
@@ -126,10 +126,10 @@ class HeuristicEvolver:
             )
 
             refined_heuristic_benchmarks = []
-            if positive_result_file:
+            if positive_result:
                 print(f"Evolution {basic_heuristic_name} on {data_name}")
                 # Get bassline 
-                basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file, dump_result=True)
+                basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
 
                 prompt_dict = self.gpt_helper.load_background(self.problem)
                 prompt_dict["all_heuristic_docs"] = all_heuristic_docs
@@ -139,8 +139,8 @@ class HeuristicEvolver:
                 bottlenecks = self.identity_bottlenecks(
                     prompt_dict=prompt_dict,
                     env=env,
-                    positive_result_file=positive_result_file,
-                    negative_result_file=negative_result_file,
+                    positive_result=positive_result,
+                    negative_result=negative_result,
                     heuristic_file=basic_heuristic_file
                 )
 
@@ -158,6 +158,9 @@ class HeuristicEvolver:
                         smoke_test=smoke_test
                     )
                     if suggested_heuristic_file:
+                        output_heuristic_name = suggested_heuristic_file.split(os.sep)[-1].split(".")[0]
+                        self.gpt_helper.dump(f"{basic_heuristic_name}_to_{output_heuristic_name}")
+
                         suggested_improvement = sum(self.get_improvement(env, basic_heuristic_result, suggested_result)) / len(basic_heuristic_result)
                         print(f"Improvement for {suggested_heuristic_file}: {suggested_improvement}")
                         refined_heuristic_benchmarks.append([suggested_heuristic_file, suggested_improvement])
@@ -187,6 +190,8 @@ class HeuristicEvolver:
                                 print("Error and skip")
                                 continue
                             if refined_heuristic_file:
+                                output_heuristic_name = refined_heuristic_file.split(os.sep)[-1].split(".")[0]
+                                self.gpt_helper.dump(f"{last_heuristic_name}_to_{output_heuristic_name}")
                                 refined_improvement = sum(self.get_improvement(env, basic_heuristic_result, refined_result)) / len(basic_heuristic_result)
                                 print(f"Improvement for {refined_heuristic_file}: {refined_improvement}")
                                 refined_heuristic_benchmarks.append([refined_heuristic_file, refined_improvement])
@@ -212,26 +217,24 @@ class HeuristicEvolver:
             perturbation_ratio: float=0.1,
             perturbation_time: int=100,
         ) -> tuple[bool, str, str]:
-        env.reset(os.path.join(output_dir, "negative_solution"))
+        env.reset(output_dir)
 
         # Generate negative result from basic heuristic
         hyper_heuristic = SingleHyperHeuristic(basic_heuristic_file, problem=self.problem)
         hyper_heuristic.run(env)
-        env.dump_result(dump_trajectory=True, compress_trajectory=True)
-        negative_result_file = os.path.join(env.output_dir, "result.txt")
+        negative_result = env.dump_result(dump_trajectory=True, compress_trajectory=True, result_file="negative_solution.txt")
         negative_value = env.key_value
 
         # Generate positive result by perturbation heuristic
-        positive_result_file = None
+        positive_result = None
         for _ in range(perturbation_time):
-            env.reset(os.path.join(output_dir, "positive_solution"))
+            env.reset(output_dir)
             hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, self.problem, perturbation_ratio)
             hyper_heuristic.run(env)
             if env.compare(env.key_value, negative_value) > 0:
-                env.dump_result(dump_trajectory=True, compress_trajectory=True)
-                positive_result_file = os.path.join(env.output_dir, "result.txt")
+                positive_result = env.dump_result(dump_trajectory=True, compress_trajectory=True, result_file="positive_solution.txt")
                 break
-        return negative_result_file, positive_result_file
+        return negative_result, positive_result
 
     def load_heuristic_code(self, heuristic_file: str, prompt_dict: dict) -> str:
         heuristic_file = search_file(heuristic_file, problem=self.problem)
@@ -247,8 +250,8 @@ class HeuristicEvolver:
             self,
             prompt_dict: dict,
             env: BaseEnv,
-            positive_result_file: str,
-            negative_result_file: str,
+            positive_result: str,
+            negative_result: str,
             heuristic_file: str
         ) -> list[list[int, str, str, str]]:
         env.reset()
@@ -258,8 +261,8 @@ class HeuristicEvolver:
         prompt_dict["global_data_feature"] = filter_dict_to_str(self.get_global_data_feature_function(env.global_data))
 
         # Load solution
-        positive_result = parse_text_to_dict(open(positive_result_file).read())
-        negative_result = parse_text_to_dict(open(negative_result_file).read())
+        positive_result = parse_text_to_dict(positive_result)
+        negative_result = parse_text_to_dict(negative_result)
         prompt_dict["positive_solution"] = positive_result["current_solution"]
         prompt_dict["negative_solution"] = negative_result["current_solution"]
         prompt_dict["positive_result"] = positive_result[env.key_item]
@@ -376,6 +379,8 @@ class HeuristicEvolver:
             description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the {last_heuristic_name}."
             env_summarize = prompt_dict["env_summarize"]
             output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, env_summarize, smoke_test, compress=True)
+            output_heuristic_name = output_heuristic_file.split(os.sep)[-1].split(".")[0]
+            self.gpt_helper.dump(f"{previous_heuristic_name}_to_{output_heuristic_name}")
             if output_heuristic_file:
                 suggested_heuristic_result = self.validation(self.validation_cases, output_heuristic_file)
                 return output_heuristic_file, suggestion, suggested_heuristic_result
