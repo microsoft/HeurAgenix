@@ -5,7 +5,7 @@ state_data (dict): A dictionary containing the solution state data with the foll
   - 0 represents idle,
   - 1 represents serving a trip, and
   - 2 represents charging.
-- "time_to_next_availability": A 1D array of size as fleet_size, indicating the lead time until the fleet becomes available (after completing a trip or finishing charging).
-- "battery_soc": A 1D array of size as fleet_size, representing the battery state of charge in percentage.
+- "time_to_next_availability" (np.ndarray): A 1D array of size as fleet_size, indicating the lead time until the fleet becomes available (after completing a trip or finishing charging).
+- "battery_soc" (np.ndarray): A 1D array of size as fleet_size, representing the battery state of charge in percentage.
 - "reward": The total reward for the entire fleet at the current time step.
 - "return": The accumulated reward for the entire fleet from time step 0 to the current time step.
