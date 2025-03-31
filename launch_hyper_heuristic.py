@@ -60,8 +60,7 @@ def main():
         )
     elif heuristic == "random_hh":
         output_dir = f"{heuristic}.{datetime_str}"
-        if heuristic_type == "evolved":
-            output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
+        output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "or_solver":
         output_dir = "or_solver"
