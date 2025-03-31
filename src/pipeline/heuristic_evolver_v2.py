@@ -110,9 +110,8 @@ class HeuristicEvolver:
     ) -> list[tuple[str, list[float]]]:
         try:
             env = Env(data_name=train_data)
-            data_name = env.data_name
             basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
-            output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", data_name)
+            output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", env.data_ref_name)
             self.gpt_helper.reset(output_dir)
 
             # Perturb for better solution
@@ -127,7 +126,7 @@ class HeuristicEvolver:
 
             refined_heuristic_benchmarks = []
             if positive_result:
-                print(f"Evolution {basic_heuristic_name} on {data_name}")
+                print(f"Evolution {basic_heuristic_name} on {train_data}")
                 # Get bassline 
                 basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
 
