@@ -46,13 +46,11 @@ def main():
     gpt_helper = GPTHelper(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
     if heuristic == "gpt_hh":
         output_dir = f"{heuristic}.{datetime_str}"
-        if heuristic_type == "evolved":
-            output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
+        output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = GPTSelectionHyperHeuristic(gpt_helper=gpt_helper, heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "gpt_deep_hh":
         output_dir = f"{heuristic}.{datetime_str}"
-        if heuristic_type == "evolved":
-            output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
+        output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = GPTDeepSelectionHyperHeuristic(
             gpt_helper=gpt_helper,
             heuristic_pool=heuristic_pool,
