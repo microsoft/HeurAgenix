@@ -230,7 +230,6 @@ class HeuristicGenerator:
         return output_heuristic_file
 
     def smoke_test(self, heuristic_code: str, function_name: str, max_try_times: int=5) -> str:
-        store_message = self.gpt_helper.messages.copy()
         prompt_dict = {}
         # Load smoke data
         smoke_data_dir = search_file("smoke_data", problem=self.problem)
@@ -283,11 +282,10 @@ class HeuristicGenerator:
                 # Actual result
                 if response is None:
                     # Give up
-                    self.gpt_helper.messages = store_message
+                    self.gpt_helper.load("We can not implement and give up.")
                     return None
                 elif "correct" in response:
                     # Correct
-                    self.gpt_helper.messages = store_message
                     self.gpt_helper.load(f"To ensure the stable of heuristics, we adjust the code to:\n{heuristic_code}")
                     return heuristic_code
                 else:
@@ -301,10 +299,8 @@ class HeuristicGenerator:
                 heuristic_code = extract(response, "python_code")
                 if heuristic_code is None:
                     # Give up
-                    self.gpt_helper.messages = store_message
                     self.gpt_helper.load("We can not implement and give up.")
                     return None
-        self.gpt_helper.messages = store_message
-        self.gpt_helper.load("We can not implement and give up.")
         # Give up due to the try limitation
+        self.gpt_helper.load("We can not implement and give up.")
         return None

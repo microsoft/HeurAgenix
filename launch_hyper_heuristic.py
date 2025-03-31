@@ -14,7 +14,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Generate heuristic")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
     parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'gpt_hh' / 'gpt_deep_hh' /'random_hh' for GPT/random selection from the heuristic directory, and 'or_solver' for OR result.")
-    parser.add_argument("-d", "--heuristic_type", type=str, default="basic", choices=["basic", "evolved"], help="Directory containing heuristic functions.")
+    parser.add_argument("-d", "--heuristic_type", type=str, default="basic_heuristics", help="Directory containing heuristic functions.")
     parser.add_argument("-si", "--search_interval", type=int, default=None, help="Search interval for deep hh mode.")
     parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Data name for single test case.")
@@ -36,12 +36,9 @@ def main():
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
 
-    if heuristic_type == "basic":
-        heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics"))
-    elif heuristic_type == "evolved":
-        heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", "evolved_heuristics"))
-        evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
-        heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
+    heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_type))
+    evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
+    heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
 
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
