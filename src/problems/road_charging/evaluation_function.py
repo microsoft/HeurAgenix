@@ -62,7 +62,7 @@ def get_global_data_feature(global_data: dict) -> dict:
         "fleet_to_charger_ratio": fleet_to_charger_ratio,
         "average_consume_rate": average_consume_rate,
         "average_charging_rate": average_charging_rate,
-        "battery_capacity_utilization": battery_capacity_utilization,
+        "battery_capacity_utilization": battery_capacity_utilization[0],
         "min_SoC_threshold": min_SoC_threshold,
         "max_SoC_threshold": max_SoC_threshold
     }
