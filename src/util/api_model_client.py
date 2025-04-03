@@ -1,7 +1,5 @@
 import os
 import json
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 import requests
 from src.util.base_llm_helper import BaseLLMHelper
 
@@ -14,7 +12,7 @@ class APIModelClient(BaseLLMHelper):
             setting_file: dict=None,
         ):
         if not setting_file:
-            setting_file = os.path.join("src", "util", "deepseek_setting.json")
+            setting_file = os.path.join("src", "util", "api_model_setting.json")
         super().__init__(prompt_dir, output_dir, setting_file)
 
         self.url = self.setting["url"]

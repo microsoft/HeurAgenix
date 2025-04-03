@@ -13,7 +13,7 @@ class AzureGPTClient(BaseLLMHelper):
             setting_file: dict=None,
         ):
         if not setting_file:
-            setting_file = os.path.join("src", "util", "gpt_setting.json")
+            setting_file = os.path.join("src", "util", "azure_gpt_setting.json")
         super().__init__(prompt_dir, output_dir, setting_file)
 
         self.api_version = self.setting["api_version"]
