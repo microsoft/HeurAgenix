@@ -38,7 +38,6 @@ class HeuristicEvolver:
             perturbation_time: int=100,
             filtered_num: int=3,
             evolution_round: int=3,
-            time_limitation: float=10,
             smoke_test: bool=True,
             validation: bool=True,
         ) -> None:
@@ -87,7 +86,7 @@ class HeuristicEvolver:
                     # validation
                     if evolved_heuristic_file:
                         print(f"Validation on {evolved_heuristic_file}")
-                        validation_values = self.validation(self.validation_dir, evolved_heuristic_file, time_limitation, True)
+                        validation_values = self.validation(self.validation_dir, evolved_heuristic_file, True)
                         if validation_values:
                             average_advantage = 0
                             for index in range(len(validation_values)):
@@ -269,14 +268,14 @@ class HeuristicEvolver:
             return output_heuristic_file
         return None
 
-    def validation(self, validation_dir: str, heuristic_file: str, time_limitation: float=10, validation: bool=True) -> list[float, float]:
+    def validation(self, validation_dir: str, heuristic_file: str, validation: bool=True) -> list[float, float]:
         validation_results = []
         heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
         for data_name in os.listdir(validation_dir):
             env = Env(data_name=os.path.join(validation_dir, data_name))
             env.reset(heuristic_name)
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
-            is_complete_solution = hyper_heuristic.run(env, time_limitation, validation=validation)
+            is_complete_solution = hyper_heuristic.run(env, validation=validation)
             if is_complete_solution:
                 env.dump_result(dump_trajectory=False)
                 validation_results.append(env.key_value)

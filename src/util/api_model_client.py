@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from util.base_llm_client import BaseLLMClient
+from src.util.base_llm_client import BaseLLMClient
 
 
 class APIModelClient(BaseLLMClient):

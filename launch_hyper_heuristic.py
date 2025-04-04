@@ -4,8 +4,8 @@ import importlib
 from datetime import datetime
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
-from pipeline.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
-from pipeline.hyper_heuristics.llm_deep_selection import LLMDeepSelectionHyperHeuristic
+from src.pipeline.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
+from src.pipeline.hyper_heuristics.llm_deep_selection import LLMDeepSelectionHyperHeuristic
 
 def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
@@ -52,11 +52,11 @@ def main():
         llm_client = APIModelClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
     if heuristic == "llm_hh":
         output_dir = f"{heuristic}.{heuristic_type}.{llm_type}.{datetime_str}"
-        hyper_heuristic = LLMSelectionHyperHeuristic(llm_type=llm_type, heuristic_pool=heuristic_pool, problem=problem)
+        hyper_heuristic = LLMSelectionHyperHeuristic(llm_client=llm_client, heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "llm_deep_hh":
         output_dir = f"{heuristic}.{heuristic_type}.{llm_type}.{datetime_str}"
         hyper_heuristic = LLMDeepSelectionHyperHeuristic(
-            llm_type=llm_type,
+            llm_client=llm_client,
             heuristic_pool=heuristic_pool,
             problem=problem,
             search_interval=search_interval,

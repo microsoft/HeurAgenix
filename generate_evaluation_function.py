@@ -1,7 +1,6 @@
 import argparse
 import os
 from src.pipeline.evaluation_function_generator import EvaluationFunctionGenerator
-from src.util.llm_client import GPTHelper
 
 def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
@@ -20,7 +19,7 @@ def main():
     llm_type= args.llm_type
     if llm_type == "AzureGPT":
         from src.util.azure_gpt_client import AzureGPTClient
-        llm_client = AzureGPTClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
+        llm_client = AzureGPTClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"), output_dir=os.path.join("output", problem, "generate_evaluation_function"))
     elif llm_type == "APIModel":
         from src.util.api_model_client import APIModelClient
         llm_client = APIModelClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"), output_dir=os.path.join("output", problem, "generate_evaluation_function"))
