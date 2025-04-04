@@ -2,10 +2,10 @@ import os
 import json
 from openai import AzureOpenAI
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from src.util.base_llm_helper import BaseLLMHelper
+from src.util.base_llm_client import BaseLLMClient
 
 
-class AzureGPTClient(BaseLLMHelper):
+class AzureGPTClient(BaseLLMClient):
     def __init__(
             self,
             prompt_dir: str=None,

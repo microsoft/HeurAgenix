@@ -2,7 +2,6 @@ import argparse
 import os
 import re
 from src.pipeline.heuristic_evolver_v2 import HeuristicEvolver
-from src.util.gpt_helper import GPTHelper
 from src.util.util import search_file
 
 def parse_arguments():
@@ -21,6 +20,7 @@ def parse_arguments():
     parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Number of evolution rounds.")
     parser.add_argument("-l", "--time_limit", type=int, default=None, help="Time limit for running.")
     parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
+    parser.add_argument("-l", "--llm_type", type=str, default="AzureGPT", choices=["AzureGPT", "APIModel"], help="LLM Type to use.")
 
     return parser.parse_args()
 
@@ -36,6 +36,7 @@ def main():
     evolution_rounds = args.evolution_rounds
     time_limitation = args.time_limit
     smoke_test = args.smoke_test
+    llm_type= args.llm_type
 
     train_dir = search_file(args.train_dir, problem)
     validation_dir = search_file(args.validation_dir, problem)
@@ -54,9 +55,14 @@ def main():
             perturbation_heuristic_file += ".py"
         perturbation_heuristic_file = search_file(perturbation_heuristic_file, problem)
 
-    gpt_helper = GPTHelper(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
-    gpt_evolver = HeuristicEvolver(gpt_helper, problem, train_dir, validation_dir)
-    evolved_heuristics = gpt_evolver.evolution(
+    if llm_type == "AzureGPT":
+        from src.util.azure_gpt_client import AzureGPTClient
+        llm_client = AzureGPTClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
+    elif llm_type == "APIModel":
+        from src.util.api_model_client import APIModelClient
+        llm_client = APIModelClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
+    heuristic_evolver = HeuristicEvolver(llm_client, problem, train_dir, validation_dir)
+    evolved_heuristics = heuristic_evolver.evolution(
         basic_heuristic_file,
         perturbation_heuristic_file,
         perturbation_ratio=perturbation_ratio,

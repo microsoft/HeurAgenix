@@ -7,7 +7,7 @@ from time import sleep
 from src.util.util import compress_numbers, extract, load_framework_description
 
 
-class BaseLLMHelper:
+class BaseLLMClient:
     def __init__(
             self,
             prompt_dir: str,

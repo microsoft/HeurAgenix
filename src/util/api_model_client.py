@@ -1,10 +1,10 @@
 import os
 import json
 import requests
-from src.util.base_llm_helper import BaseLLMHelper
+from util.base_llm_client import BaseLLMClient
 
 
-class APIModelClient(BaseLLMHelper):
+class APIModelClient(BaseLLMClient):
     def __init__(
             self,
             prompt_dir: str=None,

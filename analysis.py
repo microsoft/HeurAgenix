@@ -98,7 +98,7 @@ def dump_hh_to_latex():
         problem = problem_dict["problem"]
         key_item = problem_dict["key_item"]
         latex_strs += ["\midrule\n\multirow{8}{*}{" + problem + "} & & " + " & ".join([data_name for data_name, upper_bound in problem_dict["data"]])]
-        for experiment in ["gpt_hh", "random_hh"]:
+        for experiment in ["llm_hh", "random_hh"]:
             gap_strs = []
             for data_name, upper_bound in problem_dict["data"]:
                 gaps = []
@@ -162,7 +162,7 @@ def dump_single_to_image():
 def dump_hh_to_image():
     bar_width = 0.15
     colors = ['lightblue', 'darkblue', 'lightgreen', 'darkgreen', 'lightcoral', 'darkred']
-    experiments = ["gpt_hh", "gpt_hh_evolved", "random_hh", "random_hh_evolved"]
+    experiments = ["llm_hh", "llm_hh_evolved", "random_hh", "random_hh_evolved"]
     experiment_names = ["LLM selection (basic)", "LLM selection (evolved)", "Random selection (basic)", "Random selection (evolved)"]
     for problem_dict in total_experiments:
         problem = problem_dict["problem"]
@@ -276,13 +276,13 @@ def dump_all_result():
             result_str = get_hh_results(problem_dict, data_index, test_dir, "random_hh.evolved")
             print(result_str)
 
-            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh")
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "llm_hh")
             print(result_str)
 
-            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_hh.evolved")
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "llm_hh.evolved")
             print(result_str)
 
-            result_str = get_hh_results(problem_dict, data_index, test_dir, "gpt_deep_hh.evolved")
+            result_str = get_hh_results(problem_dict, data_index, test_dir, "llm_deep_hh.evolved")
             print(result_str)
 
 

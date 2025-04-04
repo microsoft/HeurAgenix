@@ -2,60 +2,60 @@ import os
 import importlib
 import traceback
 from src.util.util import extract, load_heuristic, search_file
-from src.util.gpt_helper import GPTHelper
+from src.util.base_llm_client import BaseLLMClient
 
 
 class EvaluationFunctionGenerator:
     def __init__(
         self,
-        gpt_helper: GPTHelper,
+        llm_client: BaseLLMClient,
         problem: str
     ) -> None:
-        self.gpt_helper = gpt_helper
+        self.llm_client = llm_client
         self.problem = problem
-        self.output_dir = self.gpt_helper.output_dir
+        self.output_dir = self.llm_client.output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_evaluation_function(self, smoke_test: bool=False) -> str:
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem)
 
         # Get global data feature
-        self.gpt_helper.load("global_data_feature", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("global_data_feature", prompt_dict)
+        response = self.llm_client.chat()
         global_data_features = extract(response, "global_data_feature", "\n")
         global_data_features = ",".join([global_data_feature.split(";")[0] for global_data_feature in global_data_features])
         prompt_dict["global_data_features"] = global_data_features
 
         # Generate global data feature code
-        self.gpt_helper.load("implement_global_data_feature_code", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("implement_global_data_feature_code", prompt_dict)
+        response = self.llm_client.chat()
         global_data_feature_code = extract(response, "python_code")
-        self.gpt_helper.dump(f"global_data_feature")
+        self.llm_client.dump(f"global_data_feature")
 
         # Get state data feature
-        self.gpt_helper.load("state_data_feature", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("state_data_feature", prompt_dict)
+        response = self.llm_client.chat()
         state_data_features = extract(response, "state_data_feature", "\n")
         state_data_features = ",".join([state_data_feature.split(";")[0] for state_data_feature in state_data_features])
         prompt_dict["state_data_features"] = state_data_features
 
         # Generate state data feature code
-        self.gpt_helper.load("implement_state_data_feature_code", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("implement_state_data_feature_code", prompt_dict)
+        response = self.llm_client.chat()
         state_data_feature_code = extract(response, "python_code")
-        self.gpt_helper.dump(f"state_data_feature")
+        self.llm_client.dump(f"state_data_feature")
 
         # Verify and revision code
         if smoke_test:
             global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
             while global_error_message or state_error_message:
                 if global_error_message:
-                    self.gpt_helper.load(global_error_message)
-                    response = self.gpt_helper.chat()
+                    self.llm_client.load(global_error_message)
+                    response = self.llm_client.chat()
                     global_data_feature_code = extract(response, "python_code")
                 if state_error_message:
-                    self.gpt_helper.load(state_error_message)
-                    response = self.gpt_helper.chat()
+                    self.llm_client.load(state_error_message)
+                    response = self.llm_client.chat()
                     state_data_feature_code = extract(response, "python_code")
                 global_error_message, state_error_message = self.smoke_test(global_data_feature_code, state_data_feature_code)
 
