@@ -2,8 +2,8 @@ from src.problems.base.mdp_components import Solution, ActionOperator
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 
-def demand_responsive_dispatch_7d2b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
-    """ Heuristic algorithm with fine-tuned ensemble methods and sophisticated feedback mechanism for dynamic threshold adjustment.
+def demand_responsive_dispatch_f1d9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
+    """ Heuristic algorithm with ensemble methods and feedback mechanism for dynamic threshold adjustment.
 
     Args:
         global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
@@ -37,9 +37,9 @@ def demand_responsive_dispatch_7d2b(global_data: dict, state_data: dict, algorit
     # Initialize action list for all EVs
     actions = [0] * fleet_size
 
-    # Train ensemble model with fine-tuned hyperparameters for prediction
+    # Train ensemble model for prediction
     if current_step > 0:
-        model = RandomForestRegressor(n_estimators=100, max_depth=5, min_samples_split=3, random_state=0)
+        model = RandomForestRegressor(n_estimators=100, random_state=0)
         recent_data_steps = max(0, current_step - 10)  # Use the last 10 steps for training
         X = np.arange(recent_data_steps, current_step).reshape(-1, 1)
         y_arrivals = customer_arrivals[recent_data_steps:current_step]
@@ -64,14 +64,13 @@ def demand_responsive_dispatch_7d2b(global_data: dict, state_data: dict, algorit
     if predicted_price > high_price_threshold:
         dynamic_soc_threshold -= 0.1  # Decrease threshold during predicted high charging prices
 
-    # Implement sophisticated feedback mechanism
-    historical_performance = algorithm_data.get('historical_performance', [])
-    if historical_performance:
-        average_performance = np.mean(historical_performance)
-        if average_performance > 0:
-            dynamic_soc_threshold *= 0.95  # Slightly decrease threshold if average performance is positive
+    # Incorporate feedback mechanism
+    if 'performance' in algorithm_data:
+        performance_feedback = algorithm_data['performance']
+        if performance_feedback > 0:
+            dynamic_soc_threshold *= 0.95  # Slightly decrease threshold if recent performance is positive
         else:
-            dynamic_soc_threshold *= 1.05  # Slightly increase threshold if average performance is negative
+            dynamic_soc_threshold *= 1.05  # Slightly increase threshold if recent performance is negative
 
     # Prioritize EVs that are currently serving rides and have low SoC, and are about to become available
     prioritize_for_charging = [i for i in range(fleet_size) if operational_status[i] == 1 and time_to_next_availability[i] == 0 and battery_soc[i] < dynamic_soc_threshold]
@@ -93,8 +92,7 @@ def demand_responsive_dispatch_7d2b(global_data: dict, state_data: dict, algorit
     actions = [0 if time_to_next_availability[i] > 0 else actions[i] for i in range(fleet_size)]
 
     # Update performance metrics for future feedback
-    updated_algorithm_data = algorithm_data.copy()
-    updated_algorithm_data.setdefault('historical_performance', []).append(np.random.choice([-1, 1]))  # Placeholder for actual performance calculation
+    updated_algorithm_data = {'performance': np.random.choice([-1, 1])}  # Placeholder for actual performance calculation
 
     # Create and return the ActionOperator
     action_operator = ActionOperator(actions)
