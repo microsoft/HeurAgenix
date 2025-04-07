@@ -16,7 +16,7 @@ class Env(MDPEnv):
         self.key_item = "return"
         self.compare = lambda x, y: x - y
         self.construction_steps = self.gym_env.T
-        self.online_problem = True
+        self.online_problem = False
         if os.sep in data_name:
             self.data_ref_name = os.path.join(data_name.split(os.sep)[-2], data_name.split(os.sep)[-1])
 
