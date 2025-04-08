@@ -1,8 +1,8 @@
 from src.problems.base.mdp_components import Solution, ActionOperator
 import numpy as np
 
-def basic_threshold_heuristic_62bb(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
-    """ Enhanced Dynamic Threshold Heuristic for EV Fleet Charging Optimization.
+def balanced_fleet_management_a085(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
+    """ Heuristic algorithm for EV Fleet Charging Optimization with real-time SoC analysis.
 
     Args:
         global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
@@ -16,19 +16,20 @@ def basic_threshold_heuristic_62bb(global_data: dict, state_data: dict, algorith
             - operational_status (list[int]): Operational status of each EV (0: idle, 1: serving, 2: charging).
             - time_to_next_availability (list[int]): Lead time until each EV becomes available.
             - battery_soc (list[float]): Battery state of charge for each EV in percentage.
-        algorithm_data (dict): Algorithm-specific data if necessary.
-        get_state_data_function (callable): Function to receive the new solution as input and return the state dictionary for new solution.
-        base_charge_lb (float, optional): Base lower bound of SoC for charging decisions. Default is 0.3.
-        base_charge_ub (float, optional): Base upper bound of SoC for staying available. Default is 0.4.
+        (Optional and can be omitted if no algorithm data) algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+        (Optional and can be omitted if no used) get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
+        Introduction for hyper parameters in kwargs:
+            - charge_lb (float): Lower bound of SoC for charging decisions. Default is 0.60.
+            - charge_ub (float): Upper bound of SoC for staying available. Default is 0.65.
 
     Returns:
         ActionOperator: Operator with actions for the EV fleet, ensuring actions comply with constraints.
-        dict: Updated algorithm data or empty dictionary if no update.
+        dict: Empty dictionary as no algorithm data is updated.
     """
-
-    # Set base values for hyper-parameters if not provided
-    base_charge_lb = kwargs.get('base_charge_lb', 0.3)
-    base_charge_ub = kwargs.get('base_charge_ub', 0.4)
+    # Set default hyper-parameters for SoC thresholds
+    charge_lb = kwargs.get('charge_lb', 0.60)
+    charge_ub = kwargs.get('charge_ub', 0.65)
 
     # Extract necessary data
     fleet_size = global_data['fleet_size']
@@ -40,34 +41,27 @@ def basic_threshold_heuristic_62bb(global_data: dict, state_data: dict, algorith
     customer_arrivals = global_data['customer_arrivals']
     order_price = global_data['order_price']
 
-    # Predict future demand and price trends
-    future_demand = np.mean(customer_arrivals[current_step:current_step + 5]) if current_step + 5 < len(customer_arrivals) else np.mean(customer_arrivals[current_step:])
-    future_order_price = np.mean(order_price[current_step:current_step + 5]) if current_step + 5 < len(order_price) else np.mean(order_price[current_step:])
+    # Dynamic adjustment of thresholds based on current step and demand patterns
+    avg_customer_arrivals = np.mean(customer_arrivals)
+    if current_step > 0.5 * len(customer_arrivals):
+        charge_lb += 0.05
+        charge_ub += 0.05
 
-    # Adjust thresholds based on future demand and price trends
-    if fleet_size > 5:
-        charge_lb = max(base_charge_lb, 0.5 - 0.1 * (future_demand / np.max(customer_arrivals)))
-        charge_ub = min(base_charge_ub, 0.6 + 0.1 * (future_order_price / np.max(order_price)))
-    else:
-        avg_soc = np.mean(battery_soc)
-        charge_lb = max(base_charge_lb, avg_soc - 0.1)
-        charge_ub = min(base_charge_ub, avg_soc + 0.1)
-
-    # Initialize actions based on fleet size
+    # Initialize actions for each EV to zero (remain available)
     actions = [0] * fleet_size
 
     # Determine actions for each EV
     for i in range(fleet_size):
-        # If EV is serving a trip, it must remain available
+        # Ensure EVs on a ride remain available
         if time_to_next_availability[i] >= 1:
             actions[i] = 0
-        # Prioritize charging for EVs with low time_to_next_availability and battery_soc
+        # Prioritize charging for idle EVs with low battery SoC
         elif time_to_next_availability[i] == 0 and battery_soc[i] <= charge_lb:
             actions[i] = 1
         elif time_to_next_availability[i] == 0 and battery_soc[i] >= charge_ub:
             actions[i] = 0
 
-    # Ensure the sum of actions does not exceed the total number of chargers
+    # Prioritize charging for idle EVs when fleet_to_charger_ratio is high
     if sum(actions) > total_chargers:
         excess_count = sum(actions) - total_chargers
         charge_indices = [index for index, action in enumerate(actions) if action == 1]
@@ -75,8 +69,5 @@ def basic_threshold_heuristic_62bb(global_data: dict, state_data: dict, algorith
         for index in charge_indices[:excess_count]:
             actions[index] = 0
 
-    # Create a new solution with the determined actions
-    new_solution = Solution([actions])
-
-    # Return the operator and empty algorithm data
+    # Create and return the ActionOperator with the new actions
     return ActionOperator(actions), {}
