@@ -13,11 +13,11 @@ To set up the environment, run the following command:
 pip install -r requirements.txt
 ```
 
-### Set up GPT
-Currently, the framework supports activation of GPT using tokens from Azure.
+### Set up LLM
+Currently, the framework supports GPT from Azure using tokens and api based model.
 
-1. Fill in the parameters in `gpt_setting.json`.
-2. Test the GPT activation using:
+1. Fill in the parameters in `src/util/azure_gpt_setting.json` / `src/util/azure_gpt_setting.json`.
+2. Test the LLM activation using:
 ```bash
 python chat.py
 ```
@@ -79,7 +79,7 @@ python generate_heuristic.py -p <problem> -s <source> [-m] [-pp <paper_path>] [-
 
 - `-p`, `--problem`: Specifies the type of CO problem to solve (required). Choose from available options in the `problem_pool`.
 - `-s`, `--source`: Defines the source for generating heuristics (required), with options:
-  - `gpt`: Use LLM’s internal knowledge.
+  - `llm`: Use LLM’s internal knowledge.
   - `paper`: Extract heuristics from a specified research paper.
   - `related_problem`: Transfer heuristics from related CO problems.
 - `-m`, `--smoke_test`: Runs a smoke test (optional).
@@ -90,7 +90,7 @@ The generated heuristics are saved in the `output/{problem}/generate_heuristic` 
 #### Examples
 To generate heuristics for the Traveling Salesman Problem (TSP) using LLM with a smoke test:
 ```bash
-python generate_heuristic.py -p TSP -s gpt -m
+python generate_heuristic.py -p TSP -s llm -m
 ```
 
 To generate heuristics from a paper:
@@ -182,8 +182,8 @@ Parameters:
 - `-p`, `--problem`: Specifies the type of problem to solve (required).
 - `-e`, `--heuristic`: Specifies the heuristic function. Options include:
   - `<heuristic_function_name>`: Directly specify the name of a particular heuristic function.
-  - `'gpt_hh'`: LLM-based rapid selection from heuristics in the specified directory.
-  - `'gpt_deep_hh'`: LLM-based comprehensive selection from heuristics in the specified directory.
+  - `'llm_hh'`: LLM-based rapid selection from heuristics in the specified directory.
+  - `'llm_deep_hh'`: LLM-based comprehensive selection from heuristics in the specified directory.
   - `'random_hh'`: Randomly selects a heuristic from the directory.
   - `'or_solver'`: Uses an exact OR solver (only applicable for specific problems like DPOSP).
 - `-d`, `--heuristic_dir`: Directory containing heuristic functions (if needed).
@@ -197,11 +197,11 @@ python launch_hyper_heuristic.py -p TSP -e nearest_neighbor_f91d -c path/to/test
 ```
 To run the rapid heuristic selection on a test case:
 ```bash
-python launch_hyper_heuristic.py -p TSP -e gpt_hh -c path/to/test_case
+python launch_hyper_heuristic.py -p TSP -e llm_hh -c path/to/test_case
 ```
 To run the comprehensive heuristic selection on a test case:
 ```bash
-python launch_hyper_heuristic.py -p TSP -e gpt_gpt_hh -c path/to/test_case
+python launch_hyper_heuristic.py -p TSP -e llm_deep_hh -c path/to/test_case
 ```
 
 ## Solving On New Problems
@@ -227,24 +227,3 @@ streamlit run doc/app.py
  
 This command will open a web-based interface where you can visually navigate through the project's architecture and processes. Please note that this visualization is for demonstration purposes only and does not perform any actual optimization tasks.
 
-## Run Baseline
-The baseline we provide are also implement in `baselines` folder, including:
-- GLS for TSP
-- GLS + EoH for TSP
-- GLS + ReEvo for TSP
-- ACO for TSP
-- ACO + ReEvo for TSP
-- EoH constructive for TSP
-- ReEvo constructive for TSP
-- Or-Tools for TSP
-- ACO for CVRP
-- ACO + ReEvo for CVRP
-- Or-Tools for CVRP
-- ACO for MKP
-- ACO + ReEvo for MKP
-Entry to corresponding folder, modify the 'heuristic' and run `python run.py` to get result.
-
-
-## Future Work
-- We will provide a unified interface to handle various types of data.
-- Support for key-based GPT and other LLMs will be added.

@@ -5,35 +5,35 @@ import traceback
 from copy import deepcopy
 from src.problems.base.components import BaseOperator
 from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
-from src.util.gpt_helper import GPTHelper
+from src.util.base_llm_client import BaseLLMClient
 
 
 class HeuristicGenerator:
     def __init__(
         self,
-        gpt_helper: GPTHelper,
+        llm_client: BaseLLMClient,
         problem: str
     ) -> None:
-        self.gpt_helper = gpt_helper
+        self.llm_client = llm_client
         self.problem = problem
-        self.output_dir = self.gpt_helper.output_dir
+        self.output_dir = self.llm_client.output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def generate_from_gpt(self, reference_data: str=None, smoke_test: bool=False) -> list[str]:
+    def generate_from_llm(self, reference_data: str=None, smoke_test: bool=False) -> list[str]:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
 
         # Generate available heuristic description
-        self.gpt_helper.load("generate_from_gpt", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("generate_from_llm", prompt_dict)
+        response = self.llm_client.chat()
         heuristics = extract(response, "heuristic", sep="\n")
-        self.gpt_helper.dump("heuristic_from_gpt")
+        self.llm_client.dump("heuristic_from_llm")
 
         for heuristic in heuristics:
             # Generate description for single heuristic
-            self.gpt_helper.load_chat("heuristic_from_gpt")
+            self.llm_client.load_chat("heuristic_from_llm")
             heuristic_name, description = heuristic.split(":")
             env_summarize = prompt_dict["env_summarize"]
             heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
@@ -43,7 +43,7 @@ class HeuristicGenerator:
     def generate_from_paper(self, paper_path: str, reference_data: str=None, smoke_test: bool=False) -> str:
         heuristic_file = None
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
 
         # Load whole paper
         if os.path.isdir(paper_path):
@@ -70,10 +70,10 @@ class HeuristicGenerator:
         # Read abstract to check whether we can generate heuristic from paper
         prompt_dict["title"] = title
         prompt_dict["abstract"] = abstract
-        self.gpt_helper.load("reading_paper_abstract", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("reading_paper_abstract", prompt_dict)
+        response = self.llm_client.chat()
         related_to_problem = extract(response, "related_to_problem")
-        self.gpt_helper.dump("read_paper")
+        self.llm_client.dump("read_paper")
 
         if "yes" in related_to_problem:
             last_interested_section = "None"
@@ -86,15 +86,15 @@ class HeuristicGenerator:
                 prompt_dict["last_interested_section"] = last_interested_section
                 prompt_dict["last_interested_content"] = last_interested_content
                 prompt_dict["remaining_section_dict"] = dict_str
-                self.gpt_helper.load("reading_paper_section", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("reading_paper_section", prompt_dict)
+                response = self.llm_client.chat()
                 interested_section = extract(response, "interested_section")
                 if interested_section is None:
-                    self.gpt_helper.dump("abandoned")
+                    self.llm_client.dump("abandoned")
                     return None
                 interested_content = find_key_value(section_dict, interested_section)
                 if interested_content is None:
-                    self.gpt_helper.dump(f"generate_from_paper")
+                    self.llm_client.dump(f"generate_from_paper")
                     heuristic_name = interested_section
                     env_summarize = prompt_dict["env_summarize"]
                     heuristic_file = self.generate(heuristic_name, f"Generate from paper {title}. Please add the notes in code to show the source paper.", env_summarize, smoke_test)
@@ -102,7 +102,7 @@ class HeuristicGenerator:
                 last_interested_section = interested_section
                 last_interested_content = interested_content
         else:
-            self.gpt_helper.dump(f"abandoned")
+            self.llm_client.dump(f"abandoned")
             return None
 
 
@@ -110,7 +110,7 @@ class HeuristicGenerator:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
 
         # Find similar problem
         description_dict = {
@@ -122,15 +122,15 @@ class HeuristicGenerator:
             for problem in related_problems
         ])
         prompt_dict["studied_problems"] = studied_problems
-        self.gpt_helper.load("reference_problem", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("reference_problem", prompt_dict)
+        response = self.llm_client.chat()
         related_problems = extract(response, "referenced_problem", ";")
-        self.gpt_helper.dump("reference_problem")
+        self.llm_client.dump("reference_problem")
 
         for referenced_problem in related_problems:
             if referenced_problem not in description_dict:
                 continue
-            self.gpt_helper.load_chat("reference_problem")
+            self.llm_client.load_chat("reference_problem")
 
             # Find the similarities between referenced problem and new problem
             component_code = open(os.path.join("src", "problems", referenced_problem, "components.py")).read()
@@ -140,8 +140,8 @@ class HeuristicGenerator:
             prompt_dict["referenced_problem_description"] = description
             prompt_dict["referenced_problem_solution_class"] = reference_solution_class
             prompt_dict["referenced_problem_operation_class"] = reference_operation_class
-            self.gpt_helper.load("mapping_component_in_problem", prompt_dict)
-            response = self.gpt_helper.chat()
+            self.llm_client.load("mapping_component_in_problem", prompt_dict)
+            response = self.llm_client.chat()
             similarities = extract(response, "similarities", "\n")
             prompt_dict["similarities_in_problem"] = "\n".join(similarities)
 
@@ -154,14 +154,14 @@ class HeuristicGenerator:
                 referenced_heuristic_docs.append(f"{heuristic_name}:{referenced_heuristic_doc}")
             referenced_heuristic_docs = "\n".join(referenced_heuristic_docs)
             prompt_dict["candidate_heuristic_pool"] = referenced_heuristic_docs
-            self.gpt_helper.load("reference_heuristic", prompt_dict)
-            response = self.gpt_helper.chat()
+            self.llm_client.load("reference_heuristic", prompt_dict)
+            response = self.llm_client.chat()
             reference_heuristics = extract(response, "referenced_heuristics", "\n")
-            self.gpt_helper.dump(f"reference_heuristics_in_{referenced_problem}")
+            self.llm_client.dump(f"reference_heuristics_in_{referenced_problem}")
 
             # Find the similarities between referenced heuristic and new problem
             for reference_heuristic_item in reference_heuristics:
-                self.gpt_helper.load_chat(f"reference_heuristics_in_{referenced_problem}")
+                self.llm_client.load_chat(f"reference_heuristics_in_{referenced_problem}")
                 reference_heuristic = reference_heuristic_item.split(";")[0]
                 reference_heuristic_file = os.path.join("src", "problems", referenced_problem, "heuristics", "basic_heuristics", reference_heuristic + ".py")
                 reference_heuristic_code = open(reference_heuristic_file).read()
@@ -169,15 +169,15 @@ class HeuristicGenerator:
                 prompt_dict["referenced_heuristic_code"] = reference_heuristic_code
                 prompt_dict["referenced_global_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "global_data.txt")).read()
                 prompt_dict["referenced_state_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "state_data.txt")).read()
-                self.gpt_helper.load("mapping_component_in_heuristic", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("mapping_component_in_heuristic", prompt_dict)
+                response = self.llm_client.chat()
                 similarities_in_heuristics = extract(response, "similarities", "\n")
                 if similarities_in_heuristics:
                     similarities += similarities_in_heuristics
 
                 # Update the description
-                self.gpt_helper.load("transfer_heuristic", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("transfer_heuristic", prompt_dict)
+                response = self.llm_client.chat()
                 heuristic_name, description = extract(response, "heuristic", ";")
                 description += f"We hope to transfer {reference_heuristic} in {referenced_problem} into new {heuristic_name} in {self.problem}.\n" \
                     + "Following are some similarities(source_component;target_component;introduction):\n" \
@@ -207,20 +207,20 @@ class HeuristicGenerator:
         else:
             prompt_dict["components_file"] = f"src.problems.base.mdp_components"
         if compress:
-            self.gpt_helper.load("implement_code_compress", prompt_dict)
+            self.llm_client.load("implement_code_compress", prompt_dict)
         else:
-            self.gpt_helper.load("implement_code", prompt_dict)
-        response = self.gpt_helper.chat()
+            self.llm_client.load("implement_code", prompt_dict)
+        response = self.llm_client.chat()
         code = extract(response, "python_code")
 
         # Verify and revision code
         if smoke_test:
             code = self.smoke_test(code, function_name)
             if not code:
-                self.gpt_helper.dump(f"{function_name}_abandoned")
+                self.llm_client.dump(f"{function_name}_abandoned")
                 return None
 
-        self.gpt_helper.dump(f"{function_name}")
+        self.llm_client.dump(f"{function_name}")
 
         # Save code
         output_heuristic_file = os.path.join(self.output_dir, function_name + ".py")
@@ -265,8 +265,8 @@ class HeuristicGenerator:
                 operator = traceback.format_exc()
             if operator is None or isinstance(operator, BaseOperator):
                 # Expected result
-                self.gpt_helper.load("smoke_test_expected_result.txt", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("smoke_test_expected_result.txt", prompt_dict)
+                response = self.llm_client.chat()
                 expected_result = extract(response, "expected_result")
 
                 # Actual result
@@ -276,17 +276,17 @@ class HeuristicGenerator:
 
                 # Compare
                 prompt_dict["expected_result"] = expected_result
-                self.gpt_helper.load("smoke_test_compare.txt", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("smoke_test_compare.txt", prompt_dict)
+                response = self.llm_client.chat()
                 response = extract(response, "python_code")
                 # Actual result
                 if response is None:
                     # Give up
-                    self.gpt_helper.load("We can not implement and give up.")
+                    self.llm_client.load("We can not implement and give up.")
                     return None
                 elif "correct" in response:
                     # Correct
-                    self.gpt_helper.load(f"To ensure the stable of heuristics, we adjust the code to:\n{heuristic_code}")
+                    self.llm_client.load(f"To ensure the stable of heuristics, we adjust the code to:\n{heuristic_code}")
                     return heuristic_code
                 else:
                     # Update code
@@ -294,13 +294,13 @@ class HeuristicGenerator:
             else:
                 # Crashed during running the heuristic
                 prompt_dict["error_message"] = operator
-                self.gpt_helper.load("smoke_test_crashed.txt", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("smoke_test_crashed.txt", prompt_dict)
+                response = self.llm_client.chat()
                 heuristic_code = extract(response, "python_code")
                 if heuristic_code is None:
                     # Give up
-                    self.gpt_helper.load("We can not implement and give up.")
+                    self.llm_client.load("We can not implement and give up.")
                     return None
         # Give up due to the try limitation
-        self.gpt_helper.load("We can not implement and give up.")
+        self.llm_client.load("We can not implement and give up.")
         return None

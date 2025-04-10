@@ -2,23 +2,22 @@ import os
 import math
 import traceback
 import multiprocessing
-import multiprocessing.managers
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
-from src.util.gpt_helper import GPTHelper
+from src.util.base_llm_client import BaseLLMClient
 from src.util.compare_heuristics import compare_heuristics
 
 
-class GPTDeepSelectionHyperHeuristic:
+class LLMDeepSelectionHyperHeuristic:
     def __init__(
         self,
-        gpt_helper: GPTHelper,
+        llm_client: BaseLLMClient,
         heuristic_pool: list[str],
         problem: str,
         search_interval: int=None,
         search_time: int=None,
     ) -> None:
-        self.gpt_helper = gpt_helper
+        self.llm_client = llm_client
         self.problem = problem
         self.search_interval = search_interval
         self.search_time = search_time
@@ -37,12 +36,12 @@ class GPTDeepSelectionHyperHeuristic:
         
 
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem)
 
         # Classify heuristic pool
         prompt_dict["heuristic_pool_introduction"] = "\n".join([open(search_file(heuristic_file + ".py", self.problem)).read() for heuristic_file in self.heuristic_pool])
-        self.gpt_helper.load("heuristic_classification", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("heuristic_classification", prompt_dict)
+        response = self.llm_client.chat()
         heuristic_classification = extract(response, "heuristic_classification", sep="\n")
         classified_heuristic = {}
         classified_heuristic_introduction = ""
@@ -58,18 +57,18 @@ class GPTDeepSelectionHyperHeuristic:
                 assert heuristic_name in self.heuristic_pool
                 classified_heuristic[classification_name].append(heuristic_name)
                 classified_heuristic_introduction += extract_function_with_short_docstring(open(search_file(heuristic_name + ".py", self.problem)).read(), heuristic_name) + "\n"
-        self.gpt_helper.dump("heuristic_classification")
+        self.llm_client.dump("heuristic_classification")
 
         # Make plan
-        self.gpt_helper.load_chat("background")
+        self.llm_client.load_chat("background")
         global_data_feature = get_global_data_feature_function(env.global_data)
         prompt_dict["global_data_feature"] = filter_dict_to_str([env.global_data, global_data_feature], data_feature_content_threshold)
         prompt_dict["category_names"] = ",".join(classified_heuristic.keys())
         prompt_dict["classified_heuristic_introduction"] = classified_heuristic_introduction
         prompt_dict["running_step"] = search_interval
-        self.gpt_helper.load("make_plan", prompt_dict)
-        self.gpt_helper.chat()
-        self.gpt_helper.dump("make_plan")
+        self.llm_client.load("make_plan", prompt_dict)
+        self.llm_client.chat()
+        self.llm_client.dump("make_plan")
 
         heuristic_traject = []
         current_steps = 0
@@ -79,7 +78,7 @@ class GPTDeepSelectionHyperHeuristic:
         while current_steps <= max_steps and env.continue_run:
             try:
                 # Select heuristic category
-                self.gpt_helper.load_chat("make_plan")
+                self.llm_client.load_chat("make_plan")
                 state_data_feature = get_state_data_feature_function(env.global_data, env.state_data)
                 prompt_dict["state_data_feature"] = filter_dict_to_str([env.state_data, state_data_feature], data_feature_content_threshold)
                 if heuristic_traject == []:
@@ -102,9 +101,9 @@ class GPTDeepSelectionHyperHeuristic:
                         prompt_dict[key] = value
                         prompt_dict.update(env.global_data)
 
-                self.gpt_helper.load("heuristic_category_selection", prompt_dict)
-                response = self.gpt_helper.chat()
-                self.gpt_helper.dump(f"step_{chat_index}")
+                self.llm_client.load("heuristic_category_selection", prompt_dict)
+                response = self.llm_client.chat()
+                self.llm_client.dump(f"step_{chat_index}")
 
                 # Continue run
                 if "continue_run" in response or "None" in response:

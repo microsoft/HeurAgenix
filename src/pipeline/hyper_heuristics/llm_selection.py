@@ -2,17 +2,17 @@ import os
 import traceback
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
-from src.util.gpt_helper import GPTHelper
+from src.util.base_llm_client import BaseLLMClient
 
 
-class GPTSelectionHyperHeuristic:
+class LLMSelectionHyperHeuristic:
     def __init__(
         self,
-        gpt_helper: GPTHelper,
+        llm_client: BaseLLMClient,
         heuristic_pool: list[str],
         problem: str,
     ) -> None:
-        self.gpt_helper = gpt_helper
+        self.llm_client = llm_client
         self.problem = problem
         self.heuristic_docs = {
             heuristic_file.split(".")[0]: extract_function_with_short_docstring(open(search_file(heuristic_file, problem)).read(), heuristic_file.split(".")[0]) 
@@ -25,14 +25,14 @@ class GPTSelectionHyperHeuristic:
 
     def run(self, env:BaseEnv, max_steps: int=None, data_feature_content_threshold: int=1000, **kwargs) -> bool:
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem)
 
         # Load heuristic pool
         max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         prompt_dict["heuristic_pool_introduction"] = "\n".join(self.heuristic_docs.values())
-        self.gpt_helper.load("heuristic_pool", prompt_dict)
-        self.gpt_helper.chat()
-        self.gpt_helper.dump("heuristic_pool")
+        self.llm_client.load("heuristic_pool", prompt_dict)
+        self.llm_client.chat()
+        self.llm_client.dump("heuristic_pool")
 
         # Generate global heuristic value
         global_data = env.global_data
@@ -45,7 +45,7 @@ class GPTSelectionHyperHeuristic:
             try:
                 if env.is_complete_solution:
                     env.dump_result()
-                self.gpt_helper.load_chat("heuristic_pool")
+                self.llm_client.load_chat("heuristic_pool")
 
                 # Generate state heuristic value
                 state_data = env.state_data
@@ -68,10 +68,10 @@ class GPTSelectionHyperHeuristic:
                     if len(str(key) + str(value)) <= data_feature_content_threshold:  
                         prompt_dict[key] = value
                         prompt_dict.update(env.global_data)
-                self.gpt_helper.load("heuristic_selection", prompt_dict)
+                self.llm_client.load("heuristic_selection", prompt_dict)
 
-                response = self.gpt_helper.chat()
-                self.gpt_helper.dump(f"step_{len(heuristic_traject)}")
+                response = self.llm_client.chat()
+                self.llm_client.dump(f"step_{len(heuristic_traject)}")
 
                 if "Run heuristic:" in response:
                     # Load selected heuristic, running step, parameters(optional) and reason

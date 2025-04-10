@@ -3,43 +3,21 @@ import json
 import re
 import base64
 import importlib
-from openai import AzureOpenAI
 from time import sleep
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from src.util.util import compress_numbers, extract, load_framework_description
 
 
-class GPTHelper:
+class BaseLLMClient:
     def __init__(
             self,
-            prompt_dir: str=None,
-            output_dir: str=None,
-            gpt_setting: dict=None,
+            prompt_dir: str,
+            output_dir: str,
+            setting_file: str,
         ):
         self.prompt_dir = prompt_dir
         self.output_dir = output_dir
-        if gpt_setting is None:
-            gpt_setting = json.load(open("gpt_setting.json"))
-
-        self.api_version = gpt_setting["api_version"]
-        self.model = gpt_setting["model"]
-        self.temperature = gpt_setting["temperature"]
-        self.top_p = gpt_setting["top-p"]
-        self.seed = gpt_setting.get("seed", None)
-        self.max_tokens = gpt_setting["max_tokens"]
-        self.max_attempts = gpt_setting["max_attempts"]
-        self.default_sleep_time = gpt_setting["sleep_time"]
-        self.azure_endpoint = gpt_setting["azure_endpoint"]
-
-        credential = DefaultAzureCredential()
-        token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-        self.client = AzureOpenAI(
-            azure_endpoint=self.azure_endpoint,
-            azure_ad_token_provider=token_provider,
-            api_version=self.api_version,
-            max_retries=5,
-        )
-
+        setting_file = os.path.join(setting_file)
+        self.setting = json.load(open(setting_file))
         self.reset(output_dir)
 
     def reset(self, output_dir:str=None) -> None:
@@ -48,30 +26,18 @@ class GPTHelper:
             self.output_dir = output_dir
             os.makedirs(output_dir, exist_ok=True)
 
-    def chat(self) -> str:
+    def chat_once(self) -> str:
+        pass
 
+    def chat(self) -> str:
         for index in range(self.max_attempts):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=self.messages,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    top_p=self.top_p,
-                    seed=self.seed,
-                    frequency_penalty=0,
-                    presence_penalty=0,
-                    stop=None,
-                    stream=False,
-                )
-                response_content = response.choices[-1].message.content
+                response_content = self.chat_once()
                 self.messages.append({"role": "assistant", "content": [{"type": "text", "text": response_content}]})
                 return response_content
             except Exception as e:
                 print(f"Try to chat {index + 1} time: {e}")
-                sleep_time = self.default_sleep_time
-                if "Please retry after " in str(e) and " seconds." in str(e):
-                    sleep_time = int(str(e).split("Please retry after ")[1].split(" seconds.")[0]) + 1
+                sleep_time = self.sleep_time
                 sleep(sleep_time)
         self.messages.append({"role": "assistant", "content": "Exceeded the maximum number of attempts"})
         self.dump("error")

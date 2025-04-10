@@ -9,17 +9,16 @@ from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
 from src.util.util import df_to_str, extract, filter_dict_to_str, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
-from src.util.gpt_helper import GPTHelper
-
+from src.util.base_llm_client import BaseLLMClient
 class HeuristicEvolver:
     def __init__(
         self,
-        gpt_helper: GPTHelper,
+        llm_client: BaseLLMClient,
         problem: str,
         train_dir: str=None,
         validation_dir: str=None,
     ) -> None:
-        self.gpt_helper = gpt_helper
+        self.llm_client = llm_client
         self.problem = problem
         train_dir = train_dir if train_dir is not None else os.path.join("src", "problems", problem, "data", "train_data")
         validation_dir = validation_dir if validation_dir is not None else os.path.join("src", "problems", problem, "data", "validation_data")
@@ -112,7 +111,7 @@ class HeuristicEvolver:
             env = Env(data_name=train_data)
             basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
             output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", env.data_ref_name)
-            self.gpt_helper.reset(output_dir)
+            self.llm_client.reset(output_dir)
 
             # Perturb for better solution
             negative_result, positive_result = self.perturbation(
@@ -130,7 +129,7 @@ class HeuristicEvolver:
                 # Get bassline 
                 basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
 
-                prompt_dict = self.gpt_helper.load_background(self.problem)
+                prompt_dict = self.llm_client.load_background(self.problem)
                 prompt_dict["all_heuristic_docs"] = all_heuristic_docs
                 self.load_heuristic_code(basic_heuristic_file, prompt_dict)
 
@@ -158,7 +157,7 @@ class HeuristicEvolver:
                     )
                     if suggested_heuristic_file:
                         output_heuristic_name = suggested_heuristic_file.split(os.sep)[-1].split(".")[0]
-                        self.gpt_helper.dump(f"{basic_heuristic_name}_to_{output_heuristic_name}")
+                        self.llm_client.dump(f"{basic_heuristic_name}_to_{output_heuristic_name}")
 
                         suggested_improvement = sum(self.get_improvement(env, basic_heuristic_result, suggested_result)) / len(basic_heuristic_result)
                         print(f"Improvement for {suggested_heuristic_file}: {suggested_improvement}")
@@ -190,7 +189,7 @@ class HeuristicEvolver:
                                 continue
                             if refined_heuristic_file:
                                 output_heuristic_name = refined_heuristic_file.split(os.sep)[-1].split(".")[0]
-                                self.gpt_helper.dump(f"{last_heuristic_name}_to_{output_heuristic_name}")
+                                self.llm_client.dump(f"{last_heuristic_name}_to_{output_heuristic_name}")
                                 refined_improvement = sum(self.get_improvement(env, basic_heuristic_result, refined_result)) / len(basic_heuristic_result)
                                 print(f"Improvement for {refined_heuristic_file}: {refined_improvement}")
                                 refined_heuristic_benchmarks.append([refined_heuristic_file, refined_improvement])
@@ -270,10 +269,10 @@ class HeuristicEvolver:
         prompt_dict["negative_trajectory"] = negative_result["trajectory"]
 
         # Identify bottleneck operations
-        self.gpt_helper.load("identify_bottleneck_v2", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("identify_bottleneck_v2", prompt_dict)
+        response = self.llm_client.chat()
         bottleneck_operation_strs = extract(response, key="bottleneck_operations", sep="\n")
-        self.gpt_helper.dump("bottleneck_operations")
+        self.llm_client.dump("bottleneck_operations")
 
         bottlenecks = []
         for bottleneck_operation_str in bottleneck_operation_strs:
@@ -295,7 +294,7 @@ class HeuristicEvolver:
             smoke_test: bool,
     ) -> tuple[str, str]:
         env.reset()
-        self.gpt_helper.load_chat("bottleneck_operations")
+        self.llm_client.load_chat("bottleneck_operations")
         prompt_dict["bottleneck_operation_id"] = bottleneck_operation_id
         prompt_dict["proposed_operation"] = proposed_operation
         prompt_dict["reason"] = reason
@@ -309,18 +308,18 @@ class HeuristicEvolver:
         prompt_dict["state_data_feature"] = filter_dict_to_str(self.get_state_data_feature_function(env.global_data, env.state_data))
 
         # Try to provide suggestion
-        self.gpt_helper.load("extract_suggestion_v2", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("extract_suggestion_v2", prompt_dict)
+        response = self.llm_client.chat()
         suggestion = extract(response, key="suggestion")
         if suggestion:
-            self.gpt_helper.dump(suggestion_name)
+            self.llm_client.dump(suggestion_name)
             # Implement the new code
             heuristic_name = prompt_dict["heuristic_name"]
             origin_function_name = prompt_dict["function_name"]
             prompt_dict["suggestion"] = suggestion
             description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the {origin_function_name}."
             env_summarize = prompt_dict["env_summarize"]
-            output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, env_summarize, smoke_test)
+            output_heuristic_file = HeuristicGenerator(self.llm_client, self.problem).generate(heuristic_name, description, env_summarize, smoke_test)
             if output_heuristic_file:
                 suggested_result = self.validation(self.validation_cases, output_heuristic_file)
                 return output_heuristic_file, suggestion, suggested_result
@@ -362,10 +361,10 @@ class HeuristicEvolver:
         prompt_dict["compare"] = compare
         prompt_dict["benchmark_result"] = df_to_str(benchmark_df)
 
-        self.gpt_helper.load("refinement", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("refinement", prompt_dict)
+        response = self.llm_client.chat()
         analysis_results = extract(response, key="refinement", sep="\n")
-        self.gpt_helper.dump(suggestion_name)
+        self.llm_client.dump(suggestion_name)
         suggestion = None
         for analysis_result in analysis_results:
             if "code adjustment suggestion" in analysis_result:
@@ -377,9 +376,9 @@ class HeuristicEvolver:
             prompt_dict["suggestion"] = suggestion
             description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the {last_heuristic_name}."
             env_summarize = prompt_dict["env_summarize"]
-            output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, env_summarize, smoke_test, compress=True)
+            output_heuristic_file = HeuristicGenerator(self.llm_client, self.problem).generate(heuristic_name, description, env_summarize, smoke_test, compress=True)
             output_heuristic_name = output_heuristic_file.split(os.sep)[-1].split(".")[0]
-            self.gpt_helper.dump(f"{previous_heuristic_name}_to_{output_heuristic_name}")
+            self.llm_client.dump(f"{previous_heuristic_name}_to_{output_heuristic_name}")
             if output_heuristic_file:
                 suggested_heuristic_result = self.validation(self.validation_cases, output_heuristic_file)
                 return output_heuristic_file, suggestion, suggested_heuristic_result

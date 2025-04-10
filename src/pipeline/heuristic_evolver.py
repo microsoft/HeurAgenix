@@ -13,17 +13,17 @@ from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
 from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
-from src.util.gpt_helper import GPTHelper
+from src.util.base_llm_client import BaseLLMClient
 
 class HeuristicEvolver:
     def __init__(
         self,
-        gpt_helper: GPTHelper,
+        llm_client: BaseLLMClient,
         problem: str,
         train_dir: str=None,
         validation_dir: str=None,
     ) -> None:
-        self.gpt_helper = gpt_helper
+        self.llm_client = llm_client
         self.problem = problem
         self.train_dir = train_dir if train_dir is not None else os.path.join("src", "problems", problem, "data", "train_data")
         self.validation_dir = validation_dir if validation_dir is not None else os.path.join("src", "problems", problem, "data", "validation_data")
@@ -38,7 +38,6 @@ class HeuristicEvolver:
             perturbation_time: int=100,
             filtered_num: int=3,
             evolution_round: int=3,
-            time_limitation: float=10,
             smoke_test: bool=True,
             validation: bool=True,
         ) -> None:
@@ -79,15 +78,15 @@ class HeuristicEvolver:
                             )
                         except Exception as e:
                             trace_string = traceback.format_exc()
-                            self.gpt_helper.load(trace_string)
-                            self.gpt_helper.dump("Error")
-                            self.gpt_helper.messages.pop()
+                            self.llm_client.load(trace_string)
+                            self.llm_client.dump("Error")
+                            self.llm_client.messages.pop()
                             continue
                 
                     # validation
                     if evolved_heuristic_file:
                         print(f"Validation on {evolved_heuristic_file}")
-                        validation_values = self.validation(self.validation_dir, evolved_heuristic_file, time_limitation, True)
+                        validation_values = self.validation(self.validation_dir, evolved_heuristic_file, True)
                         if validation_values:
                             average_advantage = 0
                             for index in range(len(validation_values)):
@@ -139,7 +138,7 @@ class HeuristicEvolver:
             smoke_test: bool=True,
         ) -> str:
         env.reset()
-        self.gpt_helper.reset(output_dir)
+        self.llm_client.reset(output_dir)
         
         shutil.copyfile(positive_result_file, os.path.join(output_dir, "positive_solution.txt"))
         shutil.copyfile(negative_result_file, os.path.join(output_dir, "negative_solution.txt"))
@@ -149,7 +148,7 @@ class HeuristicEvolver:
             shutil.copyfile(env.data_path, os.path.join(output_dir, os.path.basename(env.data_path)))
 
         # Load background
-        prompt_dict = self.gpt_helper.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem)
 
         # Load components
         if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
@@ -189,22 +188,22 @@ class HeuristicEvolver:
         prompt_dict["global_data"] = filter_dict_to_str(env.global_data)
 
         # Analysis solution difference 
-        self.gpt_helper.load("compare_solution", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("compare_solution", prompt_dict)
+        response = self.llm_client.chat()
         solution_difference = extract(response, key="solution_difference", sep="\n")
         prompt_dict["solution_difference"] = solution_difference
 
         # Decompose solution
-        self.gpt_helper.load("decompose_solution", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("decompose_solution", prompt_dict)
+        response = self.llm_client.chat()
         operation_analysis = extract(response, key="operation_analysis", sep="\n")
         prompt_dict["operation_analysis"] = "\n".join(operation_analysis)
 
         # Identify bottleneck operations
-        self.gpt_helper.load("identify_bottleneck", prompt_dict)
-        response = self.gpt_helper.chat()
+        self.llm_client.load("identify_bottleneck", prompt_dict)
+        response = self.llm_client.chat()
         bottleneck_operations = extract(response, key="bottleneck_operations", sep="\n")
-        self.gpt_helper.dump("bottleneck_operations")
+        self.llm_client.dump("bottleneck_operations")
 
         prompt_dict["suggestions"] = ""
         for index, bottleneck_operation_analysis in enumerate(bottleneck_operations):
@@ -220,8 +219,8 @@ class HeuristicEvolver:
             prompt_dict["state_data"] = filter_dict_to_str(env.state_data)
 
             # Propose another operation
-            self.gpt_helper.load("propose_operation", prompt_dict)
-            response = self.gpt_helper.chat()
+            self.llm_client.load("propose_operation", prompt_dict)
+            response = self.llm_client.chat()
             propose_analysis = extract(response, key="propose")
             if propose_analysis is None:
                 continue
@@ -247,36 +246,36 @@ class HeuristicEvolver:
 
             # Extract rule if proposed result is better than negative result
             if env.compare(env.key_value, negative_value) > 0:
-                self.gpt_helper.load("extract_suggestion", prompt_dict)
-                response = self.gpt_helper.chat()
+                self.llm_client.load("extract_suggestion", prompt_dict)
+                response = self.llm_client.chat()
                 suggestion = extract(response, "suggestion")
                 prompt_dict["suggestions"] += f"suggestion {index}:\n" + suggestion.strip() + "\n"
             else:
-                self.gpt_helper.load("Your suggestion does not work well and we skip.\n")
-                self.gpt_helper.chat()
+                self.llm_client.load("Your suggestion does not work well and we skip.\n")
+                self.llm_client.chat()
 
-            self.gpt_helper.dump(f"suggestion_{index}")
+            self.llm_client.dump(f"suggestion_{index}")
 
         if prompt_dict["suggestions"] != "":
             # Sort suggestion
-            self.gpt_helper.load("sort_suggestion", prompt_dict)
-            response = self.gpt_helper.chat()
+            self.llm_client.load("sort_suggestion", prompt_dict)
+            response = self.llm_client.chat()
             code_suggestion = extract(response, "code_suggestion")
 
             # Implement the new code
             description = f"Now, based on these suggestions:\n{code_suggestion}\nUpdate the nearest_neighbor_f91d."
-            output_heuristic_file = HeuristicGenerator(self.gpt_helper, self.problem).generate(heuristic_name, description, smoke_test)
+            output_heuristic_file = HeuristicGenerator(self.llm_client, self.problem).generate(heuristic_name, description, smoke_test)
             return output_heuristic_file
         return None
 
-    def validation(self, validation_dir: str, heuristic_file: str, time_limitation: float=10, validation: bool=True) -> list[float, float]:
+    def validation(self, validation_dir: str, heuristic_file: str, validation: bool=True) -> list[float, float]:
         validation_results = []
         heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
         for data_name in os.listdir(validation_dir):
             env = Env(data_name=os.path.join(validation_dir, data_name))
             env.reset(heuristic_name)
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
-            is_complete_solution = hyper_heuristic.run(env, time_limitation, validation=validation)
+            is_complete_solution = hyper_heuristic.run(env, validation=validation)
             if is_complete_solution:
                 env.dump_result(dump_trajectory=False)
                 validation_results.append(env.key_value)

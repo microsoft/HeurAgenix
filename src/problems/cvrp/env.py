@@ -21,10 +21,21 @@ class Env(BaseEnv):
         return len(self.state_data["visited_nodes"]) == self.node_num
 
     def load_data(self, data_path: str) -> None:
-        problem = tsplib95.load(data_path) 
+        problem = tsplib95.load(data_path)
         depot = problem.depots[0] - 1
-        distance_matrix = nx.to_numpy_array(problem.get_graph())
-        node_num = len(distance_matrix)
+        if problem.edge_weight_type == "EUC_2D":
+            node_coords = problem.node_coords
+            node_num = len(node_coords)
+            distance_matrix = np.zeros((node_num, node_num))
+            for i in range(node_num):
+                for j in range(node_num):
+                    if i != j:
+                        x1, y1 = node_coords[i + 1]
+                        x2, y2 = node_coords[j + 1]
+                        distance_matrix[i][j] = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+        else:
+            distance_matrix = nx.to_numpy_array(problem.get_graph())
+            node_num = len(distance_matrix)
         if os.path.basename(data_path).split(".")[0].split("-")[-1][0] == "k":
             vehicle_num = int(os.path.basename(data_path).split(".")[0].split("-")[-1][1:])
         elif open(data_path).readlines()[-1].strip().split(" : ")[0] == "VEHICLE":
