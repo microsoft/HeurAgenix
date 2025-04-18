@@ -3,6 +3,8 @@ import os
 import re
 from src.pipeline.heuristic_evolver_v2 import HeuristicEvolver
 from src.util.util import search_file
+from src.util.llm_client.get_llm_client import get_llm_client
+
 
 def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
@@ -19,7 +21,7 @@ def parse_arguments():
     parser.add_argument("-f", "--filter_num", type=int, default=1, help="Number of heuristics to keep after each validation.")
     parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Number of evolution rounds.")
     parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
-    parser.add_argument("-l", "--llm_type", type=str, default="AzureGPT", choices=["AzureGPT", "APIModel"], help="LLM Type to use.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default="AzureGPT", help="LLM config file to use.")
 
     return parser.parse_args()
 
@@ -34,7 +36,7 @@ def main():
     filter_num = args.filter_num
     evolution_rounds = args.evolution_rounds
     smoke_test = args.smoke_test
-    llm_type= args.llm_type
+    llm_config_file = args.llm_config_file
 
     train_dir = search_file(args.train_dir, problem)
     validation_dir = search_file(args.validation_dir, problem)
@@ -53,12 +55,9 @@ def main():
             perturbation_heuristic_file += ".py"
         perturbation_heuristic_file = search_file(perturbation_heuristic_file, problem)
 
-    if llm_type == "AzureGPT":
-        from src.util.azure_gpt_client import AzureGPTClient
-        llm_client = AzureGPTClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
-    elif llm_type == "APIModel":
-        from src.util.api_model_client import APIModelClient
-        llm_client = APIModelClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"))
+    prompt_dir=os.path.join("src", "problems", "base", "prompt")
+    llm_client = get_llm_client(llm_config_file, prompt_dir, None)
+
     heuristic_evolver = HeuristicEvolver(llm_client, problem, train_dir, validation_dir)
     evolved_heuristics = heuristic_evolver.evolution(
         basic_heuristic_file,

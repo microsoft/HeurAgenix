@@ -16,8 +16,57 @@ pip install -r requirements.txt
 ### Set up LLM
 Currently, the framework supports GPT from Azure using tokens and api based model.
 
-1. Fill in the parameters in `src/util/azure_gpt_setting.json` / `src/util/azure_gpt_setting.json`.
-2. Test the LLM activation using:
+1. Fill in the parameters in json file.
+Azure GPT config:
+```json
+{
+    "type": "azure_apt",
+
+    "api_type": "azure",
+    "api_base": "https://gcraoai9sw1.openai.azure.com/",
+    "api_version": "2024-05-01-preview",
+    "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
+    "model": "gpt-4o_2024-08-06",
+    "temperature": 0.7,
+    "top-p": 0.95,
+    "max_tokens": 3200,
+
+    "max_attempts": 50,
+    "sleep_time": 10
+}
+```
+API model config:
+```json
+{
+    "type": "api_model",
+
+    "url": "xxx",
+    "api_key": "xxx",
+    "model": "xxx",
+    "temperature": 0.7,
+    "top-p": 0.95,
+    "max_tokens": 3200,
+
+    "max_attempts": 50,
+    "sleep_time": 10
+}
+```
+Local model config:
+```json
+{
+    "type": "local_model",
+
+    "temperature": 0.7,
+    "top-p": 0.95,
+    "max_tokens": 1600,
+    "model_path": "xxx",
+
+    "max_attempts": 50,
+    "sleep_time": 10
+}
+```
+2. Test the LLM activation by:
+Modify the `config_file` in chat.py and run
 ```bash
 python chat.py
 ```
@@ -85,6 +134,7 @@ python generate_heuristic.py -p <problem> -s <source> [-m] [-pp <paper_path>] [-
 - `-m`, `--smoke_test`: Runs a smoke test (optional).
 - `-pp`, `--paper_path`: Path to the LaTeX paper file or directory, used only when the source is `paper`.
 - `-r`, `--related_problems`: A comma-separated list of related problems to reference, default is `"all"`.
+- `-l`, `--llm_config_file`: Path to LLM config file.
 The generated heuristics are saved in the `output/{problem}/generate_heuristic` folder.
 
 #### Examples

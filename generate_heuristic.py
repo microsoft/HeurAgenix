@@ -1,6 +1,7 @@
 import argparse
 import os
 from src.pipeline.heuristic_generator import HeuristicGenerator
+from src.util.llm_client.get_llm_client import get_llm_client
 
 
 def parse_arguments():
@@ -13,7 +14,7 @@ def parse_arguments():
     parser.add_argument("-pp", "--paper_path", type=str, help="Path to Latex paper file or directory.")
     parser.add_argument("-r", "--related_problems", type=str, default="all", help="Comma-separated list of related problems to reference.")
     parser.add_argument("-d", "--reference_data", type=str, default=None, help="Path for reference data.")
-    parser.add_argument("-l", "--llm_type", type=str, default="AzureGPT", choices=["AzureGPT", "APIModel"], help="LLM Type to use.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default="AzureGPT", help="LLM config file to use.")
 
     return parser.parse_args()
 
@@ -23,13 +24,12 @@ def main():
     problem = args.problem
     source = args.source
     smoke_test = args.smoke_test
-    llm_type= args.llm_type
-    if llm_type == "AzureGPT":
-        from src.util.azure_gpt_client import AzureGPTClient
-        llm_client = AzureGPTClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"), output_dir=os.path.join("output", problem, "generate_heuristic"))
-    elif llm_type == "APIModel":
-        from src.util.api_model_client import APIModelClient
-        llm_client = APIModelClient(prompt_dir=os.path.join("src", "problems", "base", "prompt"), output_dir=os.path.join("output", problem, "generate_heuristic"))
+    llm_config_file = args.llm_config_file
+
+    prompt_dir=os.path.join("src", "problems", "base", "prompt")
+    output_dir=os.path.join("output", problem, "generate_heuristic")
+    llm_client = get_llm_client(llm_config_file, prompt_dir, output_dir)
+
     heuristic_generator = HeuristicGenerator(llm_client=llm_client, problem=problem)
     if source == "llm":
         heuristic_generator.generate_from_llm(reference_data=args.reference_data, smoke_test=smoke_test)

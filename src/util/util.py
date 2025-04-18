@@ -10,7 +10,8 @@ def extract(message: str, key: str, sep=None) -> list[str]:
     formats = [
         rf"\*\*\*.*{key}:(.*?)\*\*\*",
         rf" \*\*\*{key}:(.*?)\*\*\*",
-        rf"\*\*\*\n{key}:(.*?)\*\*\*"
+        rf"\*\*\*\n{key}:(.*?)\*\*\*",
+        rf"\*.*{key}:(.*?)\*",
     ]
     message.replace("\n\n", "\n")
     for format in formats:
