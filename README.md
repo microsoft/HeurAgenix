@@ -25,7 +25,7 @@ Azure GPT config:
     "api_type": "azure",
     "api_base": "https://gcraoai9sw1.openai.azure.com/",
     "api_version": "2024-05-01-preview",
-	  "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
+    "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
     "model": "gpt-4o_2024-08-06",
     "temperature": 0.7,
     "top-p": 0.95,
