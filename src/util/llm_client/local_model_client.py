@@ -28,8 +28,7 @@ class LocalModelClient(BaseLLMClient):
         self.pipeline = transformers.pipeline(
             "text-generation",
             model=self.model,
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
+            model_kwargs={"torch_dtype": torch.bfloat16}
         )
 
     def chat_once(self) -> str:

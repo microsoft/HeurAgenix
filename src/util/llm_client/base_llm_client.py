@@ -77,14 +77,12 @@ class BaseLLMClient:
             "env_summarize": env_summarize
         }
 
-        self.load_chat(os.path.join("output", "cache", "background.json"))
+        self.load("background", prompt_dict)
+        response = self.chat()
+        is_cop = extract(response, "is_cop", "\n")
         self.dump("background")
-        # self.load("background", prompt_dict)
-        # response = self.chat()
-        # is_cop = extract(response, "is_cop", "\n")
-        # self.dump("background")
-        # if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
-            # raise BaseException("Not combination optimization problem")
+        if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
+            raise BaseException("Not combination optimization problem")
         return prompt_dict
 
     def load(self, message: str, replace: dict={}) -> None:
