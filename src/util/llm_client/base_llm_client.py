@@ -30,13 +30,11 @@ class BaseLLMClient:
 
     def chat(self) -> str:
         for index in range(self.max_attempts):
-            if True:
-            # try:
+            try:
                 response_content = self.chat_once()
                 self.messages.append({"role": "assistant", "content": [{"type": "text", "text": response_content}]})
                 return response_content
-            else:
-                # except Exception as e:
+            except Exception as e:
                 print(f"Try to chat {index + 1} time: {e}")
                 sleep_time = self.sleep_time
                 sleep(sleep_time)
@@ -79,12 +77,14 @@ class BaseLLMClient:
             "env_summarize": env_summarize
         }
 
-        self.load("background", prompt_dict)
-        response = self.chat()
-        is_cop = extract(response, "is_cop", "\n")
+        self.load_chat(os.path.join("output", "cache", "background.json"))
         self.dump("background")
-        if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
-            raise BaseException("Not combination optimization problem")
+        # self.load("background", prompt_dict)
+        # response = self.chat()
+        # is_cop = extract(response, "is_cop", "\n")
+        # self.dump("background")
+        # if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
+            # raise BaseException("Not combination optimization problem")
         return prompt_dict
 
     def load(self, message: str, replace: dict={}) -> None:
