@@ -10,14 +10,13 @@ from src.util.util import compress_numbers, extract, load_framework_description
 class BaseLLMClient:
     def __init__(
             self,
-            prompt_dir: str,
-            output_dir: str,
-            setting_file: str,
+            config: dict,
+            prompt_dir: str=None,
+            output_dir: str=None,
         ):
         self.prompt_dir = prompt_dir
         self.output_dir = output_dir
-        setting_file = os.path.join(setting_file)
-        self.setting = json.load(open(setting_file))
+        self.config = config
         self.reset(output_dir)
 
     def reset(self, output_dir:str=None) -> None:
@@ -31,11 +30,13 @@ class BaseLLMClient:
 
     def chat(self) -> str:
         for index in range(self.max_attempts):
-            try:
+            if True:
+            # try:
                 response_content = self.chat_once()
                 self.messages.append({"role": "assistant", "content": [{"type": "text", "text": response_content}]})
                 return response_content
-            except Exception as e:
+            else:
+                # except Exception as e:
                 print(f"Try to chat {index + 1} time: {e}")
                 sleep_time = self.sleep_time
                 sleep(sleep_time)

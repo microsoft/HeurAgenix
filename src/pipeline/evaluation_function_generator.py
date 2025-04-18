@@ -2,7 +2,7 @@ import os
 import importlib
 import traceback
 from src.util.util import extract, load_heuristic, search_file
-from src.util.base_llm_client import BaseLLMClient
+from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
 class EvaluationFunctionGenerator:
