@@ -5,7 +5,7 @@ import traceback
 from copy import deepcopy
 from src.problems.base.components import BaseOperator
 from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
-from src.util.base_llm_client import BaseLLMClient
+from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
 class HeuristicGenerator:
@@ -34,7 +34,8 @@ class HeuristicGenerator:
         for heuristic in heuristics:
             # Generate description for single heuristic
             self.llm_client.load_chat("heuristic_from_llm")
-            heuristic_name, description = heuristic.split(":")
+            heuristic_name = heuristic.split(":")[0]
+            description = heuristic[len(heuristic_name) + 1: ]
             env_summarize = prompt_dict["env_summarize"]
             heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
 

@@ -56,7 +56,8 @@ class BaseEnv:
             if os.sep in experiment_name:
                 self.output_dir = experiment_name
             else:
-                self.output_dir = os.path.join("output", self.problem, "result", self.data_ref_name, experiment_name)
+                base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+                self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, experiment_name)
             os.makedirs(self.output_dir, exist_ok=True)
 
     def load_data(self, data_path: str) -> None:

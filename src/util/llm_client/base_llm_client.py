@@ -10,14 +10,13 @@ from src.util.util import compress_numbers, extract, load_framework_description
 class BaseLLMClient:
     def __init__(
             self,
-            prompt_dir: str,
-            output_dir: str,
-            setting_file: str,
+            config: dict,
+            prompt_dir: str=None,
+            output_dir: str=None,
         ):
         self.prompt_dir = prompt_dir
         self.output_dir = output_dir
-        setting_file = os.path.join(setting_file)
-        self.setting = json.load(open(setting_file))
+        self.config = config
         self.reset(output_dir)
 
     def reset(self, output_dir:str=None) -> None:

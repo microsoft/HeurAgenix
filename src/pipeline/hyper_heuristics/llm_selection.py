@@ -2,7 +2,7 @@ import os
 import traceback
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
-from src.util.base_llm_client import BaseLLMClient
+from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
 class LLMSelectionHyperHeuristic:

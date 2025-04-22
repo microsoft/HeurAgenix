@@ -163,4 +163,3 @@ cython_debug/
 #.idea/
 
 output/
-src/util/*.json

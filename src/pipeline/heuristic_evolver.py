@@ -13,7 +13,7 @@ from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
 from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
-from src.util.base_llm_client import BaseLLMClient
+from src.util.llm_client.base_llm_client import BaseLLMClient
 
 class HeuristicEvolver:
     def __init__(
