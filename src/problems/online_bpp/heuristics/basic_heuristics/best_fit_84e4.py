@@ -1,6 +1,6 @@
 from src.problems.online_bpp.components import Solution, AssignBinOperator, NewBinOperator
 
-def best_fit_84e4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator or NewBinOperator, dict]:
+def best_fit_84e4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator | NewBinOperator, dict]:
     """ BestFit heuristic algorithm for the Online Bin Packing Problem.
 
     Args:

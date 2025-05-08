@@ -1,6 +1,6 @@
 from src.problems.online_bpp.components import Solution, AssignBinOperator, NewBinOperator
 
-def first_fit_2a2c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator or NewBinOperator, dict]:
+def first_fit_2a2c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator | NewBinOperator, dict]:
     """ FirstFit heuristic algorithm for the Online Bin Packing Problem.
 
     Args:
