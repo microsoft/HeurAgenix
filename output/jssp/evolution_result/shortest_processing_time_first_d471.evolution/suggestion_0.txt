@@ -1,0 +1,1374 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on jssp problem:
+Job Shop Scheduling Problem (JSSP) involves scheduling a series of jobs, each comprising a sequence of operations, across different machines to optimize production efficiency. In this variant, there is a one-to-one correspondence between machines and operation types, ensuring that each operation is carried out by a specific machine. Consequently, the number of operations (N) matches the number of machines, and each job includes these N operations precisely once.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the Job Shop Scheduling Problem (JSSP).
+A list of lists where each sublist represents the sequence of jobs scheduled on a machine, identified by its index in the outer list.
+Each job is represented by its integer identifier and is processed in the order specified within the sublist.
+Each sublist in 'job_sequences' corresponds to a machine's job processing sequence, with machines sorted by their identifier (index in the outer list).
+Each job within a sublist is sorted by its scheduled order of execution on that machine.
+Job matrix records the target operation(machine) sequence in job."""
+    def __init__(self, job_sequences: list[list[int]], job_operation_sequence: list[list[int]], job_operation_index: list[int]):
+        self.job_sequences = job_sequences
+        self.job_operation_sequence = job_operation_sequence
+        self.job_operation_index = job_operation_index
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AdvanceOperator(BaseOperator):
+    """AdvanceOperator is responsible for advancing the next operation in the job's processing sequence.
+This operator appends the next operation of the specified job to the processing queue of the machine that is scheduled to execute the operation.
+It identifies the appropriate machine based on the job's current operation index and the job matrix within the provided Solution instance."""
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        machine_id = solution.job_operation_sequence[self.job_id][solution.job_operation_index[self.job_id]]
+        new_job_sequences[machine_id].append(self.job_id)
+        job_operation_index = solution.job_operation_index
+        job_operation_index[self.job_id] += 1
+        return Solution(new_job_sequences, solution.job_operation_sequence, job_operation_index)
+class SwapOperator(BaseOperator):
+    """Swaps two operations in corresponding jobs in the same machine's."""
+    def __init__(self, machine_id: int, job_id1: int, job_id2: int):
+        self.machine_id = machine_id
+        self.job_id1 = job_id1
+        self.job_id2 = job_id2
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        index1 = new_job_sequences[self.machine_id].index(self.job_id1)
+        index2 = new_job_sequences[self.machine_id].index(self.job_id2)
+        (new_job_sequences[self.machine_id][index1], new_job_sequences[self.machine_id][index2]) = (new_job_sequences[self.machine_id][index2], new_job_sequences[self.machine_id][index1])
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ReverseSequenceOperator(BaseOperator):
+    """Reverses a sequence of operations in corresponding jobs within a machine's queue."""
+    def __init__(self, machine_id: int, start_position: int, end_position: int):
+        self.machine_id = machine_id
+        self.start_position = start_position
+        self.end_position = end_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        sequence = new_job_sequences[self.machine_id][self.start_position:self.end_position + 1]
+        new_job_sequences[self.machine_id][self.start_position:self.end_position + 1] = sequence[::-1]
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ShiftOperator(BaseOperator):
+    """Shifts an operation to a new position within the same machine's queue."""
+    def __init__(self, machine_id: int, job_id: int, new_position: int):
+        self.machine_id = machine_id
+        self.job_id = job_id
+        self.new_position = new_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        current_position = new_job_sequences[self.machine_id].index(self.job_id)
+        operation = new_job_sequences[self.machine_id].pop(current_position)
+        new_job_sequences[self.machine_id].insert(self.new_position, operation)
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
+    - "job_num" (int): The total number of jobs in the problem.
+    - "machine_num" (int): The total number of machines in the problem, also as operation num.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "finished_jobs" (list[int]): List of all finished jobs.
+    - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+    - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+    - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in current solution.
+    - "machine_operation_index" (list[int]): The index of the next operation to be scheduled for each machine.
+    - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+    - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is jssp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Job Shop Scheduling Problem (JSSP) is indeed considered a combinatorial optimization problem. It involves finding an optimal sequence of operations on machines to minimize a particular objective, such as makespan, which aligns with the characteristics of combinatorial optimization. Heuristic methods are commonly used to address JSSP due to its complexity and NP-hard nature, making your approach with hyper-heuristics appropriate. Your framework for solutions and operators seems aligned with common practices for implementing heuristics in scheduling problems.
+------------------------------------------------------------------------------------
+
+user
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external, which is better than negative solution.
+
+The function shortest_processing_time_first_d471 is the heuristic function:
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def shortest_processing_time_first_d471(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP.
+
+    This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability,
+    alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in their target sequence.
+            - "job_operation_time" (list[list[int]]): The time cost for each operation in each job.
+            - "machine_num" (int): Total number of machines in the problem.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
+            - "current_solution" (Solution): The current solution state.
+            - "job_diversity" (int): Diversity of jobs in the dataset (default to 1 if not provided).
+        algorithm_data (dict): The algorithm dictionary for the current algorithm only. Not used in this heuristic.
+        get_state_data_function (callable): Function to get the state data for a new solution. Not used in this heuristic.
+        kwargs: Optional hyperparameters for fine-tuning:
+            - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
+            - diversity_threshold (int, default=5): A threshold to determine when to adapt scoring based on job diversity.
+
+    Returns:
+        AdvanceOperator: The operator that advances the selected job based on priority.
+        dict: An empty dictionary as no algorithm data is updated.
+    """
+    
+    # Extract hyperparameters from kwargs with default values
+    bias_weight = kwargs.get("bias_weight", 50.0)
+    diversity_threshold = kwargs.get("diversity_threshold", 5)
+
+    # Check if there are any unfinished jobs. If not, return None.
+    if not state_data["unfinished_jobs"]:
+        return None, {}
+
+    # Extract necessary information from global and state data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    machine_last_end_times = state_data["machine_last_operation_end_times"]
+    job_operation_index = state_data["job_operation_index"]
+    job_last_end_times = state_data["job_last_operation_end_times"]
+    job_operation_sequence = global_data["job_operation_sequence"]
+    job_diversity = state_data.get("job_diversity", 1)  # Default to 1 if not provided
+
+    # Determine if fallback to a simpler logic is necessary based on dataset characteristics
+    if job_diversity <= diversity_threshold and len(unfinished_jobs) == 1:
+        job_id = unfinished_jobs[0]
+        return AdvanceOperator(job_id=job_id), {}
+
+    # Initialize variables for dynamic priority evaluation
+    best_job = None
+    best_priority_score = float('inf')  # Lower priority score is better
+
+    for job_id in unfinished_jobs:
+        # Determine the machine for the next operation of the job
+        next_operation_index = job_operation_index[job_id]
+        if next_operation_index >= len(job_operation_sequence[job_id]):
+            continue  # Skip jobs that have no remaining operations
+        next_machine_id = job_operation_sequence[job_id][next_operation_index]
+
+        # Calculate priority score based on machine availability and job alignment
+        priority_score = max(machine_last_end_times[next_machine_id], job_last_end_times[job_id])
+
+        # Introduce a dynamic bias to prefer jobs that align with the positive solution trajectory
+        priority_score -= bias_weight / (job_diversity + 1)  # Dynamic adjustment based on diversity
+
+        # Update the best job based on the computed priority score
+        if priority_score < best_priority_score:
+            best_priority_score = priority_score
+            best_job = job_id
+
+    # If no job is selected, return None
+    if best_job is None:
+        return None, {}
+
+    # Create and return the AdvanceOperator for the selected job
+    operator = AdvanceOperator(job_id=best_job)
+    return operator, {}
+
+The global data for this problem:
+job_num:10
+machine_num:10
+job_operation_sequence:[[1, 7, 6, 3, 8, 5, 0, 2, 4, 9], [8, 5, 0, 9, 3, 7, 4, 2, 6, 1], [2, 1, 7, 6, 5, 0, 4, 9, 3, 8], [0, 8, 2, 6, 3, 7, 5, 4, 9, 1], [3, 7, 1, 2, 6, 4, 9, 8, 5, 0], [6, 8, 9, 7, 0, 5, 3, 1, 4, 2], [6, 5, 8, 2, 0, 3, 9, 1, 7, 4], [5, 7, 0, 4, 9, 8, 3, 2, 1, 6], [0, 6, 5, 3, 2, 4, 9, 8, 1, 7], [5, 1, 3, 7, 4, 2, 8, 0, 9, 6]]
+job_operation_time:[[30, 41, 63, 15, 9, 132, 68, 52, 49, 12], [98, 38, 53, 78, 74, 101, 81, 123, 52, 51], [7, 100, 3, 57, 54, 23, 9, 5, 23, 86], [76, 62, 51, 45, 76, 97, 17, 64, 87, 8], [101, 31, 40, 86, 54, 48, 20, 60, 4, 9], [60, 6, 57, 40, 56, 87, 120, 39, 23, 41], [16, 29, 41, 55, 87, 87, 25, 5, 45, 124], [34, 96, 91, 30, 32, 43, 104, 47, 42, 57], [84, 31, 70, 23, 31, 11, 101, 128, 30, 132], [12, 52, 29, 28, 56, 34, 29, 39, 17, 35]]
+total_operation_num:100
+To aid your analysis, I extracted the following features from this data:
+average_operation_time:52.14
+max_operation_time:132
+min_operation_time:3
+std_deviation_operation_time:33.086256965694986
+job_operation_time_range:129
+average_job_length:10.0
+max_job_length:10
+min_job_length:10
+machine_utilization:0.9
+job_diversity:10
+
+Negative solution from shortest_processing_time_first_d471:
+machine_0: 3->8->1->7->0->2->5->6->9->4
+machine_1: 0->2->9->4->7->5->3->6->1->8
+machine_2: 2->3->6->4->9->0->7->1->5->8
+machine_3: 4->0->9->3->1->2->7->5->6->8
+machine_4: 9->7->2->4->0->3->1->5->6->8
+machine_5: 7->9->6->1->0->2->8->5->3->4
+machine_6: 5->6->0->8->2->3->4->9->7->1
+machine_7: 0->7->2->4->9->5->3->1->6->8
+machine_8: 1->3->0->5->6->7->9->2->4->8
+machine_9: 5->1->7->2->4->0->9->3->6->8
+The result is 1378.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 0\nmachine_2: \nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+1	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: 0\nmachine_2: \nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+2	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: \nmachine_1: 0\nmachine_2: 2\nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+3	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+4	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+5	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: \nmachine_6: 5\nmachine_7: \nmachine_8: 1\nmachine_9: \n
+6	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7\nmachine_6: 5\nmachine_7: \nmachine_8: 1\nmachine_9: \n
+7	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7\nmachine_6: 5\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+8	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7\nmachine_6: 5\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+9	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+10	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+11	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+12	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+13	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+14	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+15	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+16	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+17	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+18	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+19	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3->0\nmachine_9: \n
+20	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3->0\nmachine_9: \n
+21	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3->0\nmachine_9: \n
+22	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7\nmachine_8: 1->3->0\nmachine_9: \n
+23	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2\nmachine_8: 1->3->0\nmachine_9: \n
+24	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2\nmachine_8: 1->3->0\nmachine_9: \n
+25	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2\nmachine_8: 1->3->0->5\nmachine_9: \n
+26	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2->4\nmachine_8: 1->3->0->5\nmachine_9: \n
+27	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2->4\nmachine_8: 1->3->0->5\nmachine_9: 5\n
+28	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2->4\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+29	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2->4\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+30	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+31	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1\nmachine_1: 0->2->9->4\nmachine_2: 2->3\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+32	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1\nmachine_1: 0->2->9->4\nmachine_2: 2->3\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+33	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+34	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->0->5->6\nmachine_9: 5\n
+35	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+36	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->0->9\nmachine_4: \nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+37	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->0->9\nmachine_4: 9\nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+38	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->0->9\nmachine_4: 9\nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+39	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9\nmachine_4: 9\nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+40	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9\nmachine_5: 7->9->6->1->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+41	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9\nmachine_5: 7->9->6->1->0->2\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+42	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9\nmachine_5: 7->9->6->1->0->2\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+43	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1\n
+44	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1->7\n
+45	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1->7\n
+46	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->0->9->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1->7\n
+47	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9\nmachine_3: 4->0->9->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6\nmachine_9: 5->1->7\n
+48	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9\nmachine_3: 4->0->9->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+49	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+50	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+51	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->0->2\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+52	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->0->2\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+53	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->0->2\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7->2\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+54	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->0->2->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7->2\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7\n
+55	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->0->2->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7->2\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7\nmachine_9: 5->1->7->2\n
+56	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->0->2->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7->2\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2\n
+57	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->0->2->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1\nmachine_4: 9->7->2->4\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2\n
+58	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->0->2->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4\nmachine_5: 7->9->6->1->0->2->8\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2\n
+59	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->0->2->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2\n
+60	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2\n
+61	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2\n
+62	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2->4\n
+63	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9\nmachine_9: 5->1->7->2->4\n
+64	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2\nmachine_9: 5->1->7->2->4\n
+65	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2\nmachine_9: 5->1->7->2->4\n
+66	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2\nmachine_9: 5->1->7->2->4->0\n
+67	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->0->2->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2\nmachine_9: 5->1->7->2->4->0\n
+68	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2\nmachine_9: 5->1->7->2->4->0\n
+69	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7\nmachine_4: 9->7->2->4->0\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0\n
+70	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0\n
+71	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0\n
+72	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0\n
+73	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9\n
+74	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9\n
+75	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->0->2->5->6->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9\n
+76	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9\n
+77	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9\n
+78	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9\n
+79	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+80	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+81	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+82	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5\nmachine_2: 2->3->6->4->9->0->7\nmachine_3: 4->0->9->3->1->2->7->5->6\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+83	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+84	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6\nmachine_4: 9->7->2->4->0->3->1\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+85	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3\n
+86	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+87	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+88	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+89	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+90	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6\nmachine_2: 2->3->6->4->9->0->7->1\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+91	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6\nmachine_2: 2->3->6->4->9->0->7->1->5\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+92	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6\nmachine_2: 2->3->6->4->9->0->7->1->5\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+93	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+94	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6->1\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+95	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6->1\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6->8\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6\n
+96	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6->1\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6->8\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4\nmachine_9: 5->1->7->2->4->0->9->3->6->8\n
+97	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6->1\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6->8\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4->8\nmachine_9: 5->1->7->2->4->0->9->3->6->8\n
+98	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6->1->8\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6->8\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6\nmachine_8: 1->3->0->5->6->7->9->2->4->8\nmachine_9: 5->1->7->2->4->0->9->3->6->8\n
+99	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->0->2->5->6->9->4\nmachine_1: 0->2->9->4->7->5->3->6->1->8\nmachine_2: 2->3->6->4->9->0->7->1->5->8\nmachine_3: 4->0->9->3->1->2->7->5->6->8\nmachine_4: 9->7->2->4->0->3->1->5->6->8\nmachine_5: 7->9->6->1->0->2->8->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->6->8\nmachine_8: 1->3->0->5->6->7->9->2->4->8\nmachine_9: 5->1->7->2->4->0->9->3->6->8\n
+
+Positive solution from external:
+machine_0: 3->8->1->7->5->6->0->2->9->4
+machine_1: 0->2->9->4->7->8->5->3->6->1
+machine_2: 2->3->6->4->8->9->0->7->1->5
+machine_3: 4->9->0->8->3->1->7->5->2->6
+machine_4: 9->7->8->4->2->3->0->1->5->6
+machine_5: 7->9->6->1->8->0->2->5->3->4
+machine_6: 5->6->0->8->2->3->4->9->7->1
+machine_7: 0->7->2->4->9->5->3->1->8->6
+machine_8: 1->3->5->6->0->7->9->8->4->2
+machine_9: 5->1->7->8->4->2->9->3->0->6
+The result is 987.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 0\nmachine_2: \nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+1	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: 0\nmachine_2: \nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+2	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: \nmachine_1: 0\nmachine_2: 2\nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+3	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+4	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: 1\nmachine_9: \n
+5	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: \nmachine_6: 5\nmachine_7: \nmachine_8: 1\nmachine_9: \n
+6	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7\nmachine_6: 5\nmachine_7: \nmachine_8: 1\nmachine_9: \n
+7	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3\nmachine_1: 0\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7\nmachine_6: 5\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+8	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7\nmachine_6: 5\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+9	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+10	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3\nmachine_1: 0->2\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+11	random_6512	AdvanceOperator(job_id=9)	machine_0: 3\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+12	random_6512	AdvanceOperator(job_id=0)	machine_0: 3\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6->0\nmachine_7: 0\nmachine_8: 1\nmachine_9: \n
+13	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+14	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+15	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+16	random_6512	AdvanceOperator(job_id=9)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1\nmachine_9: \n
+17	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+18	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+19	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+20	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3\nmachine_9: \n
+21	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0\nmachine_7: 0->7\nmachine_8: 1->3->5\nmachine_9: \n
+22	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7\nmachine_8: 1->3->5\nmachine_9: \n
+23	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7\nmachine_8: 1->3->5\nmachine_9: 5\n
+24	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+25	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+26	random_6512	AdvanceOperator(job_id=4)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8\nmachine_7: 0->7->2->4\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+27	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+28	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1\nmachine_1: 0->2->9\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+29	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1\nmachine_1: 0->2->9->4\nmachine_2: 2->3\nmachine_3: 4->9\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+30	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1\nmachine_1: 0->2->9->4\nmachine_2: 2->3\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+31	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+32	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+33	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->5->6\nmachine_9: 5\n
+34	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->5->6\nmachine_9: 5->1\n
+35	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+36	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: \nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+37	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: 9\nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+38	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: 9\nmachine_5: 7->9->6->1->8\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+39	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0\nmachine_4: 9\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+40	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6\nmachine_3: 4->9->0->8\nmachine_4: 9\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+41	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->9->0->8\nmachine_4: 9\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+42	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->9->0->8->3\nmachine_4: 9\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+43	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->9->0->8->3\nmachine_4: 9\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+44	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->9->0->8->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1\n
+45	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->9->0->8->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1->7\n
+46	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4\nmachine_3: 4->9->0->8->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1->7\n
+47	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->5\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8\nmachine_3: 4->9->0->8->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1->7\n
+48	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8\nmachine_3: 4->9->0->8->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0\nmachine_9: 5->1->7\n
+49	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8\nmachine_3: 4->9->0->8->3\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7\n
+50	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7\n
+51	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7\n
+52	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7->8\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7\n
+53	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7->8\nmachine_5: 7->9->6->1->8->0\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7\n
+54	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7->8\nmachine_5: 7->9->6->1->8->0->2\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7\n
+55	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7->8\nmachine_5: 7->9->6->1->8->0->2\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7->8\n
+56	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7\nmachine_9: 5->1->7->8\n
+57	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7->9\nmachine_9: 5->1->7->8\n
+58	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5->6\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7->9\nmachine_9: 5->1->7->8\n
+59	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->5->6->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7->9\nmachine_9: 5->1->7->8\n
+60	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->5->6->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3\nmachine_8: 1->3->5->6->0->7->9\nmachine_9: 5->1->7->8\n
+61	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->5->6->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9\nmachine_9: 5->1->7->8\n
+62	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->5->6->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9\nmachine_9: 5->1->7->8->4\n
+63	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->5->6->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4\n
+64	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->5->6->0\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4\n
+65	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->5->6->0->2\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4\n
+66	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->5->6->0->2\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4\n
+67	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->5->6->0->2\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4->2\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4\n
+68	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4->2\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4\n
+69	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7\nmachine_4: 9->7->8->4->2\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2\n
+70	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2\n
+71	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2\n
+72	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2\n
+73	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2->9\n
+74	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2->9\n
+75	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2->9\n
+76	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3->0\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2->9\n
+77	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3->0\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8\nmachine_9: 5->1->7->8->4->2->9->3\n
+78	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3->0\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+79	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3->0\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+80	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7->8\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3->0\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+81	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7->8\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+82	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7->8\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+83	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7->8\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+84	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7->8->5\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+85	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 3->8->1->7->5->6->0->2->9\nmachine_1: 0->2->9->4->7->8->5\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+86	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4\nmachine_9: 5->1->7->8->4->2->9->3\n
+87	shortest_processing_time_first_d471	AdvanceOperator(job_id=2)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3\n
+88	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3\n
+89	shortest_processing_time_first_d471	AdvanceOperator(job_id=0)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0\n
+90	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3\nmachine_2: 2->3->6->4->8->9->0->7\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0\n
+91	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0\n
+92	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0\n
+93	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+94	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3->6\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+95	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3->6\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8->6\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+96	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3->6\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5->6\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7\nmachine_7: 0->7->2->4->9->5->3->1->8->6\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+97	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3->6\nmachine_2: 2->3->6->4->8->9->0->7->1\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5->6\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->8->6\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+98	shortest_processing_time_first_d471	AdvanceOperator(job_id=5)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3->6\nmachine_2: 2->3->6->4->8->9->0->7->1->5\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5->6\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->8->6\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+99	shortest_processing_time_first_d471	AdvanceOperator(job_id=1)	machine_0: 3->8->1->7->5->6->0->2->9->4\nmachine_1: 0->2->9->4->7->8->5->3->6->1\nmachine_2: 2->3->6->4->8->9->0->7->1->5\nmachine_3: 4->9->0->8->3->1->7->5->2->6\nmachine_4: 9->7->8->4->2->3->0->1->5->6\nmachine_5: 7->9->6->1->8->0->2->5->3->4\nmachine_6: 5->6->0->8->2->3->4->9->7->1\nmachine_7: 0->7->2->4->9->5->3->1->8->6\nmachine_8: 1->3->5->6->0->7->9->8->4->2\nmachine_9: 5->1->7->8->4->2->9->3->0->6\n
+
+Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
+Please note:
+1. Some operations, although they appear different, are essentially the same.
+2. Some operations may lead to solutions that look different but are essentially the same.
+3. Some operations may cause changes to the solution but do not affect the final cost; these are not considered bottlenecks.
+4. When an operation A is performed poorly, leading to a series of subsequent operations experiencing issues, we consider the first operation A to be a bottleneck.
+5. If there is only one item, there is no need to force multiple answers.
+6. Try to propose a better operator than origin one and you can learn from positive solution or others.
+
+The response format is very important. For better communication, please respond to me in this format:
+***bottleneck_operations:
+negative_operator_id; proposed_better_operator; reason
+negative_operator_id; proposed_better_operator; reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the negative and positive solutions, several bottleneck operations can be identified based on how they deviate from more optimal paths observed in the positive solution. Here are the identified bottlenecks and proposed improvements:
+
+1. **Operation 11**: The heuristic used was `AdvanceOperator(job_id=9)`, which led to machine_1 being filled with job_id=9 too early. This forced other jobs to wait unnecessarily.
+2. **Operation 16**: The heuristic used was `AdvanceOperator(job_id=9)` again, which further delayed job_id=3 on machine_3.
+3. **Operation 19**: The heuristic used was `AdvanceOperator(job_id=1)` on machine_0, causing job_id=1 to be scheduled on machine_0 too soon, leading to later delays on machine_8.
+4. **Operation 26**: Using `AdvanceOperator(job_id=4)` on machine_7 led to a non-optimal sequence as job_id=4 was scheduled on machine_7 too early, causing unnecessary waiting for other jobs.
+
+Proposed better operators could involve prioritizing jobs with shorter remaining time or following a sequence more aligned with the positive solution. Here is the response in the required format:
+
+***bottleneck_operations:
+11; AdvanceOperator(job_id=3); Scheduling job_id=3 earlier on machine_1 aligns better with the positive solution.
+16; AdvanceOperator(job_id=3); Prioritizing job_id=3 on machine_3 reduces overall makespan.
+19; AdvanceOperator(job_id=2); Advancing job_id=2 earlier on machine_0 prevents delays in machine_8.
+26; AdvanceOperator(job_id=7); Aligning job_id=7 on machine_7 with positive trajectory improves flow.
+***
+------------------------------------------------------------------------------------
+
+user
+Now focus on this operator AdvanceOperator(job_id=7) in step 11.
+
+The state before AdvanceOperator(job_id=7) is:
+current_solution:
+machine_0: 3
+machine_1: 0->2
+machine_2: 2
+machine_3: 4
+machine_4: 
+machine_5: 7->9
+machine_6: 5->6
+machine_7: 0
+machine_8: 1
+machine_9: 
+
+finished_jobs:[]
+unfinished_jobs:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+job_operation_index:[2, 1, 2, 1, 1, 1, 1, 1, 0, 1]
+job_last_operation_end_times:[71, 98, 130, 76, 101, 60, 76, 34, 0, 46]
+machine_operation_index:[1, 2, 1, 1, 0, 2, 2, 1, 1, 0]
+machine_last_operation_end_times:[76, 130, 7, 101, 0, 46, 76, 71, 98, 0]
+finished_operation_num:11
+current_makespan:130
+To aid your analysis, I extracted the following features from this state:
+average_operation_time:52.14
+max_operation_time:132
+min_operation_time:3
+std_deviation_operation_time:33.086256965694986
+job_operation_time_range:129
+average_job_length:10.0
+max_job_length:10
+min_job_length:10
+machine_utilization:0.9
+job_diversity:10
+
+You believe that  AdvanceOperator(job_id=3) is better with reason  Scheduling job_id=3 earlier on machine_1 aligns better with the positive solution.. So we hope to update shortest_processing_time_first_d471 to output  AdvanceOperator(job_id=3) in this state.
+Try to provide suggestion to update the code using mathematical analysis.
+
+Please provide suggestion in following one or more aspects:
+1. Set the hyper-parameters or update the hyper-parameters' value for better control.
+2. Add more logic to this function for better control.
+3. Limit the application scope of certain logic with an if-check.
+4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
+5. Also consider learning from other heuristics:
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def first_come_first_served_6c4f(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Implement the First Come First Served (FCFS) heuristic for the JSSP.
+    This heuristic schedules the jobs in the order they arrive, without considering their processing times or other characteristics.
+
+    Args:
+        global_data (dict): Not used in this heuristic.
+        state_data (dict): The state dictionary containing the current state information. For this algorithm, we use:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+        algorithm_data (dict): Not used in this heuristic.
+        get_state_data_function (callable): Function to get the state data for a new solution.
+        **kwargs: Additional hyperparameters (not used in this heuristic).
+
+    Returns:
+        AdvanceOperator: The operator that advances the first unfinished job.
+        dict: Empty dictionary as the algorithm data is not updated.
+    """
+    
+    # Check if there are any unfinished jobs. If not, return None.
+    if not state_data["unfinished_jobs"]:
+        return None, {}
+    
+    # Retrieve the first job from the list of unfinished jobs.
+    job_id = state_data["unfinished_jobs"][0]
+    
+    # Create an AdvanceOperator to schedule the next operation for the first job.
+    operator = AdvanceOperator(job_id=job_id)
+    
+    # No algorithm data is updated, so we return an empty dictionary.
+    return operator, {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def least_work_remaining_66c9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """
+    Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. For this algorithm, we need:
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in target job.
+        state_data (dict): The state dictionary containing the current state information. For this algorithm, we need:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+
+    Returns:
+        AdvanceOperator: Operator to advance the selected job's next operation.
+        dict: Empty dictionary as no algorithm data is updated.
+    """
+    # Extract necessary information from global_data
+    job_operation_time = global_data["job_operation_time"]
+
+    # Extract necessary state data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    job_operation_index = state_data["job_operation_index"]
+
+    # Initialize the least work remaining and corresponding job ID
+    min_work_remaining = float('inf')
+    job_to_advance = None
+
+    # Iterate over unfinished jobs to find the one with the least work remaining
+    for job_id in unfinished_jobs:
+        remaining_time = sum(job_operation_time[job_id][job_operation_index[job_id]:])
+        if remaining_time < min_work_remaining:
+            min_work_remaining = remaining_time
+            job_to_advance = job_id
+
+    # If no job is found, return None, {}
+    if job_to_advance is None:
+        return None, {}
+
+    # Create and return the AdvanceOperator for the job with the least work remaining
+    return AdvanceOperator(job_to_advance), {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def longest_job_next_2e23(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Longest Job Next heuristic for JSSP.
+    
+    Prioritizes the job with the longest total processing time remaining. It uses the
+    AdvanceOperator to schedule the next operation for the job with the maximum
+    remaining processing time.
+
+    Args:
+        global_data (dict): Contains global data about the problem.
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
+            - "job_num" (int): The total number of jobs in the problem.
+            
+        state_data (dict): Contains the current state of the solution.
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "current_solution" (Solution): The current state of the job sequences on each machine.
+            
+        algorithm_data (dict): Contains data necessary for this algorithm.
+            (No specific data needed for this algorithm; can be omitted or passed as an empty dict)
+            
+        get_state_data_function (callable): Function that takes a Solution instance and returns its state data.
+        
+        **kwargs: Additional hyperparameters (not used in this algorithm).
+
+    Returns:
+        (AdvanceOperator): The operator to advance the job with the longest processing time remaining.
+        (dict): Empty dictionary as no algorithm data is updated.
+    """
+    # Extract necessary data from the global and state dictionaries.
+    job_operation_time = global_data["job_operation_time"]
+    unfinished_jobs = state_data["unfinished_jobs"]
+    job_operation_index = state_data["job_operation_index"]
+    
+    # Check if there are any unfinished jobs. If not, return None.
+    if not unfinished_jobs:
+        return None, {}
+    
+    # Calculate remaining processing time for each unfinished job.
+    remaining_times = {
+        job_id: sum(job_operation_time[job_id][index:])
+        for job_id, index in enumerate(job_operation_index) if job_id in unfinished_jobs
+    }
+    
+    # Find the job with the maximum remaining processing time.
+    job_id_to_schedule = max(remaining_times, key=remaining_times.get)
+    
+    # Create and return the AdvanceOperator for the job with the longest job next.
+    advance_op = AdvanceOperator(job_id=job_id_to_schedule)
+    
+    return advance_op, {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def longest_processing_time_first_9dc9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
+    
+    Args:
+        global_data (dict): Contains the global data for the problem.
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
+            - "job_num" (int): The total number of jobs.
+            - "machine_num" (int): The total number of machines.
+        
+        state_data (dict): Contains the current state information.
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "current_solution" (Solution): The current solution state.
+        
+        algorithm_data (dict): Contains data specific to the algorithm (unused in this heuristic).
+        
+        get_state_data_function (callable): Function to get the state data for a new solution (unused in this heuristic).
+        
+        **kwargs: Additional hyperparameters (unused in this heuristic).
+    
+    Returns:
+        AdvanceOperator: An operator that, when applied to the current solution, advances the longest processing job.
+        dict: An empty dictionary since this heuristic doesn't update algorithm_data.
+    """
+    
+    # No additional information from algorithm_data or kwargs is used in this heuristic.
+    
+    # Extract necessary information from global_data
+    job_operation_time = global_data["job_operation_time"]
+    
+    # Extract necessary information from state_data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    current_solution = state_data["current_solution"]
+    
+    # Initialize variables to keep track of the job with the longest next operation time
+    max_time = -1
+    selected_job = None
+    
+    # Iterate through all unfinished jobs to find the job with the longest next operation time
+    for job_id in unfinished_jobs:
+        next_operation_index = current_solution.job_operation_index[job_id]
+        
+        # Check if there is a next operation for the job
+        if next_operation_index < len(job_operation_time[job_id]):
+            next_operation_time = job_operation_time[job_id][next_operation_index]
+            
+            # Update the job with the longest next operation time
+            if next_operation_time > max_time:
+                max_time = next_operation_time
+                selected_job = job_id
+    
+    # If no job is found (all jobs are finished), return None and an empty dictionary
+    if selected_job is None:
+        return None, {}
+    
+    # Create an AdvanceOperator for the job with the longest next operation time
+    operator = AdvanceOperator(selected_job)
+    
+    # Return the operator and an empty dictionary since no algorithm data is updated
+    return operator, {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def most_work_remaining_930e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Most Work Remaining heuristic for JSSP.
+    Selects the unfinished job with the maximum remaining work (total processing time of remaining operations) and returns an AdvanceOperator for that job to proceed with the next operation in sequence.
+    
+    Args:
+        global_data (dict): Contains global static problem information. This heuristic requires:
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
+        state_data (dict): Contains the current state of the solution. This heuristic requires:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+        algorithm_data (dict): Contains data specific to this algorithm. Not used in this heuristic.
+        get_state_data_function (callable): A function to get the state data for a new solution. Not used in this heuristic.
+        **kwargs: Any additional hyperparameters. Not used in this heuristic.
+    
+    Returns:
+        The AdvanceOperator to move the most work remaining job one step ahead in the sequence.
+        An empty dict, since this heuristic does not update the algorithm_data.
+    """
+    # Determine the job with the most work remaining
+    max_remaining_work = -1
+    selected_job_id = None
+    for job_id in state_data['unfinished_jobs']:
+        remaining_operations = global_data['job_operation_time'][job_id][state_data['job_operation_index'][job_id]:]
+        remaining_work = sum(remaining_operations)
+        if remaining_work > max_remaining_work:
+            max_remaining_work = remaining_work
+            selected_job_id = job_id
+    
+    # If no job is selected, return None
+    if selected_job_id is None:
+        return None, {}
+    
+    # Create and return the AdvanceOperator for the selected job
+    advance_operator = AdvanceOperator(job_id=selected_job_id)
+    return advance_operator, {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+import random
+
+def random_6512(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """This heuristic randomly selects an unfinished job and advances its next operation in the job's processing sequence.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_num" (int): The total number of jobs in the problem.
+            - "machine_num" (int): The total number of machines in the problem, also as operation num.
+            - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in the target job.
+            - "total_processing_times" (list[int]): The total processing time for each machine across all jobs in machine id.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+            - "finished_jobs" (list[int]): List of all finished jobs.
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in the current solution.
+            - "job_states" (pd.DataFrame): DataFrame for job states, columns=["JobID", "IsFinished", "CompletedOperationsForMachinesInSequence(MachineID,StartTime,EndTime)", "RemainingOperationsForMachineInSequence(MachineID)", "EndTimeForLastOperation"]
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+            - "machine_states" (pd.DataFrame): DataFrame for machine states, columns=["MachineID", "CompletedOperationsForJobsInSequence(JobID,StartTime,EndTime)", "EndTimeForLastOperation"]
+            - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+
+    Returns:
+        AdvanceOperator: The operator to advance the next operation for a randomly selected unfinished job.
+        dict: Updated algorithm data (empty in this case).
+    """
+    # Check if there are any unfinished jobs
+    unfinished_jobs = state_data["unfinished_jobs"]
+    if not unfinished_jobs:
+        return None, {}
+
+    # Randomly select an unfinished job
+    selected_job = random.choice(unfinished_jobs)
+
+    # Create an AdvanceOperator for the selected job
+    operator = AdvanceOperator(job_id=selected_job)
+
+    # Return the operator and an empty dictionary as no algorithm data is updated
+    return operator, {}
+from src.problems.jssp.components import ShiftOperator
+
+def shift_operator_109f(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ShiftOperator, dict]:
+    """
+    This heuristic attempts to find a better schedule by shifting an operation within the same machine's queue.
+    For each machine, it tries shifting each operation to all possible positions and evaluates the makespan.
+    The shift that results in the best improvement (reduction in makespan) is selected.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "machine_num" (int): The total number of machines.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): The current solution state.
+            - "current_makespan" (int): The current makespan of the schedule.
+        get_state_data_function (callable): Function to get the new state data given a Solution instance.
+
+    Returns:
+        ShiftOperator: An operator that shifts a job in the schedule to achieve a local improvement.
+        dict: An empty dictionary as this heuristic does not require algorithm data updates.
+    """
+
+    current_solution = state_data['current_solution']
+    machine_num = global_data['machine_num']
+    best_operator = None
+    best_delta = float('inf')
+
+    # Iterate over all machines
+    for machine_id in range(machine_num):
+        # Iterate over all operations in the machine's queue
+        for current_position, job_id in enumerate(current_solution.job_sequences[machine_id]):
+            # Try shifting the operation to all possible positions
+            for new_position in range(len(current_solution.job_sequences[machine_id])):
+                # Skip if the position is the same as the current one
+                if current_position == new_position:
+                    continue
+                
+                # Create a new solution with the operation shifted to the new position
+                new_solution = ShiftOperator(machine_id, job_id, new_position).run(current_solution)
+                new_state = get_state_data_function(new_solution)
+                
+                # If the new solution is valid, evaluate its makespan
+                if new_state is not None:
+                    delta = new_state['current_makespan'] - state_data['current_makespan']
+                    
+                    # If the makespan is improved, store this operator
+                    if delta < best_delta:
+                        best_operator = ShiftOperator(machine_id, job_id, new_position)
+                        best_delta = delta
+
+    # If a beneficial shift is found, return the corresponding operator
+    if best_operator and best_delta < 0:
+        return best_operator, {}
+    else:
+        return None, {}
+from src.problems.jssp.components import AdvanceOperator
+
+def shortest_job_next_5b42(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Implements the Shortest Job Next heuristic for the Job Shop Scheduling Problem.
+    This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
+
+    Args:
+        global_data (dict): Contains global static information about the problem.
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
+            
+        state_data (dict): Contains the current state information of the solution.
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "current_solution" (Solution): The current solution state.
+            
+        algorithm_data (dict): Contains data necessary for the algorithm's state, not used in this heuristic.
+        get_state_data_function (callable): A function to get the state data for a given solution.
+
+    Returns:
+        AdvanceOperator: The operator to advance the next operation of the selected job.
+        dict: An empty dictionary as this heuristic does not update algorithm data.
+    """
+
+    # Retrieve the necessary information from the global and state data
+    job_operation_time = global_data["job_operation_time"]
+    unfinished_jobs = state_data["unfinished_jobs"]
+    job_operation_index = state_data["current_solution"].job_operation_index
+
+    # Check if there are any unfinished jobs
+    if not unfinished_jobs:
+        return None, {}
+
+    # Calculate the total remaining processing time for each unfinished job
+    remaining_times = {job: sum(times[job_operation_index[job]:]) 
+                       for job, times in enumerate(job_operation_time) if job in unfinished_jobs}
+
+    # Find the job with the shortest total remaining processing time
+    shortest_job = min(remaining_times, key=remaining_times.get)
+
+    # Generate the operator to advance the selected job
+    operator = AdvanceOperator(job_id=shortest_job)
+
+    return operator, {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def shortest_processing_time_first_c374(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Implements the Shortest Processing Time first heuristic for the JSSP.
+    
+    This heuristic selects the unfinished job with the shortest next operation processing time and uses an AdvanceOperator to schedule it on the corresponding machine.
+    
+    Args:
+        global_data (dict): Contains global data about the problem.
+            - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
+            
+        state_data (dict): Contains the current state information.
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "current_solution" (Solution): The current solution state.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            
+        algorithm_data (dict): Stores data necessary for the algorithm. This heuristic does not utilize algorithm_data.
+        get_state_data_function (callable): A function that generates a state data dict for a given solution.
+        
+        **kwargs: Additional hyperparameters (unused in this heuristic).
+        
+    Returns:
+        AdvanceOperator: The selected operator to advance the job with the shortest next operation time.
+        dict: An empty dictionary as this heuristic does not update algorithm_data.
+    """
+    
+    # Extract necessary data from global_data
+    job_operation_time = global_data["job_operation_time"]
+    
+    # Extract necessary data from state_data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    job_operation_index = state_data["job_operation_index"]
+    
+    # Initialize variables to store the job with minimum processing time and its time
+    min_time = float('inf')
+    job_to_advance = None
+    
+    # Iterate through all unfinished jobs to find the job with the shortest next operation time
+    for job_id in unfinished_jobs:
+        operation_index = job_operation_index[job_id]
+        operation_time = job_operation_time[job_id][operation_index]
+        
+        # Update the job_to_advance if this job has the shortest next operation time
+        if operation_time < min_time:
+            min_time = operation_time
+            job_to_advance = job_id
+    
+    # If no job is found (e.g., if there are no unfinished jobs), return None and an empty dict
+    if job_to_advance is None:
+        return None, {}
+    
+    # Create and return the AdvanceOperator for the job with the shortest next operation time
+    return AdvanceOperator(job_to_advance), {}
+from src.problems.jssp.components import Solution, SwapOperator
+
+def _2opt_f9c1(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+    """Implements a 2-opt heuristic for the Job Shop Scheduling Problem (JSSP).
+    This heuristic attempts to reduce the makespan by swapping two non-adjacent operations in the schedule.
+    It iteratively checks all possible pairs of operations to determine if a shorter sequence can be found.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_operation_sequence" (numpy.ndarray): Each job's sequence of operations.
+            - "machine_num" (int): The total number of machines.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): The current solution state.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+
+    Returns:
+        (SwapOperator, dict): A tuple where the first element is the selected operator that performs the best swap found,
+                              and the second element is an empty dictionary since this algorithm does not update algorithm_data.
+    """
+    current_solution = state_data['current_solution']
+    job_operation_sequence = global_data['job_operation_sequence']
+    machine_num = global_data['machine_num']
+    best_operator = None
+    best_delta = 0
+
+    # Iterating over all machines and all non-adjacent pairs of jobs within each machine's sequence
+    for machine_id in range(machine_num):
+        for i in range(len(current_solution.job_sequences[machine_id]) - 2):
+            for j in range(i + 2, len(current_solution.job_sequences[machine_id])):
+                job_id1 = current_solution.job_sequences[machine_id][i]
+                job_id2 = current_solution.job_sequences[machine_id][j]
+
+                # Calculate the makespan change if the swap is performed
+                new_solution = SwapOperator(machine_id, job_id1, job_id2).run(current_solution)
+                new_state = get_state_data_function(new_solution)
+                if new_state == None:
+                    continue
+                delta = new_state['current_makespan'] - state_data['current_makespan']
+
+                # Check if this is the best swap found so far
+                if best_operator is None or delta < best_delta:
+                    best_operator = SwapOperator(machine_id, job_id1, job_id2)
+                    best_delta = delta
+
+    # If a beneficial swap is found, return the corresponding operator
+    if best_operator and best_delta < 0:
+        return best_operator, {}
+    else:
+        return None, {}
+from src.problems.jssp.components import Solution, SwapOperator
+
+def _3opt_6ee0(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+    """3-opt heuristic for Job Shop Scheduling Problem (JSSP).
+    This function does not generate a complete 3-opt operator since JSSP requires operations within a job to be executed in sequence and does not allow reordering of these operations.The heuristic is adapted to generate a series of 2-opt swaps (using the SwapOperator) which approximate a 3-opt move.
+
+    Args:
+        global_data (dict): The global data dict containing the global data.
+            - "machine_num" (int): The total number of machines.
+            - "job_num" (int): The total number of jobs.
+            
+        state_data (dict): The state dictionary containing the current state information.
+            - "current_solution" (Solution): The current solution state.
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
+            
+        algorithm_data (dict): Not used in this heuristic.
+        
+        get_state_data_function (callable): Function to get the new state data given a Solution instance.
+    
+    Returns:
+        SwapOperator: The operator to swap two jobs in the schedule.
+        dict: Empty dictionary as no algorithm data is updated.
+    """
+    
+    # Check if we have enough jobs to perform a 3-opt move
+    if global_data['job_num'] < 3:
+        return None, {}  # Not enough jobs to perform a 3-opt
+    
+    # Extract necessary information from the state data
+    current_solution = state_data['current_solution']
+    machine_last_operation_end_times = state_data['machine_last_operation_end_times']
+    
+    # Initialize variables to store the best swap operator and its corresponding makespan improvement
+    best_operator = None
+    best_improvement = 0
+    
+    # Iterate over all machines
+    for machine_id in range(global_data['machine_num']):
+        job_sequence = current_solution.job_sequences[machine_id]
+        num_jobs = len(job_sequence)
+        
+        # Need at least three jobs on the machine to consider 3-opt
+        if num_jobs < 3:
+            continue
+        
+        # Consider all triplets of jobs for potential 3-opt moves
+        for i in range(num_jobs - 2):
+            for j in range(i + 1, num_jobs - 1):
+                for k in range(j + 1, num_jobs):
+                    # Perform 2-opt swaps and check for improvement
+                    new_solution = SwapOperator(machine_id, job_sequence[i], job_sequence[k]).run(current_solution)
+                    new_state = get_state_data_function(new_solution)
+                    if new_state == None:
+                        continue
+                    improvement = state_data['current_makespan'] - new_state['current_makespan']
+                    
+                    # Update the best operator if this swap results in a better makespan
+                    if improvement > best_improvement:
+                        best_improvement = improvement
+                        best_operator = SwapOperator(machine_id, job_sequence[i], job_sequence[k])
+    
+    # Return the best operator found (if any) and an empty dictionary as no algorithm data is updated
+    return best_operator, {}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def first_come_first_served_af26(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Enhanced First Come First Served (FCFS) heuristic to dynamically prioritize jobs based on immediate impact and adapt to diverse datasets.
+    This heuristic introduces a dynamic scoring mechanism to balance alignment with the positive solution trajectory, machine availability, 
+    and dataset-specific characteristics.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in target sequence.
+            - "machine_num" (int): Total number of machines in the problem.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
+            - "job_diversity" (int): Diversity of jobs based on the dataset (optional but improves adaptability).
+        algorithm_data (dict): Not used in this heuristic.
+        get_state_data_function (callable): Function to get the state data for a new solution (not used in this heuristic).
+        kwargs (optional): Hyperparameters for fine-tuning:
+            - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
+            - diversity_threshold (int, default=5): A threshold to determine when to adapt scoring based on job diversity.
+
+    Returns:
+        AdvanceOperator: The operator that advances the selected job based on priority.
+        dict: Empty dictionary as no algorithm data is updated.
+    """
+    
+    # Extract hyperparameters from kwargs with default values
+    bias_weight = kwargs.get("bias_weight", 50.0)
+    diversity_threshold = kwargs.get("diversity_threshold", 5)
+
+    # Check if there are any unfinished jobs. If not, return None.
+    if not state_data["unfinished_jobs"]:
+        return None, {}
+
+    # Extract necessary information from global and state data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    machine_last_end_times = state_data["machine_last_operation_end_times"]
+    job_operation_index = state_data["job_operation_index"]
+    job_last_end_times = state_data["job_last_operation_end_times"]
+    job_operation_sequence = global_data["job_operation_sequence"]
+    job_diversity = state_data.get("job_diversity", 1)  # Default to 1 if not provided
+
+    # Determine if fallback to original FCFS logic is necessary based on dataset characteristics
+    if job_diversity <= diversity_threshold and len(unfinished_jobs) == 1:
+        job_id = unfinished_jobs[0]
+        return AdvanceOperator(job_id=job_id), {}
+
+    # Initialize variables for dynamic priority evaluation
+    best_job = None
+    best_priority_score = float('inf')  # Lower priority score is better
+
+    for job_id in unfinished_jobs:
+        # Determine the machine for the next operation of the job
+        next_machine_id = job_operation_sequence[job_id][job_operation_index[job_id]]
+
+        # Calculate priority score based on machine availability and job alignment
+        priority_score = max(machine_last_end_times[next_machine_id], job_last_end_times[job_id])
+
+        # Introduce a dynamic bias to align with the positive solution trajectory
+        priority_score -= bias_weight / (job_diversity + 1)  # Dynamic adjustment based on diversity
+
+        # Update the best job based on the computed priority score
+        if priority_score < best_priority_score:
+            best_priority_score = priority_score
+            best_job = job_id
+
+    # If no job is selected, return None
+    if best_job is None:
+        return None, {}
+
+    # Create and return the AdvanceOperator for the selected job
+    operator = AdvanceOperator(job_id=best_job)
+    return operator, {}
+from src.problems.jssp.components import Solution, AdvanceOperator, SwapOperator, ShiftOperator
+
+def most_work_remaining_df20(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Most Work Remaining Heuristic with Dynamic Scoring and Local Optimization for JSSP.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in their target sequence.
+            - "job_operation_time" (list[list[int]]): The time cost for each operation in each job.
+            - "machine_num" (int): Total number of machines in the problem.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
+            - "current_solution" (Solution): The current solution state.
+        algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
+            - "iteration" (int): The current iteration count for the heuristic.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the original solution.
+        kwargs (optional): Hyperparameters for fine-tuning:
+            - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
+            - k_flip_frequency (int, default=10): Frequency (iterations) for applying k-flip optimization.
+            - swap_frequency (int, default=10): Frequency (iterations) for applying swap optimization.
+
+    Returns:
+        AdvanceOperator: The operator that advances the selected job based on priority.
+        dict: Updated algorithm data with the new iteration count.
+    """
+    # Extract hyperparameters with default values
+    bias_weight = kwargs.get("bias_weight", 40.0)
+    k_flip_frequency = kwargs.get("k_flip_frequency", 10)
+    swap_frequency = kwargs.get("swap_frequency", 10)
+
+    # Get the current iteration from algorithm_data
+    iteration = algorithm_data.get("iteration", 0)
+
+    # Extract necessary data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    machine_last_end_times = state_data["machine_last_operation_end_times"]
+    job_operation_index = state_data["job_operation_index"]
+    job_last_end_times = state_data["job_last_operation_end_times"]
+    job_operation_sequence = global_data["job_operation_sequence"]
+    current_solution = state_data["current_solution"]
+    machine_num = global_data["machine_num"]
+
+    # If no unfinished jobs, return None
+    if not unfinished_jobs:
+        return None, {}
+
+    # Initialize variables for dynamic scoring
+    best_job = None
+    best_score = float("inf")  # Lower score is better
+
+    # Evaluate each unfinished job
+    for job_id in unfinished_jobs:
+        # Get the machine for the next operation of this job
+        next_operation_index = job_operation_index[job_id]
+        if next_operation_index >= len(job_operation_sequence[job_id]):
+            continue  # Skip jobs with no remaining operations
+        next_machine_id = job_operation_sequence[job_id][next_operation_index]
+
+        # Calculate expected machine availability
+        expected_machine_time = max(machine_last_end_times[next_machine_id], job_last_end_times[job_id])
+
+        # Add alignment penalty to prioritize jobs that align better with the optimal trajectory
+        alignment_penalty = bias_weight / (1 + next_operation_index)
+
+        # Calculate total score
+        score = expected_machine_time + alignment_penalty
+        if score < best_score:
+            best_score = score
+            best_job = job_id
+
+    # If no best job is found, return None
+    if best_job is None:
+        return None, {}
+
+    # Apply local optimization periodically
+    if iteration % k_flip_frequency == 0 or iteration % swap_frequency == 0:
+        best_operator = None
+        best_delta = float("inf")
+
+        # Try k-flip optimization
+        for machine_id in range(machine_num):
+            for i in range(len(current_solution.job_sequences[machine_id]) - 2):
+                for j in range(i + 2, len(current_solution.job_sequences[machine_id])):
+                    job_id1 = current_solution.job_sequences[machine_id][i]
+                    job_id2 = current_solution.job_sequences[machine_id][j]
+                    new_solution = SwapOperator(machine_id, job_id1, job_id2).run(current_solution)
+                    new_state = get_state_data_function(new_solution)
+                    if new_state is None:
+                        continue
+                    delta = new_state["current_makespan"] - state_data["current_makespan"]
+                    if delta < best_delta:
+                        best_operator = SwapOperator(machine_id, job_id1, job_id2)
+                        best_delta = delta
+
+        # Try swap optimization
+        for machine_id in range(machine_num):
+            for current_position, job_id in enumerate(current_solution.job_sequences[machine_id]):
+                for new_position in range(len(current_solution.job_sequences[machine_id])):
+                    if current_position == new_position:
+                        continue
+                    new_solution = ShiftOperator(machine_id, job_id, new_position).run(current_solution)
+                    new_state = get_state_data_function(new_solution)
+                    if new_state is None:
+                        continue
+                    delta = new_state["current_makespan"] - state_data["current_makespan"]
+                    if delta < best_delta:
+                        best_operator = ShiftOperator(machine_id, job_id, new_position)
+                        best_delta = delta
+
+        # If a better operator is found, return it
+        if best_operator is not None:
+            return best_operator, {"iteration": iteration + 1}
+
+    # Return the best AdvanceOperator
+    return AdvanceOperator(job_id=best_job), {"iteration": iteration + 1}
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def shortest_processing_time_first_d471(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP.
+
+    This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability,
+    alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in their target sequence.
+            - "job_operation_time" (list[list[int]]): The time cost for each operation in each job.
+            - "machine_num" (int): Total number of machines in the problem.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
+            - "current_solution" (Solution): The current solution state.
+            - "job_diversity" (int): Diversity of jobs in the dataset (default to 1 if not provided).
+        algorithm_data (dict): The algorithm dictionary for the current algorithm only. Not used in this heuristic.
+        get_state_data_function (callable): Function to get the state data for a new solution. Not used in this heuristic.
+        kwargs: Optional hyperparameters for fine-tuning:
+            - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
+            - diversity_threshold (int, default=5): A threshold to determine when to adapt scoring based on job diversity.
+
+    Returns:
+        AdvanceOperator: The operator that advances the selected job based on priority.
+        dict: An empty dictionary as no algorithm data is updated.
+    """
+    
+    # Extract hyperparameters from kwargs with default values
+    bias_weight = kwargs.get("bias_weight", 50.0)
+    diversity_threshold = kwargs.get("diversity_threshold", 5)
+
+    # Check if there are any unfinished jobs. If not, return None.
+    if not state_data["unfinished_jobs"]:
+        return None, {}
+
+    # Extract necessary information from global and state data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    machine_last_end_times = state_data["machine_last_operation_end_times"]
+    job_operation_index = state_data["job_operation_index"]
+    job_last_end_times = state_data["job_last_operation_end_times"]
+    job_operation_sequence = global_data["job_operation_sequence"]
+    job_diversity = state_data.get("job_diversity", 1)  # Default to 1 if not provided
+
+    # Determine if fallback to a simpler logic is necessary based on dataset characteristics
+    if job_diversity <= diversity_threshold and len(unfinished_jobs) == 1:
+        job_id = unfinished_jobs[0]
+        return AdvanceOperator(job_id=job_id), {}
+
+    # Initialize variables for dynamic priority evaluation
+    best_job = None
+    best_priority_score = float('inf')  # Lower priority score is better
+
+    for job_id in unfinished_jobs:
+        # Determine the machine for the next operation of the job
+        next_operation_index = job_operation_index[job_id]
+        if next_operation_index >= len(job_operation_sequence[job_id]):
+            continue  # Skip jobs that have no remaining operations
+        next_machine_id = job_operation_sequence[job_id][next_operation_index]
+
+        # Calculate priority score based on machine availability and job alignment
+        priority_score = max(machine_last_end_times[next_machine_id], job_last_end_times[job_id])
+
+        # Introduce a dynamic bias to prefer jobs that align with the positive solution trajectory
+        priority_score -= bias_weight / (job_diversity + 1)  # Dynamic adjustment based on diversity
+
+        # Update the best job based on the computed priority score
+        if priority_score < best_priority_score:
+            best_priority_score = priority_score
+            best_job = job_id
+
+    # If no job is selected, return None
+    if best_job is None:
+        return None, {}
+
+    # Create and return the AdvanceOperator for the selected job
+    operator = AdvanceOperator(job_id=best_job)
+    return operator, {}
+
+To make sure the suggestion is useful, please check in following aspects:
+1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.
+2. Will the updated suggestion make the function output  AdvanceOperator(job_id=3) in this step?
+3. If we run the updated function on this data from beginning to end, will the result be better than machine_0: 3->8->1->7->5->6->0->2->9->4
+machine_1: 0->2->9->4->7->8->5->3->6->1
+machine_2: 2->3->6->4->8->9->0->7->1->5
+machine_3: 4->9->0->8->3->1->7->5->2->6
+machine_4: 9->7->8->4->2->3->0->1->5->6
+machine_5: 7->9->6->1->8->0->2->5->3->4
+machine_6: 5->6->0->8->2->3->4->9->7->1
+machine_7: 0->7->2->4->9->5->3->1->8->6
+machine_8: 1->3->5->6->0->7->9->8->4->2
+machine_9: 5->1->7->8->4->2->9->3->0->6 (987)?
+4. Is this a commonly useful update for all instances or states?
+
+The response format is very important. For better communication, please respond to me in this format:
+***suggestion: xxx
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***suggestion: 
+
+1. Update Hyper-parameters:
+   - Increase `bias_weight` to 70.0 to further prioritize jobs that align with the optimal trajectory.
+
+2. Add More Logic:
+   - Incorporate logic to prioritize jobs with operations that can start sooner based on machine availability. This can be done by adding a condition to check for the earliest available machine.
+
+3. Limit Logic Scope:
+   - Add an `if-check` to only apply the above logic when the makespan has not improved for a certain number of iterations, indicating the need for an adjustment in strategy.
+
+4. Different Output Operators:
+   - Consider using a `ShiftOperator` for jobs that can be moved to an earlier position in the machine queue without disrupting the job sequence, especially for jobs that have shorter processing times and can fill gaps in machine availability.
+
+5. Learning from Other Heuristics:
+   - Integrate logic from `least_work_remaining_66c9` to dynamically evaluate the remaining processing time and prioritize jobs that can be completed sooner in the current scheduling context.
+
+By implementing these suggestions, the function should output `AdvanceOperator(job_id=3)` in the specified step and potentially improve the makespan beyond 987 when run from start to finish. These updates aim to be generally applicable across various instances by enhancing flexibility and responsiveness to current scheduling conditions.
+***
+------------------------------------------------------------------------------------
+

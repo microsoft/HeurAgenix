@@ -1,0 +1,13 @@
+-data: LA02.jssp
+-current_solution:
+machine_0: 0->1->4->2->5->7->6->8->3->9
+machine_1: 6->1->4->7->5->2->3->8->0->9
+machine_2: 1->4->2->7->3->6->8->5->9->0
+machine_3: 6->4->2->0->1->7->3->8->5->9
+machine_4: 8->1->4->6->2->3->9->7->5->0
+
+-is_complete_solution: True
+-is_valid_solution: True
+-current_makespan: 693
+-job_num: 10
+-machine_num: 5

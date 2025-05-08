@@ -1,0 +1,312 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on max_cut problem:
+MaxCut is a classical combinatorial optimization problem where the goal is to partition the vertices of a graph into two disjoint subsets such that the number (or total weight) of edges between the two sets is maximized.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MaxCut problem.
+Two sets of vertices representing the partition of the graph into two subsets."""
+    def __init__(self, set_a: set[int], set_b: set[int]):
+        self.set_a = set_a
+        self.set_b = set_b
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class InsertNodeOperator(BaseOperator):
+    """Insert a node into one of the sets for the MaxCut solution."""
+    def __init__(self, node: int, target_set: str):
+        self.node = node
+        self.target_set = target_set
+        assert target_set in ['A', 'B']
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.target_set == 'A':
+            assert self.node not in solution.set_b
+            new_set_a.add(self.node)
+        elif self.target_set == 'B':
+            assert self.node not in solution.set_a
+            new_set_b.add(self.node)
+        return Solution(new_set_a, new_set_b)
+class InsertEdgeOperator(BaseOperator):
+    """Insert an edge into the MaxCut solution with node_1 in set A and node_2 in set B."""
+    def __init__(self, node_1: int, node_2: int):
+        self.node_1 = node_1
+        self.node_2 = node_2
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        assert self.node_1 not in solution.set_b
+        assert self.node_2 not in solution.set_a
+        new_set_a.add(self.node_1)
+        new_set_b.add(self.node_2)
+        return Solution(new_set_a, new_set_b)
+class SwapOperator(BaseOperator):
+    """Swap a list of nodes from origin set to the opposite set in the MaxCut solution."""
+    def __init__(self, nodes: list[int]):
+        self.nodes = nodes
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        for node in self.nodes:
+            if node in solution.set_a:
+                assert node not in solution.set_b
+                new_set_a.remove(node)
+                new_set_b.add(node)
+            elif node in solution.set_b:
+                assert node not in solution.set_a
+                new_set_b.remove(node)
+                new_set_a.add(node)
+        return Solution(new_set_a, new_set_b)
+class DeleteOperator(BaseOperator):
+    """Delete a node from both sets in the MaxCut solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.node in solution.set_a:
+            new_set_a.remove(self.node)
+        elif self.node in solution.set_b:
+            new_set_b.remove(self.node)
+        return Solution(new_set_a, new_set_b)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of vertices in the graph.
+    - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "set_a_count" (int): The number of nodes in set A of the current partition.
+    - "set_b_count" (int): The number of nodes in set B of the current partition.
+    - "selected_nodes" (set[int]): The set of selected nodes.
+    - "selected_num" (int): The number of nodes have been selected.
+    - "unselected_nodes" (set[int]): The set of unselected nodes.
+    - "unselected_num" (int): The number of nodes have not been selected.
+    - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is max_cut a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+MaxCut is indeed a combinatorial optimization problem, which can be effectively approached using heuristic methods. The framework you've described, with its solution representation and operators, seems suitable for implementing various heuristic algorithms to tackle the MaxCut problem.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): Node Insertion,Edge Insertion,Swap-Based,Balancing/Partitioning,Probabilistic/Metaheuristic,Greedy
+
+Node Insertion: These heuristics focus on inserting nodes into sets to maximize the cut value or balance the partition.
+def highest_weight_edge_ca02(): Heuristic algorithm to maximize cut value by evaluating the impact of placing each unselected node into set A or B.
+def most_weight_neighbors_d31b(scaling_factor: float = 0.5, swap_frequency: int = 5): The most_weight_neighbors_d31b heuristic selects an unselected node based on both immediate and future impacts on the cut value and periodically considers swaps to further improve the solution.
+def balanced_cut_c0e6(): Balanced Cut heuristic for the Max Cut problem with improvements to ensure balanced partitions, future impact consideration, and periodic swap operations.
+def highest_delta_node_b31b(): This heuristic selects the unselected node that, when added to one of the sets (A or B), would result in the largest increase in the total cut weight. The node is then inserted into that set which maximizes the cut weight.
+
+Edge Insertion: This heuristic targets inserting edges to increase the cut value.
+def highest_delta_edge_9f66(): Selects the unselected edge that maximizes the increase in cut weight when added to the solution.
+
+Swap-Based: These heuristics focus on swapping nodes between sets to improve the cut value, sometimes incorporating probabilistic acceptance or multiple swaps.
+def greedy_swap_5bb5(): Greedy Swap Heuristic for the Max Cut problem. Iteratively evaluates the delta in cut value for all possible single-node swaps between set A and set B, and performs the swap that leads to the highest increase in the cut value. If no swap improves the cut value, no operator is returned.
+def simulated_annealing_ed14(): Simulated Annealing heuristic for the Max Cut problem. It probabilistically chooses to swap a node from one set to another, potentially accepting worse solutions early on to escape local optima, with the probability of accepting worse solutions decreasing over time.
+def multi_swap_2_dbfe(): This heuristic evaluates all possible pairs of nodes for swapping between set A and set B. It performs the swap that leads to the highest increase in the cut value, considering the combined effect of swapping two nodes simultaneously rather than one at a time. It utilizes numpy operations for efficient computation.
+
+Balancing/Partitioning: These heuristics consider the balance between the two partitions as a part of their strategy.
+def balanced_cut_c0e6(): Balanced Cut heuristic for the Max Cut problem with improvements to ensure balanced partitions, future impact consideration, and periodic swap operations.
+def most_weight_neighbors_d31b(scaling_factor: float = 0.5, swap_frequency: int = 5): The most_weight_neighbors_d31b heuristic selects an unselected node based on both immediate and future impacts on the cut value and periodically considers swaps to further improve the solution.
+
+Probabilistic/Metaheuristic: This heuristic uses a probabilistic approach to escape local optima by occasionally accepting worse solutions.
+def simulated_annealing_ed14(): Simulated Annealing heuristic for the Max Cut problem. It probabilistically chooses to swap a node from one set to another, potentially accepting worse solutions early on to escape local optima, with the probability of accepting worse solutions decreasing over time.
+
+Greedy: These heuristics use a greedy approach to select the best immediate action to improve the cut.
+def highest_weight_edge_ca02(): Heuristic algorithm to maximize cut value by evaluating the impact of placing each unselected node into set A or B.
+def greedy_swap_5bb5(): Greedy Swap Heuristic for the Max Cut problem. Iteratively evaluates the delta in cut value for all possible single-node swaps between set A and set B, and performs the swap that leads to the highest increase in the cut value. If no swap improves the cut value, no operator is returned.
+def highest_delta_node_b31b(): This heuristic selects the unselected node that, when added to one of the sets (A or B), would result in the largest increase in the total cut weight. The node is then inserted into that set which maximizes the cut weight.
+
+
+We aim to solve this problem using the following data:
+node_num:800
+average_node_degree:47.94
+edge_density:0.06
+average_edge_weight:-0.008343763037129746
+max_edge_weight:1.0
+min_edge_weight:-1.0
+standard_deviation_edge_weight:0.9999651902033291
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 1 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+Developing a strategic guide for selecting heuristic categories and defining execution steps involves understanding the problem characteristics, the strengths of each heuristic category, and the current state of the solution. Here's a strategic guide for selecting heuristic categories and execution steps for tackling the MaxCut problem:
+
+### Strategic Guide for Heuristic Selection
+
+#### 1. **Initial Construction Phase**
+- **Objective**: Quickly build an initial feasible solution.
+- **Suggested Categories**:
+  - **Node Insertion**: Start with a heuristic like `highest_weight_edge_ca02` or `highest_delta_node_b31b` to construct an initial solution by focusing on high-impact nodes.
+  - **Greedy**: Use greedy approaches to establish a strong initial cut value, focusing on immediate gains.
+
+#### 2. **Initial Improvement Phase**
+- **Objective**: Improve the initial solution to escape local optima and enhance the cut value.
+- **Suggested Categories**:
+  - **Swap-Based**: Implement `greedy_swap_5bb5` to make local improvements by swapping nodes.
+  - **Balancing/Partitioning**: Use `balanced_cut_c0e6` to ensure that the partitions remain balanced while improving the cut value.
+
+#### 3. **Exploration Phase**
+- **Objective**: Explore the solution space more broadly to escape local optima and discover better solutions.
+- **Suggested Categories**:
+  - **Probabilistic/Metaheuristic**: Deploy `simulated_annealing_ed14` to explore the solution space stochastically, allowing temporary acceptance of worse solutions for greater long-term gains.
+  - **Edge Insertion**: Use `highest_delta_edge_9f66` to fine-tune the solution by focusing on edge contributions.
+
+#### 4. **Intensive Improvement Phase**
+- **Objective**: Intensively improve the solution by exploring and exploiting local changes.
+- **Suggested Categories**:
+  - **Swap-Based**: Utilize `multi_swap_2_dbfe` for complex swaps that consider multiple nodes at once.
+  - **Balancing/Partitioning**: Revisit `most_weight_neighbors_d31b` to ensure optimal balance and partition quality.
+
+### Execution Steps
+
+1. **Initialization**: Start with Node Insertion or Greedy heuristics to quickly form an initial solution.
+2. **Local Improvement**: Apply Swap-Based heuristics to make quick, effective improvements.
+3. **Balancing**: Use Balancing/Partitioning to ensure the solution remains robustly partitioned.
+4. **Exploration**: Integrate Probabilistic/Metaheuristic strategies to explore beyond local optima.
+5. **Final Optimization**: Revisit Swap-Based and Edge Insertion heuristics to fine-tune the final solution.
+
+### Iterative Approach
+
+- **Evaluate and Adapt**: After each phase, assess the cut value improvements. If progress stalls, switch to another category.
+- **Time Management**: Allocate time for each phase based on initial results, ensuring a balance between exploration and exploitation.
+- **Feedback Loop**: Continuously use feedback from each phase to inform subsequent heuristic choices and execution steps.
+
+This strategic guide provides a structured approach to heuristic selection, ensuring diverse exploration and exploitation throughout the optimization process. This will help in avoiding premature convergence and improving solution quality iteratively.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+node_num:800
+average_node_degree:47.94
+edge_density:0.06
+average_edge_weight:-0.008343763037129746
+max_edge_weight:1.0
+min_edge_weight:-1.0
+standard_deviation_edge_weight:0.9999651902033291
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 7 rounds discuss and the summary are:
+---Round 0---
+Heuristic: highest_weight_edge_ca02
+Heuristic Category: Node Insertion
+Running Steps: 1
+Explain: Since the current solution is essentially empty (with no nodes selected in either set and a cut value of 0), it is crucial to initiate the construction of the solution. Node Insertion heuristics are well-suited for starting the process by placing high-impact nodes into the sets to quickly develop an initial feasible solution. This will help in setting a foundation for further improvements.
+Selected Node: 0->1
+Cut Value: 0->0
+---Round 1---
+Heuristic: most_weight_neighbors_d31b
+Heuristic Category: Node Insertion
+Running Steps: 1
+Explain: The current solution is still in its early stages, with only one node placed into set A and no cut value improvement yet. Continuing with the Node Insertion category can help further develop the solution by adding more nodes with potentially high impact on the cut value. This will build a stronger initial structure, providing a better foundation for subsequent improvement phases.
+Selected Node: 1->2
+Cut Value: 0->1.0
+---Round 2---
+Heuristic: most_weight_neighbors_d31b
+Heuristic Category: Node Insertion
+Running Steps: 1
+Explain:  The current solution is still in its early development stage with only two nodes selected and a low cut value. Continuing with the Node Insertion category is sensible to further develop the initial solution, especially since previous steps have begun to show some improvement in the cut value. Building a more robust initial solution will provide a stronger foundation for later phases, allowing for more effective application of other heuristics.
+Selected Node: 2->3
+Cut Value: 1.0->2.0
+---Round 3---
+Heuristic: multi_swap_2_dbfe
+Heuristic Category: Swap-Based
+Running Steps: 1
+Explain:  The current solution has a small number of selected nodes, and the cut value is beginning to develop. Moving to the Swap-Based category could help optimize the placement of the already selected nodes, potentially improving the cut value by swapping nodes between the two sets. This approach will also start balancing the partition more effectively, given the current imbalance ratio, and further develop the solution structure.
+Selected Node: 3->3
+Cut Value: 2.0->2.0
+---Round 4---
+Heuristic: balanced_cut_c0e6
+Heuristic Category: Balancing/Partitioning
+Running Steps: 1
+Explain:  0.00125). Utilizing a Balancing/Partitioning heuristic can help address this imbalance, improving the cut value by ensuring a more even distribution of nodes between the sets. This will provide a more robust foundation for future optimization steps.
+Selected Node: 3->4
+Cut Value: 2.0->2.0
+---Round 5---
+Heuristic: simulated_annealing_ed14
+Heuristic Category: Probabilistic/Metaheuristic
+Running Steps: 1
+Explain:  Given the current state of the solution with a low cut value and the small number of nodes selected, it might be beneficial to explore the solution space more broadly using a Probabilistic/Metaheuristic approach. This can help escape local optima and potentially identify a better configuration. Simulated Annealing, for instance, would allow temporary acceptance of worse solutions to explore new areas of the search space, possibly leading to a more substantial improvement.
+Selected Node: 4->4
+Cut Value: 2.0->2.0
+---Round 6---
+Heuristic: multi_swap_2_dbfe
+Heuristic Category: Swap-Based
+Running Steps: 1
+Explain: Given the current state of the solution with only a few selected nodes and a low cut value, focusing on optimizing the placement of these nodes could be beneficial. The previous rounds have primarily been about constructing the initial solution, and now, with a small set of selected nodes, a Swap-Based heuristic may help fine-tune the solution. It can potentially improve the cut value by evaluating and performing advantageous swaps, which may also help address any initial partition imbalances. This approach can enhance the effectiveness of the current solution configuration, preparing it for further optimization phases.
+Selected Node: 4->4
+Cut Value: 2.0->2.0
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:
+set_a: 96,401
+set_b: 509,231
+
+set_a_count:2
+set_b_count:2
+selected_nodes:{96, 401, 509, 231}
+selected_num:4
+unselected_num:796
+current_cut_value:2.0
+imbalance_ratio:0.0
+cut_value:2.0
+average_cut_edge_weight:0.5
+selected_nodes_ratio:0.005
+unselected_nodes_ratio:0.995
+edge_weight_variance_within_sets:0.25
+boundary_node_ratio:0.005
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: multi_swap_2_dbfe(Swap-Based). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: Node Insertion,Edge Insertion,Swap-Based,Balancing/Partitioning,Probabilistic/Metaheuristic,Greedy
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(Node Insertion,Edge Insertion,Swap-Based,Balancing/Partitioning,Probabilistic/Metaheuristic,Greedy)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:Edge Insertion
+explanation: The current solution has a low cut value and a small number of selected nodes. To improve the cut value, it may be beneficial to focus on increasing the contribution of edges between the two sets. Edge Insertion heuristics can help identify and add edges that maximize the cut value, potentially enhancing the solution more effectively at this stage. Given the current imbalance and the goal to increase cut value, introducing impactful edges could lead to significant improvements.
+***
+------------------------------------------------------------------------------------
+

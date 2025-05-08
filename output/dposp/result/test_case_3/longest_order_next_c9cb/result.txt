@@ -1,0 +1,12 @@
+-data: test_case_3
+-production_line_num: 5
+-product_num: 10
+-order_num: 100
+-fulfilled_order_num: 51
+-current_solution:
+production_line_0: 96->54->76
+production_line_1: 87->53->39->4->85->71->83->56->45->33->27->61->59->99->81->80
+production_line_2: 23->16->8->6->37->94->75->48->84->91
+production_line_3: 18->14->89->42->30->28->93->78->66->98->86->95
+production_line_4: 10->9->5->0->88->72->63->62->31->57
+-is_complete_solution: True

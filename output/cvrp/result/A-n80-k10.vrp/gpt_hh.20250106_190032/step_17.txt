@@ -1,0 +1,433 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on cvrp problem:
+Capacitated Vehicle Routing Problem (CVRP) is an optimization challenge focused on determining the most efficient routes for a fleet of vehicles to deliver goods to various locations, considering vehicle capacity constraints.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of CVRP.
+A list of lists where each sublist represents a vehicle's route.
+Each sublist contains integers representing the nodes (customers) visited by the vehicle in the order of visitation.
+The routes are sorted by vehicle identifier and the nodes in the list sorted by visited order."""
+    def __init__(self, routes: list[list[int]], depot: int):
+        self.routes = routes
+        self.depot = depot
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append a node at the end of the specified vehicle's route."""
+    def __init__(self, vehicle_id: int, node: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].append(self.node)
+        return Solution(new_routes, solution.depot)
+class InsertOperator(BaseOperator):
+    """Insert a node at a specified position within the route of a specified vehicle."""
+    def __init__(self, vehicle_id: int, node: int, position: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].insert(self.position, self.node)
+        return Solution(new_routes, solution.depot)
+class SwapOperator(BaseOperator):
+    """Swap two nodes between or within vehicle routes."""
+    def __init__(self, vehicle_id1: int, position1: int, vehicle_id2: int, position2: int):
+        if vehicle_id1 <= vehicle_id2:
+            self.vehicle_id1 = vehicle_id1
+            self.position1 = position1
+            self.vehicle_id2 = vehicle_id2
+            self.position2 = position2
+        else:
+            self.vehicle_id1 = vehicle_id2
+            self.position1 = position2
+            self.vehicle_id2 = vehicle_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        (new_routes[self.vehicle_id1][self.position1], new_routes[self.vehicle_id2][self.position2]) = (new_routes[self.vehicle_id2][self.position2], new_routes[self.vehicle_id1][self.position1])
+        return Solution(new_routes, solution.depot)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, vehicle_id: int, segments: list[tuple[int, int]]):
+        self.vehicle_id = vehicle_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_route = new_routes[self.vehicle_id][:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_routes[self.vehicle_id])
+            assert 0 <= end_index < len(new_routes[self.vehicle_id])
+            if start_index <= end_index:
+                new_route[start_index:end_index + 1] = reversed(new_route[start_index:end_index + 1])
+            else:
+                new_route = list(reversed(new_route[start_index:])) + new_route[end_index + 1:start_index] + list(reversed(new_route[:end_index + 1]))
+        new_routes = solution.routes[:self.vehicle_id] + [new_route] + solution.routes[self.vehicle_id + 1:]
+        return Solution(new_routes, solution.depot)
+class RelocateOperator(BaseOperator):
+    """Move a node from one position in a route to another, possibly in a different route."""
+    def __init__(self, source_vehicle_id: int, source_position: int, target_vehicle_id: int, target_position: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.source_position = source_position
+        self.target_vehicle_id = target_vehicle_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        node = new_routes[self.source_vehicle_id].pop(self.source_position)
+        if not new_routes[self.target_vehicle_id]:
+            new_routes[self.target_vehicle_id].append(node)
+        else:
+            new_routes[self.target_vehicle_id].insert(self.target_position, node)
+        return Solution(new_routes, solution.depot)
+class MergeRoutesOperator(BaseOperator):
+    """Merge two routes by appending the route of the source vehicle to the beginning of the route of the target vehicle. 
+The merged route is assigned to the target vehicle, and the source vehicle's route is cleared."""
+    def __init__(self, source_vehicle_id: int, target_vehicle_id: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.target_vehicle_id = target_vehicle_id
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.target_vehicle_id] = new_routes[self.source_vehicle_id] + new_routes[self.target_vehicle_id]
+        new_routes[self.source_vehicle_id] = []
+        return Solution(new_routes, solution.depot)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "vehicle_num" (int): The total number of vehicles.
+    - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
+    - "depot" (int): The index for depot node.
+    - "demands" (numpy.ndarray): The demand of each node.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): The current set of routes for all vehicles.
+    - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - "visited_num" (int): Number of nodes visited by each vehicle.
+    - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+    - "visited_num" (int): Number of nodes have not been visited by each vehicle.
+    - "total_current_cost" (int): The total cost of the current solution.
+    - "last_visited" (list[int]): The last visited node for each vehicle.
+    - "vehicle_loads" (list[int]): The current load of each vehicle.
+    - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is cvrp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Capacitated Vehicle Routing Problem (CVRP) is indeed a combinatorial optimization problem. It involves finding the optimal set of routes for a fleet of vehicles to deliver goods to a set of customers, subject to vehicle capacity constraints, which is characteristic of combinatorial operation problems. The use of heuristics to solve CVRP is a common approach, as these problems are NP-hard, meaning that exact solutions are computationally expensive for large instances. The framework you've described with solutions, operators, and heuristic function signatures aligns with the typical methodology used to tackle such problems.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def farthest_insertion_ce2b(): Farthest Insertion heuristic for the CVRP. This algorithm selects the unvisited node that is farthest from the depot and inserts it into a route that minimizes the increase in total distance, while also considering vehicle capacity constraints. The heuristic continues until no further nodes can be assigned without violating capacity constraints or all nodes are assigned.
+def greedy_f4c4(): Greedy heuristic algorithm for the CVRP. This algorithm attempts to construct a solution by iteratively adding the closest unvisited node to a vehicle's route until all nodes are visited or the vehicle reaches its capacity. It starts with an empty route for each vehicle and selects nodes based on the shortest distance from the last node in the route.
+def min_cost_insertion_7bfa(): Min-Cost Insertion heuristic for the CVRP.
+def nearest_neighbor_99ba(): Nearest Neighbor heuristic for CVRP. This algorithm iterates over each vehicle, starting from the depot. For each vehicle, it finds the nearest unvisited node and appends it to the route, respecting the vehicle's capacity constraints. This process repeats until no further nodes can be visited without exceeding the vehicle's capacity or all nodes have been visited.
+def node_shift_between_routes_7b8a(): Node Shift Between Routes heuristic for CVRP. This heuristic attempts to move a node from one route to another route, aiming to reduce the total distance or improve load balance. It considers the capacity constraints and ensures that the move is beneficial before applying it.
+def petal_algorithm_b384(): Petal construction heuristic algorithm for the CVRP. This heuristic attempts to build feasible routes (petals) around the depot and combine them into a set of vehicle routes. Each petal starts and ends at the depot, creating a loop that can serve as an individual route for a vehicle.
+def random_bfdc(): Random heuristic for CVRP. This heuristic selects an unvisited node at random and appends it to a vehicle's route where it does not violate the capacity constraint. This process is repeated for each vehicle until all nodes have been included in a route.
+def saving_algorithm_710e(merge_threshold: float = 0.0): Saving Algorithm heuristic for CVRP. Calculates savings for combining two routes into one for each pair of end nodes of existing routes and sorts these savings in descending order. Routes are then merged by the highest savings while considering vehicle capacity constraints.
+def three_opt_e8d7(): Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+def two_opt_0554(): Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+def variable_neighborhood_search_614b(): Variable Neighborhood Search heuristic algorithm for CVRP. This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions. It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios where each heuristic algorithm is applicable involves understanding their strengths and weaknesses. These scenarios are often characterized by factors like problem size, node distribution, and specific constraints. Here's an analysis of the heuristics you've mentioned:
+
+1. **Farthest Insertion**: 
+   - **Scenario**: Effective when you want to ensure that distant nodes are included early in the solution construction process.
+   - **Best for**: Problems where nodes are scattered far from the depot and you want to minimize long detours later in the solution.
+
+2. **Greedy**: 
+   - **Scenario**: Quick construction of initial solutions by focusing on immediate cost.
+   - **Best for**: Smaller problems or as a starting point for more sophisticated algorithms due to its simplicity and speed.
+
+3. **Min-Cost Insertion**:
+   - **Scenario**: Incrementally builds routes by inserting nodes at the least additional cost.
+   - **Best for**: Situations where minimizing incremental distance or cost is crucial, often used for initial solution construction.
+
+4. **Nearest Neighbor**:
+   - **Scenario**: Sequentially adds the nearest node to the current route.
+   - **Best for**: Problems where nodes are relatively evenly distributed and proximity is a good heuristic for minimizing total distance.
+
+5. **Node Shift Between Routes**:
+   - **Scenario**: Improves existing solutions by rebalancing routes.
+   - **Best for**: Problems where initial solutions are unbalanced in terms of load or distance, and improvement through reallocation is possible.
+
+6. **Petal Algorithm**:
+   - **Scenario**: Constructs feasible routes by creating loops or "petals" around the depot.
+   - **Best for**: Problems where routes naturally form around a central depot, benefiting from local loops.
+
+7. **Random**:
+   - **Scenario**: Generates diverse initial solutions without any bias.
+   - **Best for**: Providing varied starting points for metaheuristic algorithms that rely on population diversity, like genetic algorithms.
+
+8. **Saving Algorithm**:
+   - **Scenario**: Merges routes based on calculated savings.
+   - **Best for**: Situations where merging routes is beneficial and can significantly reduce total travel distance.
+
+9. **Three-opt**:
+   - **Scenario**: Optimizes routes by removing three edges and reconnecting them for potential cost reduction.
+   - **Best for**: Problems where local optimization can yield significant improvements, especially for medium to large-sized problems.
+
+10. **Two-opt**:
+    - **Scenario**: Simplifies route optimization by removing two edges and reconnecting them.
+    - **Best for**: Problems needing fast local optimization, often used as a refinement step after initial solution construction.
+
+11. **Variable Neighborhood Search**:
+    - **Scenario**: Escapes local optima by systematically changing neighborhood structures.
+    - **Best for**: Large and complex problems where traditional local search may get stuck in suboptimal solutions.
+
+These heuristics can be used in isolation or combined in hybrid approaches, depending on the specific characteristics and constraints of the CVRP instance being solved.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+node_num:80
+vehicle_num:10
+capacity:100
+depot:0
+demands:[0, 24, 22, 23, 5, 11, 23, 26, 9, 23, 9, 14, 16, 12, 2, 2, 6, 20, 26, 12, 15, 13, 26, 17, 7, 12, 4, 4, 20, 10, 9, 2, 9, 1, 2, 2, 12, 14, 23, 21, 13, 13, 23, 3, 6, 23, 11, 2, 7, 13, 10, 3, 6, 13, 2, 14, 7, 21, 7, 22, 13, 22, 18, 22, 6, 2, 11, 5, 9, 9, 5, 12, 2, 12, 19, 6, 14, 2, 2, 24]
+average_demand:11.775
+demand_variance:57.399374999999985
+average_distance:51.732278481012656
+max_distance:138.0
+min_distance:0.0
+distance_variance:610.1150340490307
+vehicle_capacity_utilization:0.942
+node_to_vehicle_ratio:8.0
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_solution:
+vehicle_0: 0->49->73->36->77->3->31->29->51->42->0
+vehicle_1: 0->13->1->7->10->14->21->40->0
+vehicle_2: 0->8->68->16->43->19->47->26->35->65->69->56->33->70->67->66->53->0
+vehicle_3: 0->5->27->61->57->55->9->54->72->0
+vehicle_4: 0->64->15->76->50->45->4->32->58->38->0
+vehicle_5: 0->39->74->12->44->23->34->62->0
+vehicle_6: 0->24->6->30->78->59->17->60->0
+vehicle_7: 0->71->28->79->52->11->63->0
+vehicle_8: 0->48->2->37->20->75->41->25->46->0
+vehicle_9: 0->18->22->0
+
+visited_nodes:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79]
+visited_num:80
+unvisited_nodes:[]
+unvisited_num:0
+total_current_cost:2228.0
+last_visited:[42, 40, 53, 72, 38, 62, 60, 63, 46, 22]
+vehicle_loads:[100, 99, 100, 99, 99, 99, 96, 98, 100, 52]
+vehicle_remaining_capacity:[0, 1, 0, 1, 1, 1, 4, 2, 0, 48]
+average_route_length:7.9
+max_route_length:16
+min_route_length:2
+std_dev_route_length:3.3000000000000003
+average_route_cost:105.1
+total_demand_served:942
+average_vehicle_load:94.2
+average_remaining_vehicle_capacity:5.8
+number_of_unvisited_nodes:0
+average_unvisited_node_demand:0
+total_remaining_demand:0
+solution_validity:True
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 17 rounds discuss and the summary are:
+---Round 0---
+Heuristic: nearest_neighbor_99ba
+Parameters: {}
+Running Steps: 10
+Explain: Starting with the Nearest Neighbor heuristic can quickly construct an initial solution by assigning nodes based on proximity to the depot, which is efficient given the unvisited nodes and initial zero-cost state. It leverages the node-to-vehicle ratio and the even distribution of demands to build balanced initial routes.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 197.0
+Delta of Fulfilled Demands: 113
+---Round 1---
+Heuristic: min_cost_insertion_7bfa
+Parameters: {}
+Running Steps: 10
+Explain: Applying the Min-Cost Insertion heuristic will help in constructing routes by inserting nodes at positions that incur the least additional cost. This approach should improve vehicle load balance and efficiently utilize remaining capacities while continuing to develop a feasible solution.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 202.0
+Delta of Fulfilled Demands: 120
+---Round 2---
+Heuristic: saving_algorithm_710e
+Parameters: {}
+Running Steps: 10
+Explain: The Saving Algorithm is selected for its ability to merge routes efficiently, potentially reducing the overall distance and better utilizing remaining vehicle capacities. This approach should improve the overall cost-effectiveness of the solution as we progress towards visiting all nodes.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 3---
+Heuristic: two_opt_0554
+Parameters: {}
+Running Steps: 10
+Explain: Applying the Two-opt heuristic will help in refining the current routes by attempting to reduce the overall route length and cost. This can potentially create room for incorporating more unvisited nodes by improving the efficiency of existing vehicle routes.
+Delta of Visited Node Num: 0
+Delta of Current Cost: -6.0
+Delta of Fulfilled Demands: 0
+---Round 4---
+Heuristic: two_opt_0554
+Parameters: {}
+Running Steps: 20
+Explain: Continuing with the Two-opt heuristic for additional steps to further optimize the current routes, aiming to reduce overall route costs and improve vehicle capacity utilization. This approach seeks to refine the existing solution, potentially allowing for the integration of more unvisited nodes.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 5---
+Heuristic: farthest_insertion_ce2b
+Parameters: {}
+Running Steps: 15
+Explain: The Farthest Insertion heuristic will help in integrating more unvisited nodes, particularly those located farthest from the depot, which have not been effectively incorporated in previous rounds. This approach can enhance route coverage and better utilize vehicle capacities, addressing the issue of unvisited nodes while potentially reducing future insertion costs.
+Delta of Visited Node Num: 15
+Delta of Current Cost: 491.0
+Delta of Fulfilled Demands: 145
+---Round 6---
+Heuristic: three_opt_e8d7
+Parameters: {}
+Running Steps: 20
+Explain: Following the Farthest Insertion heuristic, the current focus should be on optimizing the expanded routes to reduce costs and improve efficiency. The Three-opt heuristic is selected for its ability to make more substantial local adjustments compared to Two-opt, potentially leading to significant cost reductions and better utilization of vehicle capacities.
+Delta of Visited Node Num: 0
+Delta of Current Cost: -10.0
+Delta of Fulfilled Demands: 0
+---Round 7---
+Heuristic: variable_neighborhood_search_614b
+Parameters: {}
+Running Steps: 30
+Explain: Utilizing Variable Neighborhood Search to explore diverse solution spaces can potentially integrate more unvisited nodes while optimizing current routes. This heuristic is suitable for escaping local optima and finding more cost-effective solutions.
+Delta of Visited Node Num: 30
+Delta of Current Cost: 766.0
+Delta of Fulfilled Demands: 350
+---Round 8---
+Heuristic: three_opt_e8d7
+Parameters: {}
+Running Steps: 15
+Explain: The Three-opt heuristic is chosen to refine and optimize the current routes further, with the goal of reducing the overall cost. This approach aims to balance the increased fulfillment from the previous VNS application with cost efficiency, leveraging Three-opt's capacity for substantial local adjustments.
+Delta of Visited Node Num: 0
+Delta of Current Cost: -2.0
+Delta of Fulfilled Demands: 0
+---Round 9---
+Heuristic: variable_neighborhood_search_614b
+Parameters: {}
+Running Steps: 25
+Explain: The Variable Neighborhood Search is selected to explore diverse solution spaces and integrate any remaining unvisited nodes while optimizing current routes. This heuristic is suitable for escaping local optima and finding more cost-effective solutions. We aim to further reduce the total cost and improve vehicle capacity utilization.
+Delta of Visited Node Num: 14
+Delta of Current Cost: 590.0
+Delta of Fulfilled Demands: 214
+---Round 10---
+Heuristic: variable_neighborhood_search_614b
+Parameters: {}
+Running Steps: 20
+Explain: Continue with Variable Neighborhood Search to further explore solution space and optimize route costs. Given its previous effectiveness in improving the solution, additional steps may help in fine-tuning routes and reducing the total cost.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 11---
+Heuristic: three_opt_e8d7
+Parameters: {}
+Running Steps: 20
+Explain: Three-opt is selected to further refine and optimize the existing routes, aiming to reduce the overall cost and improve efficiency. Given the effectiveness of Three-opt in making substantial local adjustments, it may be able to further enhance the current solution by reducing route lengths and costs.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 12---
+Heuristic: variable_neighborhood_search_614b
+Parameters: {}
+Running Steps: 15
+Explain: The Variable Neighborhood Search will explore diverse solution spaces and attempt to escape local optima, potentially leading to further cost reductions and route optimizations. Given its previous success in improving the solution, additional steps are warranted to explore any remaining areas for improvement.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 13---
+Heuristic: variable_neighborhood_search_614b
+Parameters: {}
+Running Steps: 15
+Explain: Given the previous success of the Variable Neighborhood Search (VNS) in exploring diverse solution spaces and optimizing route costs, continuing with VNS for additional steps is warranted. Despite recent applications yielding no changes in visited node count or demand fulfillment, further exploration may reveal untapped improvements in cost reduction or route efficiency. The current solution is valid and well-constructed, but there's potential for cost optimization, making VNS a suitable choice to attempt further refinements.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 14---
+Heuristic: three_opt_e8d7
+Parameters: {}
+Running Steps: 10
+Explain: Apply the Three-opt heuristic for a small number of steps to attempt further cost reductions and route optimizations. Given the near-complete state of the solution and recent lack of improvements, this limited application seeks to identify any remaining opportunities for cost efficiency without extensive computational effort.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 15---
+Heuristic: three_opt_e8d7
+Parameters: {}
+Running Steps: 5
+Explain: Apply Three-opt for a limited number of steps to explore any remaining cost optimization opportunities. Given the near-complete state of the solution, this aims to ensure no inefficiencies remain without extensive computational effort. If no significant improvements are observed, we can consider stopping or switching to another heuristic.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 16---
+Heuristic: variable_neighborhood_search_614b
+Parameters: {}
+Running Steps: 10
+Explain: Given the solution's near-complete state and the success of VNS in exploring diverse solution spaces, a limited additional run may uncover any remaining opportunities for cost reduction or route improvement. This will ensure comprehensive exploration before concluding that the solution is optimal.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: variable_neighborhood_search_614b. How does variable_neighborhood_search_614b perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+***Stop***
+------------------------------------------------------------------------------------
+

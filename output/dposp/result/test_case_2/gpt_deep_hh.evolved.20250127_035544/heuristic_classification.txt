@@ -1,0 +1,785 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on dposp problem:
+Dynamic Production Order Scheduling Problem (DPOSP) involves multiple machines, each capable of producing various products. The production speed for different products varies across machines, and some transitions between products are not allowed. Each order specifies the required product, quantity, and deadline, and an order is considered completed only if all requirements are met by the deadline. Orders completed after the deadline are invalid. Each production action corresponds to an order, and the plan for each production line can be represented as a list, where each item denotes an order. The start time of each production is calculated based on the sum of the previous production and transition times, ensuring that each production is completed before the deadline. Our objective is to maximize the number of completed orders, with each order having the same priority, regardless of the quantity required.
+
+To formally describe DPOSP, we build the following optimization model. Let X_ij represent the j-th production action on the i-th production line, whereX_ij=k indicates that the j-th action on the i-th production line is producing order k, and X_ij=0 if there is no production action. The problem includes the following components:
+
+**Maximize**
+Sum over all production lines (i) and production actions (j) of the indicator function I(X_ij != 0)
+
+**Subject to**
+1. For each order k, sum over all production lines (i) and production actions (j) of the indicator function I(X_ij = k) <= 1.
+2. The start time s_ij is set to:
+   - 0 if j = 1 (the first action on the production line starts at time 0)
+   - The end time of the previous action (e_i,j-1) plus the transition time between the products of the previous action (P_k_j-1) and the current action (P_k_j) if j > 1.
+3. The end time e_ij is calculated as the start time s_ij plus the quantity of order k divided by the production speed of the production line i for product P_k, if X_ij = k.
+4. The end time e_ij must be less than or equal to the deadline D_k for the order k, if X_ij = k.
+
+Where:
+- X_ij (Decision Variable) represents the j-th production action on the i-th production line, with X_ij = k indicating production of order k and X_ij = 0 indicating no action; X_ij can take values in the set {0, 1, ..., k}.
+- v_ip (Input Variable) is the production speed of production line i for product p. If v_ip = 0, the product cannot be produced on line i.
+- t_i,p,p' (Input Variable) is the transition time for production line i from product p to product p'. If t_i,p,p' is infinity, the transition is not allowed.
+- Q_k (Input Variable) is the quantity required for order k.
+- P_k (Input Variable) is the product required for order k.
+- D_k (Input Variable) is the deadline for order k.
+- s_ij (Intermediate Variable) is the start time of the j-th production action on production line i.
+- e_ij (Intermediate Variable) is the end time of the j-th production action on production line i.
+- I() (Indicator Function) equals 1 if the condition is true, and 0 otherwise.
+
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of DPOSP.
+A list of lists, where each sublist corresponds to a production line's planned sequence of orders.
+Each integer within the sublist represents an order to be fulfilled by the machine, in the sequence they are to be produced."""
+    def __init__(self, production_schedule: list[list[int]]):
+        self.production_schedule = production_schedule
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Appends an order to the end of a specified production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].append(self.order_id)
+        return Solution(new_schedule)
+class InsertOperator(BaseOperator):
+    """Inserts an order at a specified position within a production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int, position: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].insert(self.position, self.order_id)
+        return Solution(new_schedule)
+class SwapOperator(BaseOperator):
+    """Swaps two orders between or within production lines."""
+    def __init__(self, production_line_id1: int, position1: int, production_line_id2: int, position2: int):
+        if production_line_id1 <= production_line_id2:
+            self.production_line_id1 = production_line_id1
+            self.position1 = position1
+            self.production_line_id2 = production_line_id2
+            self.position2 = position2
+        else:
+            self.production_line_id1 = production_line_id2
+            self.position1 = position2
+            self.production_line_id2 = production_line_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        (new_schedule[self.production_line_id1][self.position1], new_schedule[self.production_line_id2][self.position2]) = (new_schedule[self.production_line_id2][self.position2], new_schedule[self.production_line_id1][self.position1])
+        return Solution(new_schedule)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverses a segment of orders within a production line's schedule."""
+    def __init__(self, production_line_id: int, segments: list[tuple[int, int]]):
+        self.production_line_id = production_line_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_schedule[self.production_line_id])
+            assert 0 <= end_index < len(new_schedule[self.production_line_id])
+            if start_index > end_index:
+                (start_index, end_index) = (end_index, start_index)
+            new_schedule[self.production_line_id][start_index:end_index + 1] = reversed(new_schedule[self.production_line_id][start_index:end_index + 1])
+        return Solution(new_schedule)
+class RelocateOperator(BaseOperator):
+    """Moves an order from one position to another within the same or to a different production line."""
+    def __init__(self, source_production_line_id: int, source_position: int, target_production_line_id: int, target_position: int):
+        self.source_production_line_id = source_production_line_id
+        self.source_position = source_position
+        self.target_production_line_id = target_production_line_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        order = new_schedule[self.source_production_line_id].pop(self.source_position)
+        if not new_schedule[self.target_production_line_id]:
+            new_schedule[self.target_production_line_id].append(order)
+        else:
+            new_schedule[self.target_production_line_id].insert(self.target_position, order)
+        return Solution(new_schedule)
+class MergeOperator(BaseOperator):
+    """Merges the schedule of a source production line into the beginning of a target production line's schedule. 
+The merged schedule is assigned to the target production line, and the source production line's schedule is cleared."""
+    def __init__(self, source_production_line_id: int, target_production_line_id: int):
+        self.source_production_line_id = source_production_line_id
+        self.target_production_line_id = target_production_line_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.target_production_line_id] = new_schedule[self.source_production_line_id] + new_schedule[self.target_production_line_id]
+        new_schedule[self.source_production_line_id] = []
+        return Solution(new_schedule)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+- "product_num" (int): Total number of unique products.
+- "production_line_num" (int): Total number of production lines.
+- "order_num" (int): Total number of orders to be scheduled.
+- "production_rate" (numpy.array): 2D array of production time for each product on each production line, and shape is (production_line_num, product_num)
+- "transition_time" (numpy.array): 3D array of transition time between products on each production line, and shape is (production_line_num, product_num, product_num)
+- "order_product" (numpy.array): 1D array mapping each order to its required product and length is order_num.
+- "order_quantity" (numpy.array): 1D array of the quantity required for each order and length is order_num.
+- "order_deadline" (numpy.array): 1D array of the deadline for each order and length is order_num.
+- "current_solution" (Solution): Current scheduling solution.
+- "fulfilled_order_num" (int): Number of fulfilled orders.
+- "fulfilled_orders" (list[int]): List of fulfilled orders.
+- "unfulfilled_orders" (list[int]): List of unfulfilled orders.
+- "total_time_cost_per_production_line" (numpy.array): 1D array of the sum of production and transition times for each production line.
+- "feasible_orders_to_fulfill" (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
+- "validation_single_production_schedule" (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
+- "get_time_cost_delta" (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
+- "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is dposp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Dynamic Production Order Scheduling Problem (DPOSP) is a combinatorial optimization problem. It involves finding an optimal sequence of production actions across multiple machines, considering constraints like deadlines, production speeds, and transition times, which are characteristic of combinatorial problems. Heuristics are often suitable for such problems due to their ability to find good solutions within reasonable timeframes, especially when the problem space is large and complex. The framework you've described, with its operators and solution structure, is aligned with heuristic approaches commonly used in combinatorial optimization.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+from src.problems.dposp.components import *
+
+def exchange_production_orders_eda2(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+    """
+    The exchange production orders heuristic tries to improve the current production schedule by swapping two non-adjacent orders
+    from the same or different production lines and assessing the impact on the total production and transition times. The heuristic
+    is based on the 2-opt approach from TSP and is adapted to consider DPOSP-specific constraints such as varying production speeds,
+    transition times, order deadlines, and production line capabilities.
+
+    Args:
+        global_data (dict): Contains the static problem data. In this algorithm, the following items are necessary:
+            - production_rate (numpy.array): 2D array of production time for each product on each production line.
+            - transition_time (numpy.array): 3D array of transition time between products on each production line.
+            - order_product (numpy.array): 1D array mapping each order to its required product.
+        state_data (dict): Contains the current dynamic state data. In this algorithm, the following items are necessary:
+            - current_solution (Solution): The current scheduling solution.
+            - feasible_orders_to_fulfill (list): List of feasible orders that can be fulfilled without delaying other planned orders.
+            - validation_single_production_schedule (callable): Function to check if a production schedule is valid for a given production line.
+        algorithm_data (dict): Used for storing data necessary for the algorithm.
+        get_state_data_function (callable): Function to get the state data for a new solution.
+
+    Returns:
+        SwapOperator: Operator that swaps two orders in the production schedule.
+        dict: Empty dictionary, as this algorithm does not update algorithm_data.
+    """
+
+    # Retrieve necessary information from global_data and state_data
+    production_rate = global_data["production_rate"]
+    transition_time = global_data["transition_time"]
+    order_product = global_data["order_product"]
+    current_solution = state_data["current_solution"]
+    feasible_orders = state_data["feasible_orders_to_fulfill"]
+    validation_schedule = state_data["validation_single_production_schedule"]
+
+    # Initialize best improvement and operator
+    best_improvement = 0
+    best_operator = None
+
+    # Iterate through all pairs of feasible orders to find the best swap
+    for line in range(len(production_rate)):
+        for i in range(len(current_solution.production_schedule[line])):
+            for j in range(i + 1, len(current_solution.production_schedule[line])):
+                order_i = current_solution.production_schedule[line][i]
+                order_j = current_solution.production_schedule[line][j]
+
+                # Perform swap on a copy of the current production schedule
+                new_schedule = [schedule[:] for schedule in current_solution.production_schedule]
+                new_schedule[line][i], new_schedule[line][j] = new_schedule[line][j], new_schedule[line][i]
+
+                # Validate the new schedule for the production line
+                if not validation_schedule(line, new_schedule[line]):
+                    continue
+
+                # Get the state data for the new solution
+                new_state_data = get_state_data_function(Solution(new_schedule))
+
+                # Calculate the time cost difference
+                old_time_cost = state_data["total_time_cost_per_production_line"][line]
+                new_time_cost = new_state_data["total_time_cost_per_production_line"][line]
+
+                # If the new schedule is better, store the improvement and the operator
+                if new_time_cost < old_time_cost and (new_time_cost - old_time_cost) < best_improvement:
+                    best_improvement = new_time_cost - old_time_cost
+                    best_operator = SwapOperator(line, i, line, j)
+
+    # If a best operator was found, return it, else return None
+    if best_operator:
+        return best_operator, {}
+    else:
+        return None, {}
+from src.problems.dposp.components import *
+import numpy as np
+
+def greedy_by_order_density_de77(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+    """Heuristic to prioritize orders based on a weighted combination of deadline tightness, production feasibility, and potential flexibility for future scheduling.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - production_rate (numpy.array): 2D array of production speeds for each product on each production line.
+            - transition_time (numpy.array): 3D array of transition times between products for each production line.
+            - order_deadline (numpy.array): 1D array of deadlines for each order.
+            - order_quantity (numpy.array): 1D array of quantities required for each order.
+            - order_product (numpy.array): 1D array mapping each order to its required product.
+            - production_line_num (int): Total number of production lines.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current scheduling solution.
+            - feasible_orders_to_fulfill (list[int]): List of feasible orders that can be fulfilled.
+            - validation_single_production_schedule (callable): Function to validate a single production schedule.
+            - get_time_cost_delta (callable): Function to compute the time cost delta for inserting an order.
+        algorithm_data (dict): The algorithm dictionary for current algorithm only. This algorithm does not modify algorithm data.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
+        kwargs: Hyper-parameters for the heuristic:
+            - flexibility_weight (float, default=1.0): Weight for the flexibility factor in the scoring system.
+
+    Returns:
+        AppendOperator: The operator to append the selected order to a production line's schedule.
+        dict: Updated algorithm data (empty in this case).
+    """
+    # Extract necessary data from global_data and state_data
+    production_rate = global_data["production_rate"]
+    transition_time = global_data["transition_time"]
+    order_deadline = global_data["order_deadline"]
+    order_quantity = global_data["order_quantity"]
+    order_product = global_data["order_product"]
+    production_line_num = global_data["production_line_num"]
+
+    current_solution = state_data["current_solution"]
+    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    get_time_cost_delta = state_data["get_time_cost_delta"]
+
+    # Hyper-parameters
+    flexibility_weight = kwargs.get("flexibility_weight", 1.0)
+
+    # Return None if no feasible orders are available
+    if not feasible_orders_to_fulfill:
+        return None, {}
+
+    # Step 1: Calculate scores for feasible orders
+    best_operator = None
+    best_score = -float('inf')
+
+    for order_id in feasible_orders_to_fulfill:
+        product_id = order_product[order_id]
+        deadline_weight = 1 / (order_deadline[order_id] + 1)
+        quantity_penalty = 1 / order_quantity[order_id]
+
+        for line_id in range(production_line_num):
+            # Skip if the production line cannot produce this product
+            if production_rate[line_id][product_id] == 0:
+                continue
+
+            current_schedule = current_solution.production_schedule[line_id]
+
+            # Simulate appending the order at the end of the production line
+            new_schedule = current_schedule + [order_id]
+
+            # Validate the new schedule
+            if not validation_single_production_schedule(line_id, new_schedule):
+                continue
+
+            # Calculate flexibility factor based on the number of feasible orders after this insertion
+            future_feasibility = sum(
+                1 for future_order in feasible_orders_to_fulfill
+                if future_order != order_id and production_rate[line_id][order_product[future_order]] > 0
+            )
+            flexibility_factor = 1 / (future_feasibility + 1)
+
+            # Calculate insertion cost
+            delta_time_cost = get_time_cost_delta(line_id, order_id, len(current_schedule))
+
+            # Calculate overall score for this insertion
+            score = deadline_weight * quantity_penalty * (flexibility_factor ** flexibility_weight) - delta_time_cost
+
+            # Update the best operator if the score is higher
+            if score > best_score:
+                best_score = score
+                best_operator = AppendOperator(production_line_id=line_id, order_id=order_id)
+
+    # Return the best operator and empty updated algorithm data
+    if best_operator:
+        return best_operator, {}
+    return None, {}
+from src.problems.dposp.components import *
+import numpy as np
+
+def least_order_remaining_27ca(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+    """ Heuristic to prioritize orders based on a weighted score incorporating deadline proximity, production feasibility, and potential to maximize fulfilled orders.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - production_rate (numpy.array): 2D array of production speeds for each product on each production line.
+            - order_deadline (numpy.array): 1D array of deadlines for each order.
+            - order_quantity (numpy.array): 1D array of quantities required for each order.
+            - order_product (numpy.array): 1D array mapping each order to its product.
+            - production_line_num (int): Total number of production lines.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current scheduling solution.
+            - feasible_orders_to_fulfill (list[int]): List of feasible orders that can be fulfilled.
+            - validation_single_production_schedule (callable): Function to validate a single production schedule.
+            - get_time_cost_delta (callable): Function to compute the time cost delta for inserting an order.
+        algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
+            - operation_count (int): The number of operations performed so far. Defaults to 0.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
+        kwargs: Hyper-parameters for the heuristic:
+            - swap_frequency (int, default=10): Frequency (in terms of operations) at which swap optimization is performed.
+            - shift_frequency (int, default=5): Frequency (in terms of operations) at which order shifting is performed.
+
+    Returns:
+        AppendOperator: The operator to append the selected order to a production line's schedule.
+        dict: Updated algorithm data, if any.
+    """
+    # Extract necessary data from global_data and state_data
+    production_rate = global_data["production_rate"]
+    order_deadline = global_data["order_deadline"]
+    order_quantity = global_data["order_quantity"]
+    order_product = global_data["order_product"]
+    production_line_num = global_data["production_line_num"]
+
+    current_solution = state_data["current_solution"]
+    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    get_time_cost_delta = state_data["get_time_cost_delta"]
+
+    # Hyper-parameters
+    swap_frequency = kwargs.get("swap_frequency", 10)
+    shift_frequency = kwargs.get("shift_frequency", 5)
+    operation_count = algorithm_data.get("operation_count", 0)
+
+    # Return None if no feasible orders are available
+    if not feasible_orders_to_fulfill:
+        return None, {"operation_count": operation_count}
+
+    # Step 1: Calculate scores for feasible orders
+    best_operator = None
+    max_score = -float('inf')
+
+    for order_id in feasible_orders_to_fulfill:
+        product_id = order_product[order_id]
+        deadline_weight = 1 / (order_deadline[order_id] + 1)
+        quantity_penalty = 1 / order_quantity[order_id]
+
+        for line_id in range(production_line_num):
+            # Skip if the production line cannot produce this product
+            if production_rate[line_id][product_id] == 0:
+                continue
+
+            current_schedule = current_solution.production_schedule[line_id]
+
+            # Simulate appending the order at the end of the production line
+            new_schedule = current_schedule + [order_id]
+
+            # Validate the new schedule
+            if not validation_single_production_schedule(line_id, new_schedule):
+                continue
+
+            # Calculate feasibility factor for this order on this production line
+            feasibility_factor = 1 / (len(current_schedule) + 1)  # Simple normalization
+
+            # Calculate the score for this order
+            score = deadline_weight * quantity_penalty * feasibility_factor
+
+            # Update the best operator if the score is higher
+            if score > max_score:
+                max_score = score
+                best_operator = AppendOperator(production_line_id=line_id, order_id=order_id)
+
+    # Step 2: Perform order shifting periodically
+    if operation_count % shift_frequency == 0:
+        for source_line_id, source_schedule in enumerate(current_solution.production_schedule):
+            for order_id in source_schedule:
+                for target_line_id in range(production_line_num):
+                    if source_line_id == target_line_id or production_rate[target_line_id][order_product[order_id]] == 0:
+                        continue
+
+                    for position in range(len(current_solution.production_schedule[target_line_id]) + 1):
+                        # Attempt to shift the order and validate schedules
+                        trial_target_schedule = current_solution.production_schedule[target_line_id][:]
+                        trial_source_schedule = source_schedule[:]
+                        trial_target_schedule.insert(position, order_id)
+                        trial_source_schedule.remove(order_id)
+
+                        if not validation_single_production_schedule(source_line_id, trial_source_schedule) or not validation_single_production_schedule(target_line_id, trial_target_schedule):
+                            continue
+
+                        # Calculate time cost
+                        delta_time_cost = get_time_cost_delta(target_line_id, order_id, position)
+                        if delta_time_cost < 0:  # Improvement
+                            best_operator = RelocateOperator(
+                                source_production_line_id=source_line_id,
+                                source_position=source_schedule.index(order_id),
+                                target_production_line_id=target_line_id,
+                                target_position=position
+                            )
+
+    # Step 3: Perform swap optimization periodically
+    if operation_count % swap_frequency == 0:
+        for line_id, schedule in enumerate(current_solution.production_schedule):
+            for i in range(len(schedule) - 1):
+                for j in range(i + 1, len(schedule)):
+                    # Attempt to swap and validate the new schedule
+                    new_schedule = schedule[:]
+                    new_schedule[i], new_schedule[j] = new_schedule[j], new_schedule[i]
+
+                    if validation_single_production_schedule(line_id, new_schedule):
+                        delta_time_cost = get_time_cost_delta(line_id, schedule[j], i) + get_time_cost_delta(line_id, schedule[i], j)
+                        if delta_time_cost < 0:  # Improvement
+                            best_operator = SwapOperator(
+                                production_line_id1=line_id, position1=i,
+                                production_line_id2=line_id, position2=j
+                            )
+
+    # Update operation count and return the best operator found
+    if best_operator:
+        return best_operator, {"operation_count": operation_count + 1}
+    return None, {"operation_count": operation_count + 1}
+from src.problems.dposp.components import *
+
+def order_shift_between_lines_bd0c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[RelocateOperator, dict]:
+    """
+    This heuristic attempts to shift an unfulfilled order from one production line to another while adhering to machine capabilities, transition rules, and order deadlines.
+    
+    Args:
+        global_data (dict): Contains the global static information about the problem.
+        state_data (dict): Contains the current dynamic state data of the problem.
+        algorithm_data (dict): Contains data specific to the algorithm (unused in this heuristic).
+        get_state_data_function (callable): Function that generates state data for a given solution.
+    
+    Returns:
+        (RelocateOperator, dict): The operator to shift an order between production lines and an empty dictionary, as the heuristic does not update algorithm_data.
+    """
+    # Retrieve necessary data from global_data
+    production_rate = global_data["production_rate"]
+    transition_time = global_data["transition_time"]
+    
+    # Retrieve necessary data from state_data
+    current_solution = state_data["current_solution"]
+    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    
+    # Set a default value for optional hyper parameters
+    max_attempts = kwargs.get('max_attempts', 100)
+
+    # Initialize variables to store the best shift found
+    best_order_id = None
+    best_source_line_id = None
+    best_target_line_id = None
+    best_position = None
+    best_delta_time_cost = float('inf')
+
+    # Iterate through each feasible order to find a beneficial shift
+    for source_line_id, source_schedule in enumerate(current_solution.production_schedule):
+        for order_id in source_schedule:
+            for target_line_id, target_schedule in enumerate(current_solution.production_schedule):
+                # Skip if it's the same production line or the line cannot produce the product
+                if source_line_id == target_line_id or production_rate[target_line_id][global_data["order_product"][order_id]] == 0:
+                    continue
+
+                # Find the best position to insert the order in the target production line
+                for position in range(len(target_schedule) + 1):
+                    # Copy the current schedule and try inserting the order
+                    trial_target_schedule = target_schedule[:]
+                    trial_target_schedule.insert(position, order_id)
+                    trial_source_schedule = source_schedule[:]
+                    trial_source_schedule.remove(order_id)
+
+                    # Validate the trial schedule
+                    if not validation_single_production_schedule(source_line_id, trial_source_schedule) or not validation_single_production_schedule(target_line_id, trial_target_schedule):
+                        continue  # Skip if the new schedule is not valid
+
+                    # Calculate the delta time cost of the new schedule
+                    new_production_schedule = [schedule[:] for schedule in current_solution.production_schedule]
+                    new_production_schedule[target_line_id] = trial_target_schedule
+                    new_production_schedule[source_line_id] = trial_source_schedule
+                    state_data_for_trial = get_state_data_function(Solution(new_production_schedule))
+                    delta_time_cost = state_data_for_trial["total_time_cost_per_production_line"][target_line_id] + state_data_for_trial["total_time_cost_per_production_line"][source_line_id] - state_data["total_time_cost_per_production_line"][target_line_id] - state_data["total_time_cost_per_production_line"][source_line_id]
+
+                    # Check if this shift leads to a better solution
+                    if delta_time_cost < best_delta_time_cost:
+                        best_order_id = order_id
+                        best_source_line_id = source_line_id
+                        best_target_line_id = target_line_id
+                        best_position = position
+                        best_delta_time_cost = delta_time_cost
+
+    # If a beneficial shift is found, create and return the corresponding operator
+    if best_order_id is not None:
+        return RelocateOperator(
+            source_production_line_id=best_source_line_id,
+            source_position=state_data["current_solution"].production_schedule[best_source_line_id].index(best_order_id),
+            target_production_line_id=best_target_line_id,
+            target_position=best_position
+        ), {}
+
+    # If no beneficial shift is found, return None
+    return None, {}
+from src.problems.dposp.components import *
+import numpy as np
+
+def shortest_operation_ae31(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """Shortest Operation Heuristic with Optimization (AE31) for DPOSP.
+
+    This heuristic aims to maximize the number of fulfilled orders by prioritizing orders based on deadlines, feasibility, and production times. 
+    It dynamically searches for better insertion positions, shifts orders, and periodically optimizes through swaps.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "production_line_num" (int): Total number of production lines.
+            - "order_num" (int): Total number of orders.
+            - "order_quantity" (list[int]): Quantity required for each order.
+            - "order_deadline" (list[float]): Deadline for each order.
+            - "order_product" (list[int]): Product associated with each order.
+            - "production_rate" (numpy.array): 2D array of production speeds for each product on each production line.
+            - "transition_time" (numpy.array): 3D array of transition times between products for each production line.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): Current scheduling solution.
+            - "unfulfilled_orders" (list[int]): List of unfulfilled orders.
+            - "feasible_orders_to_fulfill" (list[int]): List of feasible orders that can be fulfilled.
+            - "validation_single_production_schedule" (callable): Function to validate a single production schedule.
+            - "get_time_cost_delta" (callable): Function to compute the time cost delta for inserting an order.
+            - "total_time_cost_per_production_line" (list[float]): Total time cost for each production line.
+        algorithm_data (dict): The algorithm dictionary for current algorithm only. This heuristic does not use algorithm_data.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the original solution.
+        **kwargs: Hyper-parameters for the heuristic:
+            - swap_frequency (int, default=10): Frequency (in terms of operations) at which swap optimization is performed.
+            - shift_frequency (int, default=5): Frequency (in terms of operations) at which order shifting is performed.
+
+    Returns:
+        InsertOperator: The operator to insert the selected order into the selected production line.
+        dict: Updated algorithm data, if any.
+    """
+    # Extract necessary data from global_data and state_data
+    production_line_num = global_data["production_line_num"]
+    order_deadline = global_data["order_deadline"]
+    order_quantity = global_data["order_quantity"]
+    order_product = global_data["order_product"]
+    production_rate = global_data["production_rate"]
+    transition_time = global_data["transition_time"]
+
+    current_solution = state_data["current_solution"]
+    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    get_time_cost_delta = state_data["get_time_cost_delta"]
+
+    # Hyper-parameters
+    swap_frequency = kwargs.get("swap_frequency", 10)
+    shift_frequency = kwargs.get("shift_frequency", 5)
+    operation_count = algorithm_data.get("operation_count", 0)
+
+    # Return None if no feasible orders are available
+    if not feasible_orders_to_fulfill:
+        return None, {"operation_count": operation_count}
+
+    # Step 1: Prioritize feasible orders based on deadlines and quantities
+    sorted_orders = sorted(
+        feasible_orders_to_fulfill,
+        key=lambda order: (order_deadline[order], order_quantity[order])
+    )
+
+    # Step 2: Search for the best insertion position for each feasible order
+    best_operator = None
+    min_time_cost = float('inf')
+
+    for order_id in sorted_orders:
+        product_id = order_product[order_id]
+        for line_id in range(production_line_num):
+            # Skip if the production line cannot produce this product
+            if production_rate[line_id][product_id] == 0:
+                continue
+
+            current_schedule = current_solution.production_schedule[line_id]
+
+            for position in range(len(current_schedule) + 1):
+                # Validate the potential new schedule
+                new_schedule = current_schedule[:]
+                new_schedule.insert(position, order_id)
+
+                if not validation_single_production_schedule(line_id, new_schedule):
+                    continue
+
+                # Calculate the time cost delta
+                delta_time_cost = get_time_cost_delta(line_id, order_id, position)
+                if delta_time_cost < min_time_cost:
+                    min_time_cost = delta_time_cost
+                    best_operator = InsertOperator(production_line_id=line_id, order_id=order_id, position=position)
+
+    # Step 3: Perform order shifting periodically
+    if operation_count % shift_frequency == 0:
+        for source_line_id, source_schedule in enumerate(current_solution.production_schedule):
+            for order_id in source_schedule:
+                for target_line_id in range(production_line_num):
+                    if source_line_id == target_line_id or production_rate[target_line_id][order_product[order_id]] == 0:
+                        continue
+
+                    for position in range(len(current_solution.production_schedule[target_line_id]) + 1):
+                        # Attempt to shift the order and validate schedules
+                        trial_target_schedule = current_solution.production_schedule[target_line_id][:]
+                        trial_source_schedule = source_schedule[:]
+                        trial_target_schedule.insert(position, order_id)
+                        trial_source_schedule.remove(order_id)
+
+                        if not validation_single_production_schedule(source_line_id, trial_source_schedule) or not validation_single_production_schedule(target_line_id, trial_target_schedule):
+                            continue
+
+                        # Calculate time cost
+                        delta_time_cost = get_time_cost_delta(target_line_id, order_id, position)
+                        if delta_time_cost < min_time_cost:
+                            min_time_cost = delta_time_cost
+                            best_operator = RelocateOperator(
+                                source_production_line_id=source_line_id,
+                                source_position=source_schedule.index(order_id),
+                                target_production_line_id=target_line_id,
+                                target_position=position
+                            )
+
+    # Step 4: Perform swap optimization periodically
+    if operation_count % swap_frequency == 0:
+        for line_id, schedule in enumerate(current_solution.production_schedule):
+            for i in range(len(schedule) - 1):
+                for j in range(i + 1, len(schedule)):
+                    # Attempt to swap and validate the new schedule
+                    new_schedule = schedule[:]
+                    new_schedule[i], new_schedule[j] = new_schedule[j], new_schedule[i]
+
+                    if validation_single_production_schedule(line_id, new_schedule):
+                        delta_time_cost = get_time_cost_delta(line_id, schedule[j], i) + get_time_cost_delta(line_id, schedule[i], j)
+                        if delta_time_cost < min_time_cost:
+                            min_time_cost = delta_time_cost
+                            best_operator = SwapOperator(
+                                production_line_id1=line_id, position1=i,
+                                production_line_id2=line_id, position2=j
+                            )
+
+    # Update operation count and return the best operator found
+    if best_operator:
+        return best_operator, {"operation_count": operation_count + 1}
+    return None, {"operation_count": operation_count + 1}
+from src.problems.dposp.components import *
+import numpy as np
+
+def _2opt_production_sequence_8e5e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+    """The 2-opt Production Sequence heuristic adapts the 2-opt approach from TSP to the context of DPOSP. 
+    It aims to improve the sequence of production orders on each production line by swapping two non-adjacent orders and re-evaluating the schedule's efficiency.
+    By considering the production rates, transition times, and order deadlines, this heuristic explores alternative sequences that could lead to a higher number of completed orders or reduced total production and transition time.
+    The heuristic iteratively checks all possible pairs of non-adjacent orders within a production line to determine if a more optimal order sequence can be found, taking care to maintain the feasibility of the schedule with respect to order deadlines.
+    If a more efficient sequence is identified, the heuristic generates a ReverseSegmentOperator that applies this improved order sequence to the production line.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - production_rate (numpy.array): 2D array of production time for each product on each production line.
+            - transition_time (numpy.array): 3D array of transition time between products on each production line.
+            - order_product (numpy.array): 1D array mapping each order to its required product.
+            - order_quantity (numpy.array): 1D array of the quantity required for each order.
+            - order_deadline (numpy.array): 1D array of the deadline for each order.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current scheduling solution.
+            - validation_single_production_schedule (callable): Function to check whether the production schedule is valid.
+        get_state_data_function (callable): Function to get the state data for a new solution.
+
+    Returns:
+        ReverseSegmentOperator: The operator that reverse two nodes in the solution to achieve a shorter production schedule.
+        dict: Empty dictionary as this algorithm does not update algorithm_data.
+    """
+    production_rate = global_data["production_rate"]
+    transition_time = global_data["transition_time"]
+    order_product = global_data["order_product"]
+    order_quantity = global_data["order_quantity"]
+    order_deadline = global_data["order_deadline"]
+    
+    current_solution = state_data["current_solution"]
+    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    
+    best_delta = 0
+    best_pair = None
+    best_line_id = None
+    
+    # Iterate over each production line
+    for line_id, schedule in enumerate(current_solution.production_schedule):
+        # Iterate over all pairs of non-adjacent orders within the production line
+        for i in range(len(schedule) - 1):
+            for j in range(i + 1, len(schedule)):
+                # Calculate the time cost difference if these two orders are swapped
+                order_a, order_b = schedule[i], schedule[i + 1]
+                order_c, order_d = schedule[j], schedule[j + 1] if j + 1 < len(schedule) else None
+                
+                product_a, product_b = order_product[order_a], order_product[order_b]
+                product_c = order_product[order_c]
+                
+                transition_time_ab = transition_time[line_id][product_a][product_b]
+                transition_time_bc = transition_time[line_id][product_b][product_c] if order_d else 0
+                transition_time_ac = transition_time[line_id][product_a][product_c]
+                transition_time_cb = transition_time[line_id][product_c][product_b] if order_d else 0
+                
+                original_time_cost = transition_time_ab + transition_time_bc
+                new_time_cost = transition_time_ac + transition_time_cb
+                
+                delta = new_time_cost - original_time_cost
+                
+                # Check for an improvement
+                if delta < best_delta:
+                    new_schedule = schedule[:]
+                    new_schedule[i + 1:j + 1] = reversed(new_schedule[i + 1:j + 1])
+                    
+                    if validation_single_production_schedule(line_id, new_schedule):
+                        best_delta = delta
+                        best_pair = (i + 1, j)
+                        best_line_id = line_id
+    
+    # If an improvement has been found, create and return the corresponding ReverseSegmentOperator
+    if best_pair:
+        return ReverseSegmentOperator(best_line_id, [(best_pair[0], best_pair[1])]), {}
+    else:
+        # No improvement found, return an empty operator
+        return None, {}
+
+Before we solve the actual problem, we hope to select useful algorithms and classify them so that we can use different algorithms in different scenarios. 
+We hope to classify algorithms and use different algorithms in different scenarios. 
+Please note:
+1. We only hope to sort useful and powerful heuristic, some heuristic are not powerful, such pure random heuristic;
+2. One heuristic can belong to multiple classification;
+3. Detailed classification is welcome.
+
+The response format is very important. For better communication, please respond to me in this format:
+***heuristic_classification:
+classification1:heuristic_name_1,heuristic_name_2,...;reason
+classification2:heuristic_name_3,heuristic_name_4,...;reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***heuristic_classification:
+local_optimization:exchange_production_orders_eda2,_2opt_production_sequence_8e5e;These heuristics focus on improving the schedule by making small, localized changes such as swapping or reversing segments of orders within production lines, akin to techniques like 2-opt in TSP.
+priority_based:greedy_by_order_density_de77,least_order_remaining_27ca;These heuristics prioritize orders based on certain criteria such as order density, deadline proximity, and production feasibility, aiming to maximize the number of fulfilled orders.
+order_shifting:order_shift_between_lines_bd0c,shortest_operation_ae31;These heuristics involve shifting orders between production lines or within a line to optimize the schedule, taking into account production capabilities and deadlines.
+combined_approach:shortest_operation_ae31,least_order_remaining_27ca;These heuristics use a combination of strategies such as prioritization, shifting, and periodic optimization to iteratively improve the schedule.
+***
+------------------------------------------------------------------------------------
+

@@ -1,0 +1,461 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on cvrp problem:
+Capacitated Vehicle Routing Problem (CVRP) is an optimization challenge focused on determining the most efficient routes for a fleet of vehicles to deliver goods to various locations, considering vehicle capacity constraints.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of CVRP.
+A list of lists where each sublist represents a vehicle's route.
+Each sublist contains integers representing the nodes (customers) visited by the vehicle in the order of visitation.
+The routes are sorted by vehicle identifier and the nodes in the list sorted by visited order."""
+    def __init__(self, routes: list[list[int]], depot: int):
+        self.routes = routes
+        self.depot = depot
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append a node at the end of the specified vehicle's route."""
+    def __init__(self, vehicle_id: int, node: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].append(self.node)
+        return Solution(new_routes, solution.depot)
+class InsertOperator(BaseOperator):
+    """Insert a node at a specified position within the route of a specified vehicle."""
+    def __init__(self, vehicle_id: int, node: int, position: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].insert(self.position, self.node)
+        return Solution(new_routes, solution.depot)
+class SwapOperator(BaseOperator):
+    """Swap two nodes between or within vehicle routes."""
+    def __init__(self, vehicle_id1: int, position1: int, vehicle_id2: int, position2: int):
+        if vehicle_id1 <= vehicle_id2:
+            self.vehicle_id1 = vehicle_id1
+            self.position1 = position1
+            self.vehicle_id2 = vehicle_id2
+            self.position2 = position2
+        else:
+            self.vehicle_id1 = vehicle_id2
+            self.position1 = position2
+            self.vehicle_id2 = vehicle_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        (new_routes[self.vehicle_id1][self.position1], new_routes[self.vehicle_id2][self.position2]) = (new_routes[self.vehicle_id2][self.position2], new_routes[self.vehicle_id1][self.position1])
+        return Solution(new_routes, solution.depot)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, vehicle_id: int, segments: list[tuple[int, int]]):
+        self.vehicle_id = vehicle_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_route = new_routes[self.vehicle_id][:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_routes[self.vehicle_id])
+            assert 0 <= end_index < len(new_routes[self.vehicle_id])
+            if start_index <= end_index:
+                new_route[start_index:end_index + 1] = reversed(new_route[start_index:end_index + 1])
+            else:
+                new_route = list(reversed(new_route[start_index:])) + new_route[end_index + 1:start_index] + list(reversed(new_route[:end_index + 1]))
+        new_routes = solution.routes[:self.vehicle_id] + [new_route] + solution.routes[self.vehicle_id + 1:]
+        return Solution(new_routes, solution.depot)
+class RelocateOperator(BaseOperator):
+    """Move a node from one position in a route to another, possibly in a different route."""
+    def __init__(self, source_vehicle_id: int, source_position: int, target_vehicle_id: int, target_position: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.source_position = source_position
+        self.target_vehicle_id = target_vehicle_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        node = new_routes[self.source_vehicle_id].pop(self.source_position)
+        if not new_routes[self.target_vehicle_id]:
+            new_routes[self.target_vehicle_id].append(node)
+        else:
+            new_routes[self.target_vehicle_id].insert(self.target_position, node)
+        return Solution(new_routes, solution.depot)
+class MergeRoutesOperator(BaseOperator):
+    """Merge two routes by appending the route of the source vehicle to the beginning of the route of the target vehicle. 
+The merged route is assigned to the target vehicle, and the source vehicle's route is cleared."""
+    def __init__(self, source_vehicle_id: int, target_vehicle_id: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.target_vehicle_id = target_vehicle_id
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.target_vehicle_id] = new_routes[self.source_vehicle_id] + new_routes[self.target_vehicle_id]
+        new_routes[self.source_vehicle_id] = []
+        return Solution(new_routes, solution.depot)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "vehicle_num" (int): The total number of vehicles.
+    - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
+    - "depot" (int): The index for depot node.
+    - "demands" (numpy.ndarray): The demand of each node.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): The current set of routes for all vehicles.
+    - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - "visited_num" (int): Number of nodes visited by each vehicle.
+    - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+    - "visited_num" (int): Number of nodes have not been visited by each vehicle.
+    - "total_current_cost" (int): The total cost of the current solution.
+    - "last_visited" (list[int]): The last visited node for each vehicle.
+    - "vehicle_loads" (list[int]): The current load of each vehicle.
+    - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is cvrp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes*** 
+
+The Capacitated Vehicle Routing Problem (CVRP) is indeed a combinatorial optimization problem and can be effectively approached using heuristic and hyper-heuristic methods. Your framework with the `Solution` representation, a variety of operators, and the standardized heuristic function signature is well-aligned with tackling such problems. The problem involves finding optimal or near-optimal solutions from a discrete solution space, making it a classic case of combinatorial optimization.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def farthest_insertion_ce2b(): Farthest Insertion heuristic for the CVRP. This algorithm selects the unvisited node that is farthest from the depot and inserts it into a route that minimizes the increase in total distance, while also considering vehicle capacity constraints. The heuristic continues until no further nodes can be assigned without violating capacity constraints or all nodes are assigned.
+def greedy_f4c4(): Greedy heuristic algorithm for the CVRP. This algorithm attempts to construct a solution by iteratively adding the closest unvisited node to a vehicle's route until all nodes are visited or the vehicle reaches its capacity. It starts with an empty route for each vehicle and selects nodes based on the shortest distance from the last node in the route.
+def min_cost_insertion_7bfa(): Min-Cost Insertion heuristic for the CVRP.
+def nearest_neighbor_99ba(): Nearest Neighbor heuristic for CVRP. This algorithm iterates over each vehicle, starting from the depot. For each vehicle, it finds the nearest unvisited node and appends it to the route, respecting the vehicle's capacity constraints. This process repeats until no further nodes can be visited without exceeding the vehicle's capacity or all nodes have been visited.
+def node_shift_between_routes_7b8a(): Node Shift Between Routes heuristic for CVRP. This heuristic attempts to move a node from one route to another route, aiming to reduce the total distance or improve load balance. It considers the capacity constraints and ensures that the move is beneficial before applying it.
+def petal_algorithm_b384(): Petal construction heuristic algorithm for the CVRP. This heuristic attempts to build feasible routes (petals) around the depot and combine them into a set of vehicle routes. Each petal starts and ends at the depot, creating a loop that can serve as an individual route for a vehicle.
+def random_bfdc(): Random heuristic for CVRP. This heuristic selects an unvisited node at random and appends it to a vehicle's route where it does not violate the capacity constraint. This process is repeated for each vehicle until all nodes have been included in a route.
+def saving_algorithm_710e(merge_threshold: float = 0.0): Saving Algorithm heuristic for CVRP. Calculates savings for combining two routes into one for each pair of end nodes of existing routes and sorts these savings in descending order. Routes are then merged by the highest savings while considering vehicle capacity constraints.
+def three_opt_e8d7(): Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+def two_opt_0554(): Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+def variable_neighborhood_search_614b(): Variable Neighborhood Search heuristic algorithm for CVRP. This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions. It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+The applicability of each heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP) depends on the problem's characteristics, such as the number of nodes, demand distribution, vehicle capacity, and the structure of the distance matrix (e.g., clustered or scattered nodes). Below is an analysis of the scenarios where each algorithm is applicable and how these scenarios can be quantified:
+
+---
+
+### 1. **Farthest Insertion (`farthest_insertion_ce2b`)**
+   - **Applicability:** 
+     - Suitable when the problem involves scattered nodes and larger distances between nodes.
+     - Effective when the priority is to visit distant nodes early to ensure their inclusion in the solution.
+   - **Scenario Quantification:**
+     - High average distance between nodes in the distance matrix.
+     - Nodes are evenly spread or scattered geographically.
+     - Lower vehicle capacity or high node demands, as the algorithm tends to spread routes efficiently.
+
+---
+
+### 2. **Greedy (`greedy_f4c4`)**
+   - **Applicability:**
+     - Works well for problems where nodes are clustered and located close to each other.
+     - Suitable for quick, approximate solutions or as an initialization heuristic for further optimization.
+   - **Scenario Quantification:**
+     - Low average distance between nodes or clustered nodes in the distance matrix.
+     - Low variance in node demands.
+     - Moderate-to-high vehicle capacity.
+
+---
+
+### 3. **Min-Cost Insertion (`min_cost_insertion_7bfa`)**
+   - **Applicability:**
+     - Useful when a balance is needed between distance minimization and route feasibility.
+     - Performs well when the focus is on minimizing total cost incrementally.
+   - **Scenario Quantification:**
+     - Moderate-to-high node density with varying demands.
+     - Balanced distance matrix (neither highly clustered nor scattered nodes).
+     - Medium-sized problem instances.
+
+---
+
+### 4. **Nearest Neighbor (`nearest_neighbor_99ba`)**
+   - **Applicability:**
+     - Effective for problems with clustered nodes and simpler distance structures.
+     - Suitable for problems where computational speed is prioritized.
+   - **Scenario Quantification:**
+     - High clustering of nodes in the distance matrix.
+     - Uniform demands across nodes.
+     - Small-to-medium-sized problem instances.
+
+---
+
+### 5. **Node Shift Between Routes (`node_shift_between_routes_7b8a`)**
+   - **Applicability:**
+     - Ideal for rebalancing routes in cases where the initial solution is unbalanced.
+     - Works well in optimization stages to reduce total cost or improve load balance.
+   - **Scenario Quantification:**
+     - Initial solution shows significant imbalance in route loads or costs.
+     - Moderate-to-large problem instances where fine-tuning is necessary.
+     - High variance in node demands.
+
+---
+
+### 6. **Petal Algorithm (`petal_algorithm_b384`)**
+   - **Applicability:**
+     - Suitable for problems where nodes can be grouped into natural "petals" or sub-routes around the depot.
+     - Effective for problems with a single depot and evenly distributed demands.
+   - **Scenario Quantification:**
+     - Nodes form natural clusters around the depot.
+     - Low-to-moderate variance in node demands.
+     - Low-to-moderate vehicle capacity.
+
+---
+
+### 7. **Random (`random_bfdc`)**
+   - **Applicability:**
+     - Useful as a baseline heuristic or for generating diverse initial solutions.
+     - Works well in stochastic or exploratory settings.
+   - **Scenario Quantification:**
+     - Any scenario where a quick and random initialization is sufficient.
+     - Useful for problems where other heuristics are combined to refine the solution.
+
+---
+
+### 8. **Saving Algorithm (`saving_algorithm_710e`)**
+   - **Applicability:**
+     - Ideal for problems where merging routes can significantly reduce total cost.
+     - Effective for problems with strong interconnections between routes.
+   - **Scenario Quantification:**
+     - Moderate-to-high connectivity in the distance matrix (savings are significant).
+     - Moderate-to-high vehicle capacity.
+     - Balanced node demands.
+
+---
+
+### 9. **3-Opt (`three_opt_e8d7`)**
+   - **Applicability:**
+     - Suitable for fine-tuning solutions in the optimization stage.
+     - Effective for problems with complex distance structures and larger problem sizes.
+   - **Scenario Quantification:**
+     - Medium-to-large problem instances.
+     - High variability in route costs or distances.
+     - Initial solutions have suboptimal route structures.
+
+---
+
+### 10. **2-Opt (`two_opt_0554`)**
+   - **Applicability:**
+     - Useful for small-to-medium-sized problems to refine route sequences.
+     - Effective for improving initial solutions with minor adjustments.
+   - **Scenario Quantification:**
+     - Small-to-medium-sized problem instances.
+     - Lower variance in route costs.
+     - Initial solution is close to optimal but needs refinement.
+
+---
+
+### 11. **Variable Neighborhood Search (`variable_neighborhood_search_614b`)**
+   - **Applicability:**
+     - Ideal for escaping local optima and exploring diverse solution spaces.
+     - Effective for large and complex problem instances.
+   - **Scenario Quantification:**
+     - Large problem instances with high node and vehicle counts.
+     - High variance in node demands and distance matrix.
+     - Initial solutions are stuck in local optima.
+
+---
+
+### Summary Table:
+
+| Heuristic Name                | Best Scenarios                                                                                     | Quantification Metrics                                                                 |
+|-------------------------------|----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `farthest_insertion_ce2b`     | Scattered nodes, long distances, constrained capacity                                              | High average distance, scattered nodes                                              |
+| `greedy_f4c4`                 | Clustered nodes, uniform demands                                                                  | Low average distance, clustered nodes, low variance in demands                      |
+| `min_cost_insertion_7bfa`     | Balanced cost and feasibility                                                                      | Moderate node density, balanced distance matrix                                     |
+| `nearest_neighbor_99ba`       | Clustered nodes, small-to-medium size                                                             | High clustering, uniform demands                                                   |
+| `node_shift_between_routes_7b8a` | Imbalanced initial solutions, large problem instances                                             | High route imbalance, high variance in demands                                      |
+| `petal_algorithm_b384`        | Natural clustering around depot                                                                   | Natural clusters, low variance in demands, low-to-moderate capacity                |
+| `random_bfdc`                 | Baseline or exploratory                                                                           | Any scenario                                                                        |
+| `saving_algorithm_710e`       | High savings potential from merging                                                              | High connectivity, moderate-to-high capacity                                       |
+| `three_opt_e8d7`              | Fine-tuning, large instances, complex distance structures                                         | Medium-to-large size, high variability in route costs                               |
+| `two_opt_0554`                | Small-to-medium problems, minor refinements                                                      | Small-to-medium size, low variability in route costs                                |
+| `variable_neighborhood_search_614b` | Escaping local optima, large and complex problems                                                | Large size, high variability in demands and distances                               |
+
+--- 
+
+By understanding these scenarios and their quantification metrics, you can select or combine heuristics most appropriate for the problem instance at hand.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+node_num:78
+vehicle_num:10
+capacity:100
+depot:0
+demands:[0, 14, 17, 17, 16, 19, 17, 5, 12, 4, 2, 2, 26, 2, 7, 18, 6, 6, 18, 2, 14, 5, 9, 4, 3, 15, 4, 23, 7, 21, 4, 1, 6, 16, 4, 20, 5, 14, 14, 26, 5, 2, 14, 11, 21, 20, 18, 2, 19, 12, 22, 14, 23, 25, 8, 3, 9, 21, 3, 22, 6, 2, 22, 20, 5, 13, 6, 14, 16, 12, 23, 5, 12, 15, 21, 4, 23, 19]
+average_demand:12.012820512820513
+demand_variance:56.884451019066404
+average_distance:50.875124875124875
+max_distance:108.0
+min_distance:0.0
+distance_variance:677.8029210217022
+vehicle_capacity_utilization:0.937
+node_to_vehicle_ratio:7.8
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+current_solution:
+vehicle_0: 0->14->36->4->59->35->55->33->13->58->17->0
+vehicle_1: 0->23->11->19->48->47->38->21->24->52->1->72->0
+vehicle_2: 0->43->69->67->56->49->27->2->10->0
+vehicle_3: 0->63->65->75->5->30->37->70->31->61->0
+vehicle_4: 0->77->44->26->40->29->57->22->0
+vehicle_5: 0->8->42->71->25->15->0
+vehicle_6: 0->0
+vehicle_7: 0->0
+vehicle_8: 0->0
+vehicle_9: 0->0
+
+visited_nodes:[0, 1, 2, 4, 5, 8, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 33, 35, 36, 37, 38, 40, 42, 43, 44, 47, 48, 49, 52, 55, 56, 57, 58, 59, 61, 63, 65, 67, 69, 70, 71, 72, 75, 77]
+visited_num:51
+unvisited_nodes:[3, 6, 7, 9, 12, 16, 18, 20, 28, 32, 34, 39, 41, 45, 46, 50, 51, 53, 54, 60, 62, 64, 66, 68, 73, 74, 76]
+unvisited_num:27
+total_current_cost:1342.0
+last_visited:[17, 72, 10, 61, 22, 15, 'None', 'None', 'None', 'None']
+vehicle_loads:[100, 100, 100, 100, 100, 64, 0, 0, 0, 0]
+vehicle_remaining_capacity:[0, 0, 0, 0, 0, 36, 100, 100, 100, 100]
+average_route_length:5.0
+max_route_length:11
+min_route_length:0
+std_dev_route_length:4.358898943540674
+average_route_cost:150.66666666666666
+total_demand_served:564
+average_vehicle_load:56.4
+average_remaining_vehicle_capacity:43.6
+number_of_unvisited_nodes:27
+average_unvisited_node_demand:13.814814814814815
+total_remaining_demand:373
+solution_validity:True
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 8 rounds discuss and the summary are:
+---Round 0---
+Heuristic: farthest_insertion_ce2b
+Parameters: {}
+Running Steps: 10
+Explain: Since the current solution has no routes constructed and all nodes are unvisited, a constructive heuristic like `farthest_insertion_ce2b` is appropriate for this early stage. The heuristic will prioritize visiting distant nodes first, which helps distribute routes efficiently while considering capacity constraints. Running 10 steps is reasonable given that the problem size is moderate (node_num=78, unvisited_num=77), and we want to make meaningful progress before reassessing.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 377.0
+Delta of Fulfilled Demands: 112
+---Round 1---
+Heuristic: greedy_f4c4
+Parameters: {}
+Running Steps: 10
+Explain: The current state shows that only 11 nodes have been visited, leaving 67 unvisited nodes. Given that farthest insertion has already been applied to establish initial routes, the next logical step is to continue building the solution. A greedy heuristic (`greedy_f4c4`) is suitable at this stage to quickly and efficiently add the closest unvisited nodes to the existing routes, ensuring capacity constraints are respected. Running 10 steps will allow us to make incremental progress while still leaving room for assessment and potential switching to refinement heuristics in the next stage.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 144.0
+Delta of Fulfilled Demands: 86
+---Round 2---
+Heuristic: saving_algorithm_710e
+Parameters: {}
+Running Steps: 10
+Explain: At this stage, the solution has partially constructed routes with some vehicles fully utilized and others completely unused. The `saving_algorithm_710e` is suitable to continue building the solution by merging routes and optimizing the overall structure while respecting capacity constraints. This will help reduce the total cost and improve route efficiency. Running 10 steps is appropriate to make progress while allowing future refinement steps with 2-opt or 3-opt.
+Delta of Visited Node Num: 0
+Delta of Current Cost: 0.0
+Delta of Fulfilled Demands: 0
+---Round 3---
+Heuristic: greedy_f4c4
+Parameters: {}
+Running Steps: 10
+Explain: The current solution has partially constructed routes, with 57 unvisited nodes and significant remaining demand (739). The greedy heuristic (`greedy_f4c4`) is suitable to continue constructing the solution by incrementally adding the closest unvisited nodes to the routes while respecting capacity constraints. This will help reduce the number of unvisited nodes and improve coverage without drastically increasing the total cost. Given the moderate problem size and the constructive phase, running 10 steps is reasonable at this stage.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 211.0
+Delta of Fulfilled Demands: 122
+---Round 4---
+Heuristic: two_opt_0554
+Parameters: {}
+Running Steps: 10
+Explain: The current solution has partially constructed routes with only 31 nodes visited and significant remaining demand (617). While the greedy heuristic has made incremental progress, it has led to a higher total cost (732.0) and some inefficiencies in route structure (e.g., varying route lengths and underutilized vehicles). At this stage, a refinement heuristic like `two_opt_0554` is appropriate to improve the efficiency of existing routes by reducing route costs through edge swaps. Running 10 steps allows us to refine the solution before continuing construction with a different heuristic. If `two_opt_0554` fails to make meaningful improvements, we can escalate to `three_opt_e8d7`.
+Delta of Visited Node Num: 0
+Delta of Current Cost: -81.0
+Delta of Fulfilled Demands: 0
+---Round 5---
+Heuristic: nearest_neighbor_99ba
+Parameters: {}
+Running Steps: 10
+Explain: The current solution has 47 unvisited nodes with significant remaining demand (617). While `two_opt_0554` has refined the existing routes and reduced costs, the solution is still incomplete with numerous unvisited nodes. To incrementally build the solution, the `nearest_neighbor_99ba` heuristic is well-suited for this stage. It is computationally efficient and will allow us to systematically add the closest unvisited nodes to the routes while respecting vehicle capacity constraints. Running 10 steps is appropriate to make steady progress before possibly switching back to a refinement heuristic like `two_opt_0554` or escalating to `three_opt_e8d7`.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 234.0
+Delta of Fulfilled Demands: 120
+---Round 6---
+Heuristic: three_opt_e8d7
+Parameters: {}
+Running Steps: 10
+Explain: The current solution has partially constructed routes with 37 unvisited nodes and significant remaining demand (497). While the `nearest_neighbor_99ba` heuristic has incrementally added nodes, the total cost (885.0) and route structure still show room for improvement. As the solution is transitioning from construction to refinement, applying a powerful refinement heuristic like `three_opt_e8d7` is appropriate. It systematically optimizes the route structure by performing 3-edge swaps, which can lead to significant cost reductions and route efficiency improvements. Running 10 steps is reasonable to refine the existing routes without overcommitting, before possibly reverting to further construction heuristics to handle remaining unvisited nodes.
+Delta of Visited Node Num: 0
+Delta of Current Cost: -4.0
+Delta of Fulfilled Demands: 0
+---Round 7---
+Heuristic: greedy_f4c4
+Parameters: {}
+Running Steps: 10
+Explain: The current solution still has 37 unvisited nodes and significant remaining demand (497). While `three_opt_e8d7` has slightly reduced the total cost (-4.0), it hasn't made significant progress in terms of fulfilling the remaining demand or reducing unvisited nodes. Therefore, it is logical to switch back to a constructive heuristic to continue building the solution. `greedy_f4c4` is chosen because it is computationally efficient and systematically adds the closest unvisited nodes to the routes, which aligns with the goal of reducing unvisited nodes while maintaining cost efficiency. Running 10 steps will allow for incremental construction while leaving room for future refinement.
+Delta of Visited Node Num: 10
+Delta of Current Cost: 461.0
+Delta of Fulfilled Demands: 124
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: greedy_f4c4. How does greedy_f4c4 perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+***Run heuristic:  
+selected heuristic: two_opt_0554  
+running steps: 10  
+explanation: The current solution has 27 unvisited nodes and significant remaining demand (373). While `greedy_f4c4` has been useful for incremental construction, the total cost (1342.0) and route structure still show inefficiencies (e.g., high route length variance). As the solution is transitioning from construction to refinement, applying `two_opt_0554` is appropriate to improve route efficiency and reduce total cost through edge swaps. Running 10 steps allows for meaningful refinement before potentially switching back to a constructive heuristic to handle remaining unvisited nodes.  
+***
+------------------------------------------------------------------------------------
+

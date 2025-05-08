@@ -1,0 +1,469 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on jssp problem:
+Job Shop Scheduling Problem (JSSP) involves scheduling a series of jobs, each comprising a sequence of operations, across different machines to optimize production efficiency. In this variant, there is a one-to-one correspondence between machines and operation types, ensuring that each operation is carried out by a specific machine. Consequently, the number of operations (N) matches the number of machines, and each job includes these N operations precisely once.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the Job Shop Scheduling Problem (JSSP).
+A list of lists where each sublist represents the sequence of jobs scheduled on a machine, identified by its index in the outer list.
+Each job is represented by its integer identifier and is processed in the order specified within the sublist.
+Each sublist in 'job_sequences' corresponds to a machine's job processing sequence, with machines sorted by their identifier (index in the outer list).
+Each job within a sublist is sorted by its scheduled order of execution on that machine.
+Job matrix records the target operation(machine) sequence in job."""
+    def __init__(self, job_sequences: list[list[int]], job_operation_sequence: list[list[int]], job_operation_index: list[int]):
+        self.job_sequences = job_sequences
+        self.job_operation_sequence = job_operation_sequence
+        self.job_operation_index = job_operation_index
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AdvanceOperator(BaseOperator):
+    """AdvanceOperator is responsible for advancing the next operation in the job's processing sequence.
+This operator appends the next operation of the specified job to the processing queue of the machine that is scheduled to execute the operation.
+It identifies the appropriate machine based on the job's current operation index and the job matrix within the provided Solution instance."""
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        machine_id = solution.job_operation_sequence[self.job_id][solution.job_operation_index[self.job_id]]
+        new_job_sequences[machine_id].append(self.job_id)
+        job_operation_index = solution.job_operation_index
+        job_operation_index[self.job_id] += 1
+        return Solution(new_job_sequences, solution.job_operation_sequence, job_operation_index)
+class SwapOperator(BaseOperator):
+    """Swaps two operations in corresponding jobs in the same machine's."""
+    def __init__(self, machine_id: int, job_id1: int, job_id2: int):
+        self.machine_id = machine_id
+        self.job_id1 = job_id1
+        self.job_id2 = job_id2
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        index1 = new_job_sequences[self.machine_id].index(self.job_id1)
+        index2 = new_job_sequences[self.machine_id].index(self.job_id2)
+        (new_job_sequences[self.machine_id][index1], new_job_sequences[self.machine_id][index2]) = (new_job_sequences[self.machine_id][index2], new_job_sequences[self.machine_id][index1])
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ReverseSequenceOperator(BaseOperator):
+    """Reverses a sequence of operations in corresponding jobs within a machine's queue."""
+    def __init__(self, machine_id: int, start_position: int, end_position: int):
+        self.machine_id = machine_id
+        self.start_position = start_position
+        self.end_position = end_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        sequence = new_job_sequences[self.machine_id][self.start_position:self.end_position + 1]
+        new_job_sequences[self.machine_id][self.start_position:self.end_position + 1] = sequence[::-1]
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ShiftOperator(BaseOperator):
+    """Shifts an operation to a new position within the same machine's queue."""
+    def __init__(self, machine_id: int, job_id: int, new_position: int):
+        self.machine_id = machine_id
+        self.job_id = job_id
+        self.new_position = new_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        current_position = new_job_sequences[self.machine_id].index(self.job_id)
+        operation = new_job_sequences[self.machine_id].pop(current_position)
+        new_job_sequences[self.machine_id].insert(self.new_position, operation)
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
+    - "job_num" (int): The total number of jobs in the problem.
+    - "machine_num" (int): The total number of machines in the problem, also as operation num.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "finished_jobs" (list[int]): List of all finished jobs.
+    - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+    - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+    - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in current solution.
+    - "machine_operation_index" (list[int]): The index of the next operation to be scheduled for each machine.
+    - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+    - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is jssp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Job Shop Scheduling Problem (JSSP) is indeed a classic example of a combinatorial optimization problem. It involves finding an optimal sequence of operations across multiple machines, which is a characteristic of combinatorial problems. Heuristic algorithms are commonly used to solve JSSP due to its NP-hard nature, making exact methods impractical for large instances. Your framework, which includes the Solution and Operator classes, appears to be aligned with solving such problems using heuristics.
+------------------------------------------------------------------------------------
+
+user
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external, which is better than negative solution.
+
+The function first_come_first_served_af26 is the heuristic function:
+from src.problems.jssp.components import Solution, AdvanceOperator
+
+def first_come_first_served_af26(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+    """Enhanced First Come First Served (FCFS) heuristic to dynamically prioritize jobs based on immediate impact and adapt to diverse datasets.
+    This heuristic introduces a dynamic scoring mechanism to balance alignment with the positive solution trajectory, machine availability, 
+    and dataset-specific characteristics.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in target sequence.
+            - "machine_num" (int): Total number of machines in the problem.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+            - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
+            - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
+            - "job_diversity" (int): Diversity of jobs based on the dataset (optional but improves adaptability).
+        algorithm_data (dict): Not used in this heuristic.
+        get_state_data_function (callable): Function to get the state data for a new solution (not used in this heuristic).
+        kwargs (optional): Hyperparameters for fine-tuning:
+            - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
+            - diversity_threshold (int, default=5): A threshold to determine when to adapt scoring based on job diversity.
+
+    Returns:
+        AdvanceOperator: The operator that advances the selected job based on priority.
+        dict: Empty dictionary as no algorithm data is updated.
+    """
+    
+    # Extract hyperparameters from kwargs with default values
+    bias_weight = kwargs.get("bias_weight", 50.0)
+    diversity_threshold = kwargs.get("diversity_threshold", 5)
+
+    # Check if there are any unfinished jobs. If not, return None.
+    if not state_data["unfinished_jobs"]:
+        return None, {}
+
+    # Extract necessary information from global and state data
+    unfinished_jobs = state_data["unfinished_jobs"]
+    machine_last_end_times = state_data["machine_last_operation_end_times"]
+    job_operation_index = state_data["job_operation_index"]
+    job_last_end_times = state_data["job_last_operation_end_times"]
+    job_operation_sequence = global_data["job_operation_sequence"]
+    job_diversity = state_data.get("job_diversity", 1)  # Default to 1 if not provided
+
+    # Determine if fallback to original FCFS logic is necessary based on dataset characteristics
+    if job_diversity <= diversity_threshold and len(unfinished_jobs) == 1:
+        job_id = unfinished_jobs[0]
+        return AdvanceOperator(job_id=job_id), {}
+
+    # Initialize variables for dynamic priority evaluation
+    best_job = None
+    best_priority_score = float('inf')  # Lower priority score is better
+
+    for job_id in unfinished_jobs:
+        # Determine the machine for the next operation of the job
+        next_machine_id = job_operation_sequence[job_id][job_operation_index[job_id]]
+
+        # Calculate priority score based on machine availability and job alignment
+        priority_score = max(machine_last_end_times[next_machine_id], job_last_end_times[job_id])
+
+        # Introduce a dynamic bias to align with the positive solution trajectory
+        priority_score -= bias_weight / (job_diversity + 1)  # Dynamic adjustment based on diversity
+
+        # Update the best job based on the computed priority score
+        if priority_score < best_priority_score:
+            best_priority_score = priority_score
+            best_job = job_id
+
+    # If no job is selected, return None
+    if best_job is None:
+        return None, {}
+
+    # Create and return the AdvanceOperator for the selected job
+    operator = AdvanceOperator(job_id=best_job)
+    return operator, {}
+
+The global data for this problem:
+job_num:10
+machine_num:10
+job_operation_sequence:[[2, 8, 5, 3, 4, 6, 0, 7, 9, 1], [3, 9, 1, 6, 4, 5, 0, 8, 7, 2], [2, 5, 7, 9, 6, 0, 4, 1, 3, 8], [7, 4, 3, 6, 5, 2, 1, 9, 0, 8], [9, 3, 8, 2, 6, 4, 7, 1, 0, 5], [3, 4, 5, 2, 9, 6, 1, 7, 8, 0], [5, 1, 4, 3, 7, 2, 9, 8, 6, 0], [2, 1, 6, 5, 9, 0, 7, 3, 4, 8], [0, 5, 9, 8, 7, 2, 4, 3, 1, 6], [9, 0, 5, 8, 7, 3, 4, 2, 1, 6]]
+job_operation_time:[[35, 5, 73, 52, 22, 138, 68, 76, 6, 86], [34, 30, 48, 39, 54, 79, 28, 79, 73, 53], [63, 69, 111, 28, 87, 127, 10, 12, 9, 10], [70, 28, 41, 28, 29, 73, 36, 40, 18, 101], [40, 38, 28, 12, 6, 71, 24, 11, 27, 122], [65, 28, 53, 42, 85, 109, 85, 75, 113, 35], [39, 9, 50, 5, 48, 46, 17, 7, 43, 136], [32, 26, 60, 19, 44, 49, 62, 70, 64, 21], [58, 53, 128, 8, 107, 36, 45, 52, 60, 119], [40, 26, 3, 34, 64, 91, 85, 82, 15, 61]]
+total_operation_num:100
+To aid your analysis, I extracted the following features from this data:
+average_operation_time:51.51
+max_operation_time:138
+min_operation_time:3
+std_deviation_operation_time:33.193823220593316
+job_operation_time_range:135
+average_job_length:10.0
+max_job_length:10
+min_job_length:10
+machine_utilization:0.9
+job_diversity:10
+
+Negative solution from first_come_first_served_af26:
+machine_0: 8->9->1->4->0->7->2->3->6->5
+machine_1: 6->1->7->4->3->0->2->5->8->9
+machine_2: 0->2->7->4->5->6->3->1->8->9
+machine_3: 1->5->4->0->3->6->7->2->9->8
+machine_4: 6->3->5->1->0->4->2->7->8->9
+machine_5: 6->0->2->5->1->3->7->8->4->9
+machine_6: 1->7->4->3->0->2->5->6->8->9
+machine_7: 3->2->6->4->1->0->7->8->9->5
+machine_8: 0->4->1->6->9->8->3->2->7->5
+machine_9: 4->1->9->5->2->6->7->8->0->3
+The result is 1186.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+1	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+2	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: \n
+3	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+4	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+5	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8\nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+6	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8\nmachine_1: \nmachine_2: 0\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+7	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8\nmachine_1: \nmachine_2: 0\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+8	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8\nmachine_1: \nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+9	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+10	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+11	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1\n
+12	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1\n
+13	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1\n
+14	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+15	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+16	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+17	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->4\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+18	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->4\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+19	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->4\nmachine_4: 6->3\nmachine_5: 6->0->2\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+20	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->4\nmachine_4: 6->3\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+21	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->4\nmachine_4: 6->3->5\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+22	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7\nmachine_3: 1->5->4\nmachine_4: 6->3->5\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+23	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+24	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+25	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5->1\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+26	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5->1\nmachine_5: 6->0->2\nmachine_6: 1->7\nmachine_7: 3\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+27	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5->1\nmachine_5: 6->0->2\nmachine_6: 1->7\nmachine_7: 3\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+28	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5->1\nmachine_5: 6->0->2\nmachine_6: 1->7\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+29	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0\nmachine_4: 6->3->5->1\nmachine_5: 6->0->2->5\nmachine_6: 1->7\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+30	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3\nmachine_4: 6->3->5->1\nmachine_5: 6->0->2->5\nmachine_6: 1->7\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+31	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3\nmachine_4: 6->3->5->1->0\nmachine_5: 6->0->2->5\nmachine_6: 1->7\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+32	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3\nmachine_4: 6->3->5->1->0\nmachine_5: 6->0->2->5\nmachine_6: 1->7->4\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+33	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3\nmachine_4: 6->3->5->1->0\nmachine_5: 6->0->2->5\nmachine_6: 1->7->4->3\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+34	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0\nmachine_5: 6->0->2->5\nmachine_6: 1->7->4->3\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+35	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5\nmachine_6: 1->7->4->3\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+36	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1\nmachine_6: 1->7->4->3\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+37	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1\nmachine_6: 1->7->4->3\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+38	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9\n
+39	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2\nmachine_8: 0->4\nmachine_9: 4->1->9->5\n
+40	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6\nmachine_8: 0->4\nmachine_9: 4->1->9->5\n
+41	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6\nmachine_8: 0->4\nmachine_9: 4->1->9->5\n
+42	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6\nmachine_8: 0->4\nmachine_9: 4->1->9->5\n
+43	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4\nmachine_9: 4->1->9->5\n
+44	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4\nmachine_9: 4->1->9->5\n
+45	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5\n
+46	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5\n
+47	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2\n
+48	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2\n
+49	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2\n
+50	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->4\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2\n
+51	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->4\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2\n
+52	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1->4\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2->6\n
+53	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->4\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2->6\n
+54	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2->6\n
+55	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2->6->7\n
+56	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2->6->7\n
+57	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4->1\nmachine_8: 0->4->1\nmachine_9: 4->1->9->5->2->6->7\n
+58	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4->1\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7\n
+59	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4->1\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+60	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->4->0\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4->1\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+61	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->4->0->7\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2\nmachine_7: 3->2->6->4->1\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+62	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->4->0->7\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+63	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->4->0->7\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+64	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1->4->0->7\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+65	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+66	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0\nmachine_8: 0->4->1->6\nmachine_9: 4->1->9->5->2->6->7->8\n
+67	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0\nmachine_8: 0->4->1->6->9\nmachine_9: 4->1->9->5->2->6->7->8\n
+68	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9\nmachine_9: 4->1->9->5->2->6->7->8\n
+69	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9\nmachine_9: 4->1->9->5->2->6->7->8->0\n
+70	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0\n
+71	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0\n
+72	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+73	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+74	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+75	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+76	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->4->0->7->2\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+77	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->4->0->7->2->3\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+78	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->4->0->7->2->3\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+79	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+80	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+81	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+82	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+83	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+84	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+85	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9\nmachine_8: 0->4->1->6->9->8->3\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+86	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9\nmachine_8: 0->4->1->6->9->8->3->2\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+87	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7->8\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9\nmachine_8: 0->4->1->6->9->8->3->2\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+88	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7->8\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9\nmachine_8: 0->4->1->6->9->8->3->2->7\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+89	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2\nmachine_4: 6->3->5->1->0->4->2->7->8\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+90	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2->9\nmachine_4: 6->3->5->1->0->4->2->7->8\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+91	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2->9\nmachine_4: 6->3->5->1->0->4->2->7->8\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+92	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+93	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+94	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5->8\nmachine_2: 0->2->7->4->5->6->3->1->8\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+95	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2->3->6\nmachine_1: 6->1->7->4->3->0->2->5->8\nmachine_2: 0->2->7->4->5->6->3->1->8->9\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+96	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->4->0->7->2->3->6->5\nmachine_1: 6->1->7->4->3->0->2->5->8\nmachine_2: 0->2->7->4->5->6->3->1->8->9\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+97	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->4->0->7->2->3->6->5\nmachine_1: 6->1->7->4->3->0->2->5->8\nmachine_2: 0->2->7->4->5->6->3->1->8->9\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6->8\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+98	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2->3->6->5\nmachine_1: 6->1->7->4->3->0->2->5->8->9\nmachine_2: 0->2->7->4->5->6->3->1->8->9\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6->8\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+99	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->4->0->7->2->3->6->5\nmachine_1: 6->1->7->4->3->0->2->5->8->9\nmachine_2: 0->2->7->4->5->6->3->1->8->9\nmachine_3: 1->5->4->0->3->6->7->2->9->8\nmachine_4: 6->3->5->1->0->4->2->7->8->9\nmachine_5: 6->0->2->5->1->3->7->8->4->9\nmachine_6: 1->7->4->3->0->2->5->6->8->9\nmachine_7: 3->2->6->4->1->0->7->8->9->5\nmachine_8: 0->4->1->6->9->8->3->2->7->5\nmachine_9: 4->1->9->5->2->6->7->8->0->3\n
+
+Positive solution from external:
+machine_0: 8->9->1->0->6->2->3->4->7->5
+machine_1: 6->1->7->3->0->4->9->5->2->8
+machine_2: 0->2->7->6->4->3->5->1->9->8
+machine_3: 1->5->6->0->3->4->9->8->2->7
+machine_4: 6->3->1->0->5->4->9->2->8->7
+machine_5: 6->0->2->8->9->1->3->5->7->4
+machine_6: 1->7->3->0->4->6->2->5->9->8
+machine_7: 3->6->2->9->1->0->4->8->5->7
+machine_8: 0->4->6->9->1->8->3->2->5->7
+machine_9: 4->1->9->6->8->2->7->3->5->0
+The result is 1082.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: \nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+1	random_6512	AdvanceOperator(job_id=6)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: \nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+2	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+3	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: \n
+4	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: \nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+5	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8\nmachine_1: \nmachine_2: 0\nmachine_3: 1\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+6	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8\nmachine_1: \nmachine_2: 0\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: 4\n
+7	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8\nmachine_1: \nmachine_2: 0\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+8	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8\nmachine_1: \nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+9	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: \nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+10	random_6512	AdvanceOperator(job_id=6)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: 6\nmachine_5: 6\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+11	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+12	random_6512	AdvanceOperator(job_id=6)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5->6\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4\n
+13	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8\nmachine_1: 6\nmachine_2: 0->2\nmachine_3: 1->5->6\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1\n
+14	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5->6\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1\n
+15	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5->6\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+16	random_6512	AdvanceOperator(job_id=0)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5->6->0\nmachine_4: 6\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+17	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2\nmachine_3: 1->5->6->0\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+18	random_6512	AdvanceOperator(job_id=7)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 4->1->9\n
+19	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3->6\nmachine_8: 0\nmachine_9: 4->1->9\n
+20	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3\nmachine_5: 6->0\nmachine_6: \nmachine_7: 3->6\nmachine_8: 0\nmachine_9: 4->1->9\n
+21	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3\nmachine_5: 6->0->2\nmachine_6: \nmachine_7: 3->6\nmachine_8: 0\nmachine_9: 4->1->9\n
+22	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3->6\nmachine_8: 0\nmachine_9: 4->1->9\n
+23	random_6512	AdvanceOperator(job_id=1)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3->1\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3->6\nmachine_8: 0\nmachine_9: 4->1->9\n
+24	random_6512	AdvanceOperator(job_id=2)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7\nmachine_3: 1->5->6->0\nmachine_4: 6->3->1\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+25	random_6512	AdvanceOperator(job_id=6)	machine_0: 8->9\nmachine_1: 6->1\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0\nmachine_4: 6->3->1\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+26	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0\nmachine_4: 6->3->1\nmachine_5: 6->0->2\nmachine_6: 1\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+27	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0\nmachine_4: 6->3->1\nmachine_5: 6->0->2\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+28	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3\nmachine_4: 6->3->1\nmachine_5: 6->0->2\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+29	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3\nmachine_4: 6->3->1\nmachine_5: 6->0->2->8\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+30	random_6512	AdvanceOperator(job_id=0)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3\nmachine_4: 6->3->1->0\nmachine_5: 6->0->2->8\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+31	random_6512	AdvanceOperator(job_id=9)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3\nmachine_4: 6->3->1->0\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9\n
+32	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3\nmachine_4: 6->3->1->0\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9->6\n
+33	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0\nmachine_9: 4->1->9->6\n
+34	random_6512	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6\n
+35	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7->3\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6\n
+36	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7->3\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6\n
+37	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9\nmachine_6: 1->7->3\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6->8\n
+38	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1\nmachine_6: 1->7->3\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6->8\n
+39	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6->8\n
+40	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2\nmachine_8: 0->4\nmachine_9: 4->1->9->6->8\n
+41	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2\nmachine_8: 0->4->6\nmachine_9: 4->1->9->6->8\n
+42	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2\nmachine_8: 0->4->6->9\nmachine_9: 4->1->9->6->8\n
+43	random_6512	AdvanceOperator(job_id=3)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2\nmachine_8: 0->4->6->9\nmachine_9: 4->1->9->6->8\n
+44	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9\nmachine_9: 4->1->9->6->8\n
+45	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9\nmachine_9: 4->1->9->6->8\n
+46	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8\n
+47	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8\n
+48	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8\n
+49	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+50	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+51	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->0\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+52	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->0\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0->4\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+53	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->0\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0->4\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+54	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1->0\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+55	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2\n
+56	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0\nmachine_1: 6->1->7\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2->7\n
+57	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->0\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2->7\n
+58	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2->7\n
+59	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1->0\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9->1\nmachine_8: 0->4->6->9->1\nmachine_9: 4->1->9->6->8->2->7\n
+60	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6\nmachine_7: 3->6->2->9->1\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7\n
+61	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->0\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7\n
+62	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7\n
+63	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3\n
+64	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3\n
+65	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3\n
+66	first_come_first_served_af26	AdvanceOperator(job_id=1)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3\n
+67	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5\n
+68	random_6512	AdvanceOperator(job_id=9)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5\n
+69	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0->4\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5\n
+70	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->0->6\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0->4\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+71	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2\nmachine_7: 3->6->2->9->1->0->4\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+72	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+73	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3->0\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+74	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3->0\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+75	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3->0->4\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+76	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3->0->4->9\nmachine_2: 0->2->7->6->4->3->5->1->9\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+77	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3->0->4->9\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+78	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0->6->2\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+79	random_6512	AdvanceOperator(job_id=3)	machine_0: 8->9->1->0->6->2->3\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+80	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 8->9->1->0->6->2->3\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+81	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->0->6->2->3\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9->2\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+82	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 8->9->1->0->6->2->3\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9->2\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+83	random_6512	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0->6->2->3\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+84	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->0->6->2->3->4\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+85	first_come_first_served_af26	AdvanceOperator(job_id=4)	machine_0: 8->9->1->0->6->2->3->4\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+86	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+87	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+88	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+89	random_6512	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+90	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8->5\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+91	random_6512	AdvanceOperator(job_id=2)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8->5\nmachine_8: 0->4->6->9->1->8->3\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+92	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8->5\nmachine_8: 0->4->6->9->1->8->3->2\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+93	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8->5\nmachine_8: 0->4->6->9->1->8->3->2->5\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+94	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9\nmachine_7: 3->6->2->9->1->0->4->8->5->7\nmachine_8: 0->4->6->9->1->8->3->2->5\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+95	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9->8\nmachine_7: 3->6->2->9->1->0->4->8->5->7\nmachine_8: 0->4->6->9->1->8->3->2->5\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+96	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0->6->2->3->4->7\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2->7\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9->8\nmachine_7: 3->6->2->9->1->0->4->8->5->7\nmachine_8: 0->4->6->9->1->8->3->2->5\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+97	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 8->9->1->0->6->2->3->4->7->5\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2->7\nmachine_4: 6->3->1->0->5->4->9->2->8\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9->8\nmachine_7: 3->6->2->9->1->0->4->8->5->7\nmachine_8: 0->4->6->9->1->8->3->2->5\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+98	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0->6->2->3->4->7->5\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2->7\nmachine_4: 6->3->1->0->5->4->9->2->8->7\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9->8\nmachine_7: 3->6->2->9->1->0->4->8->5->7\nmachine_8: 0->4->6->9->1->8->3->2->5\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+99	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 8->9->1->0->6->2->3->4->7->5\nmachine_1: 6->1->7->3->0->4->9->5->2->8\nmachine_2: 0->2->7->6->4->3->5->1->9->8\nmachine_3: 1->5->6->0->3->4->9->8->2->7\nmachine_4: 6->3->1->0->5->4->9->2->8->7\nmachine_5: 6->0->2->8->9->1->3->5->7->4\nmachine_6: 1->7->3->0->4->6->2->5->9->8\nmachine_7: 3->6->2->9->1->0->4->8->5->7\nmachine_8: 0->4->6->9->1->8->3->2->5->7\nmachine_9: 4->1->9->6->8->2->7->3->5->0\n
+
+Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
+Please note:
+1. Some operations, although they appear different, are essentially the same.
+2. Some operations may lead to solutions that look different but are essentially the same.
+3. Some operations may cause changes to the solution but do not affect the final cost; these are not considered bottlenecks.
+4. When an operation A is performed poorly, leading to a series of subsequent operations experiencing issues, we consider the first operation A to be a bottleneck.
+5. If there is only one item, there is no need to force multiple answers.
+6. Try to propose a better operator than origin one and you can learn from positive solution or others.
+
+The response format is very important. For better communication, please respond to me in this format:
+***bottleneck_operations:
+negative_operator_id; proposed_better_operator; reason
+negative_operator_id; proposed_better_operator; reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***bottleneck_operations:
+16; AdvanceOperator(job_id=0); The first occurrence of job 0 on machine 3 seems to delay subsequent tasks on this machine significantly. A better scheduling of job 0 could improve the flow.
+28; AdvanceOperator(job_id=3); Advancing job 3 on machine 1 earlier could align it better with the positive solution's trajectory, potentially reducing overall makespan.
+47; AdvanceOperator(job_id=2); The scheduling of job 2 on machine 4 contributes to a delay, aligning this with earlier operations could improve efficiency.
+***
+------------------------------------------------------------------------------------
+

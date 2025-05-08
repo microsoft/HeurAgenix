@@ -1,0 +1,1193 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on cvrp problem:
+Capacitated Vehicle Routing Problem (CVRP) is an optimization challenge focused on determining the most efficient routes for a fleet of vehicles to deliver goods to various locations, considering vehicle capacity constraints.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of CVRP.
+A list of lists where each sublist represents a vehicle's route.
+Each sublist contains integers representing the nodes (customers) visited by the vehicle in the order of visitation.
+The routes are sorted by vehicle identifier and the nodes in the list sorted by visited order."""
+    def __init__(self, routes: list[list[int]], depot: int):
+        self.routes = routes
+        self.depot = depot
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Append a node at the end of the specified vehicle's route."""
+    def __init__(self, vehicle_id: int, node: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].append(self.node)
+        return Solution(new_routes, solution.depot)
+class InsertOperator(BaseOperator):
+    """Insert a node at a specified position within the route of a specified vehicle."""
+    def __init__(self, vehicle_id: int, node: int, position: int):
+        self.vehicle_id = vehicle_id
+        self.node = node
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_routes[self.vehicle_id].insert(self.position, self.node)
+        return Solution(new_routes, solution.depot)
+class SwapOperator(BaseOperator):
+    """Swap two nodes between or within vehicle routes."""
+    def __init__(self, vehicle_id1: int, position1: int, vehicle_id2: int, position2: int):
+        if vehicle_id1 <= vehicle_id2:
+            self.vehicle_id1 = vehicle_id1
+            self.position1 = position1
+            self.vehicle_id2 = vehicle_id2
+            self.position2 = position2
+        else:
+            self.vehicle_id1 = vehicle_id2
+            self.position1 = position2
+            self.vehicle_id2 = vehicle_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        (new_routes[self.vehicle_id1][self.position1], new_routes[self.vehicle_id2][self.position2]) = (new_routes[self.vehicle_id2][self.position2], new_routes[self.vehicle_id1][self.position1])
+        return Solution(new_routes, solution.depot)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverse multiple segments of indices in the solution."""
+    def __init__(self, vehicle_id: int, segments: list[tuple[int, int]]):
+        self.vehicle_id = vehicle_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        new_route = new_routes[self.vehicle_id][:]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_routes[self.vehicle_id])
+            assert 0 <= end_index < len(new_routes[self.vehicle_id])
+            if start_index <= end_index:
+                new_route[start_index:end_index + 1] = reversed(new_route[start_index:end_index + 1])
+            else:
+                new_route = list(reversed(new_route[start_index:])) + new_route[end_index + 1:start_index] + list(reversed(new_route[:end_index + 1]))
+        new_routes = solution.routes[:self.vehicle_id] + [new_route] + solution.routes[self.vehicle_id + 1:]
+        return Solution(new_routes, solution.depot)
+class RelocateOperator(BaseOperator):
+    """Move a node from one position in a route to another, possibly in a different route."""
+    def __init__(self, source_vehicle_id: int, source_position: int, target_vehicle_id: int, target_position: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.source_position = source_position
+        self.target_vehicle_id = target_vehicle_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        node = new_routes[self.source_vehicle_id].pop(self.source_position)
+        if not new_routes[self.target_vehicle_id]:
+            new_routes[self.target_vehicle_id].append(node)
+        else:
+            new_routes[self.target_vehicle_id].insert(self.target_position, node)
+        return Solution(new_routes, solution.depot)
+class MergeRoutesOperator(BaseOperator):
+    """Merge two routes by appending the route of the source vehicle to the beginning of the route of the target vehicle. 
+The merged route is assigned to the target vehicle, and the source vehicle's route is cleared."""
+    def __init__(self, source_vehicle_id: int, target_vehicle_id: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.target_vehicle_id = target_vehicle_id
+    def run(self, solution: Solution) -> Solution:
+        new_routes = [route[:] for route in solution.routes]
+        source_depot_index = solution.routes[self.source_vehicle_id].index(solution.depot)
+        target_depot_index = solution.routes[self.target_vehicle_id].index(solution.depot)
+        merge_route = new_routes[self.source_vehicle_id][source_depot_index + 1:] + new_routes[self.source_vehicle_id][:source_depot_index] + new_routes[self.target_vehicle_id][target_depot_index + 1:] + new_routes[self.target_vehicle_id][:target_depot_index]
+        new_routes[self.target_vehicle_id] = [solution.depot] + merge_route + [solution.depot]
+        new_routes[self.source_vehicle_id] = [solution.depot]
+        return Solution(new_routes, solution.depot)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "vehicle_num" (int): The total number of vehicles.
+    - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
+    - "depot" (int): The index for depot node.
+    - "demands" (numpy.ndarray): The demand of each node.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): The current set of routes for all vehicles.
+    - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - "visited_num" (int): Number of nodes visited by each vehicle.
+    - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+    - "visited_num" (int): Number of nodes have not been visited by each vehicle.
+    - "total_current_cost" (int): The total cost of the current solution.
+    - "last_visited" (list[int]): The last visited node for each vehicle.
+    - "vehicle_loads" (list[int]): The current load of each vehicle.
+    - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is cvrp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+from src.problems.cvrp.components import *
+import numpy as np
+
+def farthest_insertion_6308(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Farthest Insertion Heuristic Algorithm with Improvements for the Capacitated Vehicle Routing Problem (CVRP).
+
+    This heuristic algorithm selects unvisited nodes based on a scoring mechanism that considers insertion cost, route compactness, and vehicle capacity utilization. It periodically performs greedy improvements and inter-vehicle swaps to enhance the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int or None]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        algorithm_data (dict): Algorithm-specific data, updated with any new information during execution.
+        get_state_data_function (callable): Function to evaluate the state of a new solution without modifying the original state.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=1.0): Weight for penalizing spread in the scoring mechanism.
+            - capacity_utilization_weight (float, default=1.0): Weight for vehicle capacity utilization in the scoring mechanism.
+            - apply_greedy_frequency (int, default=3): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=5): Frequency of performing inter-vehicle swaps.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Hyper-parameters
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.2)
+    capacity_utilization_weight = kwargs.get("capacity_utilization_weight", 0.5)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 5)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 1: Scoring mechanism to prioritize unvisited nodes
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+    operator = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node] if route] + [0]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Factor in vehicle capacity utilization
+                capacity_utilization_penalty = capacity_utilization_weight * (1 - remaining_capacity / capacity)
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty + capacity_utilization_penalty
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        # Perform the insertion
+        operator = InsertOperator(best_vehicle, best_node, best_position)
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            operator = ReverseSegmentOperator(best_vehicle, [(i, j - 1)])
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                # Skip if no nodes to shift and avoid shift depot
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue  # Skip if moving the node violates source vehicle's capacity
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue  # Skip if moving the node violates target vehicle's capacity
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        # If a beneficial swap is found, return the corresponding operator
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+    if operator:
+        return operator, {}
+    # If no valid insertion was found
+    return None, {}
+from src.problems.cvrp.components import *
+import numpy as np
+
+def min_cost_insertion_3b2b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Optimized Min-Cost Insertion Heuristic for CVRP.
+
+    This heuristic algorithm is optimized for performance by restructuring the order of operations, adjusting hyper-parameters, and implementing efficient logic to enhance the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        kwargs: Hyper-parameters for the heuristic algorithm.
+            - spread_penalty_weight (float, default=0.05): Weight for penalizing spread in the scoring mechanism.
+            - apply_greedy_frequency (int, default=4): Frequency of performing greedy improvements.
+            - apply_swap_frequency (int, default=6): Frequency of performing inter-vehicle swaps.
+            - high_demand_threshold (int, default=5): Threshold for considering the number of unvisited nodes as low.
+
+    Returns:
+        InsertOperator: The operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Hyper-parameters
+    spread_penalty_weight = kwargs.get("spread_penalty_weight", 0.05)
+    apply_greedy_frequency = kwargs.get("apply_greedy_frequency", 3)
+    apply_swap_frequency = kwargs.get("apply_swap_frequency", 5)
+    high_demand_threshold = kwargs.get("high_demand_threshold", 5)
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Step 2: Periodic greedy improvement
+    if len(unvisited_nodes) % apply_greedy_frequency == 0:
+        best_delta = 0
+        best_vehicle = None
+        best_segment = None
+
+        for vehicle_id, route in enumerate(current_solution.routes):
+            if len(route) < 2:
+                continue
+
+            # Evaluate all 2-opt swaps for compactness
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    if j == len(route) - 1 and i == 0:
+                        continue
+
+                    before = distance_matrix[route[(i - 1) % len(route)]][route[i]]
+                    after = distance_matrix[route[j]][route[(j - 1) % len(route)]]
+                    new_before = distance_matrix[route[(i - 1) % len(route)]][route[(j - 1) % len(route)]]
+                    new_after = distance_matrix[route[j]][route[i]]
+                    delta = (new_before + new_after) - (before + after)
+
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_vehicle = vehicle_id
+                        best_segment = (i, j)
+
+        if best_vehicle is not None and best_segment is not None:
+            i, j = best_segment
+            return ReverseSegmentOperator(best_vehicle, [(i, j - 1)]), {}
+
+    # Step 3: Periodic inter-vehicle swapping
+    if len(unvisited_nodes) % apply_swap_frequency == 0:
+        best_cost_reduction = float('-inf')
+        best_source_vehicle_id = None
+        best_source_position = None
+        best_target_vehicle_id = None
+        best_target_position = None
+
+        for source_vehicle_id, source_route in enumerate(current_solution.routes):
+            for source_position, node in enumerate(source_route):
+                if not source_route or node == depot:
+                    continue
+
+                # Calculate the load after removing the node
+                new_load_source = vehicle_remaining_capacity[source_vehicle_id] + demands[node]
+                if new_load_source > capacity:
+                    continue
+
+                # Check each target route to find the best shift
+                for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                    if source_vehicle_id == target_vehicle_id:
+                        continue
+
+                    new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
+                    if new_load_target < 0:
+                        continue
+
+                    for target_position in range(len(target_route) + 1):
+                            # Calculate the cost difference if the node is inserted at the target position
+                            source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                            source_next_node = source_route[(source_position + 1) % len(source_route)]
+                            target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                            target_next_node = target_route[target_position % len(target_route)]
+
+                            cost_increase = (
+                                -distance_matrix[source_previous_node][node]
+                                -distance_matrix[node][source_next_node]
+                                +distance_matrix[source_previous_node][source_next_node]
+                                +distance_matrix[target_previous_node][node]
+                                +distance_matrix[node][target_next_node]
+                                -distance_matrix[target_previous_node][target_next_node]
+                            )
+                            cost_reduction = -cost_increase
+
+                            # Update best shift if this shift is better
+                            if cost_reduction > best_cost_reduction:
+                                best_source_vehicle_id = source_vehicle_id
+                                best_source_position = source_position
+                                best_target_vehicle_id = target_vehicle_id
+                                best_target_position = target_position
+                                best_cost_reduction = cost_reduction
+
+        if best_cost_reduction > 0:
+            return RelocateOperator(
+                source_vehicle_id=best_source_vehicle_id,
+                source_position=best_source_position,
+                target_vehicle_id=best_target_vehicle_id,
+                target_position=best_target_position
+            ), {}
+
+
+    # Step 1: Prioritize nodes based on demands and distances
+    best_score = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                # Calculate the cost increase for this insertion
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                # Calculate the penalty for spread (distance from depot to farthest node in the route)
+                farthest_distance = max(
+                    [distance_matrix[depot][n] for n in route + [node]] if route else [distance_matrix[depot][node]]
+                )
+                spread_penalty = spread_penalty_weight * farthest_distance
+
+                # Combine the metrics into a single score
+                score = cost_increase + spread_penalty
+
+                if score < best_score:
+                    best_score = score
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        return InsertOperator(best_vehicle, best_node, best_position), {}
+
+    # If no valid insertion was found
+    return None, {}
+from src.problems.cvrp.components import *
+import numpy as np
+
+def nearest_neighbor_54a9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """ Enhanced Nearest Neighbor Heuristic for CVRP.
+
+    This heuristic prioritizes nodes with higher demands that can fit into the vehicle's remaining capacity, especially when the number of unvisited nodes is low. It also periodically applies a 2-opt heuristic to improve route compactness.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - distance_matrix (numpy.ndarray): 2D array representing distances between nodes.
+            - demands (numpy.ndarray): Array of demands for each node.
+            - capacity (int): Capacity of each vehicle.
+            - depot (int): Index of the depot node.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - current_solution (Solution): Current routes for all vehicles.
+            - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
+            - last_visited (list[int]): Last visited node for each vehicle.
+            - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
+        get_state_data_function (callable): Function to calculate state data for a new solution.
+        **kwargs: Hyper-parameters for the heuristic algorithm.
+            - high_demand_threshold (int, default=6): Threshold for considering the number of unvisited nodes as low.
+
+    Returns:
+        InsertOperator: Operator to insert the chosen node into the current solution.
+        dict: Updated algorithm data if any.
+    """
+    # Extract required data
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+
+    current_solution = state_data["current_solution"]
+    unvisited_nodes = state_data["unvisited_nodes"]
+    last_visited = state_data["last_visited"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+
+    # Hyper-parameters
+    high_demand_threshold = kwargs.get("high_demand_threshold", 6)
+
+    # Check if there are no unvisited nodes
+    if not unvisited_nodes:
+        return None, {}
+
+    # Check if the current solution is empty
+    if all(len(route) == 0 for route in current_solution.routes):
+        # Start with the node with the highest demand that can fit into any vehicle
+        highest_demand_node = max(unvisited_nodes, key=lambda node: demands[node])
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[highest_demand_node] <= remaining_capacity:
+                return InsertOperator(vehicle_id, highest_demand_node, 0), {}
+
+    # Prioritize nodes with higher demands when unvisited nodes are below the threshold
+    if len(unvisited_nodes) <= high_demand_threshold:
+        best_cost_increase = float('inf')
+        best_node = None
+        best_vehicle = None
+        best_position = None
+
+        for node in unvisited_nodes:
+            for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+                if demands[node] > remaining_capacity:
+                    continue
+
+                # Try inserting the node at all possible positions in the vehicle's route
+                route = current_solution.routes[vehicle_id]
+                for position in range(len(route) + 1):
+                    prev_node = depot if position == 0 else route[position - 1]
+                    next_node = depot if position == len(route) else route[position]
+
+                    cost_increase = (
+                        distance_matrix[prev_node][node] +
+                        distance_matrix[node][next_node] -
+                        distance_matrix[prev_node][next_node]
+                    )
+
+                    if cost_increase < best_cost_increase:
+                        best_cost_increase = cost_increase
+                        best_node = node
+                        best_vehicle = vehicle_id
+                        best_position = position
+
+        if best_node is not None and best_vehicle is not None and best_position is not None:
+            return InsertOperator(best_vehicle, best_node, best_position), {}
+
+    # Default nearest neighbor logic
+    best_cost_increase = float('inf')
+    best_node = None
+    best_vehicle = None
+    best_position = None
+
+    for node in unvisited_nodes:
+        for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
+            if demands[node] > remaining_capacity:
+                continue
+
+            # Try inserting the node at all possible positions in the vehicle's route
+            route = current_solution.routes[vehicle_id]
+            for position in range(len(route) + 1):
+                prev_node = depot if position == 0 else route[position - 1]
+                next_node = depot if position == len(route) else route[position]
+
+                cost_increase = (
+                    distance_matrix[prev_node][node] +
+                    distance_matrix[node][next_node] -
+                    distance_matrix[prev_node][next_node]
+                )
+
+                if cost_increase < best_cost_increase:
+                    best_cost_increase = cost_increase
+                    best_node = node
+                    best_vehicle = vehicle_id
+                    best_position = position
+
+    if best_node is not None and best_vehicle is not None and best_position is not None:
+        return InsertOperator(best_vehicle, best_node, best_position), {}
+
+    # If no valid insertion was found
+    return None, {}
+from src.problems.cvrp.components import Solution, InsertOperator
+
+def greedy_f4c4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """
+    Greedy heuristic algorithm for the CVRP.
+    This algorithm attempts to construct a solution by iteratively adding the closest unvisited node to a vehicle's route until all nodes are visited or the vehicle reaches its capacity.
+    It starts with an empty route for each vehicle and selects nodes based on the shortest distance from the last node in the route.
+
+    Args:
+        global_data (dict): Contains the global problem data, including:
+            - "distance_matrix" (numpy.ndarray): The distances between nodes.
+            - "demands" (numpy.ndarray): The demand of each node.
+            - "vehicle_num" (int): The total number of vehicles.
+            - "capacity" (int): The capacity for each vehicle.
+        
+        state_data (dict): Contains the current state of the solution, including:
+            - "unvisited_nodes" (list[int]): Nodes that have not yet been visited.
+            - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+
+    Returns:
+        InsertOperator: The operator that adds a node to a vehicle's route.
+        dict: Empty dictionary as the algorithm does not update any algorithm-specific data.
+    """
+    
+    distance_matrix = global_data['distance_matrix']
+    demands = global_data['demands']
+    vehicle_num = global_data['vehicle_num']
+    vehicle_capacity = global_data['capacity']
+    
+    unvisited_nodes = state_data['unvisited_nodes']
+    vehicle_remaining_capacity = state_data['vehicle_remaining_capacity']
+    
+    # Start with the first unvisited node and the first vehicle
+    for vehicle_id in range(vehicle_num):
+        if not unvisited_nodes or vehicle_remaining_capacity[vehicle_id] <= 0:
+            continue  # Skip to the next vehicle if there are no nodes left or no capacity.
+        
+        # Initialize a temporary variable to find the closest unvisited node
+        closest_node = None
+        closest_distance = float('inf')
+        
+        last_visited_node = 0  # Assuming the depot ID is 0
+        for node in unvisited_nodes:
+            if demands[node] <= vehicle_remaining_capacity[vehicle_id]:
+                distance = distance_matrix[last_visited_node][node]
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_node = node
+        
+        if closest_node is not None:
+            # Create an InsertOperator to add this node to the solution
+            return InsertOperator(vehicle_id, closest_node, len(state_data['current_solution'].routes[vehicle_id])), {}
+    
+    # If all nodes are visited or no capacity is left to visit any node, return None
+    return None, {}
+from src.problems.cvrp.components import *
+
+def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[RelocateOperator, dict]:
+    """Node Shift Between Routes heuristic for CVRP.
+    This heuristic attempts to move a node from one route to another route, aiming to reduce the total distance or improve load balance.
+    It considers the capacity constraints and ensures that the move is beneficial before applying it.
+
+    Args:
+        global_data (dict): Contains the global information about the problem.
+            - "distance_matrix" (numpy.ndarray): The matrix of distances between nodes.
+            - "capacity" (int): The capacity for each vehicle.
+            
+        state_data (dict): Contains the current state of the solution.
+            - "current_solution" (Solution): The current set of routes.
+            - "vehicle_loads" (list[int]): The current load of each vehicle.
+            - "unvisited_nodes" (list[int]): Nodes that have not yet been visited.
+            
+        algorithm_data (dict): Contains algorithm-specific data. Not used in this heuristic.
+
+    Returns:
+        (RelocateOperator, dict): The operator to shift a node between routes and an empty dictionary, as the heuristic does not update algorithm_data.
+    """
+    # Extract required data from global_data
+    distance_matrix = global_data["distance_matrix"]
+    capacity = global_data["capacity"]
+    depot = global_data["depot"]
+    
+    # Extract required data from state_data
+    current_solution = state_data["current_solution"]
+    vehicle_loads = state_data["vehicle_loads"]
+    # Find the best position to insert the node in the target route
+    best_position = None
+    best_cost_reduction = 0
+    # Find the best node shift between routes
+    for source_vehicle_id, source_route in enumerate(current_solution.routes):
+        for source_position, node in enumerate(source_route):
+            # Skip if no nodes to shift
+            if not source_route or node == depot:
+                continue
+            
+            # Calculate the load after removing the node
+            new_load_source = vehicle_loads[source_vehicle_id] - global_data["demands"][node]
+            if new_load_source < 0:
+                continue  # Skip if moving the node violates source vehicle's capacity
+            
+            # Check each target route to find the best shift
+            for target_vehicle_id, target_route in enumerate(current_solution.routes):
+                # Do not consider the same route
+                if source_vehicle_id == target_vehicle_id:
+                    continue
+                
+                # Calculate the load after adding the node to the target vehicle
+                new_load_target = vehicle_loads[target_vehicle_id] + global_data["demands"][node]
+                if new_load_target > capacity:
+                    continue  # Skip if moving the node violates target vehicle's capacity
+                for target_position in range(len(target_route) + 1):
+                        # Calculate the cost difference if the node is inserted at the target position
+                        source_previous_node = source_route[(source_position - 1) % len(source_route)]
+                        source_next_node = source_route[(source_position + 1) % len(source_route)]
+                        target_previous_node = target_route[(target_position - 1) % len(target_route)]
+                        target_next_node = target_route[target_position % len(target_route)]
+
+                        cost_increase = (
+                            -distance_matrix[source_previous_node][node]
+                            -distance_matrix[node][source_next_node]
+                            +distance_matrix[source_previous_node][source_next_node]
+                            +distance_matrix[target_previous_node][node]
+                            +distance_matrix[node][target_next_node]
+                            -distance_matrix[target_previous_node][target_next_node]
+                        )
+                        cost_reduction = -cost_increase
+
+                        # Update best shift if this shift is better
+                        if cost_reduction > best_cost_reduction:
+                            best_source_vehicle_id = source_vehicle_id
+                            best_source_position = source_position
+                            best_target_vehicle_id = target_vehicle_id
+                            best_target_position = target_position
+                            best_cost_reduction = cost_reduction
+                        
+                
+    # If a beneficial shift is found, return the corresponding operator
+    if best_cost_reduction > 0:
+        return RelocateOperator(
+            source_vehicle_id=best_source_vehicle_id,
+            source_position=best_source_position,
+            target_vehicle_id=best_target_vehicle_id,
+            target_position=best_target_position
+        ), {}
+    
+    # If no beneficial shift is found, return None
+    return None, {}
+from src.problems.cvrp.components import Solution, InsertOperator
+import math
+
+def petal_algorithm_b384(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+    """
+    Petal construction heuristic algorithm for the CVRP. This heuristic attempts to build feasible routes (petals) around the depot and combine them into a set of vehicle routes.
+    Each petal starts and ends at the depot, creating a loop that can serve as an individual route for a vehicle.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+            - "demands" (numpy.ndarray): The demand of each node.
+            - "capacity" (int): The capacity for each vehicle.
+            - "vehicle_num" (int): The total number of vehicles.
+            - "node_num" (int): The total number of nodes in the problem.
+
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): The current set of routes for all vehicles.
+            - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+            - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+
+    Returns:
+        InsertOperator: The operator that adds a node to the route of a vehicle.
+        dict: Updated algorithm data, empty in this case as this heuristic doesn't utilize it.
+    """
+
+    distance_matrix = global_data["distance_matrix"]
+    demands = global_data["demands"]
+    vehicle_capacity = global_data["capacity"]
+    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"].copy()
+    current_solution = state_data["current_solution"].routes
+    unvisited_nodes = state_data["unvisited_nodes"].copy()
+
+    if not unvisited_nodes:
+        # No more nodes to visit, return None.
+        return None, {}
+
+    # Sort nodes based on their polar angle with respect to the depot
+    depot = 0
+    sorted_nodes = sorted(unvisited_nodes, key=lambda node: polar_angle(distance_matrix, depot, node))
+
+    # Create petals
+    petals = []
+    for node in sorted_nodes:
+        if demands[node] <= vehicle_capacity:
+            petals.append([node])
+
+    # Try to fit petals into existing vehicle routes
+    for petal in petals:
+        for vehicle_id, route in enumerate(current_solution):
+            if route_fits(petal, vehicle_id, vehicle_remaining_capacity, demands, vehicle_capacity):
+                # If the petal fits, assign it to the vehicle and return the operator
+                return InsertOperator(vehicle_id=vehicle_id, node=petal[0], position=len(route)), {}
+
+    # If no petals fit, return None
+    return None, {}
+
+def polar_angle(distance_matrix, depot, node):
+    """Calculate the polar angle of a node with respect to the depot for sorting."""
+    y_diff = distance_matrix[depot][node] - distance_matrix[depot][0]
+    x_diff = distance_matrix[node][depot] - distance_matrix[0][depot]
+    return math.atan2(y_diff, x_diff)
+
+def route_fits(petal, vehicle_id, vehicle_remaining_capacity, demands, vehicle_capacity):
+    """Check if a petal can fit into the current route of a vehicle."""
+    # Calculate the total demand of the petal
+    petal_demand = sum(demands[node] for node in petal)
+    # Check if adding the petal would exceed the vehicle's capacity
+    return petal_demand <= vehicle_remaining_capacity[vehicle_id]
+from src.problems.cvrp.components import AppendOperator
+import random
+
+def random_bfdc(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+    """Random heuristic for CVRP.
+    This heuristic selects an unvisited node at random and appends it to a vehicle's route where it does not violate the capacity constraint.
+    This process is repeated for each vehicle until all nodes have been included in a route.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. 
+            - "demands" (numpy.ndarray): The demand of each node.
+            - "vehicle_num" (int): The total number of vehicles.
+            - "capacity" (int): The capacity for each vehicle.
+        state_data (dict): The state dictionary containing the current state information.
+            - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+            - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
+            - "current_solution" (Solution): The current set of routes for all vehicles.
+
+    Returns:
+        AppendOperator: The operator to append a node to a vehicle's route.
+        dict: Empty dictionary as no algorithm data needs to be updated.
+    """
+    unvisited_nodes = state_data['unvisited_nodes']
+    vehicle_remaining_capacity = state_data['vehicle_remaining_capacity']
+    current_solution = state_data['current_solution']
+    demands = global_data['demands']
+    vehicle_num = global_data['vehicle_num']
+    capacity = global_data['capacity']
+
+    # Check if we have any unvisited nodes left
+    if not unvisited_nodes:
+        return None, {}
+
+    # Randomly select an unvisited node
+    node_to_append = random.choice(unvisited_nodes)
+
+    # Find a vehicle that can accommodate the node
+    for _ in range(vehicle_num):
+        vehicle_id = random.randrange(vehicle_num)
+        if vehicle_remaining_capacity[vehicle_id] >= demands[node_to_append]:
+            # Create and return the append operator
+            operator = AppendOperator(vehicle_id=vehicle_id, node=node_to_append)
+            return operator, {}
+
+    # If we reach here, no vehicle can accommodate the node (should not happen if vehicles start empty and capacities are correct)
+    return None, {}
+from src.problems.cvrp.components import Solution, MergeRoutesOperator
+
+def saving_algorithm_710e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, merge_threshold: float = 0.0, **kwargs) -> tuple[MergeRoutesOperator, dict]:
+    """ Saving Algorithm heuristic for CVRP.
+    Calculates savings for combining two routes into one for each pair of end nodes of existing routes and sorts these savings in descending order. Routes are then merged by the highest savings while considering vehicle capacity constraints.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "distance_matrix" (numpy.ndarray): The distance matrix between nodes.
+            - "vehicle_num" (int): The total number of vehicles.
+            - "capacity" (int): The capacity for each vehicle.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): The current set of routes for all vehicles.
+            - "vehicle_loads" (list[int]): The current load of each vehicle.
+            - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+        algorithm_data (dict): Not used in this algorithm.
+        merge_threshold (float): A hyperparameter to set the minimum saving value to consider for merging routes. Default is 0.0.
+
+    Returns:
+        MergeRoutesOperator: The chosen operator to merge two routes if a saving above the threshold is found.
+        dict: Empty dictionary as no algorithm_data is updated.
+    """
+    distance_matrix = global_data["distance_matrix"]
+    vehicle_capacity = global_data["capacity"]
+    depot = global_data["depot"]
+    vehicle_loads = state_data["vehicle_loads"]
+    current_solution = state_data["current_solution"]
+
+    best_saving = merge_threshold
+    best_operator = None
+
+    for i, route1 in enumerate(current_solution.routes):
+        if not route1:
+            continue
+        for j, route2 in enumerate(current_solution.routes):
+            if i == j or not route2:
+                continue
+            saving = (distance_matrix[route1[-1]][depot] + distance_matrix[depot][route2[0]]) - distance_matrix[route1[-1]][route2[0]]
+            if saving > best_saving and vehicle_loads[i] + vehicle_loads[j] <= vehicle_capacity:
+                best_saving = saving
+                best_operator = MergeRoutesOperator(source_vehicle_id=i, target_vehicle_id=j)
+
+    if best_operator:
+        return best_operator, {}
+    else:
+        # No valid merge found, or all merges have savings below the threshold
+        return None, {}
+from src.problems.cvrp.components import *
+
+def three_opt_e8d7(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+    """Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+
+    Args:
+        global_data (dict): Contains the global data with necessary information like distance_matrix.
+        state_data (dict): Contains the current state information with the current_solution.
+        algorithm_data (dict): Contains the data necessary for this algorithm.
+
+    Returns:
+        TwoOptOperator: The operator that represents the best 2-opt move found.
+        dict: Updated algorithm dictionary.
+    """
+    # Retrieve data from global_data and state_data
+    distance_matrix = global_data["distance_matrix"]
+    depot = global_data["depot"]
+    current_solution = state_data["current_solution"]
+
+    # Initialize variables for the best move found
+    best_delta = 0
+    best_move = None
+
+    # Iterate over all routes to apply the 3-opt move
+    for route_index, route in enumerate(current_solution.routes):
+        n = len(route)
+        if n <= 3:
+            continue  # Skip routes that are too short to apply 3-opt
+
+        # Iterate through all combinations of three edges
+        for i in range(n):
+            for j in range(i + 2, n):
+                for k in range(j + 2, n + (1 if i > 0 else 0)):
+                    # Calculate the cost difference for the 3-opt move
+                    moves, delta = calculate_3opt_moves(distance_matrix, route, i, j, k, depot)
+
+                    # Check if this move is better than the best found so far
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_move = (route_index, moves)
+
+    # If a beneficial move is found, create and return the corresponding operator
+    if best_move:
+        route_index, segments = best_move
+        return ReverseSegmentOperator(route_index, segments), algorithm_data
+
+    # If no beneficial move is found, return None
+    return None, algorithm_data
+
+def calculate_3opt_moves(distance_matrix, route, i, j, k, depot):
+    """
+    Calculate the cost difference for all 3-opt reconnection moves for the given segments and return the best move.
+    """
+    n = len(route)
+    A = route[(i - 1) % n]
+    B = route[i % n]
+    C = route[(j - 1) % n]
+    D = route[j % n]
+    E = route[(k - 1) % n]
+    F = route[k % n]
+
+    # Calculate the cost of the original segments
+    original_cost = distance_matrix[A][B] + distance_matrix[C][D] + distance_matrix[E][F]
+
+    # Initialize the list of all possible new segments and their costs
+    possible_moves = [
+        (distance_matrix[A][C] + distance_matrix[B][E] + distance_matrix[D][F], [(i % n, (j - 1) % n), (j % n, (k - 1) % n)]),
+        (distance_matrix[F][C] + distance_matrix[B][D] + distance_matrix[E][A], [(i % n, (j - 1) % n), (k % n, (i - 1) % n)]),
+        (distance_matrix[F][B] + distance_matrix[C][E] + distance_matrix[D][A], [(j % n, (k - 1) % n), (k % n, (i - 1) % n)]),
+    ]
+
+
+    # Find the move with the maximum cost reduction
+    best_delta = 0
+    best_move = None
+    for cost, move in possible_moves:
+        delta = cost - original_cost
+        if delta < best_delta:
+            best_delta = delta
+            best_move = move
+
+    # Return the best move and the corresponding cost reduction
+    return best_move, best_delta
+from src.problems.cvrp.components import *
+
+def two_opt_0554(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+    """
+    Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+
+    Args:
+        global_data (dict): Contains the global data with necessary information like distance_matrix.
+        state_data (dict): Contains the current state information with the current_solution.
+        algorithm_data (dict): Contains the data necessary for this algorithm.
+
+    Returns:
+        TwoOptOperator: The operator that represents the best 2-opt move found.
+        dict: Updated algorithm dictionary.
+    """
+
+    # Retrieve the necessary data from global_data
+    distance_matrix = global_data["distance_matrix"]
+    node_num = global_data["node_num"]
+    depot = global_data["depot"]
+
+    # Retrieve the current solution from state_data
+    current_solution = state_data["current_solution"]
+    visited_nodes = state_data["visited_nodes"]
+
+    # Initialize variables for the best move found
+    best_delta = 0
+    best_move = None
+
+    # Iterate over all routes to apply the 2-opt move
+    for route_index, route in enumerate(current_solution.routes):
+        for i in range(0, len(route)):
+            for j in range(i + 1, len(route) + 1):
+                # Calculate the cost difference for the current 2-opt move
+                delta = two_opt_cost_change(distance_matrix, route, i, j, depot)
+                # Check if this is the best move so far
+                if delta < best_delta:
+                    best_delta = delta
+                    best_move = (route_index, [(i, j - 1)])
+
+    # If a beneficial move is found, create and return the corresponding operator
+    if best_move:
+        route_index, move_pair = best_move
+        return ReverseSegmentOperator(route_index, move_pair), algorithm_data
+
+    # If no beneficial move is found, return None
+    return None, algorithm_data
+
+def two_opt_cost_change(distance_matrix, route, i, j, depot):
+    """Calculate the cost difference for a 2-opt move."""
+    # Assuming the route is a circular tour
+    n = len(route)
+    A = route[(i - 1) % n]
+    B = route[i % n]
+    C = route[(j - 1) % n]
+    D = route[j % n]
+    d0 = distance_matrix[A][B] + distance_matrix[C][D]
+    d1 = distance_matrix[A][C] + distance_matrix[B][D]
+
+    # Return the cost difference
+    return d1 - d0
+from src.problems.cvrp.components import *
+
+def variable_neighborhood_search_614b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[BaseOperator, dict]:
+    """ Variable Neighborhood Search heuristic algorithm for CVRP.
+    This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions.
+    It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
+
+    Args:
+        global_data (dict): Global data containing problem parameters.
+            - "distance_matrix" (numpy.ndarray): Distance between nodes.
+            - "vehicle_num" (int): Number of vehicles.
+            - "capacity" (int): Capacity of each vehicle.
+            - "depot" (int): Index of the depot node.
+        state_data (dict): State data containing the current state of the solution.
+            - "current_solution" (Solution): The current set of routes for all vehicles.
+            - "vehicle_loads" (list[int]): The current load of each vehicle.
+            - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
+        algorithm_data (dict): Algorithm-specific data, not used in this heuristic.
+        **kwargs: Hyperparameters for the search, such as the neighborhood size.
+
+    Returns:
+        BaseOperator: The operator that modifies the current solution, or None if no improvement is possible.
+        dict: Empty dictionary as this function does not update algorithm_data.
+    """
+
+    # Retrieve necessary data from state_data
+    current_solution = state_data.get('current_solution')
+    vehicle_loads = state_data.get('vehicle_loads')
+    unvisited_nodes = state_data.get('unvisited_nodes')
+
+    # Retrieve necessary data from global_data
+    depot = global_data.get('depot')
+    capacity = global_data.get('capacity')
+    vehicle_num = global_data.get('vehicle_num')
+    distance_matrix = global_data.get('distance_matrix')
+
+    # Define hyperparameters (with default values)
+    neighborhood_size = kwargs.get('neighborhood_size', 10)
+
+    # Initialize variables for the best modification found
+    best_operator = None
+    best_cost_saving = float('inf')
+
+    # Iterate over all possible neighborhoods defined by the neighborhood size
+    for vehicle_id in range(vehicle_num):
+        for node_index in range(len(unvisited_nodes)):
+            node = unvisited_nodes[node_index]
+            # Check if adding this node to the route exceeds the vehicle's capacity
+            if vehicle_loads[vehicle_id] + global_data['demands'][node] <= capacity:
+                for position in range(len(current_solution.routes[vehicle_id]) + 1):
+                    # Calculate the cost of inserting the node at the current position
+                    if position == 0:
+                        before_node = depot
+                    else:
+                        before_node = current_solution.routes[vehicle_id][position - 1]
+                    if position == len(current_solution.routes[vehicle_id]):
+                        after_node = depot
+                    else:
+                        after_node = current_solution.routes[vehicle_id][position]
+                    cost_to_add = distance_matrix[before_node][node] + distance_matrix[node][after_node] - distance_matrix[before_node][after_node]
+
+                    # If the insertion leads to a cost saving, and is better than the previous best saving, store it
+                    if cost_to_add < best_cost_saving:
+                        best_cost_saving = cost_to_add
+                        best_operator = InsertOperator(vehicle_id=vehicle_id, node=node, position=position)
+
+    # Return the best operator found, or None if no improving operator was found
+    return best_operator or None, {}
+
+Before we solve the actual problem, we hope to select useful algorithms and classify them so that we can use different algorithms in different scenarios. 
+We hope to classify algorithms and use different algorithms in different scenarios. 
+Please note:
+1. We only hope to sort useful and powerful heuristic, some heuristic are not powerful, such pure random heuristic;
+2. One heuristic can belong to multiple classification;
+3. Detailed classification is welcome.
+
+The response format is very important. For better communication, please respond to me in this format:
+***heuristic_classification:
+classification1:heuristic_name_1,heuristic_name_2,...;reason
+classification2:heuristic_name_3,heuristic_name_4,...;reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***heuristic_classification:
+constructive_heuristics:farthest_insertion_6308,min_cost_insertion_3b2b,nearest_neighbor_54a9,greedy_f4c4,petal_algorithm_b384;constructive heuristics are used to build initial solutions from scratch by adding nodes incrementally.
+local_search_heuristics:three_opt_e8d7,two_opt_0554;local search heuristics improve an existing solution by making small changes, like 2-opt and 3-opt swaps.
+metaheuristic_heuristics:variable_neighborhood_search_614b;sophisticated methods like VNS explore multiple neighborhoods to escape local optima and find better solutions.
+inter_route_operators:node_shift_between_routes_7b8a,saving_algorithm_710e;these heuristics focus on improving solutions by moving nodes between different routes or merging routes.
+***
+------------------------------------------------------------------------------------
+

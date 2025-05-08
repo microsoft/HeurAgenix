@@ -1,0 +1,26 @@
+-data: test_case_1
+-current_solution:
+production_line_0: 7->1
+production_line_1: 9
+production_line_2: 5->3->0
+production_line_3: 2
+production_line_4: 8->4
+
+-is_complete_solution: True
+-is_valid_solution: True
+-fulfilled_order_num: 9
+-production_line_num: 5
+-product_num: 5
+-order_num: 10
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	shortest_operation_ae31	InsertOperator(production_line_id=2, order_id=0, position=0)	production_line_0: \nproduction_line_1: \nproduction_line_2: 0\nproduction_line_3: \nproduction_line_4: \n
+1	shortest_operation_ae31	InsertOperator(production_line_id=0, order_id=1, position=0)	production_line_0: 1\nproduction_line_1: \nproduction_line_2: 0\nproduction_line_3: \nproduction_line_4: \n
+2	shortest_operation_ae31	InsertOperator(production_line_id=0, order_id=2, position=0)	production_line_0: 2->1\nproduction_line_1: \nproduction_line_2: 0\nproduction_line_3: \nproduction_line_4: \n
+3	shortest_operation_ae31	InsertOperator(production_line_id=4, order_id=4, position=0)	production_line_0: 2->1\nproduction_line_1: \nproduction_line_2: 0\nproduction_line_3: \nproduction_line_4: 4\n
+4	shortest_operation_ae31	InsertOperator(production_line_id=1, order_id=9, position=0)	production_line_0: 2->1\nproduction_line_1: 9\nproduction_line_2: 0\nproduction_line_3: \nproduction_line_4: 4\n
+5	shortest_operation_ae31	RelocateOperator(source_production_line_id=0, source_position=0, target_production_line_id=3, target_position=0)	production_line_0: 1\nproduction_line_1: 9\nproduction_line_2: 0\nproduction_line_3: 2\nproduction_line_4: 4\n
+6	shortest_operation_ae31	InsertOperator(production_line_id=0, order_id=7, position=0)	production_line_0: 7->1\nproduction_line_1: 9\nproduction_line_2: 0\nproduction_line_3: 2\nproduction_line_4: 4\n
+7	shortest_operation_ae31	InsertOperator(production_line_id=2, order_id=3, position=0)	production_line_0: 7->1\nproduction_line_1: 9\nproduction_line_2: 3->0\nproduction_line_3: 2\nproduction_line_4: 4\n
+8	shortest_operation_ae31	InsertOperator(production_line_id=2, order_id=5, position=0)	production_line_0: 7->1\nproduction_line_1: 9\nproduction_line_2: 5->3->0\nproduction_line_3: 2\nproduction_line_4: 4\n
+9	shortest_operation_ae31	InsertOperator(production_line_id=4, order_id=8, position=0)	production_line_0: 7->1\nproduction_line_1: 9\nproduction_line_2: 5->3->0\nproduction_line_3: 2\nproduction_line_4: 8->4\n

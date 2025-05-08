@@ -1,0 +1,617 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on max_cut problem:
+MaxCut is a classical combinatorial optimization problem where the goal is to partition the vertices of a graph into two disjoint subsets such that the number (or total weight) of edges between the two sets is maximized.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MaxCut problem.
+Two sets of vertices representing the partition of the graph into two subsets."""
+    def __init__(self, set_a: set[int], set_b: set[int]):
+        self.set_a = set_a
+        self.set_b = set_b
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class InsertNodeOperator(BaseOperator):
+    """Insert a node into one of the sets for the MaxCut solution."""
+    def __init__(self, node: int, target_set: str):
+        self.node = node
+        self.target_set = target_set
+        assert target_set in ['A', 'B']
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.target_set == 'A':
+            assert self.node not in solution.set_b
+            new_set_a.add(self.node)
+        elif self.target_set == 'B':
+            assert self.node not in solution.set_a
+            new_set_b.add(self.node)
+        return Solution(new_set_a, new_set_b)
+class InsertEdgeOperator(BaseOperator):
+    """Insert an edge into the MaxCut solution with node_1 in set A and node_2 in set B."""
+    def __init__(self, node_1: int, node_2: int):
+        self.node_1 = node_1
+        self.node_2 = node_2
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        assert self.node_1 not in solution.set_b
+        assert self.node_2 not in solution.set_a
+        new_set_a.add(self.node_1)
+        new_set_b.add(self.node_2)
+        return Solution(new_set_a, new_set_b)
+class SwapOperator(BaseOperator):
+    """Swap a list of nodes from origin set to the opposite set in the MaxCut solution."""
+    def __init__(self, nodes: list[int]):
+        self.nodes = nodes
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        for node in self.nodes:
+            if node in solution.set_a:
+                assert node not in solution.set_b
+                new_set_a.remove(node)
+                new_set_b.add(node)
+            elif node in solution.set_b:
+                assert node not in solution.set_a
+                new_set_b.remove(node)
+                new_set_a.add(node)
+        return Solution(new_set_a, new_set_b)
+class DeleteOperator(BaseOperator):
+    """Delete a node from both sets in the MaxCut solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.node in solution.set_a:
+            new_set_a.remove(self.node)
+        elif self.node in solution.set_b:
+            new_set_b.remove(self.node)
+        return Solution(new_set_a, new_set_b)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of vertices in the graph.
+    - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "set_a_count" (int): The number of nodes in set A of the current partition.
+    - "set_b_count" (int): The number of nodes in set B of the current partition.
+    - "selected_nodes" (set[int]): The set of selected nodes.
+    - "selected_num" (int): The number of nodes have been selected.
+    - "unselected_nodes" (set[int]): The set of unselected nodes.
+    - "unselected_num" (int): The number of nodes have not been selected.
+    - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is max_cut a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+------------------------------------------------------------------------------------
+
+user
+In this instance, I have developed a heuristic function, although its performance has not reached a satisfactory level. My goal is to learn from case studies to improve and optimize this heuristic. To achieve this, I will provide the following:
+1. The heuristic function code.
+2. Test data for evaluation.
+3. Negative solution from heuristic function.
+4. Positive solution from external, which is better than negative solution.
+
+The function most_weight_neighbors_d31b is the heuristic function:
+from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
+import numpy as np
+
+def most_weight_neighbors_d31b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, scaling_factor: float = 0.5, swap_frequency: int = 5, **kwargs) -> tuple[InsertNodeOperator, dict]:
+    """The most_weight_neighbors_d31b heuristic selects an unselected node based on both immediate and future impacts 
+    on the cut value and periodically considers swaps to further improve the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the following items:
+            - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+        state_data (dict): The state dictionary containing the current state information:
+            - "current_solution" (Solution): The current partition of the graph into sets A and B.
+            - "unselected_nodes" (set[int]): The set of nodes that have not yet been selected.
+            - "current_cut_value" (float): The current cut value of the solution.
+        algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
+            - "sorted_nodes" (list of tuples): A sorted list of (node, future_impact) in descending order.
+            - "operation_count" (int): The number of operations performed so far.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+        scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
+        swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.
+
+    Returns:
+        InsertNodeOperator or SwapOperator: The operator to modify the solution.
+        dict: Updated algorithm data with the sorted list of nodes and operation count.
+    """
+
+    # Extract necessary data
+    weight_matrix = global_data["weight_matrix"]
+    current_solution = state_data["current_solution"]
+    unselected_nodes = state_data["unselected_nodes"]
+    set_a, set_b = current_solution.set_a, current_solution.set_b
+    operation_count = algorithm_data.get("operation_count", 0)
+
+    # Step 1: Perform a swap operation periodically
+    if operation_count % swap_frequency == 0 and set_a and set_b:
+        weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1)
+        weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1)
+        best_increase = float("-inf")
+        best_pair = None
+
+        # Evaluate all possible swaps
+        for i in set_a:
+            for j in set_b:
+                delta = weight_to_a[i] - weight_to_a[j] + weight_to_b[j] - weight_to_b[i]
+                if weight_matrix[i, j] != 0:  # Adjust for the edge between i and j if it exists
+                    delta += 2 * weight_matrix[i, j]
+                if delta > best_increase:
+                    best_increase = delta
+                    best_pair = (i, j)
+
+        # If a beneficial swap is found, return the SwapOperator
+        if best_pair:
+            return SwapOperator(nodes=list(best_pair)), {"operation_count": operation_count + 1}
+
+    # Step 2: Sort unselected nodes based on future impact if not already sorted
+    if "sorted_nodes" not in algorithm_data or not algorithm_data["sorted_nodes"]:
+        # Calculate the future impact for each unselected node
+        sorted_nodes = sorted(
+            [(node, sum(abs(weight_matrix[node][other]) for other in range(len(weight_matrix)))) for node in unselected_nodes],
+            key=lambda x: x[1],
+            reverse=True
+        )
+        algorithm_data["sorted_nodes"] = sorted_nodes
+    else:
+        # Filter out nodes that have been selected since the last run
+        sorted_nodes = [
+            (node, future_impact) for (node, future_impact) in algorithm_data["sorted_nodes"]
+            if node in unselected_nodes
+        ]
+
+    # Step 3: Select the best unselected node based on both immediate and future impacts
+    if not sorted_nodes:
+        return None, {}
+
+    # Extract the best node and its future impact
+    best_node, future_impact = sorted_nodes.pop(0)
+
+    # Calculate the potential increase in cut value for adding the node to each set
+    potential_increase_a = sum(weight_matrix[best_node][other] for other in set_b)
+    potential_increase_b = sum(weight_matrix[best_node][other] for other in set_a)
+
+    # Adjust the potential increases by adding the scaled future impact
+    adjusted_increase_a = potential_increase_a + scaling_factor * future_impact
+    adjusted_increase_b = potential_increase_b + scaling_factor * future_impact
+
+    # Choose the set that gives the maximum adjusted increase in cut value
+    target_set = "A" if adjusted_increase_a >= adjusted_increase_b else "B"
+
+    # Create the operator to insert the selected node into the chosen set
+    operator = InsertNodeOperator(best_node, target_set)
+
+    # Return the operator and the updated algorithm data
+    return operator, {"sorted_nodes": sorted_nodes, "operation_count": operation_count + 1}
+
+The global data for this problem:
+node_num:5
+weight_matrix:[[0.0, 0.0, 0.0, -1.0, 0.0], [0.0, 0.0, -1.0, 1.0, 1.0], [0.0, -1.0, 0.0, -1.0, 1.0], [-1.0, 1.0, -1.0, 0.0, -1.0], [0.0, 1.0, 1.0, -1.0, 0.0]]
+To aid your analysis, I extracted the following features from this data:
+average_node_degree:2.8
+edge_density:0.7
+average_edge_weight:-0.14285714285714285
+max_edge_weight:1.0
+min_edge_weight:-1.0
+standard_deviation_edge_weight:0.989743318610787
+weighted_degree_distribution:[-1.0, 1.0, -1.0, -2.0, 1.0]
+
+Negative solution from most_weight_neighbors_d31b:
+set_a: 0,1,2,3
+set_b: 4
+The result is 1.0.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	most_weight_neighbors_d31b	InsertNodeOperator(node=3, target_set='A')	set_a: 3\nset_b: \n
+1	most_weight_neighbors_d31b	InsertNodeOperator(node=1, target_set='B')	set_a: 3\nset_b: 1\n
+2	most_weight_neighbors_d31b	InsertNodeOperator(node=2, target_set='A')	set_a: 2,3\nset_b: 1\n
+3	most_weight_neighbors_d31b	InsertNodeOperator(node=4, target_set='A')	set_a: 2,3,4\nset_b: 1\n
+4	most_weight_neighbors_d31b	InsertNodeOperator(node=0, target_set='A')	set_a: 0,2,3,4\nset_b: 1\n
+5	most_weight_neighbors_d31b	SwapOperator(nodes=[4, 1])	set_a: 0,1,2,3\nset_b: 4\n
+
+Positive solution from external:
+set_a: 0,3,4
+set_b: 1,2
+The result is 2.0.
+The trajectory to get this solution:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	most_weight_neighbors_d31b	InsertNodeOperator(node=3, target_set='A')	set_a: 3\nset_b: \n
+1	most_weight_neighbors_d31b	InsertNodeOperator(node=1, target_set='B')	set_a: 3\nset_b: 1\n
+2	random_5c59	InsertNodeOperator(node=2, target_set='B')	set_a: 3\nset_b: 1,2\n
+3	most_weight_neighbors_d31b	InsertNodeOperator(node=4, target_set='A')	set_a: 3,4\nset_b: 1,2\n
+4	most_weight_neighbors_d31b	InsertNodeOperator(node=0, target_set='A')	set_a: 0,3,4\nset_b: 1,2\n
+
+Please based on the data and solution, help to pick out the bottleneck operations in negative solution, which may cause the poor performance
+Please note:
+1. Some operations, although they appear different, are essentially the same.
+2. Some operations may lead to solutions that look different but are essentially the same.
+3. Some operations may cause changes to the solution but do not affect the final cost; these are not considered bottlenecks.
+4. When an operation A is performed poorly, leading to a series of subsequent operations experiencing issues, we consider the first operation A to be a bottleneck.
+5. If there is only one item, there is no need to force multiple answers.
+6. Try to propose a better operator than origin one and you can learn from positive solution or others.
+
+The response format is very important. For better communication, please respond to me in this format:
+***bottleneck_operations:
+negative_operator_id; proposed_better_operator; reason
+negative_operator_id; proposed_better_operator; reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***bottleneck_operations:
+3; InsertNodeOperator(node=4, target_set='B'); The node 4 should have been placed in set B to increase the cut value, as seen in the positive solution.
+5; None; The swap operation did not improve the cut value as intended, indicating a prior misplacement of nodes.
+***
+------------------------------------------------------------------------------------
+
+user
+Now focus on this operator InsertNodeOperator(node=4, target_set='A') in step 3.
+
+The state before InsertNodeOperator(node=4, target_set='A') is:
+current_solution:
+set_a: 2,3
+set_b: 1
+
+set_a_count:2
+set_b_count:1
+selected_nodes:{1, 2, 3}
+selected_num:3
+unselected_nodes:{0, 4}
+unselected_num:2
+current_cut_value:0.0
+To aid your analysis, I extracted the following features from this state:
+average_node_degree:2.8
+edge_density:0.7
+average_edge_weight:-0.14285714285714285
+max_edge_weight:1.0
+min_edge_weight:-1.0
+standard_deviation_edge_weight:0.989743318610787
+weighted_degree_distribution:[-1.0, 1.0, -1.0, -2.0, 1.0]
+
+You believe that  InsertNodeOperator(node=4, target_set='B') is better with reason  The node 4 should have been placed in set B to increase the cut value, as seen in the positive solution.. So we hope to update most_weight_neighbors_d31b to output  InsertNodeOperator(node=4, target_set='B') in this state.
+Try to provide suggestion to update the code using mathematical analysis.
+
+Please provide suggestion in following one or more aspects:
+1. Set the hyper-parameters or update the hyper-parameters' value for better control.
+2. Add more logic to this function for better control.
+3. Limit the application scope of certain logic with an if-check.
+4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
+5. Also consider learning from other heuristics:
+from src.problems.max_cut.components import *
+import numpy as np
+
+def highest_weight_edge_ca02(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+    """ Heuristic algorithm to maximize cut value by evaluating the impact of placing each unselected node into set A or B.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - "current_solution" (Solution): The current solution of the MaxCut problem.
+            - "unselected_nodes" (set[int]): The set of unselected nodes.
+            - "set_a" (set[int]): The set of nodes in partition A.
+            - "set_b" (set[int]): The set of nodes in partition B.
+        algorithm_data (dict): Not used in this algorithm.
+        get_state_data_function (callable): Not used in this algorithm.
+
+    Kwargs:
+        k (int, optional): Frequency of applying swap operations. Default is 3.
+
+    Returns:
+        InsertNodeOperator: An operator that places an unselected node into one of the sets (A or B) to maximize the cut value.
+        dict: Empty dictionary as no algorithm data is updated.
+    """
+    # Extract necessary information
+    weight_matrix = global_data["weight_matrix"]
+    current_solution = state_data["current_solution"]
+    unselected_nodes = state_data["unselected_nodes"]
+    set_a = state_data["current_solution"].set_a
+    set_b = state_data["current_solution"].set_b
+    k = kwargs.get("k", 3)  # Frequency of swap operations, default is 3
+    
+    # If there are no unselected nodes, return None
+    if not unselected_nodes:
+        return None, {}
+
+    # Initialize variables for the best node and its placement
+    best_node = None
+    best_target_set = None
+    max_delta = float('-inf')
+
+    # Evaluate each unselected node
+    for node in unselected_nodes:
+        # Calculate delta for placing the node in set A
+        delta_a = sum(weight_matrix[node][other] for other in set_b) - sum(weight_matrix[node][other] for other in set_a)
+
+        # Calculate delta for placing the node in set B
+        delta_b = sum(weight_matrix[node][other] for other in set_a) - sum(weight_matrix[node][other] for other in set_b)
+
+        # Determine the best placement for the current node
+        if delta_b > delta_a and delta_b > max_delta:
+            best_node = node
+            best_target_set = 'B'
+            max_delta = delta_b
+        elif delta_a >= delta_b and delta_a > max_delta:
+            best_node = node
+            best_target_set = 'A'
+            max_delta = delta_a
+
+    # If no valid node is found, return None
+    if best_node is None:
+        return None, {}
+
+    # Perform swap operation periodically (every k operations)
+    if len(set_a) + len(set_b) % k == 0:
+        best_swap_delta = float('-inf')
+        best_swap_pair = None
+
+        # Precompute weights to sets
+        weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1)
+        weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1)
+
+        # Evaluate all possible swaps
+        for i in set_a:
+            for j in set_b:
+                # Calculate delta for swapping nodes i and j
+                delta = weight_to_a[i] - weight_to_a[j] + weight_to_b[j] - weight_to_b[i]
+                if weight_matrix[i, j] != 0:
+                    delta += 2 * weight_matrix[i, j]
+
+                # Check if the swap improves the cut value
+                if delta > best_swap_delta:
+                    best_swap_delta = delta
+                    best_swap_pair = (i, j)
+
+        # If a beneficial swap is found, execute it
+        if best_swap_pair and best_swap_delta > 0:
+            i, j = best_swap_pair
+            return SwapOperator(nodes=[i, j]), {}
+
+    # Return the best node insertion operator
+    return InsertNodeOperator(node=best_node, target_set=best_target_set), {}
+from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
+import numpy as np
+
+def most_weight_neighbors_d31b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, scaling_factor: float = 0.5, swap_frequency: int = 5, **kwargs) -> tuple[InsertNodeOperator, dict]:
+    """The most_weight_neighbors_d31b heuristic selects an unselected node based on both immediate and future impacts 
+    on the cut value and periodically considers swaps to further improve the solution.
+
+    Args:
+        global_data (dict): The global data dict containing the following items:
+            - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+        state_data (dict): The state dictionary containing the current state information:
+            - "current_solution" (Solution): The current partition of the graph into sets A and B.
+            - "unselected_nodes" (set[int]): The set of nodes that have not yet been selected.
+            - "current_cut_value" (float): The current cut value of the solution.
+        algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
+            - "sorted_nodes" (list of tuples): A sorted list of (node, future_impact) in descending order.
+            - "operation_count" (int): The number of operations performed so far.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+        scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
+        swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.
+
+    Returns:
+        InsertNodeOperator or SwapOperator: The operator to modify the solution.
+        dict: Updated algorithm data with the sorted list of nodes and operation count.
+    """
+
+    # Extract necessary data
+    weight_matrix = global_data["weight_matrix"]
+    current_solution = state_data["current_solution"]
+    unselected_nodes = state_data["unselected_nodes"]
+    set_a, set_b = current_solution.set_a, current_solution.set_b
+    operation_count = algorithm_data.get("operation_count", 0)
+
+    # Step 1: Perform a swap operation periodically
+    if operation_count % swap_frequency == 0 and set_a and set_b:
+        weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1)
+        weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1)
+        best_increase = float("-inf")
+        best_pair = None
+
+        # Evaluate all possible swaps
+        for i in set_a:
+            for j in set_b:
+                delta = weight_to_a[i] - weight_to_a[j] + weight_to_b[j] - weight_to_b[i]
+                if weight_matrix[i, j] != 0:  # Adjust for the edge between i and j if it exists
+                    delta += 2 * weight_matrix[i, j]
+                if delta > best_increase:
+                    best_increase = delta
+                    best_pair = (i, j)
+
+        # If a beneficial swap is found, return the SwapOperator
+        if best_pair:
+            return SwapOperator(nodes=list(best_pair)), {"operation_count": operation_count + 1}
+
+    # Step 2: Sort unselected nodes based on future impact if not already sorted
+    if "sorted_nodes" not in algorithm_data or not algorithm_data["sorted_nodes"]:
+        # Calculate the future impact for each unselected node
+        sorted_nodes = sorted(
+            [(node, sum(abs(weight_matrix[node][other]) for other in range(len(weight_matrix)))) for node in unselected_nodes],
+            key=lambda x: x[1],
+            reverse=True
+        )
+        algorithm_data["sorted_nodes"] = sorted_nodes
+    else:
+        # Filter out nodes that have been selected since the last run
+        sorted_nodes = [
+            (node, future_impact) for (node, future_impact) in algorithm_data["sorted_nodes"]
+            if node in unselected_nodes
+        ]
+
+    # Step 3: Select the best unselected node based on both immediate and future impacts
+    if not sorted_nodes:
+        return None, {}
+
+    # Extract the best node and its future impact
+    best_node, future_impact = sorted_nodes.pop(0)
+
+    # Calculate the potential increase in cut value for adding the node to each set
+    potential_increase_a = sum(weight_matrix[best_node][other] for other in set_b)
+    potential_increase_b = sum(weight_matrix[best_node][other] for other in set_a)
+
+    # Adjust the potential increases by adding the scaled future impact
+    adjusted_increase_a = potential_increase_a + scaling_factor * future_impact
+    adjusted_increase_b = potential_increase_b + scaling_factor * future_impact
+
+    # Choose the set that gives the maximum adjusted increase in cut value
+    target_set = "A" if adjusted_increase_a >= adjusted_increase_b else "B"
+
+    # Create the operator to insert the selected node into the chosen set
+    operator = InsertNodeOperator(best_node, target_set)
+
+    # Return the operator and the updated algorithm data
+    return operator, {"sorted_nodes": sorted_nodes, "operation_count": operation_count + 1}
+from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
+import numpy as np
+
+def balanced_cut_c0e6(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+    """Balanced Cut heuristic for the Max Cut problem with improvements to ensure balanced partitions, 
+    future impact consideration, and periodic swap operations.
+
+    Args:
+        global_data (dict): The global data dict containing the following items:
+            - weight_matrix (numpy.ndarray): A 2D array representing the weight between nodes.
+        state_data (dict): The state dictionary containing the current state information:
+            - current_solution (Solution): The current partition of the graph into sets A and B.
+            - unselected_nodes (set[int]): The set of nodes that have not yet been selected.
+            - set_a (set[int]): The set of nodes in partition A.
+            - set_b (set[int]): The set of nodes in partition B.
+            - current_cut_value (float): The current cut value of the solution.
+        algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
+            - operation_count (int): The number of operations performed so far. Default is 0.
+            - sorted_nodes (list of tuples): A sorted list of (node, future_impact) in descending order. Default is empty.
+        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+        kwargs (dict): Hyperparameters for the heuristic:
+            - scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
+            - swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.
+
+    Returns:
+        InsertNodeOperator or SwapOperator: The operator to modify the solution.
+        dict: Updated algorithm data with the sorted list of nodes and operation count.
+    """
+    # Extract necessary data
+    weight_matrix = global_data["weight_matrix"]
+    current_solution = state_data["current_solution"]
+    unselected_nodes = state_data["unselected_nodes"]
+    set_a, set_b = current_solution.set_a, current_solution.set_b
+    operation_count = algorithm_data.get("operation_count", 0)
+    sorted_nodes = algorithm_data.get("sorted_nodes", [])
+
+    # Hyperparameters
+    scaling_factor = kwargs.get("scaling_factor", 0.5)
+    swap_frequency = kwargs.get("swap_frequency", 5)
+
+    # Step 1: Perform a swap operation periodically
+    if operation_count % swap_frequency == 0 and set_a and set_b:
+        weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1)
+        weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1)
+        best_increase = float("-inf")
+        best_pair = None
+
+        # Evaluate all possible swaps
+        for i in set_a:
+            for j in set_b:
+                delta = weight_to_a[i] - weight_to_a[j] + weight_to_b[j] - weight_to_b[i]
+                if weight_matrix[i, j] != 0:  # Adjust for the edge between i and j if it exists
+                    delta += 2 * weight_matrix[i, j]
+                if delta > best_increase:
+                    best_increase = delta
+                    best_pair = (i, j)
+
+        # If a beneficial swap is found, return the SwapOperator
+        if best_pair:
+            return SwapOperator(nodes=list(best_pair)), {"operation_count": operation_count + 1}
+
+    # Step 2: Sort unselected nodes based on future impact if not already sorted
+    if not sorted_nodes:
+        # Calculate the future impact for each unselected node
+        sorted_nodes = sorted(
+            [(node, sum(abs(weight_matrix[node][other]) for other in range(len(weight_matrix)))) for node in unselected_nodes],
+            key=lambda x: x[1],
+            reverse=True
+        )
+    else:
+        # Filter out nodes that have been selected since the last run
+        sorted_nodes = [
+            (node, future_impact) for (node, future_impact) in sorted_nodes
+            if node in unselected_nodes
+        ]
+
+    # Step 3: Select the best unselected node based on both immediate and future impacts
+    if not sorted_nodes:
+        return None, {}
+
+    # Extract the best node and its future impact
+    best_node, future_impact = sorted_nodes.pop(0)
+
+    # Calculate the potential increase in cut value for adding the node to each set
+    potential_increase_a = sum(weight_matrix[best_node][other] for other in set_b)
+    potential_increase_b = sum(weight_matrix[best_node][other] for other in set_a)
+
+    # Adjust the potential increases by adding the scaled future impact
+    adjusted_increase_a = potential_increase_a + scaling_factor * future_impact
+    adjusted_increase_b = potential_increase_b + scaling_factor * future_impact
+
+    # Choose the set that gives the maximum adjusted increase in cut value
+    target_set = "A" if adjusted_increase_a >= adjusted_increase_b else "B"
+
+    # Create the operator to insert the selected node into the chosen set
+    operator = InsertNodeOperator(best_node, target_set)
+
+    # Return the operator and the updated algorithm data
+    return operator, {"sorted_nodes": sorted_nodes, "operation_count": operation_count + 1}
+
+To make sure the suggestion is useful, please check in following aspects:
+1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.
+2. Will the updated suggestion make the function output  InsertNodeOperator(node=4, target_set='B') in this step?
+3. If we run the updated function on this data from beginning to end, will the result be better than set_a: 0,3,4
+set_b: 1,2 (2.0)?
+4. Is this a commonly useful update for all instances or states?
+
+The response format is very important. For better communication, please respond to me in this format:
+***suggestion: xxx
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***suggestion:
+1. Adjust the scaling_factor to a higher value, such as 1.0, to give more weight to future impacts, potentially improving decision-making for InsertNodeOperator.
+2. Add logic to consider negative weights more critically, potentially through an additional condition that prioritizes nodes that balance negative and positive impacts.
+3. Introduce an if-check to ensure nodes with negative weighted degrees are directed to the set that minimizes the negative impact.
+4. Incorporate logic from highest_weight_edge_ca02 to evaluate the potential delta for each node and choose based on the highest positive impact to the cut value.
+***
+------------------------------------------------------------------------------------
+

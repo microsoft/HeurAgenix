@@ -1,0 +1,1029 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on dposp problem:
+Dynamic Production Order Scheduling Problem (DPOSP) involves multiple machines, each capable of producing various products. The production speed for different products varies across machines, and some transitions between products are not allowed. Each order specifies the required product, quantity, and deadline, and an order is considered completed only if all requirements are met by the deadline. Orders completed after the deadline are invalid. Each production action corresponds to an order, and the plan for each production line can be represented as a list, where each item denotes an order. The start time of each production is calculated based on the sum of the previous production and transition times, ensuring that each production is completed before the deadline. Our objective is to maximize the number of completed orders, with each order having the same priority, regardless of the quantity required.
+
+To formally describe DPOSP, we build the following optimization model. Let X_ij represent the j-th production action on the i-th production line, whereX_ij=k indicates that the j-th action on the i-th production line is producing order k, and X_ij=0 if there is no production action. The problem includes the following components:
+
+**Maximize**
+Sum over all production lines (i) and production actions (j) of the indicator function I(X_ij != 0)
+
+**Subject to**
+1. For each order k, sum over all production lines (i) and production actions (j) of the indicator function I(X_ij = k) <= 1.
+2. The start time s_ij is set to:
+   - 0 if j = 1 (the first action on the production line starts at time 0)
+   - The end time of the previous action (e_i,j-1) plus the transition time between the products of the previous action (P_k_j-1) and the current action (P_k_j) if j > 1.
+3. The end time e_ij is calculated as the start time s_ij plus the quantity of order k divided by the production speed of the production line i for product P_k, if X_ij = k.
+4. The end time e_ij must be less than or equal to the deadline D_k for the order k, if X_ij = k.
+
+Where:
+- X_ij (Decision Variable) represents the j-th production action on the i-th production line, with X_ij = k indicating production of order k and X_ij = 0 indicating no action; X_ij can take values in the set {0, 1, ..., k}.
+- v_ip (Input Variable) is the production speed of production line i for product p. If v_ip = 0, the product cannot be produced on line i.
+- t_i,p,p' (Input Variable) is the transition time for production line i from product p to product p'. If t_i,p,p' is infinity, the transition is not allowed.
+- Q_k (Input Variable) is the quantity required for order k.
+- P_k (Input Variable) is the product required for order k.
+- D_k (Input Variable) is the deadline for order k.
+- s_ij (Intermediate Variable) is the start time of the j-th production action on production line i.
+- e_ij (Intermediate Variable) is the end time of the j-th production action on production line i.
+- I() (Indicator Function) equals 1 if the condition is true, and 0 otherwise.
+
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution of DPOSP.
+A list of lists, where each sublist corresponds to a production line's planned sequence of orders.
+Each integer within the sublist represents an order to be fulfilled by the machine, in the sequence they are to be produced."""
+    def __init__(self, production_schedule: list[list[int]]):
+        self.production_schedule = production_schedule
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AppendOperator(BaseOperator):
+    """Appends an order to the end of a specified production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].append(self.order_id)
+        return Solution(new_schedule)
+class InsertOperator(BaseOperator):
+    """Inserts an order at a specified position within a production line's schedule."""
+    def __init__(self, production_line_id: int, order_id: int, position: int):
+        self.production_line_id = production_line_id
+        self.order_id = order_id
+        self.position = position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.production_line_id].insert(self.position, self.order_id)
+        return Solution(new_schedule)
+class SwapOperator(BaseOperator):
+    """Swaps two orders between or within production lines."""
+    def __init__(self, production_line_id1: int, position1: int, production_line_id2: int, position2: int):
+        if production_line_id1 <= production_line_id2:
+            self.production_line_id1 = production_line_id1
+            self.position1 = position1
+            self.production_line_id2 = production_line_id2
+            self.position2 = position2
+        else:
+            self.production_line_id1 = production_line_id2
+            self.position1 = position2
+            self.production_line_id2 = production_line_id1
+            self.position2 = position1
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        (new_schedule[self.production_line_id1][self.position1], new_schedule[self.production_line_id2][self.position2]) = (new_schedule[self.production_line_id2][self.position2], new_schedule[self.production_line_id1][self.position1])
+        return Solution(new_schedule)
+class ReverseSegmentOperator(BaseOperator):
+    """Reverses a segment of orders within a production line's schedule."""
+    def __init__(self, production_line_id: int, segments: list[tuple[int, int]]):
+        self.production_line_id = production_line_id
+        self.segments = segments
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        for segment in self.segments:
+            (start_index, end_index) = segment
+            assert 0 <= start_index < len(new_schedule[self.production_line_id])
+            assert 0 <= end_index < len(new_schedule[self.production_line_id])
+            if start_index > end_index:
+                (start_index, end_index) = (end_index, start_index)
+            new_schedule[self.production_line_id][start_index:end_index + 1] = reversed(new_schedule[self.production_line_id][start_index:end_index + 1])
+        return Solution(new_schedule)
+class RelocateOperator(BaseOperator):
+    """Moves an order from one position to another within the same or to a different production line."""
+    def __init__(self, source_production_line_id: int, source_position: int, target_production_line_id: int, target_position: int):
+        self.source_production_line_id = source_production_line_id
+        self.source_position = source_position
+        self.target_production_line_id = target_production_line_id
+        self.target_position = target_position
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        order = new_schedule[self.source_production_line_id].pop(self.source_position)
+        if not new_schedule[self.target_production_line_id]:
+            new_schedule[self.target_production_line_id].append(order)
+        else:
+            new_schedule[self.target_production_line_id].insert(self.target_position, order)
+        return Solution(new_schedule)
+class MergeOperator(BaseOperator):
+    """Merges the schedule of a source production line into the beginning of a target production line's schedule. 
+The merged schedule is assigned to the target production line, and the source production line's schedule is cleared."""
+    def __init__(self, source_production_line_id: int, target_production_line_id: int):
+        self.source_production_line_id = source_production_line_id
+        self.target_production_line_id = target_production_line_id
+    def run(self, solution: Solution) -> Solution:
+        new_schedule = [order[:] for order in solution.production_schedule]
+        new_schedule[self.target_production_line_id] = new_schedule[self.source_production_line_id] + new_schedule[self.target_production_line_id]
+        new_schedule[self.source_production_line_id] = []
+        return Solution(new_schedule)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+- "product_num" (int): Total number of unique products.
+- "production_line_num" (int): Total number of production lines.
+- "order_num" (int): Total number of orders to be scheduled.
+- "production_rate" (numpy.array): 2D array of production time for each product on each production line, and shape is (production_line_num, product_num)
+- "transition_time" (numpy.array): 3D array of transition time between products on each production line, and shape is (production_line_num, product_num, product_num)
+- "order_product" (numpy.array): 1D array mapping each order to its required product and length is order_num.
+- "order_quantity" (numpy.array): 1D array of the quantity required for each order and length is order_num.
+- "order_deadline" (numpy.array): 1D array of the deadline for each order and length is order_num.
+- "current_solution" (Solution): Current scheduling solution.
+- "fulfilled_order_num" (int): Number of fulfilled orders.
+- "fulfilled_orders" (list[int]): List of fulfilled orders.
+- "unfulfilled_orders" (list[int]): List of unfulfilled orders.
+- "total_time_cost_per_production_line" (numpy.array): 1D array of the sum of production and transition times for each production line.
+- "feasible_orders_to_fulfill" (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
+- "validation_single_production_schedule" (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
+- "get_time_cost_delta" (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
+- "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is dposp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Dynamic Production Order Scheduling Problem (DPOSP) as you described is indeed a combinatorial optimization problem. It involves determining the optimal sequence of production actions across multiple machines to maximize the number of completed orders before their respective deadlines. The problem's constraints and objective function are typical of combinatorial problems, where the goal is to find the best combination of decisions (in this case, production sequences) from a finite set of possibilities. 
+
+The use of hyper-heuristics and the framework you've developed, which includes a solution representation and a variety of operators for modifying solutions, is a valid approach for tackling such problems. Hyper-heuristics aim to find or generate heuristics to solve complex optimization problems, and your framework provides the flexibility needed to explore different heuristic strategies for DPOSP.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def longest_order_next_c9cb(): Longest Order Next heuristic algorithm for DPOSP which selects the unfulfilled order with the longest processing time and schedules it in the most appropriate position on a production line that minimizes delays and respects deadlines.
+def least_order_remaining_9c3c(): Heuristic for selecting the next order to append to the production schedule based on least cumulative remaining work. The heuristic identifies the order with the shortest processing time left from the unfulfilled orders list and appends it to a production line.
+def random_c05a(max_attempts: int = 100) -> tuple[AppendOperator, dict]:
+    """Random Order Selection Heuristic for DPOSP.
+    
+    This heuristic randomly selects an unfulfilled order from the list of feasible orders and attempts to append it
+    to a randomly selected production line's schedule. The insertion is validated to ensure that it
+    maintains a valid schedule respecting all production and transition constraints.
+
+    Args): Random Order Selection Heuristic for DPOSP. This heuristic randomly selects an unfulfilled order from the list of feasible orders and attempts to append it to a randomly selected production line's schedule. The insertion is validated to ensure that it maintains a valid schedule respecting all production and transition constraints.
+def farthest_deadline_insertion_7e8a(): Farthest Deadline Insertion heuristic for DPOSP. This heuristic selects the unfulfilled order with the farthest deadline and attempts to insert it into a production schedule where it causes the least increase in overall production and transition times, without violating any existing deadlines. The heuristic iterates over each production line, evaluating the insertion of the farthest deadline order at various positions, considering both the production speed of the line for the product and the transition times between orders. The goal is to minimize the impact on the current schedule while ensuring that all orders are completed before their respective deadlines.
+def maximum_remaining_work_order_ec9c(): Heuristic that selects the order with the most remaining work that can be feasibly scheduled on any production line without violating existing order deadlines. The chosen order is then appended or inserted into the most appropriate production line's schedule, aiming to maximize the number of orders fulfilled before their respective deadlines.
+def greedy_order_selection_2882(): Greedy heuristic algorithm for the DPOSP. This algorithm attempts to construct a solution by iteratively adding the most suitable order to a production line's schedule based on a specific criterion such as closest deadline or shortest processing time.
+def greedy_deadline_proximity_ac6e(): Greedy Deadline Proximity heuristic for DPOSP. This heuristic attempts to construct a production schedule by iteratively appending orders to production lines based on their proximity to their deadline and the transition times between orders. It begins with an empty schedule for each production line and selects orders based on the closest deadline from the current time in the schedule. The heuristic also accounts for the transition time from the last scheduled order to the potential new order and production speeds, ensuring that the added order can be completed before its deadline without violating transition constraints. Orders are chosen to maximize the number of orders fulfilled, considering the remaining processing time and capacity constraints of each production line.
+def exchange_production_orders_eda2(): The exchange production orders heuristic tries to improve the current production schedule by swapping two non-adjacent orders from the same or different production lines and assessing the impact on the total production and transition times. The heuristic is based on the 2-opt approach from TSP and is adapted to consider DPOSP-specific constraints such as varying production speeds, transition times, order deadlines, and production line capabilities.
+def _2opt_production_sequence_8e5e(): The 2-opt Production Sequence heuristic adapts the 2-opt approach from TSP to the context of DPOSP. It aims to improve the sequence of production orders on each production line by swapping two non-adjacent orders and re-evaluating the schedule's efficiency. By considering the production rates, transition times, and order deadlines, this heuristic explores alternative sequences that could lead to a higher number of completed orders or reduced total production and transition time. The heuristic iteratively checks all possible pairs of non-adjacent orders within a production line to determine if a more optimal order sequence can be found, taking care to maintain the feasibility of the schedule with respect to order deadlines. If a more efficient sequence is identified, the heuristic generates a ReverseSegmentOperator that applies this improved order sequence to the production line.
+def greedy_by_order_density_c702(): This heuristic for DPOSP selects the next order to schedule based on an 'order density' metric, defined as the ratio of the order's value to the combined time taken for production and transition. For each unscheduled order, compute the order density as 1 divided by the sum of the production time on the assigned production line and the transition time from the last scheduled product. Select the order with the highest density value that can be completed before its deadline and append it to the corresponding production line schedule.
+def nearest_order_scheduling_1a5e(): Implements the nearest order scheduling heuristic for DPOSP. Starting from an initial order, the heuristic builds a production schedule by selecting and appending the next order that minimizes the combined criteria of setup time (transition time between orders) and proximity to the delivery deadline. The heuristic begins with either a randomly selected order or the one with the earliest deadline and iteratively adds to the schedule the order that is closest in terms of transition time from the previously scheduled order while also taking into account the urgency of order deadlines. This process continues until no further orders can be feasibly added to the schedule without violating deadline constraints.
+def shortest_order_next_25bd(): Shortest Order Next heuristic for DPOSP selects the unfulfilled order with the shortest processing time and inserts it into the best position in the production schedule.
+def order_shift_between_lines_bd0c(): This heuristic attempts to shift an unfulfilled order from one production line to another while adhering to machine capabilities, transition rules, and order deadlines.
+def shortest_operation_ff40(): Shortest Operation Heuristic for DPOSP. This heuristic iterates over each production line and attempts to insert the shortest unfulfilled order that can be appended to the end of the production line's schedule without violating any constraints.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+Analyzing the scenarios for applying each heuristic algorithm in the context of the Dynamic Production Order Scheduling Problem (DPOSP) can help determine their applicability and effectiveness. Here is a breakdown of scenarios where each heuristic might be best suited:
+
+1. **longest_order_next_c9cb()**:
+   - **Scenario**: When there are fewer but larger orders in terms of processing time, and the goal is to ensure that these significant orders are scheduled first to take advantage of production line availability.
+   - **Quantification**: Large order quantities with long processing times relative to deadlines.
+
+2. **least_order_remaining_9c3c()**:
+   - **Scenario**: Suitable for environments where there are many small orders, and the aim is to quickly fulfill as many orders as possible by focusing on those that require the least remaining work.
+   - **Quantification**: High number of small orders with short processing times.
+
+3. **random_c05a(max_attempts: int = 100)**:
+   - **Scenario**: When the solution space is vast and random exploration might help escape local optima. Useful in an initial exploration phase or when combined with other heuristics.
+   - **Quantification**: Large solution space with potentially unknown optimal configurations.
+
+4. **farthest_deadline_insertion_7e8a()**:
+   - **Scenario**: When the production schedule is relatively free, and there is an opportunity to plan long-term, prioritizing orders with the farthest deadlines to avoid last-minute rushes.
+   - **Quantification**: Orders with deadlines that are far into the future.
+
+5. **maximum_remaining_work_order_ec9c()**:
+   - **Scenario**: When there are critical, high-workload orders that must be addressed to ensure overall schedule feasibility.
+   - **Quantification**: Orders with high work content that could impact overall schedule.
+
+6. **greedy_order_selection_2882()**:
+   - **Scenario**: In situations where quick, iterative improvements are needed based on simple criteria like deadline proximity or processing time.
+   - **Quantification**: Orders with clear priority metrics such as deadlines or processing times.
+
+7. **greedy_deadline_proximity_ac6e()**:
+   - **Scenario**: When deadlines are tight, and orders need to be scheduled based on their proximity to deadlines and the current time.
+   - **Quantification**: Tight deadlines with high penalties for delay.
+
+8. **exchange_production_orders_eda2()**:
+   - **Scenario**: When the current schedule is suboptimal, and swapping orders could significantly reduce transition times or improve order completion.
+   - **Quantification**: High transition costs or suboptimal order sequences.
+
+9. **_2opt_production_sequence_8e5e()**:
+   - **Scenario**: Adapted from TSP, useful when the current order sequence is highly inefficient and improvements can be made by rearranging the sequence.
+   - **Quantification**: Inefficient sequences with potential for reduced time through reordering.
+
+10. **greedy_by_order_density_c702()**:
+    - **Scenario**: When orders vary greatly in value or urgency, and a metric like order density can help prioritize high-value orders.
+    - **Quantification**: Orders with varying values or urgency levels.
+
+11. **nearest_order_scheduling_1a5e()**:
+    - **Scenario**: When minimizing setup time is crucial, and scheduling the next nearest order can help maintain flow and reduce transition delays.
+    - **Quantification**: High setup times between orders.
+
+12. **shortest_order_next_25bd()**:
+    - **Scenario**: When the goal is to minimize the time orders remain in the queue by quickly processing those with the shortest processing times.
+    - **Quantification**: High volume of short-duration orders.
+
+13. **order_shift_between_lines_bd0c()**:
+    - **Scenario**: When balancing load across production lines is necessary, and shifting orders can help optimize overall production efficiency.
+    - **Quantification**: Imbalance in workload distribution across lines.
+
+14. **shortest_operation_ff40()**:
+    - **Scenario**: Similar to shortest_order_next, but specifically focuses on inserting the shortest operations to fill gaps in the schedule.
+    - **Quantification**: Opportunities to fill short gaps in the production schedule.
+
+In summary, each heuristic targets specific aspects of the DPOSP, and their applicability depends on the characteristics of the orders, deadlines, and production line capabilities. Quantifying these scenarios involves evaluating order size, processing time, deadlines, transition times, and production line loads.
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+product_num:40
+production_line_num:20
+order_num:2000
+average_production_rate:[1.1, 0.5, 0.9, 0.0, 1.35, 0.4, 0.25, 0.45, 0.25, 0.3, 1.0, 0.85, 0.25, 0.8, 0.4, 0.1, 1.65, 0.75, 0.75, 0.85, 0.95, 0.75, 0.1, 0.5, 0.3, 0.8, 0.15, 0.1, 0.15, 1.8, 1.1, 1.0, 0.45, 0.0, 0.6, 0.35, 0.4, 1.5, 0.25, 0.5]
+maximum_transition_time:inf
+average_order_quantity:26.479
+deadline_variance:19971.8559
+product_to_order_ratio:0.02
+average_deadline_per_product:[238.390243902439, 239.42857142857142, 259.0, 248.05714285714285, 265.05263157894734, 210.92307692307693, 259.46666666666664, 246.0, 216.55555555555554, 213.73333333333332, 269.58620689655174, 235.69811320754718, 226.18867924528303, 231.70909090909092, 247.88235294117646, 248.94545454545454, 184.8, 240.8135593220339, 236.4, 226.30188679245282, 257.4146341463415, 252.45283018867926, 220.6046511627907, 199.1764705882353, 247.57894736842104, 233.1818181818182, 285.1914893617021, 275.0869565217391, 251.25, 198.8, 244.0, 267.0, 247.75862068965517, 235.86885245901638, 247.8, 258.8, 244.55555555555554, 252.3, 286.03636363636366, 252.3673469387755]
+production_line_utilization_potential:[inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf, inf]
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+fulfilled_order_num:1100
+total_time_cost_per_production_line:[349.66666666666663, 345.2, 352.0, 353.96666666666664, 342.0, 351.9333333333333, 346.0, 327.0, 355.0, 333.00000000000006, 336.0, 330.0, 343.5, 346.53333333333336, 346.0, 300.5, 338.0, 352.6, 328.1333333333333, 291.0]
+fulfillment_ratio:0.55
+average_time_cost:338.4016666666667
+max_time_cost:355.0
+unfulfilled_order_quantity_sum:27147.0
+unfulfilled_order_deadline_variance:20873.524400000002
+feasible_order_count:498
+solution_validity:True
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 88 rounds discuss and the summary are:
+---Round 0---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 20
+Explain: Start constructing the initial solution by prioritizing orders based on deadline proximity to manage the high variance in deadlines effectively.
+Delta of Total Time Cost For All Production Lines: 62.800000000000004
+Delta of Feasible Orders To Fulfill Num: -835
+Delta of Fulfilled Order Num: 20
+---Round 1---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Applying the 2-opt heuristic to optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 2---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Attempting to construct a better initial solution by prioritizing orders based on deadline proximity to manage high variance in deadlines and increase order fulfillment.
+Delta of Total Time Cost For All Production Lines: 118.33333333333331
+Delta of Feasible Orders To Fulfill Num: -102155
+Delta of Fulfilled Order Num: 25
+---Round 3---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Apply the 2-opt heuristic to refine the current sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency, given the high deadline variance and potential inefficiencies in the current schedule.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 4---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 30
+Explain: With the high variance in deadlines and a large number of unfulfilled orders, using a constructive heuristic that prioritizes deadline proximity may help build a more robust initial solution before further refinement.
+Delta of Total Time Cost For All Production Lines: 168.76666666666665
+Delta of Feasible Orders To Fulfill Num: 56450
+Delta of Fulfilled Order Num: 30
+---Round 5---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Apply the 2-opt heuristic to refine the current sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency, considering the high number of unfulfilled orders and potential sequence inefficiencies.
+Delta of Total Time Cost For All Production Lines: -3.0
+Delta of Feasible Orders To Fulfill Num: 123
+Delta of Fulfilled Order Num: 0
+---Round 6---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to manage high deadline variance and increase the number of fulfilled orders. This will help construct a more robust solution before further refinement.
+Delta of Total Time Cost For All Production Lines: 133.66666666666663
+Delta of Feasible Orders To Fulfill Num: 34739
+Delta of Fulfilled Order Num: 25
+---Round 7---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Apply the 2-opt heuristic to refine the current sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step follows a constructive heuristic and is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: -3.0
+Delta of Feasible Orders To Fulfill Num: 195
+Delta of Fulfilled Order Num: 0
+---Round 8---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to manage high deadline variance and increase the number of fulfilled orders. This will help construct a more robust solution before further refinement.
+Delta of Total Time Cost For All Production Lines: 163.26666666666665
+Delta of Feasible Orders To Fulfill Num: -5582
+Delta of Fulfilled Order Num: 25
+---Round 9---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: -6.0
+Delta of Feasible Orders To Fulfill Num: 198
+Delta of Fulfilled Order Num: 0
+---Round 10---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to further build the solution by managing high deadline variance and increasing the number of fulfilled orders. This step follows the previous improvement heuristic and continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 161.60000000000002
+Delta of Feasible Orders To Fulfill Num: -57420
+Delta of Fulfilled Order Num: 25
+---Round 11---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -1.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 12---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given that the last heuristic applied was `_2opt_production_sequence_8e5e` for refining the solution, we should continue the cycle by running a constructive heuristic. The `greedy_deadline_proximity_ac6e` heuristic is suitable for the current scenario as it helps manage the high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 146.19999999999993
+Delta of Feasible Orders To Fulfill Num: 45161
+Delta of Fulfilled Order Num: 25
+---Round 13---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Apply the 2-opt heuristic to refine the current sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step follows the constructive heuristic and is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 14---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to further build the solution by managing high deadline variance and increasing the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 127.06666666666683
+Delta of Feasible Orders To Fulfill Num: -8710
+Delta of Fulfilled Order Num: 25
+---Round 15---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one, `greedy_deadline_proximity_ac6e`, which aimed to manage high deadline variance and increase fulfilled orders. Now, it's time to refine the sequence of production orders using `_2opt_production_sequence_8e5e` to optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 16---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given that the last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e), we should now switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable because it helps manage high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 186.70000000000005
+Delta of Feasible Orders To Fulfill Num: -45353
+Delta of Fulfilled Order Num: 25
+---Round 17---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive heuristic (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders using _2opt_production_sequence_8e5e. This heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: 1.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 18---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: The last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e). We will now switch to a constructive heuristic, `greedy_deadline_proximity_ac6e`, to manage high deadline variance and aim to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 128.5999999999999
+Delta of Feasible Orders To Fulfill Num: 22949
+Delta of Fulfilled Order Num: 25
+---Round 19---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 20---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to further build the solution by managing high deadline variance and increasing the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 182.0
+Delta of Feasible Orders To Fulfill Num: -58421
+Delta of Fulfilled Order Num: 25
+---Round 21---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Given that the last heuristic applied was a constructive heuristic (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: -1.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 22---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continue building the solution by prioritizing orders based on deadline proximity to manage the high variance in deadlines and increase the number of fulfilled orders.
+Delta of Total Time Cost For All Production Lines: 165.20000000000005
+Delta of Feasible Orders To Fulfill Num: 34592
+Delta of Fulfilled Order Num: 25
+---Round 23---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The current strategy involves alternating between constructive and improvement heuristics. Following the last constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders by reducing transition times and improving overall schedule efficiency. This step continues the iterative refinement process.
+Delta of Total Time Cost For All Production Lines: -2.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 24---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continuing with the alternating strategy, apply the constructive heuristic to prioritize orders based on deadline proximity. This approach aims to manage the high variance in deadlines and increase the number of fulfilled orders, setting a stronger foundation for subsequent refinements.
+Delta of Total Time Cost For All Production Lines: 133.70000000000005
+Delta of Feasible Orders To Fulfill Num: -34223
+Delta of Fulfilled Order Num: 25
+---Round 25---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive heuristic (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase fulfilled orders. Now, it's time to refine the sequence of production orders using _2opt_production_sequence_8e5e to optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: -6.0
+Delta of Feasible Orders To Fulfill Num: -12366
+Delta of Fulfilled Order Num: 0
+---Round 26---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to further build the solution by managing high deadline variance and increasing the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 115.33333333333326
+Delta of Feasible Orders To Fulfill Num: -31999
+Delta of Fulfilled Order Num: 25
+---Round 27---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the last constructive heuristic, applying `_2opt_production_sequence_8e5e` will help optimize the order sequence, reduce transition times, and improve overall schedule efficiency, as part of the iterative refinement process.
+Delta of Total Time Cost For All Production Lines: -5.0
+Delta of Feasible Orders To Fulfill Num: 496
+Delta of Fulfilled Order Num: 0
+---Round 28---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to further build the solution by managing high deadline variance and increasing the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 164.93333333333317
+Delta of Feasible Orders To Fulfill Num: -39128
+Delta of Fulfilled Order Num: 25
+---Round 29---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -4.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 30---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continuing the alternating strategy, apply the constructive heuristic to prioritize orders based on deadline proximity. This approach aims to manage the high variance in deadlines and increase the number of fulfilled orders, building a stronger foundation for subsequent refinements.
+Delta of Total Time Cost For All Production Lines: 142.9333333333334
+Delta of Feasible Orders To Fulfill Num: 27887
+Delta of Fulfilled Order Num: 25
+---Round 31---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -4.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 32---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given the high variance in deadlines and the goal to increase the number of fulfilled orders, applying the `greedy_deadline_proximity_ac6e` heuristic will help prioritize orders based on deadline proximity, building a more robust solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 139.33333333333348
+Delta of Feasible Orders To Fulfill Num: 11873
+Delta of Fulfilled Order Num: 25
+---Round 33---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -9.0
+Delta of Feasible Orders To Fulfill Num: -72272
+Delta of Fulfilled Order Num: 0
+---Round 34---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given the high variance in deadlines and the need to increase fulfilled orders, applying the `greedy_deadline_proximity_ac6e` heuristic will help prioritize orders based on deadline proximity, further building the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 196.5999999999999
+Delta of Feasible Orders To Fulfill Num: 18715
+Delta of Fulfilled Order Num: 25
+---Round 35---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive heuristic, `greedy_deadline_proximity_ac6e`, which aimed to manage high deadline variance and increase fulfilled orders. Now, it's time to refine the sequence of production orders using `_2opt_production_sequence_8e5e` to optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally build and refine the solution.
+Delta of Total Time Cost For All Production Lines: -4.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 36---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: The last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e). Therefore, we should switch to a constructive heuristic. Given the high variance in deadlines and the goal to increase the number of fulfilled orders, the greedy_deadline_proximity_ac6e heuristic will help prioritize orders based on deadline proximity, building a more robust solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 149.30000000000018
+Delta of Feasible Orders To Fulfill Num: -57668
+Delta of Fulfilled Order Num: 25
+---Round 37---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders. Using the `_2opt_production_sequence_8e5e` heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -2.0
+Delta of Feasible Orders To Fulfill Num: 653
+Delta of Fulfilled Order Num: 0
+---Round 38---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continue with a constructive heuristic to prioritize orders based on deadline proximity, aiming to manage high deadline variance and increase the number of fulfilled orders. This will further build the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 160.0
+Delta of Feasible Orders To Fulfill Num: -73206
+Delta of Fulfilled Order Num: 25
+---Round 39---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders. Using the _2opt_production_sequence_8e5e heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step continues the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -3.0
+Delta of Feasible Orders To Fulfill Num: 694
+Delta of Fulfilled Order Num: 0
+---Round 40---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Switch to a constructive heuristic to prioritize orders based on deadline proximity, aiming to manage high deadline variance and increase the number of fulfilled orders. This continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 123.16666666666697
+Delta of Feasible Orders To Fulfill Num: 62601
+Delta of Fulfilled Order Num: 25
+---Round 41---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's now time to refine the sequence of production orders. Using the `_2opt_production_sequence_8e5e` heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This continues the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -3.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 42---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to manage high deadline variance and increase the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 169.29999999999927
+Delta of Feasible Orders To Fulfill Num: 13718
+Delta of Fulfilled Order Num: 25
+---Round 43---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's now time to refine the sequence of production orders. Using the _2opt_production_sequence_8e5e heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step continues the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -6.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 44---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given the high deadline variance and the goal to increase the number of fulfilled orders, applying the `greedy_deadline_proximity_ac6e` heuristic will help prioritize orders based on deadline proximity, further building the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 154.10000000000036
+Delta of Feasible Orders To Fulfill Num: -61984
+Delta of Fulfilled Order Num: 25
+---Round 45---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders. Using the _2opt_production_sequence_8e5e heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -1.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 46---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given that the last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e), we should switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable for the current scenario as it helps manage the high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 130.06666666666615
+Delta of Feasible Orders To Fulfill Num: -22347
+Delta of Fulfilled Order Num: 25
+---Round 47---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders. This heuristic aims to reduce transition times and improve overall schedule efficiency, continuing the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -4.0
+Delta of Feasible Orders To Fulfill Num: 1653
+Delta of Fulfilled Order Num: 0
+---Round 48---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, aiming to further build the solution by managing high deadline variance and increasing the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 182.73333333333358
+Delta of Feasible Orders To Fulfill Num: 11038
+Delta of Fulfilled Order Num: 25
+---Round 49---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -4.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 50---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Switch to a constructive heuristic to prioritize orders based on deadline proximity, aiming to manage high deadline variance and increase the number of fulfilled orders. This continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 135.9333333333334
+Delta of Feasible Orders To Fulfill Num: -21195
+Delta of Fulfilled Order Num: 25
+---Round 51---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which focused on managing high deadline variance and increasing the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the `_2opt_production_sequence_8e5e` heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -13.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 52---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Since the last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e), we will now switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable because it helps manage the high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 165.56666666666706
+Delta of Feasible Orders To Fulfill Num: -71049
+Delta of Fulfilled Order Num: 25
+---Round 53---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last applied heuristic was constructive, we will now refine the sequence of production orders using `_2opt_production_sequence_8e5e`. This heuristic will optimize the order arrangement, reduce transition times, and improve overall schedule efficiency, continuing the alternating strategy of building and refining the solution.
+Delta of Total Time Cost For All Production Lines: -5.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 54---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given the high deadline variance and the goal to increase the number of fulfilled orders, the `greedy_deadline_proximity_ac6e` heuristic will help prioritize orders based on deadline proximity, building a more robust solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 194.599999999999
+Delta of Feasible Orders To Fulfill Num: 8088
+Delta of Fulfilled Order Num: 25
+---Round 55---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -3.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 56---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continue constructing the solution by prioritizing orders based on deadline proximity to manage high variance in deadlines and increase the number of fulfilled orders. This approach will further build the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 130.73333333333449
+Delta of Feasible Orders To Fulfill Num: -159600
+Delta of Fulfilled Order Num: 25
+---Round 57---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -5.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 58---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Given that the last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e), it's time to switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable for the current scenario as it helps manage the high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 187.0666666666666
+Delta of Feasible Orders To Fulfill Num: 42512
+Delta of Fulfilled Order Num: 25
+---Round 59---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was constructive (`greedy_deadline_proximity_ac6e`), it's time to refine the sequence of production orders using `_2opt_production_sequence_8e5e`. This heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -5.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 60---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Switching to a constructive heuristic will help prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 150.23333333333267
+Delta of Feasible Orders To Fulfill Num: -8208
+Delta of Fulfilled Order Num: 25
+---Round 61---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, we will now refine the sequence of production orders using `_2opt_production_sequence_8e5e`. This heuristic aims to optimize the order arrangement, reduce transition times, and improve overall schedule efficiency, continuing the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -7.0
+Delta of Feasible Orders To Fulfill Num: 1105
+Delta of Fulfilled Order Num: 0
+---Round 62---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Since the last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e), it's time to switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable for the current scenario as it helps manage the high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 169.96666666666624
+Delta of Feasible Orders To Fulfill Num: -54199
+Delta of Fulfilled Order Num: 25
+---Round 63---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This continues the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 64---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Switching to a constructive heuristic to prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 203.9333333333343
+Delta of Feasible Orders To Fulfill Num: 34587
+Delta of Fulfilled Order Num: 25
+---Round 65---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Apply the 2-opt heuristic to refine the current sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution after a constructive heuristic.
+Delta of Total Time Cost For All Production Lines: -9.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 66---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continue constructing the solution by prioritizing orders based on deadline proximity to manage high variance in deadlines and increase the number of fulfilled orders. This will further build the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 158.73333333333267
+Delta of Feasible Orders To Fulfill Num: -38227
+Delta of Fulfilled Order Num: 25
+---Round 67---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -5.0
+Delta of Feasible Orders To Fulfill Num: 1105
+Delta of Fulfilled Order Num: 0
+---Round 68---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Switch to a constructive heuristic to prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 204.80000000000018
+Delta of Feasible Orders To Fulfill Num: -35633
+Delta of Fulfilled Order Num: 25
+---Round 69---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last applied heuristic was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, we should focus on refining the solution by optimizing the sequence of production orders. Using the _2opt_production_sequence_8e5e heuristic will help reduce transition times and improve overall schedule efficiency, continuing the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -2.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 70---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: The constructive heuristic `greedy_deadline_proximity_ac6e` will help prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 179.30000000000018
+Delta of Feasible Orders To Fulfill Num: -76523
+Delta of Fulfilled Order Num: 25
+---Round 71---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 72---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Switch to a constructive heuristic to prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This step continues the iterative construction and refinement process.
+Delta of Total Time Cost For All Production Lines: 184.5666666666666
+Delta of Feasible Orders To Fulfill Num: -5225
+Delta of Fulfilled Order Num: 25
+---Round 73---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -3.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 74---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Apply the constructive heuristic to prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This step will further build the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 206.6333333333332
+Delta of Feasible Orders To Fulfill Num: -46340
+Delta of Fulfilled Order Num: 25
+---Round 75---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -8.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 76---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Since the last heuristic applied was an improvement heuristic (_2opt_production_sequence_8e5e), it's time to switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable for the current scenario as it helps manage the high deadline variance and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 114.36666666666679
+Delta of Feasible Orders To Fulfill Num: -128487
+Delta of Fulfilled Order Num: 25
+---Round 77---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -5.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 78---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Applying the constructive heuristic will help manage the high deadline variance and prioritize orders based on their deadline proximity. This approach aims to further build the solution by increasing the number of fulfilled orders before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 103.00000000000091
+Delta of Feasible Orders To Fulfill Num: 16005
+Delta of Fulfilled Order Num: 25
+---Round 79---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the last constructive step with `greedy_deadline_proximity_ac6e`, we will now refine the sequence of production orders using `_2opt_production_sequence_8e5e`. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 80---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continue constructing the solution by prioritizing orders based on deadline proximity to manage high variance in deadlines and increase the number of fulfilled orders. This will further build the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 154.29999999999927
+Delta of Feasible Orders To Fulfill Num: 2413
+Delta of Fulfilled Order Num: 25
+---Round 81---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Since the last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This heuristic will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 82---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: The last applied heuristic was an improvement one (_2opt_production_sequence_8e5e). To continue the alternating strategy of building and refining the solution, we should now switch to a constructive heuristic. The greedy_deadline_proximity_ac6e heuristic is suitable for this stage as it helps manage the high variance in deadlines and aims to increase the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 119.53333333333285
+Delta of Feasible Orders To Fulfill Num: -41553
+Delta of Fulfilled Order Num: 25
+---Round 83---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: The last heuristic applied was a constructive one (greedy_deadline_proximity_ac6e), which aimed to manage high deadline variance and increase the number of fulfilled orders. Now, it's time to refine the sequence of production orders using the _2opt_production_sequence_8e5e heuristic. This will help optimize the order arrangement, reduce transition times, and improve overall schedule efficiency as part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -2.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 84---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Applying the constructive heuristic will help manage the high deadline variance and prioritize orders based on their deadline proximity. This approach aims to further build the solution by increasing the number of fulfilled orders before subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 164.06666666666752
+Delta of Feasible Orders To Fulfill Num: -66840
+Delta of Fulfilled Order Num: 25
+---Round 85---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step is part of the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: 0.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+---Round 86---
+Heuristic: greedy_deadline_proximity_ac6e
+Parameters: {}
+Running Steps: 25
+Explain: Continue constructing the solution by prioritizing orders based on deadline proximity to manage high variance in deadlines and increase the number of fulfilled orders. This will further build the solution for subsequent refinement.
+Delta of Total Time Cost For All Production Lines: 281.0
+Delta of Feasible Orders To Fulfill Num: -18908
+Delta of Fulfilled Order Num: 25
+---Round 87---
+Heuristic: _2opt_production_sequence_8e5e
+Parameters: {}
+Running Steps: 15
+Explain: Following the constructive step with `greedy_deadline_proximity_ac6e`, applying `_2opt_production_sequence_8e5e` will help optimize the sequence of production orders, aiming to reduce transition times and improve overall schedule efficiency. This step continues the alternating strategy to incrementally refine the solution.
+Delta of Total Time Cost For All Production Lines: -4.0
+Delta of Feasible Orders To Fulfill Num: 0
+Delta of Fulfilled Order Num: 0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: _2opt_production_sequence_8e5e. How does _2opt_production_sequence_8e5e perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+Try in this way:
+run constructive heuristic  and then improve solution by _2opt/exchange/shift_order/... as a loop.
+If last heuristic is  constructive heuristic, we run improve heuristics by _2opt/exchange/shift_order/... some steps.
+If last heuristic is improve  steps,we run  constructive heuristic: for  some steps.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+Based on the current stage and the alternating strategy outlined, since the last heuristic applied was an improvement heuristic (`_2opt_production_sequence_8e5e`), we should now switch to a constructive heuristic. The `greedy_deadline_proximity_ac6e` heuristic is suitable given its effectiveness in managing high deadline variance and increasing the number of fulfilled orders by prioritizing orders based on their deadline proximity. This approach will further construct and enhance the current solution before subsequent refinement.
+
+***Run heuristic:
+selected heuristic: greedy_deadline_proximity_ac6e
+running steps: 25
+explanation: Switching to a constructive heuristic to prioritize orders based on deadline proximity, managing high variance in deadlines and aiming to increase the number of fulfilled orders. This step continues the iterative construction and refinement process.
+***
+------------------------------------------------------------------------------------
+

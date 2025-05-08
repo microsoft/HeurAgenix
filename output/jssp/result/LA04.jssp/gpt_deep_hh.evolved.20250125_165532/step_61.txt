@@ -1,0 +1,774 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on jssp problem:
+Job Shop Scheduling Problem (JSSP) involves scheduling a series of jobs, each comprising a sequence of operations, across different machines to optimize production efficiency. In this variant, there is a one-to-one correspondence between machines and operation types, ensuring that each operation is carried out by a specific machine. Consequently, the number of operations (N) matches the number of machines, and each job includes these N operations precisely once.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the Job Shop Scheduling Problem (JSSP).
+A list of lists where each sublist represents the sequence of jobs scheduled on a machine, identified by its index in the outer list.
+Each job is represented by its integer identifier and is processed in the order specified within the sublist.
+Each sublist in 'job_sequences' corresponds to a machine's job processing sequence, with machines sorted by their identifier (index in the outer list).
+Each job within a sublist is sorted by its scheduled order of execution on that machine.
+Job matrix records the target operation(machine) sequence in job."""
+    def __init__(self, job_sequences: list[list[int]], job_operation_sequence: list[list[int]], job_operation_index: list[int]):
+        self.job_sequences = job_sequences
+        self.job_operation_sequence = job_operation_sequence
+        self.job_operation_index = job_operation_index
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class AdvanceOperator(BaseOperator):
+    """AdvanceOperator is responsible for advancing the next operation in the job's processing sequence.
+This operator appends the next operation of the specified job to the processing queue of the machine that is scheduled to execute the operation.
+It identifies the appropriate machine based on the job's current operation index and the job matrix within the provided Solution instance."""
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        machine_id = solution.job_operation_sequence[self.job_id][solution.job_operation_index[self.job_id]]
+        new_job_sequences[machine_id].append(self.job_id)
+        job_operation_index = solution.job_operation_index
+        job_operation_index[self.job_id] += 1
+        return Solution(new_job_sequences, solution.job_operation_sequence, job_operation_index)
+class SwapOperator(BaseOperator):
+    """Swaps two operations in corresponding jobs in the same machine's."""
+    def __init__(self, machine_id: int, job_id1: int, job_id2: int):
+        self.machine_id = machine_id
+        self.job_id1 = job_id1
+        self.job_id2 = job_id2
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        index1 = new_job_sequences[self.machine_id].index(self.job_id1)
+        index2 = new_job_sequences[self.machine_id].index(self.job_id2)
+        (new_job_sequences[self.machine_id][index1], new_job_sequences[self.machine_id][index2]) = (new_job_sequences[self.machine_id][index2], new_job_sequences[self.machine_id][index1])
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ReverseSequenceOperator(BaseOperator):
+    """Reverses a sequence of operations in corresponding jobs within a machine's queue."""
+    def __init__(self, machine_id: int, start_position: int, end_position: int):
+        self.machine_id = machine_id
+        self.start_position = start_position
+        self.end_position = end_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        sequence = new_job_sequences[self.machine_id][self.start_position:self.end_position + 1]
+        new_job_sequences[self.machine_id][self.start_position:self.end_position + 1] = sequence[::-1]
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+class ShiftOperator(BaseOperator):
+    """Shifts an operation to a new position within the same machine's queue."""
+    def __init__(self, machine_id: int, job_id: int, new_position: int):
+        self.machine_id = machine_id
+        self.job_id = job_id
+        self.new_position = new_position
+    def run(self, solution: Solution) -> Solution:
+        new_job_sequences = [ops[:] for ops in solution.job_sequences]
+        current_position = new_job_sequences[self.machine_id].index(self.job_id)
+        operation = new_job_sequences[self.machine_id].pop(current_position)
+        new_job_sequences[self.machine_id].insert(self.new_position, operation)
+        return Solution(new_job_sequences, solution.job_operation_sequence, solution.job_operation_index)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - "job_operation_time" (numpy.ndarray): The time cost for each operation in target job.
+    - "job_num" (int): The total number of jobs in the problem.
+    - "machine_num" (int): The total number of machines in the problem, also as operation num.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "finished_jobs" (list[int]): List of all finished jobs.
+    - "unfinished_jobs" (list[int]): List of all unfinished jobs.
+    - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+    - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job in current solution.
+    - "machine_operation_index" (list[int]): The index of the next operation to be scheduled for each machine.
+    - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine, also as the available time for next operation.
+    - "current_makespan" (int): The time cost for current operation jobs, also known as the current_makespan.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is jssp a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The Job Shop Scheduling Problem (JSSP) is indeed a combinatorial operation problem, as it involves finding an optimal sequence of operations across multiple machines under given constraints. It is well-suited to be approached with heuristic algorithms, given its complex solution space and the necessity to explore various permutations and combinations of job sequences to optimize production efficiency. Your framework with the Solution and Operator classes, along with the heuristic function signature, appears logically structured for tackling this type of problem.
+------------------------------------------------------------------------------------
+
+user
+We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): ShortestProcessingTime,LongestProcessingTime,MostWorkRemaining,LeastWorkRemaining,FirstComeFirstServed,LocalOptimization,JobLengthBased
+
+ShortestProcessingTime: Prioritizes jobs with the shortest processing time to minimize idle times and improve throughput.
+def shortest_processing_time_first_d471(): Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP. This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability, alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
+
+LongestProcessingTime: Focuses on scheduling jobs with the longest processing time first to balance workload distribution across machines.
+def longest_processing_time_first_9dc9(): Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
+
+MostWorkRemaining: Selects jobs with the most work remaining to reduce the potential for bottlenecks and improve overall completion time.
+def most_work_remaining_df20(): Most Work Remaining Heuristic with Dynamic Scoring and Local Optimization for JSSP.
+
+LeastWorkRemaining: Targets jobs with the least work remaining to quickly finish jobs and potentially free up resources for other tasks.
+def least_work_remaining_66c9(): Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
+
+FirstComeFirstServed: Schedules jobs based on their arrival order, which can be useful in scenarios where job arrival times are critical.
+def first_come_first_served_af26(): Enhanced First Come First Served (FCFS) heuristic to dynamically prioritize jobs based on immediate impact and adapt to diverse datasets. This heuristic introduces a dynamic scoring mechanism to balance alignment with the positive solution trajectory, machine availability, and dataset-specific characteristics.
+
+LocalOptimization: Applies local optimization techniques to improve the current schedule by making small, beneficial changes to job sequences.
+def _2opt_f9c1(): Implements a 2-opt heuristic for the Job Shop Scheduling Problem (JSSP). This heuristic attempts to reduce the makespan by swapping two non-adjacent operations in the schedule. It iteratively checks all possible pairs of operations to determine if a shorter sequence can be found.
+def _3opt_6ee0(): 3-opt heuristic for Job Shop Scheduling Problem (JSSP). This function does not generate a complete 3-opt operator since JSSP requires operations within a job to be executed in sequence and does not allow reordering of these operations.The heuristic is adapted to generate a series of 2-opt swaps (using the SwapOperator) which approximate a 3-opt move.
+def shift_operator_109f(): This heuristic attempts to find a better schedule by shifting an operation within the same machine's queue. For each machine, it tries shifting each operation to all possible positions and evaluates the makespan. The shift that results in the best improvement (reduction in makespan) is selected.
+
+JobLengthBased: Uses the total remaining or longest job length as a criterion for scheduling, which can help manage job priorities effectively.
+def shortest_job_next_5b42(): Implements the Shortest Job Next heuristic for the Job Shop Scheduling Problem. This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
+def longest_job_next_2e23(): Longest Job Next heuristic for JSSP. Prioritizes the job with the longest total processing time remaining. It uses the AdvanceOperator to schedule the next operation for the job with the maximum remaining processing time.
+
+
+We aim to solve this problem using the following data:
+job_num:10
+machine_num:5
+job_operation_sequence:[[0, 2, 3, 4, 1], [1, 3, 4, 2, 0], [1, 0, 3, 4, 2], [2, 4, 0, 3, 1], [1, 3, 4, 0, 2], [3, 2, 0, 4, 1], [2, 1, 0, 3, 4], [1, 3, 0, 4, 2], [2, 4, 0, 1, 3], [2, 4, 3, 1, 0]]
+job_operation_time:[[12, 94, 92, 91, 7], [19, 11, 66, 21, 87], [14, 75, 13, 16, 20], [95, 66, 7, 7, 77], [45, 6, 89, 15, 34], [77, 20, 76, 88, 53], [74, 88, 52, 27, 9], [88, 69, 62, 98, 52], [61, 9, 62, 52, 90], [54, 5, 59, 15, 88]]
+total_operation_num:50
+average_operation_time:50.14
+max_operation_time:98
+min_operation_time:5
+std_deviation_operation_time:32.00875505232904
+job_operation_time_range:93
+average_job_length:5.0
+max_job_length:5
+min_job_length:5
+machine_utilization:0.8
+job_diversity:5
+
+In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run 1 to test its performance.
+
+Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.
+
+------------------------------------------------------------------------------------
+
+assistant
+To create an effective strategic guide for selecting heuristic categories and defining execution steps, we'll consider the distinct phases of solving the Job Shop Scheduling Problem (JSSP): the construction phase and the improvement phase. Here's a framework to guide the selection and execution:
+
+### Strategic Guide for Heuristic Selection
+
+#### Construction Phase
+The construction phase focuses on building an initial feasible solution. During this phase, the goal is to quickly generate a schedule that adheres to constraints, which can then be refined in the improvement phase.
+
+1. **Start with Diversified Construction Heuristics:**
+   - **FirstComeFirstServed (FCFS):** Begin with FCFS to set a baseline. This heuristic is straightforward and can help establish an initial sequence based on job arrival order.
+   - **ShortestProcessingTime / LongestProcessingTime:** Experiment with these to see how prioritizing jobs based on processing time affects the initial makespan. They help in understanding the impact of operation time distribution.
+
+2. **Evaluate Initial Solution Performance:**
+   - Use the makespan, total idle time, and machine utilization metrics to evaluate the performance of the initial solution.
+   - Transition to the improvement phase if the initial solution is feasible and provides a reasonable starting point.
+
+#### Improvement Phase
+The improvement phase aims to refine the initial solution by reducing the makespan, minimizing idle time, and balancing machine workload.
+
+1. **Apply Local Optimization Heuristics:**
+   - **2-opt / 3-opt:** Use these to explore local changes that can significantly reduce makespan by reordering operations within machine queues.
+   - **ShiftOperator:** Evaluate shifts within a machine's queue to identify potential improvements in operation sequencing.
+
+2. **Explore Work Remaining Heuristics:**
+   - **MostWorkRemaining / LeastWorkRemaining:** These can be useful for addressing bottlenecks and optimizing job flow through the system. They can help balance workload distribution.
+
+3. **Iterate with Job Length-Based Heuristics:**
+   - **ShortestJobNext / LongestJobNext:** After some improvements, use these to fine-tune the schedule by focusing on job lengths, which can help in managing priorities effectively.
+
+4. **Alternate Between Heuristic Categories:**
+   - Regularly switch between different heuristics to prevent premature convergence and explore diverse solutions. This approach can help avoid local optima and find a more global solution.
+
+5. **Reassess and Iterate:**
+   - Continuously assess the solution's performance using key metrics, and iterate with different heuristic combinations if improvements stagnate.
+   - Revisit the construction phase briefly if necessary, to explore new initial solutions or different heuristic setups.
+
+### Execution Steps
+1. **Initialize with FCFS or ShortestProcessingTime.**
+2. **Evaluate initial performance and apply 2-opt or 3-opt for local improvements.**
+3. **Switch to MostWorkRemaining if bottlenecks are identified.**
+4. **Incorporate ShiftOperator to explore further local sequence optimizations.**
+5. **Iterate with ShortestJobNext to fine-tune based on job lengths.**
+6. **Regularly reassess and alternate heuristics to enhance exploration.**
+
+This framework is designed to be flexible, allowing for experimentation with various heuristics and adapting based on solution performance. It encourages using a mix of strategies for both constructing and refining solutions, promoting a balanced exploration-exploitation approach to solving JSSP.
+------------------------------------------------------------------------------------
+
+user
+Now, let review the global data with some heuristic values for this problem:
+job_num:10
+machine_num:5
+job_operation_sequence:[[0, 2, 3, 4, 1], [1, 3, 4, 2, 0], [1, 0, 3, 4, 2], [2, 4, 0, 3, 1], [1, 3, 4, 0, 2], [3, 2, 0, 4, 1], [2, 1, 0, 3, 4], [1, 3, 0, 4, 2], [2, 4, 0, 1, 3], [2, 4, 3, 1, 0]]
+job_operation_time:[[12, 94, 92, 91, 7], [19, 11, 66, 21, 87], [14, 75, 13, 16, 20], [95, 66, 7, 7, 77], [45, 6, 89, 15, 34], [77, 20, 76, 88, 53], [74, 88, 52, 27, 9], [88, 69, 62, 98, 52], [61, 9, 62, 52, 90], [54, 5, 59, 15, 88]]
+total_operation_num:50
+average_operation_time:50.14
+max_operation_time:98
+min_operation_time:5
+std_deviation_operation_time:32.00875505232904
+job_operation_time_range:93
+average_job_length:5.0
+max_job_length:5
+min_job_length:5
+machine_utilization:0.8
+job_diversity:5
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 61 rounds discuss and the summary are:
+---Round 0---
+Heuristic: first_come_first_served_af26
+Heuristic Category: FirstComeFirstServed
+Running Steps: 1
+Explain: Since no operations have been scheduled yet, it's beneficial to start with a straightforward heuristic like First Come First Served (FCFS) to establish an initial sequence. This will allow us to quickly generate a baseline solution and set the stage for further improvement in subsequent phases. FCFS is useful for understanding how jobs will flow through the machines initially, without any complex prioritization. Once we have this initial solution, we can better evaluate and select other heuristics to refine and improve the schedule.
+current_makespan: 0->12
+Finished Job Num: 0->0
+Finished Operation Num: 0->1
+---Round 1---
+Heuristic: shortest_processing_time_first_d471
+Heuristic Category: ShortestProcessingTime
+Running Steps: 1
+Explain: Given that we've initiated the scheduling with First Come First Served, transitioning to Shortest Processing Time can help reduce idle times and improve throughput. By focusing on the next operation with the shortest processing time, we can aim to minimize machine idle times and balance the workload more efficiently across the machines. This approach will help in creating a tighter initial schedule, setting a strong foundation for further optimization in subsequent phases.
+current_makespan: 12->19
+Finished Job Num: 0->0
+Finished Operation Num: 1->2
+---Round 2---
+Heuristic: shortest_processing_time_first_d471
+Heuristic Category: ShortestProcessingTime
+Running Steps: 1
+Explain:  Since the initial steps have focused on establishing a baseline with First Come First Served and then reducing idle times using Shortest Processing Time, it is beneficial to continue with the ShortestProcessingTime category. This heuristic is still applicable as we have just begun to schedule operations, and further iterations could enhance machine utilization and decrease the makespan. Continuing with this category will allow us to refine the current solution by targeting operations that can quickly proceed, thereby maintaining a balanced workload across machines and reducing overall completion time. Once we observe diminishing returns from this heuristic, we can consider switching to another category, such as LocalOptimization, for further improvements.
+current_makespan: 19->95
+Finished Job Num: 0->0
+Finished Operation Num: 2->3
+---Round 3---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Since we have already established a baseline with First Come First Served and have utilized Shortest Processing Time to reduce idle times, it's now beneficial to switch strategies to address potential bottlenecks and balance workload distribution across machines. The Most Work Remaining heuristic can help identify jobs with the largest amount of work left, which could be causing these bottlenecks, and focus on advancing these jobs to improve overall system flow and reduce the makespan. This approach will provide a new perspective on the problem and could lead to substantial improvements in the schedule.
+current_makespan: 95->95
+Finished Job Num: 0->0
+Finished Operation Num: 3->4
+---Round 4---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where no jobs have been completed and the makespan has not improved in the last round, it suggests that the current approach might be encountering diminishing returns or potential bottlenecks. Switching to the LocalOptimization category can help refine the existing solution by exploring local changes that could reduce the makespan and improve the flow of jobs through the machines. Local optimization techniques, like 2-opt or shift operators, can help identify beneficial changes in the sequence of operations, potentially unlocking improvements that previous heuristics might have missed.
+current_makespan: 95->95
+Finished Job Num: 0->0
+Finished Operation Num: 4->4
+---Round 5---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain: Given the current state of the solution, where the makespan has not improved and no jobs have been completed, it suggests that the existing approach might not be effectively addressing potential bottlenecks or workload imbalances. By selecting the Most Work Remaining heuristic category, we can focus on advancing jobs with the largest amount of work left, which could help in redistributing the workload and potentially unlocking improvements in the schedule. This approach aims to tackle the unfinished jobs that could be causing delays, thereby improving the overall flow and reducing the makespan.
+current_makespan: 95->96
+Finished Job Num: 0->0
+Finished Operation Num: 4->5
+---Round 6---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state where the makespan has only marginally increased and no jobs have been completed, it's important to explore local changes that could yield improvements. The LocalOptimization category can help identify small but impactful adjustments to the current sequence of operations. Techniques like 2-opt or shift operators might uncover potential improvements by reordering operations or optimizing sequences within machines, which could address existing bottlenecks and improve overall flow.
+current_makespan: 96->96
+Finished Job Num: 0->0
+Finished Operation Num: 5->5
+---Round 7---
+Heuristic: least_work_remaining_66c9
+Heuristic Category: LeastWorkRemaining
+Running Steps: 1
+Explain: Given the current state of the solution, where no jobs have been completed and the makespan has not significantly improved, it might be beneficial to switch strategies. Using the Least Work Remaining heuristic could help focus on completing jobs with the least amount of work left. This approach might quickly free up resources and create opportunities for other operations, potentially leading to improvements in flow and a reduction in the makespan. By targeting jobs that can be completed quickly, we might be able to unlock more efficient scheduling possibilities and enhance overall system performance.
+current_makespan: 96->117
+Finished Job Num: 0->0
+Finished Operation Num: 5->6
+---Round 8---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state where no jobs have been completed and the makespan has increased, it indicates potential inefficiencies or bottlenecks in the scheduling sequence. Returning to the Most Work Remaining category can help address these issues by focusing on advancing jobs with significant work left, which could be contributing to the delays. This approach may help redistribute workload and unlock improvements in flow and overall system performance. By targeting jobs with the most work remaining, we aim to balance the schedule and reduce the makespan effectively.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 6->7
+---Round 9---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution where the makespan has not improved and no jobs have been completed, it suggests that the existing approach might not effectively address potential inefficiencies or bottlenecks. The LocalOptimization category can help identify small but impactful adjustments to the current sequence of operations. Techniques like 2-opt or shift operators might uncover potential improvements by reordering operations or optimizing sequences within machines, which could address existing bottlenecks and improve overall flow. This category is well-suited for refining the current schedule and potentially unlocking improvements that previous heuristics might have missed.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 7->7
+---Round 10---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where no jobs have been completed and the makespan remains unchanged despite local optimization efforts, it indicates that potential bottlenecks or inefficiencies are still present. The Most Work Remaining heuristic can help address these issues by focusing on advancing jobs with significant work left, which may contribute to these delays. By targeting jobs that have the most work remaining, we can attempt to rebalance the workload and potentially unlock improvements in the schedule, reducing the makespan and enhancing overall system performance.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 7->8
+---Round 11---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain: Given the current state of the solution, where the makespan has remained unchanged despite attempts with Most Work Remaining, it suggests that potential inefficiencies or bottlenecks still exist. Local Optimization techniques, such as 2-opt or shift operators, are well-suited for refining the schedule by making small but impactful changes. This category can help identify beneficial adjustments to the sequence of operations, potentially reducing the makespan and improving flow. Since the current approach hasn't led to significant improvements, exploring Local Optimization may uncover opportunities for enhancement that previous heuristics have missed.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 8->8
+---Round 12---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution where the makespan remains unchanged and no jobs have been completed, it suggests potential bottlenecks or workload imbalances. The Most Work Remaining heuristic category can help identify and advance jobs with significant work left, which could be contributing to these delays. By focusing on these jobs, we aim to redistribute the workload and potentially unlock improvements in the schedule, reducing the makespan and enhancing overall system performance. This approach provides a new perspective that previous heuristics might have missed and could lead to a more balanced and efficient schedule.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 8->9
+---Round 13---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, where no jobs have been completed and the makespan remains unchanged, it's crucial to explore local changes that could yield improvements. Local Optimization techniques, such as 2-opt or shift operators, are well-suited for refining the schedule by making small but impactful changes. This category can help identify beneficial adjustments to the sequence of operations, potentially reducing the makespan and improving flow. Since MostWorkRemaining has not led to significant improvements, exploring Local Optimization may uncover opportunities for enhancement that previous heuristics have missed.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 9->9
+---Round 14---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state where the makespan remains unchanged despite several attempts with Local Optimization, there may still be underlying bottlenecks or workload imbalances. Switching to the Most Work Remaining heuristic can help prioritize jobs with significant work left, potentially redistributing the workload and unlocking improvements. By focusing on these jobs, we aim to enhance overall system performance and reduce the makespan, potentially addressing inefficiencies that Local Optimization has not resolved.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 9->10
+---Round 15---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain: Given the current state, where the makespan remains unchanged and no jobs have been completed despite several attempts with Most Work Remaining, it suggests that potential inefficiencies or bottlenecks still exist. Local Optimization techniques, such as 2-opt or shift operators, are well-suited for refining the schedule by making small but impactful changes. This category can help identify beneficial adjustments to the sequence of operations, potentially reducing the makespan and improving flow. Since the current approach hasn't led to significant improvements, exploring Local Optimization may uncover opportunities for enhancement that previous heuristics have missed.
+current_makespan: 117->117
+Finished Job Num: 0->0
+Finished Operation Num: 10->10
+---Round 16---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Despite multiple rounds of Local Optimization, the solution has not shown significant improvement in terms of makespan reduction or job completion. The fact that no jobs have been completed indicates potential bottlenecks that remain unresolved. Switching back to the Most Work Remaining category could help in addressing these bottlenecks by prioritizing jobs that have a significant amount of work left. This strategy aims to redistribute the workload more effectively, potentially unlocking improvements that previous local optimizations did not achieve. By focusing on advancing jobs with substantial remaining work, we can attempt to balance the schedule and reduce the overall makespan.
+current_makespan: 117->162
+Finished Job Num: 0->0
+Finished Operation Num: 10->11
+---Round 17---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where no jobs have been completed and the makespan has increased, it suggests that there are still potential inefficiencies or bottlenecks present in the schedule. Despite multiple rounds with Most Work Remaining, significant improvements have not been achieved, indicating that focusing solely on workload distribution may not be sufficient. Switching to Local Optimization techniques could help identify small but impactful adjustments to the sequence of operations. Techniques like 2-opt or shift operators might uncover potential improvements by reordering operations or optimizing sequences within machines, which could address existing bottlenecks and improve overall flow. Local Optimization is well-suited for refining the current schedule and potentially unlocking improvements that previous heuristics might have missed.
+current_makespan: 162->162
+Finished Job Num: 0->0
+Finished Operation Num: 11->11
+---Round 18---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state where no jobs have been completed and the makespan has remained high despite attempts with Local Optimization, it suggests potential bottlenecks or inefficiencies in workload distribution. Switching back to the Most Work Remaining category can help address these issues by focusing on advancing jobs with significant work left, potentially redistributing the workload and unlocking improvements. By targeting jobs with the most remaining work, we aim to balance the schedule more effectively and reduce the makespan, potentially resolving issues that Local Optimization alone has not addressed.
+current_makespan: 162->166
+Finished Job Num: 0->0
+Finished Operation Num: 11->12
+---Round 19---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  The current state shows that no jobs have been completed and the makespan remains high, indicating potential inefficiencies or bottlenecks. Since attempts with Most Work Remaining have not led to significant improvements, switching to Local Optimization could help by focusing on refining the schedule through small but impactful adjustments. Techniques like 2-opt or shift operators might uncover beneficial changes to the sequence of operations, potentially reducing the makespan and improving overall flow. Local Optimization is suitable for identifying and addressing inefficiencies that might not be resolved through workload distribution alone.
+current_makespan: 166->166
+Finished Job Num: 0->0
+Finished Operation Num: 12->12
+---Round 20---
+Heuristic: longest_job_next_2e23
+Heuristic Category: JobLengthBased
+Running Steps: 1
+Explain:  Given the current state of the solution, where no jobs have been completed and the makespan remains high despite attempts with Local Optimization, it suggests that a different perspective might be beneficial. Switching to a Job Length Based heuristic, such as Shortest Job Next, could help prioritize jobs that can be completed quickly, potentially freeing up resources and creating opportunities for other operations. This approach might lead to improvements in flow and a reduction in the makespan by focusing on advancing jobs that have shorter remaining processing times, thereby enhancing overall system performance.
+current_makespan: 166->166
+Finished Job Num: 0->0
+Finished Operation Num: 12->13
+---Round 21---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state, where no jobs have been completed and the makespan remains high, it's crucial to address potential bottlenecks and workload imbalances. The Most Work Remaining heuristic can help focus on advancing jobs with significant work left, which might be contributing to these delays. By targeting these jobs, we aim to redistribute the workload more effectively and potentially unlock improvements in the schedule. This strategy provides a new perspective that could address inefficiencies that other heuristics have not resolved, thereby reducing the makespan and enhancing overall system performance.
+current_makespan: 166->204
+Finished Job Num: 0->1
+Finished Operation Num: 13->14
+---Round 22---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, where the makespan is high and only one job has been completed, it suggests that there may still be inefficiencies or bottlenecks that need addressing. Local Optimization techniques like 2-opt or shift operators can refine the current schedule by making small but impactful changes to the sequence of operations. These techniques are well-suited for identifying beneficial adjustments that could reduce the makespan and improve the flow of jobs through the machines. Switching to Local Optimization might uncover opportunities for enhancement that previous heuristics have missed, providing a fresh perspective on the problem and potentially leading to significant improvements in the schedule.
+current_makespan: 204->204
+Finished Job Num: 1->1
+Finished Operation Num: 14->14
+---Round 23---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where only one job has been completed and the makespan is high, it indicates that there may still be bottlenecks or workload imbalances. The Most Work Remaining heuristic can help by focusing on advancing jobs with the most significant work left, potentially redistributing the workload more effectively. This approach could address these delays and unlock improvements in the schedule, reducing the makespan and enhancing overall system performance. By targeting jobs that are contributing to these inefficiencies, we can attempt to balance the schedule and improve flow, making this category a suitable choice for the next iteration.
+current_makespan: 204->211
+Finished Job Num: 1->1
+Finished Operation Num: 14->15
+---Round 24---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where only one job has been completed and the makespan is high, it suggests that there may still be inefficiencies or bottlenecks. Local Optimization techniques can help refine the current schedule by making small but impactful changes to the sequence of operations. These techniques are well-suited for identifying beneficial adjustments that could reduce the makespan and improve the flow of jobs through the machines. Since the current approach hasn't led to significant improvements, exploring Local Optimization might uncover opportunities for enhancement that previous heuristics have missed, potentially leading to significant improvements in the schedule.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 15->15
+---Round 25---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state, where only one job has been completed and there are still significant inefficiencies or bottlenecks, it is crucial to address workload imbalances. The Most Work Remaining heuristic can help focus on advancing jobs with substantial work left, potentially redistributing the workload more effectively. This approach may help to unlock improvements in the schedule, reduce the makespan, and enhance overall system performance. By targeting jobs that are contributing to these inefficiencies, we aim to balance the schedule and improve flow, making this category a suitable choice for the next iteration.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 15->15
+---Round 26---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where only one job has been completed and the makespan is relatively high, it suggests that there are still potential inefficiencies or bottlenecks in the scheduling. The Most Work Remaining heuristic has not led to significant improvements in recent rounds, indicating that workload redistribution alone may not be sufficient. Switching to Local Optimization can help by focusing on refining the schedule through small but impactful changes. Techniques like 2-opt or shift operators might uncover beneficial adjustments to the sequence of operations, potentially reducing the makespan and improving overall flow. Local Optimization is suitable for identifying and addressing inefficiencies that might not be resolved through workload distribution alone. This approach offers a fresh perspective and could lead to significant improvements in the schedule.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 15->15
+---Round 27---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution with a high makespan and only one job completed, there appear to be significant bottlenecks or inefficiencies in workload distribution. The Most Work Remaining heuristic can address these issues by prioritizing jobs with the most substantial work left, potentially redistributing the workload more effectively. This approach aims to unlock improvements in the schedule, reduce the makespan, and enhance overall system performance by targeting jobs contributing to these inefficiencies. Switching back to this category provides a fresh perspective that can address underlying issues that Local Optimization has not resolved.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 15->16
+---Round 28---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  The current state of the solution indicates that only one job has been completed, and the makespan remains high. While the Most Work Remaining heuristic has been applied multiple times, it hasn't led to significant improvements, suggesting that there might be inefficiencies or bottlenecks that require different strategies to address. Local Optimization techniques, such as 2-opt or shift operators, can help by making small but impactful adjustments to the sequence of operations. These techniques are well-suited for refining the schedule and may uncover beneficial changes that reduce the makespan and improve the flow of jobs through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 16->16
+---Round 29---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain: Given the current state of the solution with a high makespan and only one job completed, it suggests that there are significant bottlenecks or workload imbalances. Switching to the Most Work Remaining heuristic can help address these issues by focusing on advancing jobs with substantial work left, potentially redistributing the workload more effectively. This approach aims to unlock improvements in the schedule, reduce the makespan, and enhance overall system performance by targeting jobs contributing to these inefficiencies. The strategy provides a fresh perspective that can address underlying issues that Local Optimization has not resolved.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 16->17
+---Round 30---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state where the makespan is high and only one job has been completed, it suggests that there are inefficiencies or bottlenecks that require addressing. The Most Work Remaining heuristic has not led to significant improvements, indicating that the issues might not be solely related to workload distribution. Switching to Local Optimization could help refine the schedule by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators can help identify beneficial changes that reduce the makespan and improve the flow of jobs through the machines. This approach is suitable for uncovering opportunities for enhancement that previous heuristics have missed, potentially leading to significant improvements in the schedule.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 17->17
+---Round 31---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state where only one job has been completed and the makespan remains high, there are indications of bottlenecks or workload imbalances. The LocalOptimization techniques have not led to significant improvements, suggesting that the issues may not be solely related to operation sequencing. Switching to the Most Work Remaining heuristic can help address these bottlenecks by prioritizing jobs with significant work left, potentially redistributing the workload more effectively and unlocking improvements. This approach aims to balance the schedule and reduce the makespan by targeting jobs contributing to inefficiencies, offering a fresh perspective that Local Optimization has not resolved.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 17->18
+---Round 32---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where only one job has been completed and the makespan remains high, there appear to be inefficiencies or bottlenecks that need addressing. The Most Work Remaining heuristic has not led to significant improvements, suggesting that the issues might not be solely related to workload distribution. Switching to Local Optimization could help refine the schedule by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators can help identify beneficial changes that reduce the makespan and improve the flow of jobs through the machines. This approach is suitable for uncovering opportunities for enhancement that previous heuristics have missed, potentially leading to significant improvements in the schedule.
+current_makespan: 211->211
+Finished Job Num: 1->1
+Finished Operation Num: 18->18
+---Round 33---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan remains high and only one job has been completed, it suggests that there are significant bottlenecks or workload imbalances. Previous local optimization efforts have not led to substantial improvements, indicating that the current operation sequences may not be effectively addressing the underlying issues. Switching to the Most Work Remaining heuristic can help prioritize and advance jobs with the most substantial work left, potentially redistributing the workload more effectively. This approach aims to address the inefficiencies contributing to the high makespan and improve overall system performance by targeting jobs that are causing delays. By focusing on jobs with the most work remaining, we can attempt to balance the schedule and reduce the makespan, offering a fresh perspective that previous heuristics might have missed.
+current_makespan: 211->285
+Finished Job Num: 1->1
+Finished Operation Num: 18->19
+---Round 34---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state where the makespan is high and only one job has been completed, it suggests that there are inefficiencies or bottlenecks in the schedule. The Most Work Remaining heuristic has not significantly improved the solution, indicating that focusing solely on workload distribution may not be sufficient. Switching to the LocalOptimization category can help refine the schedule by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt or shift operators may uncover beneficial changes that reduce the makespan and improve the flow of jobs through the machines. This approach can help address underlying inefficiencies and offer a fresh perspective that previous heuristics might have missed, potentially leading to significant improvements in the schedule.
+current_makespan: 285->285
+Finished Job Num: 1->1
+Finished Operation Num: 19->19
+---Round 35---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, with a high makespan and only one job completed, there are significant inefficiencies or bottlenecks that need addressing. The LocalOptimization category has not led to substantial improvements, suggesting that the issues might not be solely related to operation sequencing. Switching back to the Most Work Remaining heuristic can help prioritize jobs with significant work left, potentially redistributing the workload more effectively. By targeting these jobs, we aim to address the inefficiencies contributing to the high makespan and improve overall system performance. This approach provides a new perspective that could address underlying issues and help balance the schedule more effectively.
+current_makespan: 285->285
+Finished Job Num: 1->1
+Finished Operation Num: 19->20
+---Round 36---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is high and only one job has been completed, it indicates potential inefficiencies or bottlenecks that have not been effectively addressed by the Most Work Remaining heuristic. Local Optimization techniques, such as 2-opt, 3-opt, or shift operators, can help refine the schedule by making small but impactful adjustments to the sequence of operations. These techniques are suitable for uncovering beneficial changes that reduce the makespan and improve job flow through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance, offering a fresh perspective that previous heuristics might have missed.
+current_makespan: 285->285
+Finished Job Num: 1->1
+Finished Operation Num: 20->20
+---Round 37---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is high and only one job has been completed, it suggests that there are still significant inefficiencies or bottlenecks. The LocalOptimization category has been applied multiple times without substantial improvements, indicating that the issues may not be solely related to operation sequencing. Switching back to the Most Work Remaining heuristic can help focus on advancing jobs with substantial work left, potentially redistributing the workload more effectively. This approach aims to unlock improvements in the schedule, reduce the makespan, and enhance overall system performance by targeting jobs contributing to these inefficiencies. By focusing on jobs with the most work remaining, we might address underlying issues that previous heuristics have not resolved, leading to a more balanced and efficient schedule.
+current_makespan: 285->285
+Finished Job Num: 1->2
+Finished Operation Num: 20->21
+---Round 38---
+Heuristic: _3opt_6ee0
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, with a high makespan and only two jobs completed, there are evident inefficiencies or bottlenecks that need addressing. While the Most Work Remaining heuristic has been applied multiple times, it hasn't led to significant improvements, suggesting that the issues might not be solely related to workload distribution. Switching back to Local Optimization could help refine the schedule by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators can help identify beneficial changes that reduce the makespan and improve the flow of jobs through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance, offering a fresh perspective that previous heuristics might have missed. This approach could lead to significant improvements in the schedule.
+current_makespan: 285->285
+Finished Job Num: 2->2
+Finished Operation Num: 21->21
+---Round 39---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan remains high and only a few jobs have been completed, it suggests that there are significant bottlenecks or workload imbalances. The LocalOptimization heuristics have been applied multiple times without substantial improvements, indicating that the issues may not be solely related to operation sequencing. Switching to the Most Work Remaining category can help address these issues by focusing on advancing jobs with substantial work left, potentially redistributing the workload more effectively. This approach aims to unlock improvements in the schedule, reduce the makespan, and enhance overall system performance by targeting jobs contributing to these inefficiencies.
+current_makespan: 285->285
+Finished Job Num: 2->2
+Finished Operation Num: 21->22
+---Round 40---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, where the makespan remains high and only a few jobs have been completed, it suggests there are inefficiencies or bottlenecks that might not be fully addressed by the Most Work Remaining heuristic. Local Optimization techniques, such as 2-opt or shift operators, can help refine the schedule by making small but impactful adjustments to the sequence of operations. These techniques are well-suited for uncovering beneficial changes that reduce the makespan and improve job flow through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance, offering a fresh perspective that previous heuristics might have missed. This approach could lead to significant improvements in the schedule.
+current_makespan: 285->267
+Finished Job Num: 2->2
+Finished Operation Num: 22->22
+---Round 41---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state, where the makespan remains relatively high and a significant portion of jobs are still unfinished, it suggests that there are workload imbalances or bottlenecks impacting the overall system performance. The recent application of local optimization has provided some improvement, but focusing on the Most Work Remaining heuristic could help address these bottlenecks by prioritizing jobs with substantial remaining work. This strategy can potentially redistribute the workload more effectively, unlocking further improvements in the schedule and reducing the makespan. By targeting jobs contributing to inefficiencies, we aim to balance the schedule and enhance overall system performance.
+current_makespan: 267->267
+Finished Job Num: 2->2
+Finished Operation Num: 22->23
+---Round 42---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state where the makespan is relatively high and only a few jobs have been completed, focusing on Local Optimization can provide a strategic advantage. While the Most Work Remaining heuristic has been applied previously, it seems to have reached its limit in terms of improvements. Local Optimization techniques, such as 2-opt or shift operators, are well-suited for refining the schedule by making small yet impactful adjustments to the sequence of operations. These techniques can help uncover beneficial changes that reduce the makespan and improve the flow of jobs through the machines, potentially addressing underlying inefficiencies and enhancing overall system performance. This approach offers a fresh perspective and could lead to significant improvements in the schedule.
+current_makespan: 267->267
+Finished Job Num: 2->2
+Finished Operation Num: 23->23
+---Round 43---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state where the makespan is relatively high and only a small proportion of jobs are finished, there are potential bottlenecks or workload imbalances that need addressing. The Local Optimization has been applied but with limited improvement. Switching to the Most Work Remaining category can help by focusing on advancing jobs with substantial remaining work, potentially redistributing the workload more effectively. This approach aims to address the inefficiencies contributing to the high makespan and improve overall system performance by targeting jobs that are causing delays. By redistributing workload, we might achieve a more balanced schedule and further reduce the makespan. This strategy offers a fresh perspective that could complement the progress made by local optimization.
+current_makespan: 267->303
+Finished Job Num: 2->2
+Finished Operation Num: 23->24
+---Round 44---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is high and only a small proportion of jobs are finished, there are significant inefficiencies or bottlenecks that need addressing. The Most Work Remaining heuristic has been applied multiple times with limited success, suggesting that workload redistribution may have reached its limits in improving the solution. Switching to Local Optimization could provide the necessary refinement by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt or shift operators can help identify beneficial changes that reduce the makespan and improve the flow of jobs through the machines. Local Optimization is suitable for uncovering opportunities for enhancement that previous heuristics have missed, potentially leading to significant improvements in the schedule. This approach offers a fresh perspective and could complement the progress made by previous heuristics.
+current_makespan: 303->303
+Finished Job Num: 2->2
+Finished Operation Num: 24->24
+---Round 45---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is high and only a small proportion of jobs are finished, there appear to be significant bottlenecks or workload imbalances. The recent application of local optimization has not led to substantial improvements, indicating that the issues may not be solely related to operation sequencing. Switching to the Most Work Remaining heuristic can help focus on advancing jobs with substantial remaining work, potentially redistributing the workload more effectively. This approach aims to address the inefficiencies contributing to the high makespan and improve overall system performance by targeting jobs that are causing delays. By redistributing workload, we might achieve a more balanced schedule and further reduce the makespan. This strategy offers a fresh perspective that could complement the progress made by local optimization.
+current_makespan: 303->285
+Finished Job Num: 2->2
+Finished Operation Num: 24->24
+---Round 46---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan has seen a recent decrease but remains relatively high with only a small proportion of jobs finished, a shift in strategy could be beneficial. Local Optimization techniques, such as 2-opt or shift operators, can help refine the schedule by making small yet impactful adjustments to the sequence of operations. These techniques are well-suited for uncovering beneficial changes that further reduce the makespan and improve job flow through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance, offering a fresh perspective that complements previous progress. This approach could lead to significant improvements in the schedule.
+current_makespan: 285->285
+Finished Job Num: 2->2
+Finished Operation Num: 24->24
+---Round 47---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state where only 2 jobs are finished and the makespan is still relatively high at 285, it suggests there are underlying bottlenecks or workload imbalances that have not been fully addressed. The Local Optimization category has been used extensively, and while it has provided some improvements, focusing on the Most Work Remaining category could help address these issues. By prioritizing jobs with substantial remaining work, we can potentially redistribute the workload more effectively, unlock improvements in the schedule, and further reduce the makespan. This approach offers a different perspective that could complement the progress made by local optimization.
+current_makespan: 285->295
+Finished Job Num: 2->3
+Finished Operation Num: 24->25
+---Round 48---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, with only 3 jobs finished and a relatively high makespan of 295, it suggests there are still inefficiencies or bottlenecks that need addressing. While the Most Work Remaining heuristic has been applied, focusing on Local Optimization could help refine the schedule further by making small yet impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators are well-suited for uncovering beneficial changes that reduce the makespan and improve the flow of jobs through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance, offering a fresh perspective that complements previous progress. This approach could lead to significant improvements in the schedule and better balance between finished and unfinished jobs.
+current_makespan: 295->295
+Finished Job Num: 3->3
+Finished Operation Num: 25->25
+---Round 49---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state, the makespan is relatively high at 295, and only 3 jobs are finished, indicating potential bottlenecks or workload imbalances. The Local Optimization category has been used extensively, and while it has provided some improvements, focusing on the Most Work Remaining category could help address these issues. By prioritizing jobs with substantial remaining work, we can potentially redistribute the workload more effectively, unlock improvements in the schedule, and further reduce the makespan. This approach offers a different perspective that could complement the progress made by local optimization.
+current_makespan: 295->310
+Finished Job Num: 3->3
+Finished Operation Num: 25->26
+---Round 50---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is high at 310 and a significant number of jobs remain unfinished, it indicates potential inefficiencies or bottlenecks that need to be addressed. The Most Work Remaining heuristic has been applied multiple times, leading to mixed results, suggesting that focusing solely on workload distribution may not be sufficient. Switching to the LocalOptimization category could provide the necessary refinement by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators can help identify beneficial changes that reduce the makespan and improve the flow of jobs through the machines. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance. This approach offers a fresh perspective and could lead to significant improvements in the schedule, potentially increasing the proportion of finished jobs and decreasing idle times.
+current_makespan: 310->310
+Finished Job Num: 3->3
+Finished Operation Num: 26->26
+---Round 51---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state, with a makespan of 310 and a significant portion of jobs remaining unfinished, it suggests that there are still bottlenecks or workload imbalances. Although Local Optimization has been extensively used, focusing on the Most Work Remaining category could help address these issues by prioritizing jobs with substantial remaining work. This approach aims to redistribute the workload more effectively, potentially unlocking improvements in the schedule and further reducing the makespan. By targeting jobs that contribute to inefficiencies, we can attempt to balance the schedule and enhance overall system performance.
+current_makespan: 310->349
+Finished Job Num: 3->3
+Finished Operation Num: 26->27
+---Round 52---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, where the makespan has increased to 349 and a significant portion of jobs remain unfinished, it suggests that the Most Work Remaining heuristic is not effectively addressing the bottlenecks or workload imbalances. Switching to the Local Optimization category can help refine the schedule by making small but impactful adjustments to the sequence of operations. Techniques like 2-opt or shift operators can identify beneficial changes that reduce the makespan and improve the flow of jobs through the machines. This approach may address underlying inefficiencies and enhance overall system performance, providing a fresh perspective that could lead to significant improvements in the schedule.
+current_makespan: 349->349
+Finished Job Num: 3->3
+Finished Operation Num: 27->27
+---Round 53---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is relatively high at 349 and only 3 jobs are finished, it suggests that there are significant bottlenecks or workload imbalances. The Local Optimization heuristics have been applied multiple times with limited success, indicating that the issues may not be solely related to operation sequencing. Switching to the Most Work Remaining category can help address these issues by focusing on advancing jobs with substantial remaining work, potentially redistributing the workload more effectively. This approach aims to unlock improvements in the schedule, reduce the makespan, and enhance overall system performance by targeting jobs contributing to these inefficiencies. By focusing on jobs with the most work remaining, we might address underlying issues that previous heuristics have not resolved, leading to a more balanced and efficient schedule.
+current_makespan: 349->349
+Finished Job Num: 3->3
+Finished Operation Num: 27->28
+---Round 54---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, where only 3 jobs are finished and there are significant inefficiencies or bottlenecks indicated by the high makespan and workload imbalances, Local Optimization appears to be a suitable choice. This category can help refine the schedule by making small yet impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators can identify beneficial changes that reduce the makespan and improve job flow through the machines. Since previous applications of Most Work Remaining have not significantly improved the solution, focusing on Local Optimization may uncover opportunities for enhancement that address underlying inefficiencies, potentially leading to a more balanced and efficient schedule.
+current_makespan: 349->349
+Finished Job Num: 3->3
+Finished Operation Num: 28->28
+---Round 55---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain: Given the current state of the solution, where there is a high makespan of 349 and only 3 jobs are finished, it indicates potential bottlenecks or workload imbalances. The LocalOptimization category has been applied multiple times, and while it offers small, incremental improvements, a more strategic approach might be needed to address the larger inefficiencies. Switching to the Most Work Remaining category could help prioritize jobs with substantial remaining work, potentially redistributing the workload more effectively and reducing the makespan. By focusing on jobs that are contributing to the inefficiencies, we can attempt to balance the schedule and enhance overall system performance. This approach offers a fresh perspective that could complement the progress made by local optimization.
+current_makespan: 349->383
+Finished Job Num: 3->3
+Finished Operation Num: 28->29
+---Round 56---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, the makespan is quite high at 383, and only 3 out of 10 jobs are completed, indicating that there are significant inefficiencies or bottlenecks. Previous attempts with the Most Work Remaining heuristic haven't led to substantial improvements, suggesting that simply prioritizing jobs with more work may not be addressing the root cause of these inefficiencies. Switching to the LocalOptimization category could help by focusing on refining the current schedule through small but impactful changes to the sequence of operations. Techniques like 2-opt or shift operators can uncover beneficial adjustments that might reduce the makespan and improve job flow, potentially addressing underlying inefficiencies. This approach offers a fresh perspective that complements previous attempts and could lead to more balanced and efficient scheduling.
+current_makespan: 383->383
+Finished Job Num: 3->3
+Finished Operation Num: 29->29
+---Round 57---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  The current state of the solution indicates that the makespan is high at 383, with only 3 out of 10 jobs completed. Previous attempts with Local Optimization have led to minimal improvements, suggesting that operation sequencing alone may not be sufficient to address the underlying inefficiencies. Switching back to the Most Work Remaining category can provide a strategic advantage by focusing on advancing jobs with substantial remaining work. This approach can help redistribute the workload more effectively, potentially unlocking improvements in the schedule and further reducing the makespan. By targeting jobs that contribute to inefficiencies, we aim to balance the schedule and enhance overall system performance. This strategy offers a fresh perspective that could complement the incremental progress made by Local Optimization.
+current_makespan: 383->413
+Finished Job Num: 3->3
+Finished Operation Num: 29->30
+---Round 58---
+Heuristic: shift_operator_109f
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state of the solution, where the makespan is high at 413 and only 3 out of 10 jobs are completed, there are significant inefficiencies or bottlenecks that need addressing. The Most Work Remaining heuristic has been applied multiple times, resulting in minimal improvements. This suggests that simply prioritizing jobs with more work is not effectively addressing the root cause of these inefficiencies. Switching to the Local Optimization category could help refine the schedule by making small yet impactful adjustments to the sequence of operations. Techniques like 2-opt or shift operators are well-suited for uncovering beneficial changes that reduce the makespan and improve job flow. By focusing on local changes, we can potentially address underlying inefficiencies and enhance overall system performance. This approach offers a fresh perspective that complements previous attempts and could lead to more balanced and efficient scheduling.
+current_makespan: 413->383
+Finished Job Num: 3->3
+Finished Operation Num: 30->30
+---Round 59---
+Heuristic: most_work_remaining_df20
+Heuristic Category: MostWorkRemaining
+Running Steps: 1
+Explain:  Given the current state of the solution, where there are still a significant number of unfinished jobs and the makespan remains high at 383, it suggests potential bottlenecks or workload imbalances. While the Local Optimization category has been applied recently, the most recent improvements indicate that there might be larger systemic issues that need to be addressed. Switching back to the Most Work Remaining category could help in prioritizing jobs with substantial remaining work, potentially redistributing the workload more effectively and unlocking improvements in the schedule. This approach aims to target jobs contributing to inefficiencies, balance the schedule, and enhance overall system performance. By focusing on jobs with the most work remaining, we can address underlying issues that previous local optimizations might not have resolved.
+current_makespan: 383->386
+Finished Job Num: 3->3
+Finished Operation Num: 30->31
+---Round 60---
+Heuristic: _2opt_f9c1
+Heuristic Category: LocalOptimization
+Running Steps: 1
+Explain:  Given the current state, where the makespan is relatively high and only 3 jobs are completed, there are inefficiencies and potential bottlenecks that need addressing. The Most Work Remaining heuristic has been applied multiple times with minimal improvements, indicating that workload redistribution may not be sufficient. Switching to Local Optimization can help refine the schedule through small but impactful adjustments to the sequence of operations. Techniques like 2-opt, 3-opt, or shift operators can help identify beneficial changes that reduce the makespan and improve job flow through the machines. This approach may uncover opportunities for enhancement that previous heuristics have missed, potentially leading to a more balanced and efficient schedule.
+current_makespan: 386->386
+Finished Job Num: 3->3
+Finished Operation Num: 31->31
+
+After the previous running, the state data some heuristic values for current stage:
+current_solution:
+machine_0: 0->2->1->3->7->5
+machine_1: 1->2->7->4->3->6
+machine_2: 3->1->0->6->5->2->8
+machine_3: 1->5->2->7->4->3->0
+machine_4: 1->3->2->4->7
+
+finished_jobs:[1, 2, 3]
+unfinished_jobs:[0, 4, 5, 6, 7, 8, 9]
+job_operation_index:[3, 5, 5, 5, 3, 3, 2, 4, 1, 0]
+job_last_operation_end_times:[310, 204, 325, 295, 285, 381, 383, 383, 386, 0]
+machine_operation_index:[6, 6, 7, 7, 5]
+machine_last_operation_end_times:[381, 383, 386, 310, 383]
+finished_operation_num:31
+current_makespan:386
+num_finished_jobs:3
+num_unfinished_jobs:7
+average_job_completion:295.2
+max_job_completion_time:386
+min_job_completion_time:0
+std_dev_job_completion_time:113.00247784893924
+average_machine_completion:368.6
+max_machine_completion_time:386
+min_machine_completion_time:310
+std_dev_machine_completion_time:29.343483092502844
+average_idle_time_per_machine:17.4
+proportion_of_finished_jobs:0.3
+proportion_of_unfinished_jobs:0.7
+Note: Some data are omitted due to space constraints.
+
+The last heuristic category is: _2opt_f9c1(LocalOptimization). How it works?
+Should me:
+- Continue with the same heuristic category to further develop the current solution, or
+- Switch to a different heuristic category from our pool to either enhance the existing solution or take a new approach to the problem.
+
+We intend to choose a target heuristic category from the following options: ShortestProcessingTime,LongestProcessingTime,MostWorkRemaining,LeastWorkRemaining,FirstComeFirstServed,LocalOptimization,JobLengthBased
+
+The response format is very important.
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***continue_run:
+select_heuristic_category:xxx(ShortestProcessingTime,LongestProcessingTime,MostWorkRemaining,LeastWorkRemaining,FirstComeFirstServed,LocalOptimization,JobLengthBased)
+explanation:xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***continue_run:
+select_heuristic_category:JobLengthBased
+explanation: Given the current state, where the makespan is relatively high and only 3 jobs are completed out of 10, there is potential for improvement by switching to a Job Length Based heuristic. This approach can help manage job priorities effectively by focusing on either the longest or shortest job length remaining. Specifically, using the Shortest Job Next heuristic could potentially free up resources faster by completing shorter jobs, which can lead to a more efficient allocation of machine resources and potentially reduce the makespan. This strategy offers a fresh perspective that complements previous attempts and could lead to more balanced and efficient scheduling.
+***
+------------------------------------------------------------------------------------
+

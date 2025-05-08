@@ -1,0 +1,18 @@
+-data: LA19.jssp
+-current_solution:
+machine_0: 7->0->4->1->2->9->8->6->5->3
+machine_1: 1->4->3->6->2->8->0->5->7->9
+machine_2: 0->8->3->5->4->6->9->2->1->7
+machine_3: 0->8->4->2->7->1->6->5->3->9
+machine_4: 1->0->2->9->8->6->5->4->7->3
+machine_5: 8->7->0->5->6->3->4->1->2->9
+machine_6: 4->6->2->8->9->5->7->3->0->1
+machine_7: 1->5->0->8->9->3->4->6->2->7
+machine_8: 7->1->5->0->8->4->2->3->6->9
+machine_9: 2->9->7->8->4->0->6->1->5->3
+
+-is_complete_solution: True
+-is_valid_solution: True
+-current_makespan: 907
+-job_num: 10
+-machine_num: 10

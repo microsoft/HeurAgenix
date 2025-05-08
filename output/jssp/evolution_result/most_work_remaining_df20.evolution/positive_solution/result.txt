@@ -1,0 +1,74 @@
+-data: output\jssp\data\train_data\train_case_11.jssp
+-current_solution:
+machine_0: 0->2->3->1->4
+machine_1: 3->2->0->1->4
+machine_2: 4->0->1->3->2
+machine_3: 0->3->2->1->4
+machine_4: 4->3->2->0->1
+machine_5: 1->2->0->3->4
+machine_6: 0->4->3->2->1
+machine_7: 3->4->0->2->1
+machine_8: 0->1->4->2->3
+machine_9: 1->2->3->0->4
+
+-is_complete_solution: True
+-is_valid_solution: True
+-current_makespan: 790
+-job_num: 5
+-machine_num: 10
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: \nmachine_2: \nmachine_3: 0\nmachine_4: \nmachine_5: \nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+1	random_6512	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: \nmachine_2: \nmachine_3: 0\nmachine_4: \nmachine_5: 1\nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+2	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: \nmachine_1: 3\nmachine_2: \nmachine_3: 0\nmachine_4: \nmachine_5: 1\nmachine_6: \nmachine_7: \nmachine_8: \nmachine_9: \n
+3	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: \nmachine_1: 3\nmachine_2: \nmachine_3: 0\nmachine_4: \nmachine_5: 1\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: \n
+4	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: \nmachine_1: 3\nmachine_2: \nmachine_3: 0\nmachine_4: 4\nmachine_5: 1\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: \n
+5	random_6512	AdvanceOperator(job_id=4)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4\nmachine_5: 1\nmachine_6: \nmachine_7: 3\nmachine_8: \nmachine_9: \n
+6	random_6512	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4\nmachine_5: 1\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: \n
+7	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4\nmachine_5: 1\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 1\n
+8	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1\nmachine_6: \nmachine_7: 3\nmachine_8: 0\nmachine_9: 1\n
+9	random_6512	AdvanceOperator(job_id=4)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1\nmachine_6: \nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1\n
+10	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1->2\nmachine_6: \nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1\n
+11	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 3\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1->2\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1\n
+12	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: \nmachine_1: 3->2\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1->2\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1\n
+13	random_6512	AdvanceOperator(job_id=2)	machine_0: \nmachine_1: 3->2\nmachine_2: 4\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1->2\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1->2\n
+14	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 1->2\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1->2\n
+15	most_work_remaining_df20	ShiftOperator(machine_id=5, job_id=1, new_position=1)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0\nmachine_3: 0\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1->2\n
+16	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0\nmachine_3: 0->3\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0\nmachine_9: 1->2\n
+17	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0\nmachine_3: 0->3\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0\nmachine_7: 3->4\nmachine_8: 0->1\nmachine_9: 1->2\n
+18	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0\nmachine_3: 0->3\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+19	random_6512	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+20	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0->4\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+21	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 2->1\nmachine_6: 0->4\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+22	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: \nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 2->1->0\nmachine_6: 0->4\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+23	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: 0\nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 2->1->0\nmachine_6: 0->4\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+24	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: 0\nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 2->1->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+25	random_6512	AdvanceOperator(job_id=2)	machine_0: 0->2\nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 2->1->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1\nmachine_9: 1->2\n
+26	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 0->2\nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 2->1->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2\n
+27	most_work_remaining_df20	ShiftOperator(machine_id=5, job_id=2, new_position=1)	machine_0: 0->2\nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 1->2->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2\n
+28	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: 0->2\nmachine_1: 3->2\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 1->2->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2->3\n
+29	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: 0->2\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2\nmachine_4: 4->3\nmachine_5: 1->2->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2->3\n
+30	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 0->2\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4\nmachine_4: 4->3\nmachine_5: 1->2->0\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2->3\n
+31	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: 0->2\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4\nmachine_4: 4->3\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2->3\n
+32	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: 0->2\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4\nmachine_4: 4->3->0\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2->3\n
+33	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4\nmachine_4: 4->3->0\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4\nmachine_9: 1->2->3\n
+34	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4\nmachine_4: 4->3->0\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3\n
+35	random_6512	AdvanceOperator(job_id=1)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4->1\nmachine_4: 4->3->0\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3\n
+36	most_work_remaining_df20	AdvanceOperator(job_id=0)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4->1\nmachine_4: 4->3->0\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3->0\n
+37	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->4->1\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3->0\n
+38	most_work_remaining_df20	ShiftOperator(machine_id=3, job_id=4, new_position=4)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3->0\n
+39	random_6512	AdvanceOperator(job_id=3)	machine_0: 0->2->3\nmachine_1: 3->2->0\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3->0\n
+40	random_6512	AdvanceOperator(job_id=1)	machine_0: 0->2->3\nmachine_1: 3->2->0->1\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3->0\n
+41	random_6512	AdvanceOperator(job_id=2)	machine_0: 0->2->3\nmachine_1: 3->2->0->1\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2\nmachine_9: 1->2->3->0\n
+42	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: 0->2->3\nmachine_1: 3->2->0->1\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0\n
+43	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0\n
+44	random_6512	AdvanceOperator(job_id=2)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0\n
+45	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0\n
+46	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2->1\nmachine_5: 1->2->0->3\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0\n
+47	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0\n
+48	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0->4\n
+49	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2->1\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0->4\n
+50	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: 0->2->3->1\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3->2\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2->1\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0->4\n
+51	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 0->2->3->1->4\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3->2\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->0->2->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2->1\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0->4\n
+52	most_work_remaining_df20	ShiftOperator(machine_id=4, job_id=0, new_position=3)	machine_0: 0->2->3->1->4\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3->2\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->2->0->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2->1\nmachine_7: 3->4->0->2\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0->4\n
+53	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: 0->2->3->1->4\nmachine_1: 3->2->0->1->4\nmachine_2: 4->0->1->3->2\nmachine_3: 0->3->2->1->4\nmachine_4: 4->3->2->0->1\nmachine_5: 1->2->0->3->4\nmachine_6: 0->4->3->2->1\nmachine_7: 3->4->0->2->1\nmachine_8: 0->1->4->2->3\nmachine_9: 1->2->3->0->4\n

@@ -1,0 +1,840 @@
+user
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+In this conversation, I will introduce the problem and then framework we have built now, you just remember this.
+In next conversation, I will describe the challenges I'm encountering and explore how we can collaborate to resolve them.
+
+Currently, I am working on max_cut problem:
+MaxCut is a classical combinatorial optimization problem where the goal is to partition the vertices of a graph into two disjoint subsets such that the number (or total weight) of edges between the two sets is maximized.
+
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+class Solution:
+    """The solution for the MaxCut problem.
+Two sets of vertices representing the partition of the graph into two subsets."""
+    def __init__(self, set_a: set[int], set_b: set[int]):
+        self.set_a = set_a
+        self.set_b = set_b
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+class InsertNodeOperator(BaseOperator):
+    """Insert a node into one of the sets for the MaxCut solution."""
+    def __init__(self, node: int, target_set: str):
+        self.node = node
+        self.target_set = target_set
+        assert target_set in ['A', 'B']
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.target_set == 'A':
+            assert self.node not in solution.set_b
+            new_set_a.add(self.node)
+        elif self.target_set == 'B':
+            assert self.node not in solution.set_a
+            new_set_b.add(self.node)
+        return Solution(new_set_a, new_set_b)
+class InsertEdgeOperator(BaseOperator):
+    """Insert an edge into the MaxCut solution with node_1 in set A and node_2 in set B."""
+    def __init__(self, node_1: int, node_2: int):
+        self.node_1 = node_1
+        self.node_2 = node_2
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        assert self.node_1 not in solution.set_b
+        assert self.node_2 not in solution.set_a
+        new_set_a.add(self.node_1)
+        new_set_b.add(self.node_2)
+        return Solution(new_set_a, new_set_b)
+class SwapOperator(BaseOperator):
+    """Swap a list of nodes from origin set to the opposite set in the MaxCut solution."""
+    def __init__(self, nodes: list[int]):
+        self.nodes = nodes
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        for node in self.nodes:
+            if node in solution.set_a:
+                assert node not in solution.set_b
+                new_set_a.remove(node)
+                new_set_b.add(node)
+            elif node in solution.set_b:
+                assert node not in solution.set_a
+                new_set_b.remove(node)
+                new_set_a.add(node)
+        return Solution(new_set_a, new_set_b)
+class DeleteOperator(BaseOperator):
+    """Delete a node from both sets in the MaxCut solution."""
+    def __init__(self, node: int):
+        self.node = node
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        if self.node in solution.set_a:
+            new_set_a.remove(self.node)
+        elif self.node in solution.set_b:
+            new_set_b.remove(self.node)
+        return Solution(new_set_a, new_set_b)
+
+In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
+def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
+The inputs are:
+global_data (dict): The global data dict containing the global instance data with:
+    - "node_num" (int): The total number of vertices in the graph.
+    - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+state_data (dict): The state data dict containing the solution state data with:
+    - "current_solution" (Solution): An instance of the Solution class representing the current solution.
+    - "set_a_count" (int): The number of nodes in set A of the current partition.
+    - "set_b_count" (int): The number of nodes in set B of the current partition.
+    - "selected_nodes" (set[int]): The set of selected nodes.
+    - "selected_num" (int): The number of nodes have been selected.
+    - "unselected_nodes" (set[int]): The set of unselected nodes.
+    - "unselected_num" (int): The number of nodes have not been selected.
+    - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
+    - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
+algorithm_data(dict): Algorithm data contains the data that necessary for some algorithms.
+get_state_data_function(callable): The get_state_data_function is the function that receives the new solution as input and return the state dictionary for new solution. It will not modify the origin solution.
+Other hyper-parameters in kwargs.
+The outputs includes the operator that must be an instance of a predefined target operator type and updated algorithm dict, which contains new information for future work for both this or other algorithm.
+
+Please consider is max_cut a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
+------------------------------------------------------------------------------------
+
+assistant
+***is_cop:yes***
+
+The MaxCut problem is indeed a combinatorial optimization problem, as it involves finding an optimal partition of vertices in a graph to maximize a specific objective (the total weight of edges between two disjoint sets). The framework you've described, including the `Solution` and `Operator` classes, as well as the standardized heuristic function signature, appears well-suited for applying heuristic algorithms to solve this problem.
+------------------------------------------------------------------------------------
+
+user
+We have already implement the following heuristics.
+These are the heuristics inb format: heuristic_name(parameter=default_value, ..): introduction
+def balanced_cut_21d5(max_iterations: int = 100) -> tuple[InsertNodeOperator, dict]:
+    """
+    Balanced Cut heuristic for the Max Cut problem. This heuristic tries to balance the number of nodes in sets A and B
+    while maximizing the cut value. It iteratively adds nodes to the smaller set until a balanced state is reached or
+    the maximum number of iterations is exceeded.
+
+    Args): Balanced Cut heuristic for the Max Cut problem. This heuristic tries to balance the number of nodes in sets A and B while maximizing the cut value. It iteratively adds nodes to the smaller set until a balanced state is reached or the maximum number of iterations is exceeded.
+def greedy_swap_5bb5(): Greedy Swap Heuristic for the Max Cut problem. Iteratively evaluates the delta in cut value for all possible single-node swaps between set A and set B, and performs the swap that leads to the highest increase in the cut value. If no swap improves the cut value, no operator is returned.
+def highest_delta_edge_9f66(): Selects the unselected edge that maximizes the increase in cut weight when added to the solution.
+def highest_delta_node_b31b(): This heuristic selects the unselected node that, when added to one of the sets (A or B), would result in the largest increase in the total cut weight. The node is then inserted into that set which maximizes the cut weight.
+def highest_weight_edge_eb0c(): Selects an edge with the highest weight where both nodes are unselected and adds each node to opposite sets, choosing the set that maximizes the cut value increase for each node.
+def most_weight_neighbors_320c(): This heuristic selects an unselected node that has the highest sum of weights connected to it and inserts it into one of the sets (A or B) in the Solution, aiming to maximize the cut value. It stores the sorted list of unselected nodes based on the sum of weights for future use.
+def multi_swap_2_dbfe(): This heuristic evaluates all possible pairs of nodes for swapping between set A and set B. It performs the swap that leads to the highest increase in the cut value, considering the combined effect of swapping two nodes simultaneously rather than one at a time. It utilizes numpy operations for efficient computation.
+def random_5c59(): Random node insertion heuristic for Max Cut.
+def simulated_annealing_ed14(): Simulated Annealing heuristic for the Max Cut problem. It probabilistically chooses to swap a node from one set to another, potentially accepting worse solutions early on to escape local optima, with the probability of accepting worse solutions decreasing over time.
+
+Before we solve the actual problem, please try to analysis the scenarios where each algorithm is applicable, and these scenarios are best quantified.
+
+------------------------------------------------------------------------------------
+
+assistant
+### Analysis of Scenarios for Each Heuristic
+
+Below is an analysis of the scenarios where each heuristic is most applicable, along with suggestions on how to quantify these scenarios:
+
+---
+
+#### 1. **`balanced_cut_21d5`**
+   - **Scenario**: This heuristic is well-suited for scenarios where the graph is dense or nearly balanced, and the goal is to maintain balance between the sizes of sets A and B while maximizing the cut value. It is particularly effective in cases where the graph has uniform or close-to-uniform edge weights.
+   - **Quantification**:
+     - Node degree distribution is relatively uniform.
+     - The total number of nodes is even or close to even.
+     - High density of edges (e.g., density > 0.5).
+   - **Limitations**: May not perform well for highly skewed graphs where some nodes have significantly higher degrees than others.
+
+---
+
+#### 2. **`greedy_swap_5bb5`**
+   - **Scenario**: This heuristic is effective when the initial solution is already close to optimal, and only minor adjustments are needed to improve the cut value. It is best applied when the graph is sparse or when small, localized changes can significantly affect the cut value.
+   - **Quantification**:
+     - Initial solution cut value is close to the maximum cut value (e.g., within 10%).
+     - Sparse graph with low edge density (e.g., density < 0.3).
+     - Nodes with high degrees are already well-distributed between sets A and B.
+   - **Limitations**: Computationally expensive for dense graphs due to the need to evaluate every possible swap.
+
+---
+
+#### 3. **`highest_delta_edge_9f66`**
+   - **Scenario**: This heuristic is ideal for graphs where edge weights vary significantly, and there are a few high-weight edges that dominate the cut value. It is effective in early stages of solution construction or refinement.
+   - **Quantification**:
+     - High variance in edge weights (e.g., standard deviation of edge weights > 0.5 × mean edge weight).
+     - A significant number of high-weight edges remain unselected.
+   - **Limitations**: May lead to suboptimal solutions if applied in isolation, as it focuses only on edge weights without considering balance or node distribution.
+
+---
+
+#### 4. **`highest_delta_node_b31b`**
+   - **Scenario**: This heuristic is useful when the graph has nodes with highly varied degrees or when selecting a single node can significantly impact the cut value. It is particularly effective for graphs with hub-and-spoke structures.
+   - **Quantification**:
+     - High variance in node degrees (e.g., standard deviation of node degrees > 0.5 × mean degree).
+     - Unselected nodes with high degrees remain in the graph.
+   - **Limitations**: May neglect global balance between sets A and B, focusing solely on local improvements.
+
+---
+
+#### 5. **`highest_weight_edge_eb0c`**
+   - **Scenario**: This heuristic is applicable to graphs where edge weights dominate the optimization problem. It works well in cases where adding specific high-weight edges early on can significantly affect the solution quality.
+   - **Quantification**:
+     - High variance in edge weights (similar to `highest_delta_edge_9f66`).
+     - A significant proportion of high-weight edges remain unselected.
+   - **Limitations**: May lead to imbalanced solutions if the focus on edge weights ignores node distribution.
+
+---
+
+#### 6. **`most_weight_neighbors_320c`**
+   - **Scenario**: This heuristic excels in graphs where local neighborhoods (nodes and their immediate connections) dominate the graph structure. It is effective for graphs with clusters or communities, where the goal is to iteratively select nodes with high connectivity to existing sets.
+   - **Quantification**:
+     - Strong community structure in the graph (e.g., modularity > 0.3).
+     - Nodes with high neighbor weights remain unselected.
+   - **Limitations**: May get stuck in local optima if the heuristic prioritizes local improvements over global balance.
+
+---
+
+#### 7. **`multi_swap_2_dbfe`**
+   - **Scenario**: This heuristic is suitable for scenarios where multiple swaps can collectively lead to a significant improvement in the cut value, even if individual swaps are not beneficial. It is particularly effective in dense graphs or graphs with complex interactions between nodes.
+   - **Quantification**:
+     - Dense graph with high edge density (e.g., density > 0.5).
+     - Current solution is far from optimal, and single-node swaps are insufficient to improve the cut value.
+   - **Limitations**: Computationally expensive, especially for large graphs with many nodes.
+
+---
+
+#### 8. **`random_5c59`**
+   - **Scenario**: This heuristic is best applied in the early stages of solution construction or as a diversification mechanism in metaheuristics. It is effective when there is little information about the problem structure or when escaping local optima.
+   - **Quantification**:
+     - Early-stage optimization with no prior knowledge of the graph structure.
+     - Used as part of an iterative metaheuristic (e.g., simulated annealing or genetic algorithms) to introduce randomness.
+   - **Limitations**: Inefficient for fine-tuning or refinement of solutions.
+
+---
+
+#### 9. **`simulated_annealing_ed14`**
+   - **Scenario**: This heuristic is highly effective for escaping local optima and exploring the solution space. It is applicable to both dense and sparse graphs, especially when the problem landscape has many local optima.
+   - **Quantification**:
+     - The current solution is stuck in a local optimum (e.g., no improvement after several iterations of other heuristics).
+     - The cut value is far from the expected maximum (e.g., < 80% of the estimated maximum cut value).
+   - **Limitations**: May require careful tuning of hyperparameters (e.g., initial temperature, cooling rate) to balance exploration and exploitation.
+
+---
+
+### Summary Table of Scenarios and Quantification
+
+| **Heuristic**              | **Best Scenario**                                                                                  | **Quantification**                                                                                     |
+|-----------------------------|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `balanced_cut_21d5`         | Dense and balanced graphs                                                                          | Uniform node degree, even node count, edge density > 0.5                                              |
+| `greedy_swap_5bb5`          | Small adjustments to near-optimal solutions                                                       | Initial cut value near maximum, sparse graph (density < 0.3)                                          |
+| `highest_delta_edge_9f66`   | Graphs with dominant high-weight edges                                                            | High variance in edge weights                                                                         |
+| `highest_delta_node_b31b`   | Graphs with dominant high-degree nodes                                                            | High variance in node degrees                                                                         |
+| `highest_weight_edge_eb0c`  | Graphs where edge weights dominate optimization                                                   | Similar to `highest_delta_edge_9f66`                                                                 |
+| `most_weight_neighbors_320c`| Graphs with strong community structures                                                           | High modularity, high neighbor weights                                                               |
+| `multi_swap_2_dbfe`         | Dense graphs where multi-node swaps can significantly improve the cut                             | Dense graph (density > 0.5), far from optimal                                                        |
+| `random_5c59`               | Early-stage optimization or diversification in metaheuristics                                     | Early stage, lack of prior information                                                                |
+| `simulated_annealing_ed14`  | Graphs with many local optima                                                                     | Stuck in local optimum, cut value < 80% of maximum                                                   |
+
+This
+------------------------------------------------------------------------------------
+
+user
+The global data with some heuristic values for this problem:
+node_num:800
+average_node_degree:47.94
+edge_density:0.06
+average_edge_weight:-0.008343763037129746
+max_edge_weight:1.0
+min_edge_weight:-1.0
+standard_deviation_edge_weight:0.9999651902033291
+Note: Some data are omitted due to space constraints.
+
+The state data some heuristic values for current stage:
+set_a_count:378
+set_b_count:422
+selected_num:800
+unselected_nodes:set()
+unselected_num:0
+current_cut_value:1792.0
+imbalance_ratio:0.055
+cut_value:1792.0
+average_cut_edge_weight:2.24
+selected_nodes_ratio:1.0
+unselected_nodes_ratio:0.0
+edge_weight_variance_within_sets:0.05960744419179678
+boundary_node_ratio:0.0
+Note: Some data are omitted due to space constraints.
+
+Before this discuss, we have already 76 rounds discuss and the summary are:
+---Round 0---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 20
+Explain: The graph is sparse (edge density = 0.06), and the edge weights have high variance (std_dev = ~1.0). At this stage, no nodes have been selected, and the imbalance ratio is 0.0. The heuristic `most_weight_neighbors_320c` can effectively construct an initial solution by iteratively selecting nodes with the highest weighted connections to maximize the cut value. Running 20 steps is appropriate given the large number of unselected nodes (800).
+Delta of Selected Node: 20
+Delta of Cut Value: 9.0
+---Round 1---
+Heuristic: highest_delta_edge_9f66
+Parameters: {}
+Running Steps: 15
+Explain: At this stage, we have constructed an initial solution with a small cut value (9.0) and a very low imbalance ratio (0.005). The graph is sparse (edge density = 0.06) with high variance in edge weights (std_dev ~ 1.0). Since there are still a large number of unselected nodes (780, ~97.5% of total nodes), it is ideal to focus on adding edges that maximize the increase in cut weight. The `highest_delta_edge_9f66` heuristic is well-suited for this purpose as it prioritizes high-weight edges for inclusion. Running 15 steps ensures significant progress while keeping the computation manageable.
+Delta of Selected Node: 30
+Delta of Cut Value: 101.0
+---Round 2---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The graph is still sparse (edge density = 0.06) and has a high variance in edge weights (std_dev ~ 1.0). With 750 unselected nodes remaining (~93.75% of total), it is essential to continue constructing the solution by targeting nodes with high-weighted connections. The `most_weight_neighbors_320c` heuristic is ideal for this stage to maximize the cut value incrementally while ensuring high-quality node selection. Running 15 steps balances progress and computational cost.
+Delta of Selected Node: 15
+Delta of Cut Value: 20.0
+---Round 3---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current imbalance ratio is low (0.01375), and the graph still has a large number of unselected nodes (735). With the edge weights exhibiting high variance (std_dev = ~1.0), it is appropriate to focus on selecting individual nodes that maximize the cut value. The `highest_delta_node_b31b` heuristic is effective at this stage because it evaluates the impact of each node on the cut weight and ensures incremental construction of a high-quality solution. Running 15 steps will allow for significant progress while maintaining computational efficiency.
+Delta of Selected Node: 15
+Delta of Cut Value: 61.0
+---Round 4---
+Heuristic: simulated_annealing_ed14
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has achieved a significant cut value (191.0) with a low imbalance ratio (0.0125), and a substantial portion of nodes remain unselected (720, 90%). While the solution is progressing well, the graph's high variance in edge weights (std_dev ~ 1.0) suggests there may still be opportunities to escape potential local optima and explore better configurations. Simulated Annealing (`simulated_annealing_ed14`) is a suitable choice at this stage to probabilistically accept suboptimal swaps and further improve the solution by refining the partition. Running 15 steps is appropriate given the large number of unselected nodes and the need to explore the solution space efficiently.
+Delta of Selected Node: 0
+Delta of Cut Value: -7.0
+---Round 5---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.01) and a substantial number of unselected nodes (720, ~90%). Given the sparse nature of the graph (edge density = 0.06) and the high variance in edge weights (std_dev ~ 1.0), it is appropriate to focus on constructing the solution further by targeting nodes with high-weighted connections to maximize the cut value incrementally. The `most_weight_neighbors_320c` heuristic is well-suited for this stage as it prioritizes high-quality node selection while maintaining balance between sets A and B. Running 15 steps balances progress and computational cost.
+Delta of Selected Node: 15
+Delta of Cut Value: 24.0
+---Round 6---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.01125) and a substantial number of unselected nodes (705). The edge weights still exhibit high variance (std_dev ~ 1.0), and the current strategy should focus on carefully selecting individual nodes that maximize the cut value. The `highest_delta_node_b31b` heuristic is well-suited at this stage, as it evaluates the impact of adding each unselected node to either set A or B and prioritizes those that maximize the cut weight. Running 15 steps balances computational efficiency and solution refinement.
+Delta of Selected Node: 15
+Delta of Cut Value: 63.0
+---Round 7---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has achieved a good cut value (261.0) and a low imbalance ratio (0.01). However, with 690 nodes still unselected, there is room for significant refinement. The `multi_swap_2_dbfe` heuristic is a good choice at this stage, as it allows for simultaneous swaps of multiple nodes, which can lead to significant improvements in cut value by considering the combined effects of swaps. This aligns well with the idea of improving the current solution after a constructive phase. Running 15 steps provides a balance between computational cost and refinement potential, especially given the still-large number of unselected nodes.
+Delta of Selected Node: 0
+Delta of Cut Value: 7.0
+---Round 8---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 15
+Explain: With 690 nodes still unselected and the graph having high variance in edge weights (std_dev ~ 1.0), it is a good time to focus on constructing the solution further by targeting high-weight edges. The `highest_weight_edge_eb0c` heuristic is well-suited for this stage as it prioritizes edges with significant weight, which can lead to a substantial increase in the cut value. Running 15 steps ensures that we make meaningful progress while keeping the computation manageable.
+Delta of Selected Node: 30
+Delta of Cut Value: 23.0
+---Round 9---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.01) and a substantial number of unselected nodes (660). The graph continues to exhibit high variance in edge weights (std_dev ~ 1.0), making it ideal to focus on carefully selecting individual nodes that maximize the cut value. Since the previous heuristic (`highest_weight_edge_eb0c`) provided only a small improvement in the cut value (Delta = 16.0), switching to `highest_delta_node_b31b` ensures a focus on node-level optimization to maximize the incremental gain in the cut value. Running 15 steps strikes a balance between progress and computational efficiency.
+Delta of Selected Node: 15
+Delta of Cut Value: 74.0
+---Round 10---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a good cut value (369.0) and a low imbalance ratio (0.00625), but there are still a significant number of unselected nodes (645). This indicates that there is room for refinement. While `highest_delta_node_b31b` showed strong performance in the previous round (Delta Cut Value = 77.0), switching to `multi_swap_2_dbfe` is appropriate at this stage to explore the benefits of performing multi-node swaps. This approach can refine the solution more globally by considering the combined effects of multiple swaps, especially since single-node optimizations may start to yield diminishing returns. Running 15 steps balances computational cost and the potential for significant cut value improvement.
+Delta of Selected Node: 0
+Delta of Cut Value: 13.0
+---Round 11---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a good cut value (379.0) and a very low imbalance ratio (0.00625). However, with 645 nodes still unselected, there is substantial room for further construction. Given the graph's high variance in edge weights (std_dev ~ 1.0), focusing on individual nodes that maximize the cut value remains a promising strategy. The `highest_delta_node_b31b` heuristic has consistently shown strong performance in prior rounds, with significant gains in cut value. Running 15 steps balances progress with computational efficiency, continuing the construction phase while preparing for future refinement.
+Delta of Selected Node: 15
+Delta of Cut Value: 80.0
+---Round 12---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a relatively low imbalance ratio (0.0) and a significant number of nodes (630) still unselected. Given the high variance in edge weights (std_dev ~ 1.0), focusing on high-weight edges is a logical next step to continue constructing the solution. The `highest_weight_edge_eb0c` heuristic is suitable for this stage as it prioritizes edges with the highest weight, which can lead to meaningful improvements in the cut value while maintaining balance. Running 15 steps ensures progress without overcommitting to a single heuristic.
+Delta of Selected Node: 30
+Delta of Cut Value: 17.0
+---Round 13---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a very low imbalance ratio (0.0) and a significant number of unselected nodes (600). The graph still exhibits high variance in edge weights (std_dev ~ 1.0), suggesting that selecting individual nodes with the highest delta in cut value remains an effective strategy. While the last heuristic (`highest_weight_edge_eb0c`) improved the cut value slightly (Delta = 28.0), focusing on `highest_delta_node_b31b` allows for more targeted node-level optimizations. Running 15 steps balances computational efficiency and potential cut value improvement.
+Delta of Selected Node: 15
+Delta of Cut Value: 80.0
+---Round 14---
+Heuristic: simulated_annealing_ed14
+Parameters: {}
+Running Steps: 15
+Explain: While the `highest_delta_node_b31b` heuristic has consistently shown strong performance in prior rounds, the repeated use of node-level optimization may lead to diminishing returns as the solution progresses. Simulated Annealing (`simulated_annealing_ed14`) is a good choice at this stage to escape potential local optima and explore the solution space more globally. The current imbalance ratio is very low (0.00625), and the cut value is substantial (455.0), indicating the solution is nearing a plateau. This heuristic can probabilistically accept worse solutions to encourage exploration, improving the chances of finding a better configuration. Running 15 steps balances exploration and computational cost while ensuring meaningful progress.
+Delta of Selected Node: 0
+Delta of Cut Value: -7.0
+---Round 15---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a very low imbalance ratio (0.00625), and there are still 585 unselected nodes, indicating room for further construction. The graph continues to exhibit high variance in edge weights (std_dev ~ 1.0), making it ideal to focus on carefully selecting individual nodes that maximize the cut value. The `highest_delta_node_b31b` heuristic has consistently shown strong performance in prior rounds, delivering significant gains in cut value. Running 15 steps balances computational efficiency and incremental improvement while preparing the solution for future refinement steps.
+Delta of Selected Node: 15
+Delta of Cut Value: 77.0
+---Round 16---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.005), and there are still 570 unselected nodes remaining, indicating room for further construction. The graph has a high variance in edge weights (std_dev ~ 1.0), and focusing on high-weight edges can lead to meaningful improvements in the cut value. This heuristic complements the previous use of `highest_delta_node_b31b` by targeting edge-level optimization rather than node-level optimization. Running 15 steps balances computational efficiency and progress in constructing the solution.
+Delta of Selected Node: 30
+Delta of Cut Value: 37.0
+---Round 17---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 15
+Explain: With 540 unselected nodes remaining and the cut value showing incremental improvements, it is appropriate to switch focus to multi-node refinement. `multi_swap_2_dbfe` is a 2-opt method that evaluates simultaneous node swaps to refine the solution globally. Since recent node and edge-level heuristics have shown diminishing returns, this heuristic can provide a broader exploration of the solution space. Running 15 steps balances computational cost and the potential for meaningful cut value improvement, especially given the large number of remaining unselected nodes.
+Delta of Selected Node: 0
+Delta of Cut Value: 46.0
+---Round 18---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.005) and still has 540 unselected nodes, indicating ample room for further construction. The high variance in edge weights (std_dev ~ 1.0) and the recent success of node-level optimization suggest that focusing on individual nodes with the highest delta in cut value is the most effective strategy. This heuristic has consistently shown significant improvements in the cut value in prior rounds. Running 15 steps balances computational efficiency and incremental improvement, setting the stage for future refinement steps.
+Delta of Selected Node: 15
+Delta of Cut Value: 83.0
+---Round 19---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.00375) and still has 525 unselected nodes remaining, indicating room for further construction. With the high variance in edge weights (std_dev ~ 1.0), focusing on high-weight edges can help construct the solution further by targeting the most impactful edges. This complements the previous use of `highest_delta_node_b31b` by shifting focus from node-level optimization to edge-level optimization. Running 15 steps balances computational efficiency and progress in the solution-building phase.
+Delta of Selected Node: 30
+Delta of Cut Value: 21.0
+---Round 20---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.00375) and 525 unselected nodes remaining, indicating that there is still significant room for construction. The high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization can yield meaningful improvements. The `highest_delta_node_b31b` heuristic has consistently performed well in prior rounds, delivering substantial gains in the cut value. Running 15 steps balances computational efficiency with progress, further refining the solution while preparing it for future global optimization.
+Delta of Selected Node: 15
+Delta of Cut Value: 85.0
+---Round 21---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has a low imbalance ratio (0.005) and a significant number of unselected nodes (480), indicating that further construction is still necessary. Given the high variance in edge weights (std_dev ~ 1.0), focusing on high-weight edges can help maximize the cut value by targeting the most impactful edges during this construction phase. Switching to `highest_weight_edge_eb0c` ensures a complementary edge-level optimization approach, balancing progress in constructing the solution while maintaining computational efficiency. Increasing the running steps to 20 is appropriate given the large number of unselected nodes and the need for substantial progress.
+Delta of Selected Node: 40
+Delta of Cut Value: 6.0
+---Round 22---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.005), and there are still 480 unselected nodes remaining, which is significant. The high variance in edge weights (std_dev ~ 1.0) and the sparse graph structure (edge density = 0.06) make it effective to continue constructing the solution by targeting nodes with high-weighted connections. The `most_weight_neighbors_320c` heuristic is well-suited for this stage to incrementally improve the cut value while maintaining balance. Running 15 steps balances computational efficiency and solution progress.
+Delta of Selected Node: 15
+Delta of Cut Value: 45.0
+---Round 23---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution shows progress with a low imbalance ratio (0.00125) and 425 unselected nodes remaining, indicating that there is still significant room for further construction. The high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization focusing on individual nodes with the highest delta in cut value can yield meaningful improvements. Switching to `highest_delta_node_b31b` ensures targeted node-level construction while leveraging the graph's characteristics. Increasing the running steps to 20 is appropriate given the large number of remaining unselected nodes and the need for substantial progress.
+Delta of Selected Node: 20
+Delta of Cut Value: 118.0
+---Round 24---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has a low imbalance ratio (0.00625) and 405 unselected nodes remaining, indicating that further construction is necessary. The sparse graph (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0) suggest that focusing on nodes with high-weighted connections is an effective strategy for incremental improvement. The `most_weight_neighbors_320c` heuristic is well-suited for this stage to continue constructing the solution while maintaining balance between sets A and B. Running 15 steps balances computational efficiency and progress in solution construction.
+Delta of Selected Node: 15
+Delta of Cut Value: 43.0
+---Round 25---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has a low imbalance ratio (0.00625) and 390 unselected nodes remaining, indicating significant room for further construction. The graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization focusing on individual nodes with the highest delta in cut value is an effective strategy. `highest_delta_node_b31b` has consistently performed well in prior rounds, delivering meaningful improvements in the cut value. Increasing the running steps to 20 balances computational efficiency and the need for further construction while preparing the solution for refinement in subsequent steps.
+Delta of Selected Node: 20
+Delta of Cut Value: 108.0
+---Round 26---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has 390 unselected nodes, indicating significant room for further construction. The graph has high variance in edge weights (std_dev ~ 1.0), and focusing on high-weight edges can lead to impactful improvements in the cut value. Shifting to `highest_weight_edge_eb0c` complements the previous use of `highest_delta_node_b31b` by targeting edge-level optimization rather than node-level optimization. Running 15 steps balances computational efficiency and progress in constructing the solution further.
+Delta of Selected Node: 30
+Delta of Cut Value: 5.0
+---Round 27---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has a low imbalance ratio (0.00625) and still has 360 unselected nodes, which is a significant number. The graph's high variance in edge weights (std_dev ~ 1.0) suggests that focusing on node-level optimization remains effective. The `highest_delta_node_b31b` heuristic has consistently demonstrated strong performance in prior rounds, delivering meaningful improvements in the cut value. Running 20 steps balances computational efficiency and incremental improvement, further constructing the solution while preparing for potential refinement in subsequent steps.
+Delta of Selected Node: 20
+Delta of Cut Value: 106.0
+---Round 28---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has 360 unselected nodes, which is still a significant number, indicating that further construction is necessary. The graph's sparse structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0) make the `most_weight_neighbors_320c` heuristic well-suited for this stage. This heuristic prioritizes high-weight connections, enabling incremental construction of the solution while maintaining balance. Running 15 steps ensures computational efficiency while making meaningful progress in constructing the solution further.
+Delta of Selected Node: 15
+Delta of Cut Value: 36.0
+---Round 29---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has 345 unselected nodes, which is still significant, and the cut value has been improving steadily with node-level optimization. Given the high variance in edge weights (std_dev ~ 1.0), focusing on nodes that maximize the delta in cut value remains an effective strategy. `highest_delta_node_b31b` has consistently delivered strong improvements in prior rounds, and running 20 steps balances computational efficiency with meaningful progress in constructing the solution further.
+Delta of Selected Node: 20
+Delta of Cut Value: 85.0
+---Round 30---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution still has a significant number of unselected nodes (345), and the imbalance ratio is very low (0.00375). The graph's sparse structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0) indicate that focusing on nodes with high-weighted connections is effective for incremental construction. Switching to `most_weight_neighbors_320c` ensures a complementary strategy to `highest_delta_node_b31b`, targeting local neighborhood connections to further build the solution. Running 15 steps balances computational efficiency and meaningful progress.
+Delta of Selected Node: 15
+Delta of Cut Value: 35.0
+---Round 31---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: Switching to `highest_delta_node_b31b` ensures targeted node-level optimization, leveraging the high variance in edge weights to incrementally improve the cut value. With 345 remaining nodes, running 20 steps balances computational efficiency and meaningful progress in the solution-building phase.
+Delta of Selected Node: 20
+Delta of Cut Value: 80.0
+---Round 32---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has 325 unselected nodes remaining, which is still a significant number. The imbalance ratio is very low (0.00375), and the graph is sparse (edge density = 0.06) with high variance in edge weights (std_dev ~ 1.0). This suggests that further construction is necessary. The `most_weight_neighbors_320c` heuristic is well-suited for this stage as it prioritizes high-weighted connections, enabling incremental construction while maintaining balance. Switching to this heuristic complements previous use of `highest_delta_node_b31b`, targeting local neighborhood connections for further progress. Running 15 steps balances computational efficiency and meaningful progress.
+Delta of Selected Node: 15
+Delta of Cut Value: 19.0
+---Round 33---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has a significant number of unselected nodes (325), and the imbalance ratio is very low (0.00375). The graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization focusing on individual nodes with the highest delta in cut value can yield meaningful improvements. Switching to `highest_delta_node_b31b` leverages its proven effectiveness in prior rounds and ensures targeted node-level construction. Running 20 steps balances computational efficiency and meaningful progress, preparing the solution for future refinement steps.
+Delta of Selected Node: 20
+Delta of Cut Value: 70.0
+---Round 34---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution still has 305 unselected nodes, indicating there is significant room for further construction. The graph is sparse (edge density = 0.06) and has high variance in edge weights (std_dev ~ 1.0), making the `most_weight_neighbors_320c` heuristic a suitable choice for incremental construction. This heuristic prioritizes high-weighted connections, which can help improve the cut value while maintaining balance. Running 15 steps ensures computational efficiency and meaningful progress in constructing the solution further.
+Delta of Selected Node: 15
+Delta of Cut Value: 19.0
+---Round 35---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 305 unselected nodes, which is a significant number, and the imbalance ratio is very low (0.00375). The graph's high variance in edge weights (std_dev ~ 1.0) makes node-level optimization targeting individual nodes with the highest delta in cut value a promising strategy. Previous rounds of `highest_delta_node_b31b` have consistently delivered meaningful improvements in cut value. Running 20 steps balances computational efficiency and substantial progress, continuing the construction phase effectively before switching to a refinement approach.
+Delta of Selected Node: 20
+Delta of Cut Value: 52.0
+---Round 36---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution still has 305 unselected nodes, which is a significant number, and the imbalance ratio is very low (0.00375). The sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0) suggest that further construction is necessary. The `most_weight_neighbors_320c` heuristic is well-suited for this stage, as it prioritizes nodes with high-weighted connections, enabling incremental construction of the solution while maintaining balance. This complements the previous use of `highest_delta_node_b31b` and continues the strategy of alternating between node-level and neighborhood-level optimization. Running 15 steps balances computational efficiency and meaningful progress.
+Delta of Selected Node: 15
+Delta of Cut Value: 4.0
+---Round 37---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 290 unselected nodes, which is significant, and the imbalance ratio is very low (0.00375). The graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization remains effective. The `highest_delta_node_b31b` heuristic has consistently delivered strong improvements in cut value in prior rounds, and continuing with it for 20 steps ensures meaningful progress while leveraging the graph's characteristics. This step complements the previous use of `most_weight_neighbors_320c` by shifting back to targeted node-level optimization for further construction of the solution.
+Delta of Selected Node: 20
+Delta of Cut Value: 36.0
+---Round 38---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has 290 unselected nodes remaining, which is still significant, and the imbalance ratio is very low (0.00375). While recent rounds of node-level construction with `highest_delta_node_b31b` have shown incremental improvements, the diminishing returns on cut value suggest that it's time to transition to a refinement phase. The `multi_swap_2_dbfe` heuristic is a 2-opt method that evaluates simultaneous node swaps, enabling global refinement of the solution. This approach is well-suited for leveraging the current partially constructed solution and addressing potential inefficiencies in node assignments. Running 20 steps ensures meaningful progress while balancing computational cost.
+Delta of Selected Node: 0
+Delta of Cut Value: 114.0
+---Round 39---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has 290 unselected nodes, which is a significant number, and the imbalance ratio is very low (0.00375). The graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization remains effective. While the last heuristic (`multi_swap_2_dbfe`) showed strong performance in refining the solution (Delta Cut Value = 131.0), it is important to alternate back to a construction phase to further reduce the number of unselected nodes. The `highest_delta_node_b31b` heuristic has consistently delivered meaningful improvements in cut value during prior rounds and is well-suited for continuing the construction phase. Running 20 steps balances computational efficiency and progress in constructing the solution further.
+Delta of Selected Node: 20
+Delta of Cut Value: 36.0
+---Round 40---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution still has 270 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). The sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0) suggest that further construction is necessary. Returning to `most_weight_neighbors_320c` complements the recent node-level optimization with `highest_delta_node_b31b` by focusing on selecting nodes with high-weighted neighborhood connections. This heuristic is effective for incremental progress while maintaining balance between sets A and B. Running 15 steps balances computational efficiency with meaningful progress.
+Delta of Selected Node: 15
+Delta of Cut Value: -8.0
+---Round 41---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 255 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). The graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization focusing on individual nodes with the highest delta in cut value remains effective. Switching to `highest_delta_node_b31b` ensures targeted node-level construction, which has consistently delivered meaningful improvements in prior rounds. Running 20 steps balances computational efficiency and progress, reducing the number of unselected nodes while preparing for future refinement.
+Delta of Selected Node: 20
+Delta of Cut Value: 10.0
+---Round 42---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution has 255 unselected nodes, which is still significant, and the imbalance ratio remains very low (0.00375). The graph is sparse (edge density = 0.06) with high variance in edge weights (std_dev ~ 1.0), making it appropriate to focus on incremental construction. Using `most_weight_neighbors_320c` complements recent node-level optimizations with `highest_delta_node_b31b` by selecting nodes with high-weighted connections in their local neighborhoods. This approach balances computational efficiency with meaningful progress in constructing the solution further.
+Delta of Selected Node: 15
+Delta of Cut Value: -22.0
+---Round 43---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has 255 unselected nodes remaining, which is still significant, and the imbalance ratio remains very low (0.00375). The graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization remains effective. Switching to `highest_delta_node_b31b` ensures targeted node-level construction, which has consistently delivered meaningful improvements in prior rounds. Running 20 steps balances computational efficiency and progress, further reducing the number of unselected nodes while preparing for future refinement steps.
+Delta of Selected Node: 20
+Delta of Cut Value: -18.0
+---Round 44---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 255 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Recent rounds of node-level optimization (`highest_delta_node_b31b`) have shown diminishing returns, with a negative delta in cut value in the last round (-25.0). This indicates that it may be time to transition to a refinement phase. The `multi_swap_2_dbfe` heuristic is a 2-opt method that evaluates simultaneous node swaps, enabling global refinement of the solution. By considering the combined effects of multiple swaps, it can address inefficiencies in node assignments and refine the solution globally. Running 20 steps balances computational cost and the potential for meaningful cut value improvement.
+Delta of Selected Node: 0
+Delta of Cut Value: 65.0
+---Round 45---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution still has 255 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). The graph is sparse (edge density = 0.06) with high variance in edge weights (std_dev ~ 1.0), making it effective to focus on incremental construction. Returning to `most_weight_neighbors_320c` complements the recent use of `multi_swap_2_dbfe` by targeting high-weighted connections in local neighborhoods. This approach continues to build the solution while preparing it for further refinement. Running 15 steps ensures computational efficiency and meaningful progress.
+Delta of Selected Node: 15
+Delta of Cut Value: -37.0
+---Round 46---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is significant, and the imbalance ratio is very low (0.00375). While the last heuristic `most_weight_neighbors_320c` showed a negative delta in cut value (-24.0), returning to `highest_delta_node_b31b` ensures targeted node-level optimization to continue constructing the solution. Node-level strategies have consistently shown strong performance in prior rounds, and with a high variance in edge weights (std_dev ~ 1.0), focusing on nodes that maximize the delta in cut value is effective. Running 20 steps balances computational efficiency and progress, further reducing the number of unselected nodes and preparing for future refinement.
+Delta of Selected Node: 20
+Delta of Cut Value: -58.0
+---Round 47---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Recent rounds of node-level construction with `highest_delta_node_b31b` have shown negative deltas in the cut value (-51.0 in the last round), indicating diminishing returns from single-node optimizations. Transitioning to the refinement phase using the `multi_swap_2_dbfe` heuristic is appropriate as it evaluates simultaneous node swaps, addressing inefficiencies in node assignments and refining the solution globally. Running 20 steps allows for meaningful progress while leveraging the partially constructed solution to maximize the cut value.
+Delta of Selected Node: 0
+Delta of Cut Value: 40.0
+---Round 48---
+Heuristic: highest_weight_edge_eb0c
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Given the high variance in edge weights (std_dev ~ 1.0) and the sparse graph structure (edge density = 0.06), focusing on high-weight edges is an effective strategy to continue incremental construction. This complements the recent use of `multi_swap_2_dbfe`, which focused on global refinement. Returning to edge-level optimization ensures that impactful edges are prioritized, making meaningful progress in the solution-building phase. Running 20 steps balances computational efficiency and progress.
+Delta of Selected Node: 20
+Delta of Cut Value: -138.0
+---Round 49---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has 240 unselected nodes, which is still significant, and the imbalance ratio remains very low (0.00375). Recent rounds of edge-level (`highest_weight_edge_eb0c`) and node-level (`highest_delta_node_b31b`) optimizations have shown negative deltas in the cut value (-126.0 and -51.0, respectively), indicating diminishing returns from incremental construction methods. Transitioning to a global refinement phase using `multi_swap_2_dbfe` is appropriate, as it evaluates simultaneous node swaps and has previously shown strong performance in refining the solution (e.g., +52.0 and +104.0 cut value gains in earlier rounds). Running 20 steps ensures meaningful progress while addressing inefficiencies in the current solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 34.0
+---Round 50---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Given the sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), focusing on incremental construction by selecting nodes with high-weighted neighborhood connections is a logical next step. This heuristic complements recent refinement efforts (e.g., `multi_swap_2_dbfe`) by continuing the construction phase, which is necessary given the large number of unselected nodes. Increasing the running steps to 20 balances computational efficiency and meaningful progress at this stage.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 51---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is significant, and recent construction heuristics have shown diminishing returns (e.g., no improvement from `most_weight_neighbors_320c`). Transitioning to a refinement phase using `multi_swap_2_dbfe` is appropriate, as it evaluates simultaneous node swaps and has previously demonstrated strong performance (e.g., +52.0 and +46.0 cut value improvements). Running 20 steps ensures meaningful progress while addressing inefficiencies in the current solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 52---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Recent rounds of `multi_swap_2_dbfe` have shown diminishing returns (e.g., 0.0 improvement in the last round). Since the graph has high variance in edge weights (std_dev ~ 1.0), node-level optimization remains a promising approach to further construct the solution. The `highest_delta_node_b31b` heuristic has demonstrated consistent performance in improving the cut value, and running 20 steps balances computational efficiency and incremental improvement. This step focuses on reducing the unselected nodes further before switching back to global refinement.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 53---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The current solution has 240 unselected nodes remaining, which is a significant number, and recent rounds of node-level (`highest_delta_node_b31b`) and edge-level (`highest_weight_edge_eb0c`) optimizations have shown no improvement in the cut value. This indicates diminishing returns from incremental construction methods. Transitioning to a refinement phase with `multi_swap_2_dbfe` is appropriate, as it evaluates simultaneous node swaps and has previously shown strong performance in refining the solution (e.g., +52.0 and +46.0 cut value gains). Running 20 steps balances computational cost with the potential for meaningful global refinement of the solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 54---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 15
+Explain: The current solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Recent rounds of `multi_swap_2_dbfe` have shown diminishing returns (e.g., 0.0 improvement in the last round). Given the graph's sparse structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), it is effective to return to a constructive heuristic to incrementally build the solution. Using `most_weight_neighbors_320c` complements prior refinement efforts by focusing on nodes with high-weighted neighborhood connections, which can help improve the cut value while maintaining balance. Running 15 steps balances computational efficiency and potential progress.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 55---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of constructive heuristics like `most_weight_neighbors_320c` and node-level optimizations like `highest_delta_node_b31b` have shown no improvement in the cut value (Delta = 0.0), indicating diminishing returns from construction-focused methods. The graph still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Transitioning to a global refinement heuristic like `multi_swap_2_dbfe` is appropriate, as it evaluates simultaneous node swaps and has previously demonstrated strong performance in improving the cut value (e.g., +52.0 and +46.0 in earlier rounds). Running 20 steps balances computational efficiency with the potential for meaningful refinement.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 56---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is a significant number, and the imbalance ratio remains very low (0.00375). Recent rounds of `multi_swap_2_dbfe` and `most_weight_neighbors_320c` have shown diminishing returns (Delta = 0.0). However, given the graph's high variance in edge weights (std_dev ~ 1.0), node-level optimization remains a viable approach. The `highest_delta_node_b31b` heuristic has demonstrated consistent performance in prior rounds, and it is appropriate to attempt further construction with this heuristic. Running 20 steps balances computational efficiency with the potential for improvement.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 57---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of both constructive (`highest_delta_node_b31b`, `most_weight_neighbors_320c`) and refinement (`multi_swap_2_dbfe`) heuristics have shown diminishing returns, with no improvement in the cut value (Delta = 0.0). However, given that the graph still has 240 unselected nodes and the imbalance ratio is low (0.00375), there is room for refinement. `multi_swap_2_dbfe` has previously demonstrated strong performance in refining the solution (e.g., +52.0 and +46.0 cut value gains). Running 20 steps ensures a balance between computational efficiency and the potential for global refinement of the solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 58---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is a significant number. The graph exhibits high variance in edge weights (std_dev ~ 1.0), and node-level optimization remains a promising approach. While recent rounds have shown diminishing returns, alternating between construction and refinement heuristics is essential. `highest_delta_node_b31b` has previously demonstrated effective performance in similar stages and can help further construct the solution by targeting individual nodes that maximize the cut value. Running 20 steps ensures computational efficiency while attempting meaningful progress.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 59---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of both constructive (`highest_delta_node_b31b`, `most_weight_neighbors_320c`) and refinement (`multi_swap_2_dbfe`) heuristics have shown diminishing returns, with no improvement in the cut value (Delta = 0.0). However, given the graph still has 240 unselected nodes and the imbalance ratio is very low (0.00375), refinement is a logical next step. The `multi_swap_2_dbfe` heuristic has demonstrated strong performance in refinement phases earlier (e.g., +52.0 and +46.0 cut value improvements). Running 20 steps allows exploration of global refinements to address inefficiencies in the current solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 60---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The current solution still has 240 unselected nodes, which is a significant number, and the imbalance ratio remains very low (0.00375). While recent refinement attempts with `multi_swap_2_dbfe` have shown diminishing returns (Delta = 0.0), a return to node-level optimization is logical at this stage. The graph exhibits high variance in edge weights (std_dev ~ 1.0), making `highest_delta_node_b31b` effective for targeting individual nodes that maximize the cut value. Running 20 steps balances computational efficiency and the potential for meaningful progress in constructing the solution further.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 61---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of node-level (`highest_delta_node_b31b`) and neighborhood-level (`most_weight_neighbors_320c`) heuristics have shown no improvement in the cut value (Delta = 0.0). While `multi_swap_2_dbfe` has also shown diminishing returns recently, it has previously demonstrated strong performance in refinement phases (e.g., +52.0 and +46.0 cut value improvements). Given that 240 unselected nodes remain and the imbalance ratio is very low (0.00375), transitioning to a refinement phase with `multi_swap_2_dbfe` is logical to explore global adjustments and address inefficiencies in the current solution. Running 20 steps ensures computational efficiency while attempting meaningful refinements.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 62---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Given the sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), returning to `most_weight_neighbors_320c` is a logical step to incrementally construct the solution. This heuristic focuses on selecting nodes with high-weighted neighborhood connections, which can help improve the cut value while maintaining balance. Increasing the running steps to 20 ensures meaningful progress in this construction phase.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 63---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has 240 unselected nodes, which is a significant number, and recent attempts with constructive heuristics (`most_weight_neighbors_320c` and `highest_delta_node_b31b`) have shown no improvement in the cut value (Delta = 0.0). Transitioning to a refinement phase is logical at this stage, as `multi_swap_2_dbfe` evaluates simultaneous node swaps to address inefficiencies in the current solution globally. Previous rounds have demonstrated that this heuristic can yield meaningful cut value improvements (e.g., +52.0 and +46.0). Running 20 steps ensures computational efficiency while attempting meaningful refinements.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 64---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Given the sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), it is logical to return to a constructive heuristic to incrementally build the solution. The `most_weight_neighbors_320c` heuristic prioritizes high-weighted neighborhood connections, which can help improve the cut value while maintaining balance. This complements recent refinement-focused rounds and continues the construction phase effectively.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 65---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of both constructive heuristics (`most_weight_neighbors_320c`, `highest_delta_node_b31b`) and refinement heuristics (`multi_swap_2_dbfe`) have shown no improvement in the cut value (Delta = 0.0). However, the solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Since the constructive methods have failed to progress, transitioning to a refinement phase using `multi_swap_2_dbfe` is logical. This heuristic evaluates simultaneous node swaps globally and has previously shown strong performance in refinement phases, yielding significant cut value improvements (e.g., +52.0 and +46.0). Running 20 steps ensures computational efficiency while attempting meaningful refinements to address inefficiencies in the current solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 66---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: Given that the solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375), node-level optimization remains a viable approach for further construction. While recent rounds of `multi_swap_2_dbfe` and `most_weight_neighbors_320c` have shown diminishing returns, the graph's high variance in edge weights (std_dev ~ 1.0) suggests that targeting individual nodes with the highest delta in cut value can yield meaningful improvements. Running 20 steps balances computational efficiency and the need for incremental progress in constructing the solution further.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 67---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Recent rounds of constructive heuristics (`most_weight_neighbors_320c`, `highest_delta_node_b31b`) and refinement (`multi_swap_2_dbfe`) have shown no improvement, but `multi_swap_2_dbfe` has historically performed well in similar refinement stages (e.g., +52.0 and +46.0 cut value improvements). Since the current solution may have inefficiencies in node assignments, attempting further global refinement with `multi_swap_2_dbfe` is logical. Running 20 steps ensures computational efficiency while exploring potential refinements to address these inefficiencies.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 68---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has a significant number of unselected nodes (240), and the imbalance ratio remains very low (0.00375). Given the sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), focusing on incremental construction using `most_weight_neighbors_320c` is appropriate. This heuristic prioritizes nodes with high-weighted neighborhood connections, which can help improve the cut value while maintaining balance. Running 20 steps ensures meaningful progress in constructing the solution further before switching back to refinement heuristics for global optimization.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 69---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of constructive heuristics (`most_weight_neighbors_320c`, `highest_delta_node_b31b`) have shown no improvement in the cut value (Delta = 0.0), indicating diminishing returns from node-level or neighborhood-level construction. Given that the solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375), transitioning to a refinement phase with `multi_swap_2_dbfe` is logical. This heuristic has demonstrated strong performance in similar refinement phases (e.g., +52.0 and +46.0 cut value improvements). Running 20 steps ensures computational efficiency while exploring potential global refinements to address inefficiencies in the current solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 70---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Recent attempts with `multi_swap_2_dbfe` and `most_weight_neighbors_320c` have not yielded any improvement (Delta = 0.0), indicating diminishing returns from those heuristics. However, the graph's high variance in edge weights (std_dev ~ 1.0) suggests that node-level optimization focusing on individual nodes with the highest delta in cut value remains a viable approach for incremental construction. This heuristic has historically performed well in similar scenarios, making it a logical choice for further progress. Running 20 steps balances computational efficiency and the need for meaningful improvement.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 71---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of constructive heuristics (`highest_delta_node_b31b`, `most_weight_neighbors_320c`) have shown no improvement in the cut value (Delta = 0.0), indicating diminishing returns from node-level or neighborhood-level construction. With 240 unselected nodes and a very low imbalance ratio (0.00375), transitioning to a refinement phase with `multi_swap_2_dbfe` is logical. This heuristic has previously demonstrated strong performance in similar refinement phases (e.g., +52.0 and +46.0 cut value improvements). Running 20 steps ensures computational efficiency while exploring potential global refinements to address inefficiencies in the current solution.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 72---
+Heuristic: most_weight_neighbors_320c
+Parameters: {}
+Running Steps: 20
+Explain: The solution still has a significant number of unselected nodes (240), and the imbalance ratio remains very low (0.00375). Given the sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), focusing on incremental construction is logical. The `most_weight_neighbors_320c` heuristic is suitable for selecting nodes with high-weighted neighborhood connections, which can help incrementally improve the cut value while maintaining balance. Since recent refinement attempts with `multi_swap_2_dbfe` have shown diminishing returns, it is important to alternate back to a construction phase to explore further progress. Running 20 steps ensures computational efficiency and potential improvement.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 73---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of constructive heuristics (`most_weight_neighbors_320c`, `highest_delta_node_b31b`) have shown no improvement in the cut value (Delta = 0.0). With 240 unselected nodes and a very low imbalance ratio (0.00375), the current solution likely has inefficiencies in node assignments that require global refinement. The `multi_swap_2_dbfe` heuristic evaluates simultaneous node swaps and has previously demonstrated strong performance in similar refinement stages (e.g., +52.0 and +46.0 cut value gains). Running 20 steps balances computational efficiency and the potential for meaningful global refinement to address these inefficiencies.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 74---
+Heuristic: highest_delta_node_b31b
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of both constructive (`most_weight_neighbors_320c`) and refinement (`multi_swap_2_dbfe`) heuristics have shown no improvement (Delta = 0.0), indicating diminishing returns from global refinement. However, the graph's high variance in edge weights (std_dev ~ 1.0) and the significant number of unselected nodes (240) suggest that node-level optimization remains a viable approach. Switching to `highest_delta_node_b31b` ensures targeted node-level construction, focusing on nodes with the highest incremental impact on the cut value. Running 20 steps balances computational efficiency and the need for meaningful progress in constructing the solution further.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+---Round 75---
+Heuristic: multi_swap_2_dbfe
+Parameters: {}
+Running Steps: 20
+Explain: Recent rounds of constructive heuristics (`highest_delta_node_b31b`, `most_weight_neighbors_320c`) have shown no improvement (Delta = 0.0), indicating diminishing returns from node-level or neighborhood-level construction. With 240 unselected nodes remaining and the imbalance ratio very low (0.00375), global refinement is a logical next step. The `multi_swap_2_dbfe` heuristic evaluates simultaneous node swaps, addressing inefficiencies in node assignments, and has previously demonstrated strong performance in similar refinement stages (e.g., +52.0 and +46.0 cut value gains). Running 20 steps balances computational efficiency and the potential for meaningful global improvement.
+Delta of Selected Node: 0
+Delta of Cut Value: 0.0
+
+Considerations for Next Steps
+- Is the current data sufficient for decision-making?
+- Is there a need to construct or refine the solution further?
+- The last heuristic is: multi_swap_2_dbfe. How does multi_swap_2_dbfe perform, and should we continue with it?
+- How much steps should we run for next heuristic?
+
+Decision Options:
+We aim to incrementally construct an optimal solution by strategically applying a set of heuristic algorithms. Each heuristic, when applied, contributes one operator to the evolving solution. Here is the refined process:
+1. I will present you with the initial data. Your role will be to evaluate this data and select the most appropriate heuristic algorithm from our pool of heuristics. This selection will be based on predefined criteria and heuristic performance measures.
+2. I will then execute the chosen heuristic for a number of steps, resulting in a partial solution. Once this stage is complete, I will provide you with the updated solution state. Your task will be to assess the progress and determine whether to:
+    - Continue with the same heuristic algorithm to further develop the current solution, or
+    - Switch to a different heuristic algorithm from our pool to either enhance the existing solution or take a new approach to the problem.
+
+As the selection hyper-heuristic algorithm agent, your role is critical in orchestrating the application of these heuristics to navigate towards an improved or final solution. Please familiarize yourself with the available heuristic algorithms and the overall decision-making pipeline. Once I introduce the specific data for our problem, we will collaborate to advance towards the solution.
+
+The response format is very important. For better communication, please respond to me in this format:
+1. If you believe the we should continue to build or improve solution, please respond to me in this format:
+***Run heuristic:
+selected heuristic: heuristic_name
+running steps: N
+hype parameter(optional): a=xx;b=xx
+explanation: xxx
+***
+2. If you think the solution can not be improved, please respond to me in this format:
+***Stop***
+
+------------------------------------------------------------------------------------
+
+assistant
+***Run heuristic:
+selected heuristic: most_weight_neighbors_320c
+running steps: 15
+explanation: The solution still has 240 unselected nodes, which is significant, and the imbalance ratio remains very low (0.00375). Given the sparse graph structure (edge density = 0.06) and high variance in edge weights (std_dev ~ 1.0), it is logical to return to a constructive heuristic to incrementally build the solution. The `most_weight_neighbors_320c` heuristic prioritizes nodes with high-weighted neighborhood connections, which can help improve the cut value while maintaining balance. Running 15 steps ensures meaningful progress in constructing the solution further before transitioning back to refinement heuristics.***
+
+------------------------------------------------------------------------------------
+

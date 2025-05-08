@@ -1,0 +1,82 @@
+-data: LA02.jssp
+-current_solution:
+machine_0: 0->4->1->2->7->5->8->3->6->9
+machine_1: 2->7->1->5->3->6->9->0->4->8
+machine_2: 1->2->3->9->7->4->8->0->5->6
+machine_3: 0->4->1->2->6->9->7->5->3->8
+machine_4: 1->4->6->2->8->9->3->5->0->7
+
+-is_complete_solution: True
+-is_valid_solution: True
+-current_makespan: 655
+-job_num: 10
+-machine_num: 5
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	least_work_remaining_66c9	AdvanceOperator(job_id=1)	machine_0: \nmachine_1: \nmachine_2: \nmachine_3: \nmachine_4: 1\n
+1	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 0\nmachine_1: \nmachine_2: \nmachine_3: \nmachine_4: 1\n
+2	least_work_remaining_66c9	AdvanceOperator(job_id=1)	machine_0: 0\nmachine_1: \nmachine_2: 1\nmachine_3: \nmachine_4: 1\n
+3	first_come_first_served_af26	AdvanceOperator(job_id=2)	machine_0: 0\nmachine_1: 2\nmachine_2: 1\nmachine_3: \nmachine_4: 1\n
+4	least_work_remaining_66c9	AdvanceOperator(job_id=1)	machine_0: 0->1\nmachine_1: 2\nmachine_2: 1\nmachine_3: \nmachine_4: 1\n
+5	most_work_remaining_df20	ShiftOperator(machine_id=0, job_id=0, new_position=1)	machine_0: 1->0\nmachine_1: 2\nmachine_2: 1\nmachine_3: \nmachine_4: 1\n
+6	shortest_processing_time_first_d471	AdvanceOperator(job_id=4)	machine_0: 1->0\nmachine_1: 2\nmachine_2: 1\nmachine_3: \nmachine_4: 1->4\n
+7	most_work_remaining_df20	AdvanceOperator(job_id=1)	machine_0: 1->0\nmachine_1: 2->1\nmachine_2: 1\nmachine_3: \nmachine_4: 1->4\n
+8	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: 1->0\nmachine_1: 2->1\nmachine_2: 1->2\nmachine_3: \nmachine_4: 1->4\n
+9	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 1->0\nmachine_1: 2->1\nmachine_2: 1->2\nmachine_3: \nmachine_4: 1->4->6\n
+10	least_work_remaining_66c9	AdvanceOperator(job_id=1)	machine_0: 1->0\nmachine_1: 2->1\nmachine_2: 1->2\nmachine_3: 1\nmachine_4: 1->4->6\n
+11	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: 1->0\nmachine_1: 2->1\nmachine_2: 1->2\nmachine_3: 1\nmachine_4: 1->4->6->2\n
+12	most_work_remaining_df20	AdvanceOperator(job_id=6)	machine_0: 1->0\nmachine_1: 2->1->6\nmachine_2: 1->2\nmachine_3: 1\nmachine_4: 1->4->6->2\n
+13	most_work_remaining_df20	AdvanceOperator(job_id=4)	machine_0: 1->0->4\nmachine_1: 2->1->6\nmachine_2: 1->2\nmachine_3: 1\nmachine_4: 1->4->6->2\n
+14	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 1->0->4\nmachine_1: 2->1->6\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2\n
+15	most_work_remaining_df20	AdvanceOperator(job_id=5)	machine_0: 1->0->4\nmachine_1: 2->1->6->5\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2\n
+16	most_work_remaining_df20	AdvanceOperator(job_id=2)	machine_0: 1->0->4->2\nmachine_1: 2->1->6->5\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2\n
+17	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 1->0->4->2\nmachine_1: 2->1->6->5\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2->8\n
+18	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 1->0->4->2\nmachine_1: 2->1->6->5\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2->8->9\n
+19	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 1->0->4->2\nmachine_1: 2->1->6->5->7\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2->8->9\n
+20	shift_operator_109f	ShiftOperator(machine_id=1, job_id=7, new_position=1)	machine_0: 1->0->4->2\nmachine_1: 2->7->1->6->5\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2->8->9\n
+21	most_work_remaining_df20	AdvanceOperator(job_id=7)	machine_0: 1->0->4->2->7\nmachine_1: 2->7->1->6->5\nmachine_2: 1->2->3\nmachine_3: 1\nmachine_4: 1->4->6->2->8->9\n
+22	most_work_remaining_df20	AdvanceOperator(job_id=9)	machine_0: 1->0->4->2->7\nmachine_1: 2->7->1->6->5\nmachine_2: 1->2->3->9\nmachine_3: 1\nmachine_4: 1->4->6->2->8->9\n
+23	longest_job_next_2e23	AdvanceOperator(job_id=3)	machine_0: 1->0->4->2->7\nmachine_1: 2->7->1->6->5->3\nmachine_2: 1->2->3->9\nmachine_3: 1\nmachine_4: 1->4->6->2->8->9\n
+24	longest_processing_time_first_9dc9	AdvanceOperator(job_id=2)	machine_0: 1->0->4->2->7\nmachine_1: 2->7->1->6->5->3\nmachine_2: 1->2->3->9\nmachine_3: 1->2\nmachine_4: 1->4->6->2->8->9\n
+25	_3opt_6ee0	SwapOperator(machine_id=1, job_id1=7, job_id2=6)	machine_0: 1->0->4->2->7\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9\nmachine_3: 1->2\nmachine_4: 1->4->6->2->8->9\n
+26	shortest_job_next_5b42	AdvanceOperator(job_id=4)	machine_0: 1->0->4->2->7\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9\nmachine_3: 1->2->4\nmachine_4: 1->4->6->2->8->9\n
+27	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 1->0->4->2->7->5\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9\nmachine_3: 1->2->4\nmachine_4: 1->4->6->2->8->9\n
+28	shift_operator_109f	ShiftOperator(machine_id=0, job_id=1, new_position=1)	machine_0: 0->1->4->2->7->5\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9\nmachine_3: 1->2->4\nmachine_4: 1->4->6->2->8->9\n
+29	longest_processing_time_first_9dc9	AdvanceOperator(job_id=7)	machine_0: 0->1->4->2->7->5\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9->7\nmachine_3: 1->2->4\nmachine_4: 1->4->6->2->8->9\n
+30	most_work_remaining_df20	SwapOperator(machine_id=3, job_id1=1, job_id2=4)	machine_0: 0->1->4->2->7->5\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9->7\nmachine_3: 4->2->1\nmachine_4: 1->4->6->2->8->9\n
+31	least_work_remaining_66c9	AdvanceOperator(job_id=4)	machine_0: 0->1->4->2->7->5\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1\nmachine_4: 1->4->6->2->8->9\n
+32	first_come_first_served_af26	AdvanceOperator(job_id=3)	machine_0: 0->1->4->2->7->5\nmachine_1: 2->6->1->7->5->3\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1\nmachine_4: 1->4->6->2->8->9->3\n
+33	first_come_first_served_af26	AdvanceOperator(job_id=9)	machine_0: 0->1->4->2->7->5\nmachine_1: 2->6->1->7->5->3->9\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1\nmachine_4: 1->4->6->2->8->9->3\n
+34	longest_job_next_2e23	AdvanceOperator(job_id=8)	machine_0: 0->1->4->2->7->5->8\nmachine_1: 2->6->1->7->5->3->9\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1\nmachine_4: 1->4->6->2->8->9->3\n
+35	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 0->1->4->2->7->5->8\nmachine_1: 2->6->1->7->5->3->9\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1->0\nmachine_4: 1->4->6->2->8->9->3\n
+36	least_work_remaining_66c9	AdvanceOperator(job_id=4)	machine_0: 0->1->4->2->7->5->8\nmachine_1: 2->6->1->7->5->3->9->4\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1->0\nmachine_4: 1->4->6->2->8->9->3\n
+37	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 0->1->4->2->7->5->8\nmachine_1: 2->6->1->7->5->3->9->4\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1->0\nmachine_4: 1->4->6->2->8->9->3->5\n
+38	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 0->1->4->2->7->5->8\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1->0\nmachine_4: 1->4->6->2->8->9->3->5\n
+39	shortest_processing_time_first_d471	AdvanceOperator(job_id=3)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1->0\nmachine_4: 1->4->6->2->8->9->3->5\n
+40	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4\nmachine_3: 4->2->1->0->6\nmachine_4: 1->4->6->2->8->9->3->5\n
+41	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8\nmachine_3: 4->2->1->0->6\nmachine_4: 1->4->6->2->8->9->3->5\n
+42	first_come_first_served_af26	AdvanceOperator(job_id=5)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8\nmachine_3: 4->2->1->0->6->5\nmachine_4: 1->4->6->2->8->9->3->5\n
+43	first_come_first_served_af26	AdvanceOperator(job_id=0)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8\nmachine_3: 4->2->1->0->6->5\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+44	shortest_job_next_5b42	AdvanceOperator(job_id=0)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 4->2->1->0->6->5\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+45	_2opt_f9c1	SwapOperator(machine_id=3, job_id1=4, job_id2=1)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->6->5\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+46	shortest_processing_time_first_d471	AdvanceOperator(job_id=7)	machine_0: 0->1->4->2->7->5->8->3\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->6->5->7\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+47	first_come_first_served_af26	AdvanceOperator(job_id=6)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->6->5->7\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+48	shortest_processing_time_first_d471	AdvanceOperator(job_id=8)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->6->5->7\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+49	most_work_remaining_df20	AdvanceOperator(job_id=3)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->6->5->7->3\nmachine_4: 1->4->6->2->8->9->3->5->0\n
+50	first_come_first_served_af26	AdvanceOperator(job_id=7)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->6->5->7->3\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+51	_2opt_f9c1	SwapOperator(machine_id=3, job_id1=6, job_id2=7)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0\nmachine_3: 1->2->4->0->7->5->6->3\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+52	most_work_remaining_df20	AdvanceOperator(job_id=5)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5\nmachine_3: 1->2->4->0->7->5->6->3\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+53	longest_processing_time_first_9dc9	AdvanceOperator(job_id=9)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5\nmachine_3: 1->2->4->0->7->5->6->3->9\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+54	shortest_processing_time_first_d471	AdvanceOperator(job_id=6)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 1->2->4->0->7->5->6->3->9\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+55	first_come_first_served_af26	AdvanceOperator(job_id=8)	machine_0: 0->1->4->2->7->5->8->3->6\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 1->2->4->0->7->5->6->3->9->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+56	shortest_processing_time_first_d471	AdvanceOperator(job_id=9)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 1->2->4->0->7->5->6->3->9->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+57	_3opt_6ee0	SwapOperator(machine_id=3, job_id1=1, job_id2=0)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->6->1->7->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->2->4->1->7->5->6->3->9->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+58	_2opt_f9c1	SwapOperator(machine_id=1, job_id1=6, job_id2=7)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->2->4->1->7->5->6->3->9->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+59	shift_operator_109f	ShiftOperator(machine_id=3, job_id=6, new_position=1)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->6->2->4->1->7->5->3->9->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+60	shift_operator_109f	ShiftOperator(machine_id=3, job_id=3, new_position=8)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->6->2->4->1->7->5->9->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+61	shift_operator_109f	ShiftOperator(machine_id=3, job_id=4, new_position=1)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->4->6->2->1->7->5->9->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+62	shift_operator_109f	ShiftOperator(machine_id=3, job_id=9, new_position=5)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->4->0->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->4->6->2->1->9->7->5->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+63	shift_operator_109f	ShiftOperator(machine_id=1, job_id=4, new_position=8)	machine_0: 0->1->4->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->0->4->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->4->6->2->1->9->7->5->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+64	shift_operator_109f	ShiftOperator(machine_id=0, job_id=1, new_position=2)	machine_0: 0->4->1->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->0->4->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->4->6->2->1->9->7->5->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+65	_3opt_6ee0	SwapOperator(machine_id=3, job_id1=6, job_id2=1)	machine_0: 0->4->1->2->7->5->8->3->6->9\nmachine_1: 2->7->1->6->5->3->9->0->4->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->4->1->2->6->9->7->5->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n
+66	shift_operator_109f	ShiftOperator(machine_id=1, job_id=6, new_position=5)	machine_0: 0->4->1->2->7->5->8->3->6->9\nmachine_1: 2->7->1->5->3->6->9->0->4->8\nmachine_2: 1->2->3->9->7->4->8->0->5->6\nmachine_3: 0->4->1->2->6->9->7->5->3->8\nmachine_4: 1->4->6->2->8->9->3->5->0->7\n

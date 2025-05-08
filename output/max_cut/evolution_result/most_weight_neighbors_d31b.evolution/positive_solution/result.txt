@@ -1,0 +1,18 @@
+-data: output/max_cut/data/train_data/train_case_12.mc
+-current_solution:
+set_a: 0,3,4
+set_b: 1,2
+
+-is_complete_solution: True
+-is_valid_solution: True
+-current_cut_value: 2.0
+-node_num: 5
+-set_a_count: 3
+-set_b_count: 2
+-trajectory:
+operation_id	heuristic	operator(parameter)	solution_after_operation
+0	most_weight_neighbors_d31b	InsertNodeOperator(node=3, target_set='A')	set_a: 3\nset_b: \n
+1	most_weight_neighbors_d31b	InsertNodeOperator(node=1, target_set='B')	set_a: 3\nset_b: 1\n
+2	random_5c59	InsertNodeOperator(node=2, target_set='B')	set_a: 3\nset_b: 1,2\n
+3	most_weight_neighbors_d31b	InsertNodeOperator(node=4, target_set='A')	set_a: 3,4\nset_b: 1,2\n
+4	most_weight_neighbors_d31b	InsertNodeOperator(node=0, target_set='A')	set_a: 0,3,4\nset_b: 1,2\n
