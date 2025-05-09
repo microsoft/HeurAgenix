@@ -44,7 +44,7 @@ class LLMSelectionHyperHeuristicTTS:
 
         heuristic_traject = []
         current_steps = 0
-        running_step = 5
+        running_step = 10
         while current_steps <= max_steps and env.continue_run:
             try:
                 if env.is_complete_solution:
@@ -76,7 +76,7 @@ class LLMSelectionHyperHeuristicTTS:
                 self.llm_client.load("heuristic_selection_tts", prompt_dict)
 
                 response = self.llm_client.chat()
-                self.llm_client.dump(f"step_{len(heuristic_traject)}")
+                self.llm_client.dump(f"step_{current_steps}")
 
                 if "Run heuristic:" in response:
                     # Load selected heuristic, running step, parameters(optional) and reason

@@ -18,17 +18,16 @@ def run_random_hh(
 ) -> float:
     random_hh = RandomHyperHeuristic(heuristic_pool, problem)
     env = dill.loads(env_serialized)
-    complete_and_valid_solution = random_hh.run(env, max_steps=max_steps)
+    complete_and_valid_solution = False
+    while not complete_and_valid_solution:
+        complete_and_valid_solution = random_hh.run(env, max_steps=max_steps)
 
-    if complete_and_valid_solution:
-        # If found best, save it
-        if dump_best_result and best_result_proxy:
-            if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) >= 0:
-                best_result_proxy.value = env.key_value
-                env.dump_result(dump_trajectory=True, result_file=f"best_result_{env.key_value}.txt")
-        return env.key_value
-    else:
-        return None
+    # If found best, save it
+    if dump_best_result and best_result_proxy:
+        if best_result_proxy.value == float('-inf') or env.compare(env.key_value, best_result_proxy.value) >= 0:
+            best_result_proxy.value = env.key_value
+            env.dump_result(dump_trajectory=True, result_file=f"best_result_{env.key_value}.txt")
+    return env.key_value
 
 def evaluate_heuristic(
         env_serialized: bytes,
@@ -76,7 +75,7 @@ def find_best(
                 env_serialized,
                 heuristic,
                 heuristic_pool,
-                int(env.construction_steps * 1.2),
+                int(env.construction_steps * 1.3),
                 10,
                 search_time,
                 problem,
