@@ -6,6 +6,7 @@ from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
 from src.pipeline.hyper_heuristics.llm_deep_selection import LLMDeepSelectionHyperHeuristic
+from src.pipeline.hyper_heuristics.llm_selection_tts import LLMSelectionHyperHeuristicTTS
 from src.util.llm_client.get_llm_client import get_llm_client
 
 def parse_arguments():
@@ -57,6 +58,14 @@ def main():
             heuristic_pool=heuristic_pool,
             problem=problem,
             search_interval=search_interval,
+            search_time=search_time,
+        )
+    elif heuristic == "tts":
+        output_dir = f"tts_{search_time}.{heuristic_type}.{llm_name}.{datetime_str}"
+        hyper_heuristic = LLMSelectionHyperHeuristicTTS(
+            llm_client=llm_client,
+            heuristic_pool=heuristic_pool,
+            problem=problem,
             search_time=search_time,
         )
     elif heuristic == "random_hh":

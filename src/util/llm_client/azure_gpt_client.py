@@ -40,17 +40,29 @@ class AzureGPTClient(BaseLLMClient):
             os.makedirs(output_dir, exist_ok=True)
 
     def chat_once(self) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=self.messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            top_p=self.top_p,
-            seed=self.seed,
-            frequency_penalty=0,
-            presence_penalty=0,
-            stop=None,
-            stream=False,
-        )
+        if self.model == "o3_2025-04-16":
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=self.messages,
+                max_completion_tokens=self.max_tokens,
+                seed=self.seed,
+                frequency_penalty=0,
+                presence_penalty=0,
+                stop=None,
+                stream=False,
+            )
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=self.messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
+                seed=self.seed,
+                frequency_penalty=0,
+                presence_penalty=0,
+                stop=None,
+                stream=False,
+            )
         response_content = response.choices[-1].message.content
         return response_content

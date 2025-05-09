@@ -16,7 +16,6 @@ def run_random_hh(
         best_result_proxy: multiprocessing.managers.ValueProxy=None,
         dump_best_result: bool=False
 ) -> float:
-    
     random_hh = RandomHyperHeuristic(running_heuristic_pool, problem)
     env = dill.loads(env_serialized)
     complete_and_valid_solution = random_hh.run(env, max_steps=max_steps)
@@ -46,8 +45,7 @@ def evaluate_heuristic(
     heuristic = load_heuristic(heuristic_name, problem)
     operators = []
     for _ in range(search_interval):
-        if env.continue_run:
-            operators.append(env.run_heuristic(heuristic))
+        operators.append(env.run_heuristic(heuristic))
     after_step_env_serialized = dill.dumps(env)
     # MCTS to evaluate heuristic performance
     results = []
@@ -92,3 +90,40 @@ def compare_heuristics(
         heuristic_name, results, after_step_env_serialized, operators = future.result()
         total_results.append([heuristic_name, results, dill.loads(after_step_env_serialized), operators])
     return total_results
+
+
+def best_result(
+        env: BaseEnv,
+        candidate_heuristics: list[str],
+        running_heuristic_pool: list[str],
+        search_time: int,
+        problem: str,
+) -> tuple[str, bytes]:
+    manager = multiprocessing.Manager()
+    best_result_proxy = manager.Value('d', float('-inf'))
+    env_serialized = dill.dumps(env)
+    futures = []
+    for heuristic in candidate_heuristics:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            futures.append(executor.submit(
+                evaluate_heuristic,
+                env_serialized,
+                heuristic,
+                running_heuristic_pool,
+                None,
+                5,
+                search_time,
+                problem,
+                best_result_proxy,
+                True
+            ))
+
+    total_results = []
+    best_average_score = None
+    for future in concurrent.futures.as_completed(futures):
+        heuristic_name, results, _, _ = future.result()
+        average_score = None if len(results) <= 0 else sum(results) / len(results)
+        if average_score is not None and best_average_score is None or env.compare(average_score, best_average_score) > 0:
+            best_heuristic_name = heuristic_name
+            best_average_score = average_score
+    return best_heuristic_name
