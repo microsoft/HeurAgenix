@@ -3,7 +3,7 @@ import traceback
 from src.problems.base.env import BaseEnv
 from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
-from src.util.compare_heuristics import best_result
+from src.util.find_best import find_best
 
 
 class LLMSelectionHyperHeuristicTTS:
@@ -82,13 +82,12 @@ class LLMSelectionHyperHeuristicTTS:
                     # Load selected heuristic, running step, parameters(optional) and reason
                     result = extract(response, key="Run heuristic", sep="\n")
                     selected_heuristic_names = result[0].split(":")[-1].strip()
-                    # running_step = int(result[1].split(":")[-1].strip().split(" ")[0])
                     explain = result[-1].split(":")[-1].strip()
                     parameters = {}
 
                     candidate_heuristics = [h for h in selected_heuristic_names.replace(" ", "").split(";") if h in self.heuristic_pools]
 
-                    selected_heuristic_name = best_result(env, candidate_heuristics, self.heuristic_pools.keys(), self.search_time, self.problem, best_result_proxy)
+                    selected_heuristic_name = find_best(env, candidate_heuristics, self.heuristic_pools.keys(), self.search_time, self.problem)
 
                     assert selected_heuristic_name in self.heuristic_pools.keys()
                     selected_heuristic = self.heuristic_pools[selected_heuristic_name]
