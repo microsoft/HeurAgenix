@@ -19,6 +19,7 @@ def parse_arguments():
     parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Data name for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
+    parser.add_argument("-m", "--card_mode", action='store_true', help="whether to use card mode.")
     parser.add_argument("-l", "--llm_config_file", type=str, default="AzureGPT", help="LLM config file to use.")
 
     return parser.parse_args()
@@ -49,7 +50,7 @@ def main():
 
     if heuristic == "llm_hh":
         output_dir = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
-        hyper_heuristic = LLMSelectionHyperHeuristic(llm_client=llm_client, heuristic_pool=heuristic_pool, problem=problem)
+        hyper_heuristic = LLMSelectionHyperHeuristic(llm_client=llm_client, heuristic_pool=heuristic_pool, problem=problem, use_card_mode=args.card_mode)
     elif heuristic == "llm_deep_hh":
         output_dir = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMDeepSelectionHyperHeuristic(
