@@ -11,9 +11,11 @@ class LLMSelectionHyperHeuristic:
         llm_client: BaseLLMClient,
         heuristic_pool: list[str],
         problem: str,
+        use_card_mode: bool = False,
     ) -> None:
         self.llm_client = llm_client
         self.problem = problem
+        self.use_card_mode = use_card_mode
         self.heuristic_docs = {
             heuristic_file.split(".")[0]: extract_function_with_short_docstring(open(search_file(heuristic_file, problem)).read(), heuristic_file.split(".")[0]) 
             for heuristic_file in heuristic_pool}
