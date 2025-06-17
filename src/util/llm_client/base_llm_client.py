@@ -51,7 +51,7 @@ class BaseLLMClient:
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)
 
-    def load_background(self, problem: str, reference_data: str=None) -> dict:
+    def load_background(self, problem: str, background_file="background", reference_data: str=None) -> dict:
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
         if os.path.exists(os.path.join("src", "problems", problem, "components.py")):
@@ -77,10 +77,10 @@ class BaseLLMClient:
             "env_summarize": env_summarize
         }
 
-        self.load("background", prompt_dict)
+        self.load(background_file, prompt_dict)
         response = self.chat()
         is_cop = extract(response, "is_cop", "\n")
-        self.dump("background")
+        self.dump(background_file)
         if not is_cop or "no" in is_cop or "No" in is_cop or "NO" in is_cop:
             raise BaseException("Not combination optimization problem")
         return prompt_dict

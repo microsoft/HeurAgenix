@@ -148,7 +148,7 @@ class HeuristicEvolver:
             shutil.copyfile(env.data_path, os.path.join(output_dir, os.path.basename(env.data_path)))
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem, "background_with_code")
 
         # Load components
         if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):

@@ -129,7 +129,7 @@ class HeuristicEvolver:
                 # Get bassline 
                 basic_heuristic_result = self.validation(self.validation_cases, basic_heuristic_file)
 
-                prompt_dict = self.llm_client.load_background(self.problem)
+                prompt_dict = self.llm_client.load_background(self.problem, "background_with_code")
                 prompt_dict["all_heuristic_docs"] = all_heuristic_docs
                 self.load_heuristic_code(basic_heuristic_file, prompt_dict)
 

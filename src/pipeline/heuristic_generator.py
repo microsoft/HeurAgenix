@@ -23,7 +23,7 @@ class HeuristicGenerator:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, reference_data, "background_with_code")
 
         # Generate available heuristic description
         self.llm_client.load("generate_from_llm", prompt_dict)
@@ -44,7 +44,7 @@ class HeuristicGenerator:
     def generate_from_paper(self, paper_path: str,  reference_data: str=None, smoke_test: bool=False) -> str:
         heuristic_file = None
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, reference_data, "background_with_code")
 
         # Load whole paper
         if os.path.isdir(paper_path):
@@ -111,7 +111,7 @@ class HeuristicGenerator:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, reference_data, "background_with_code")
 
         # Find similar problem
         description_dict = {

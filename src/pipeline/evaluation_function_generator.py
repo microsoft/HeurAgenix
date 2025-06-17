@@ -17,7 +17,7 @@ class EvaluationFunctionGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_evaluation_function(self, smoke_test: bool=False) -> str:
-        prompt_dict = self.llm_client.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem, "background_with_code")
 
         # Get global data feature
         self.llm_client.load("global_data_feature", prompt_dict)

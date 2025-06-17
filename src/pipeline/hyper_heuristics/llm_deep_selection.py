@@ -60,7 +60,7 @@ class LLMDeepSelectionHyperHeuristic:
         self.llm_client.dump("heuristic_classification")
 
         # Make plan
-        self.llm_client.load_chat("background")
+        self.llm_client.load_background("background")
         global_data_feature = get_global_data_feature_function(env.global_data)
         prompt_dict["global_data_feature"] = filter_dict_to_str([env.global_data, global_data_feature], data_feature_content_threshold)
         prompt_dict["category_names"] = ",".join(classified_heuristic.keys())
