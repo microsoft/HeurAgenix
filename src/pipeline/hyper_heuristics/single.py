@@ -12,7 +12,7 @@ class SingleHyperHeuristic:
     ) -> None:
         self.heuristic = load_heuristic(heuristic_file, problem=problem)
 
-    def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
+    def run(self, env:BaseEnv, **kwargs) -> bool:
         current_steps = 0
         heuristic_work = BaseOperator()
         while isinstance(heuristic_work, BaseOperator) and env.continue_run:

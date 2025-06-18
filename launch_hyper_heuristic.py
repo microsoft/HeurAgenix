@@ -16,9 +16,10 @@ def parse_arguments():
     parser.add_argument("-d", "--heuristic_dir", type=str, default="basic_heuristics", help="Directory containing heuristic functions.")
     parser.add_argument("-t", "--test_case", type=str, default=None, help="Data or directory name for test case(s).")
     parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file in llm_hh.")
-    parser.add_argument("-lf", "--selection_frequency", type=int, default=5, help="Search interval in llm_hh.")
-    parser.add_argument("-lc", "--num_candidate_heuristics", type=int, default=3, help="Number of candidate heuristics from llm in llm_hh.")
-    parser.add_argument("-lb", "--rollout_budget", type=int, default=10, help="Number of Monte-Carlo evaluation for each heuristic in llm_hh.")
+    parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor for determining total heuristic steps based on problem size")
+    parser.add_argument("-m", "--steps_per_selection", type=int, required=True, help="Number of steps each heuristic selection should execute in llm_hh mode.")
+    parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics from llm in llm_hh mode.")
+    parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluation for each heuristic in llm_hh mode.")
 
     return parser.parse_args()
 
@@ -29,7 +30,8 @@ def main():
     heuristic_dir = args.heuristic_dir
     test_case = args.test_case
     llm_config_file = args.llm_config_file
-    selection_frequency = args.selection_frequency
+    iterations_scale_factor = args.iterations_scale_factor
+    steps_per_selection = args.steps_per_selection
     num_candidate_heuristics = args.num_candidate_heuristics
     rollout_budget = args.rollout_budget
 
@@ -46,13 +48,14 @@ def main():
             llm_client=llm_client,
             heuristic_pool=heuristic_pool,
             problem=problem,
-            selection_frequency=selection_frequency,
+            iterations_scale_factor=iterations_scale_factor,
+            steps_per_selection=steps_per_selection,
             num_candidate_heuristics=num_candidate_heuristics,
             rollout_budget=rollout_budget,
         )
     elif heuristic == "random_hh":
         output_dir = f"{heuristic}.{heuristic_dir}.{datetime_str}"
-        hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem)
+        hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem, iterations_scale_factor=iterations_scale_factor)
     elif heuristic == "or_solver":
         output_dir = "or_solver"
         module = importlib.import_module(f"src.problems.{problem}.or_solver")
@@ -60,7 +63,7 @@ def main():
         hyper_heuristic = ORSolver(problem=problem)
     else:
         output_dir = heuristic
-        hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
+        hyper_heuristic = SingleHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem,)
 
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")

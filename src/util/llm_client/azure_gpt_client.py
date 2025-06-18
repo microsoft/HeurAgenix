@@ -43,9 +43,6 @@ class AzureGPTClient(BaseLLMClient):
         response = self.client.chat.completions.create(
             model=self.model,
             messages=self.messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            top_p=self.top_p,
             seed=self.seed,
             frequency_penalty=0,
             presence_penalty=0,

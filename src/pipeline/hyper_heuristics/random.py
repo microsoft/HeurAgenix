@@ -9,11 +9,13 @@ class RandomHyperHeuristic:
         self,
         heuristic_pool: list[str],
         problem: str,
+        iterations_scale_factor: float=2.0,
     ) -> None:
         self.heuristic_pools = [load_heuristic(heuristic, problem=problem) for heuristic in heuristic_pool]
+        self.iterations_scale_factor = iterations_scale_factor
 
-    def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
-        max_steps = max_steps if max_steps is not None else env.construction_steps * 2
+    def run(self, env:BaseEnv) -> bool:
+        max_steps = env.construction_steps * self.iterations_scale_factor
         current_steps = 0
         while current_steps <= max_steps and env.continue_run:
             heuristic = random.choice(self.heuristic_pools)
