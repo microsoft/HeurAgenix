@@ -40,7 +40,6 @@ class MDPEnv(BaseEnv):
         return state_data
 
     def validation_solution(self, solution: Solution=None) -> bool:
-        # TODO
         pass
 
     def run_operator(self, operator: ActionOperator, inplace: bool=True, heuristic_name: str=None) -> bool:

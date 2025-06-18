@@ -109,8 +109,6 @@ class LLMSelectionHyperHeuristic:
                         heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
                 heuristic_traject.append(heuristic_dict)
                 selection_round += 1
-                # TODO: hidden rules
-                # TODO: stop rules
             except Exception as e:
                 trace_string = traceback.format_exc()
                 print(trace_string)
