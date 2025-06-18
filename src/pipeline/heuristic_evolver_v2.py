@@ -220,7 +220,7 @@ class HeuristicEvolver:
         # Generate negative result from basic heuristic
         hyper_heuristic = SingleHyperHeuristic(basic_heuristic_file, problem=self.problem)
         hyper_heuristic.run(env)
-        negative_result = env.dump_result(dump_trajectory=True, compress_trajectory=True, result_file="negative_solution.txt")
+        negative_result = env.dump_result(dump_trajectory=True, dump_heuristic=False, result_file="negative_solution.txt")
         negative_value = env.key_value
 
         # Generate positive result by perturbation heuristic
@@ -230,7 +230,7 @@ class HeuristicEvolver:
             hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, self.problem, perturbation_ratio)
             hyper_heuristic.run(env)
             if env.compare(env.key_value, negative_value) > 0:
-                positive_result = env.dump_result(dump_trajectory=True, compress_trajectory=True, result_file="positive_solution.txt")
+                positive_result = env.dump_result(dump_trajectory=True, dump_heuristic=False, result_file="positive_solution.txt")
                 break
         return negative_result, positive_result
 

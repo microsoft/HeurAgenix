@@ -160,4 +160,4 @@ class HeuristicSelectionDataCollector:
 
             env = best_after_heuristic_env
             round_index += 1
-        env.dump_result(dump_trajectory=True, compress_trajectory=False, result_file="finished.txt")
+        env.dump_result(dump_trajectory=True, dump_heuristic=False, result_file="finished.txt")

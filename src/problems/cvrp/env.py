@@ -175,10 +175,10 @@ class Env(BaseEnv):
             "Fulfilled Demands": sum([self.demands[node] for node in self.state_data["visited_nodes"]])
         }
 
-    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
+    def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
             "visited_num": self.state_data["visited_num"]
         }
-        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
+        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
         return content
