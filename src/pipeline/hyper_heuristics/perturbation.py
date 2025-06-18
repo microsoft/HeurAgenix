@@ -19,7 +19,7 @@ class PerturbationHyperHeuristic:
         self.iterations_scale_factor = iterations_scale_factor
 
     def run(self, env:BaseEnv) -> bool:
-        max_steps = env.construction_steps * self.iterations_scale_factor
+        max_steps = int(env.construction_steps * self.iterations_scale_factor)
         current_steps = 0
         heuristic_work = BaseOperator()
         while current_steps <= max_steps and isinstance(heuristic_work, BaseOperator) and env.continue_run:

@@ -17,7 +17,7 @@ class SingleConstructiveSingleImproveHyperHeuristic:
         self.iterations_scale_factor = iterations_scale_factor
 
     def run(self, env:BaseEnv) -> bool:
-        max_steps = env.construction_steps * self.iterations_scale_factor
+        max_steps = int(env.construction_steps * self.iterations_scale_factor)
         heuristic_work = BaseOperator()
         while isinstance(heuristic_work, BaseOperator):
             heuristic_work = env.run_heuristic(self.constructive_heuristic)

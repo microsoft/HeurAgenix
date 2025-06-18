@@ -37,7 +37,7 @@ class LLMSelectionHyperHeuristic:
         self.get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
 
     def run(self, env:BaseEnv) -> bool:
-        max_steps = env.construction_steps * self.iterations_scale_factor
+        max_steps = int(env.construction_steps * self.iterations_scale_factor)
         selection_round = 0
         max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         hidden_heuristics = []

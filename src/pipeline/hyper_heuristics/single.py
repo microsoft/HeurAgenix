@@ -7,10 +7,10 @@ from src.util.util import load_heuristic
 class SingleHyperHeuristic:
     def __init__(
         self,
-        heuristic_file: str,
+        heuristic: str,
         problem: str,
     ) -> None:
-        self.heuristic = load_heuristic(heuristic_file, problem=problem)
+        self.heuristic = load_heuristic(heuristic, problem=problem)
 
     def run(self, env:BaseEnv, **kwargs) -> bool:
         current_steps = 0

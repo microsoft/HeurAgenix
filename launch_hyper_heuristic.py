@@ -6,6 +6,7 @@ from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
 from src.util.llm_client.get_llm_client import get_llm_client
+from src.util.util import search_file
 
 def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
@@ -17,7 +18,7 @@ def parse_arguments():
     parser.add_argument("-t", "--test_case", type=str, default=None, help="Data or directory name for test case(s).")
     parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file in llm_hh.")
     parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor for determining total heuristic steps based on problem size")
-    parser.add_argument("-m", "--steps_per_selection", type=int, required=True, help="Number of steps each heuristic selection should execute in llm_hh mode.")
+    parser.add_argument("-m", "--steps_per_selection", type=int, default=5.0, help="Number of steps each heuristic selection should execute in llm_hh mode.")
     parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics from llm in llm_hh mode.")
     parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluation for each heuristic in llm_hh mode.")
 
@@ -63,7 +64,7 @@ def main():
         hyper_heuristic = ORSolver(problem=problem)
     else:
         output_dir = heuristic
-        hyper_heuristic = SingleHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem,)
+        hyper_heuristic = SingleHyperHeuristic(heuristic=heuristic, problem=problem)
 
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
@@ -71,23 +72,25 @@ def main():
     if test_case is None:
         test_case = os.path.join("output", problem, "data", "test_data")
     
-    try:
-        env = Env(data_name=os.listdir(test_case)[0])
+    test_case = search_file(test_case, problem)
+    if os.path.isdir(test_case):
         test_case = os.listdir(test_case)
-    except:
+    elif os.path.isfile(test_case):
         test_case = [test_case]
-    finally:
-        for data_name in test_case:
-            env = Env(data_name=data_name)
-            env.reset(output_dir)
-            if heuristic == "llm_hh":
-                llm_client.reset(env.output_dir)
-            validation_result = hyper_heuristic.run(env)
-            if validation_result:
-                env.dump_result()
-                print(os.path.join(env.output_dir, "result.txt"), heuristic, test_case, env.key_item, env.key_value)
-            else:
-                print("Invalid solution", heuristic, test_case)
+    else:
+        raise ValueError(f"Invalid test case: {test_case}")
+    
+    for data_name in test_case:
+        env = Env(data_name=data_name)
+        env.reset(output_dir)
+        if heuristic == "llm_hh":
+            llm_client.reset(env.output_dir)
+        validation_result = hyper_heuristic.run(env)
+        if validation_result:
+            env.dump_result()
+            print(os.path.join(env.output_dir, "result.txt"), heuristic, data_name, env.key_item, env.key_value)
+        else:
+            print("Invalid solution", heuristic, test_case)
 
 
 if __name__ == "__main__":
