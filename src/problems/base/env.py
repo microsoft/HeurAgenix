@@ -1,8 +1,7 @@
 import os
 import traceback
-import time
 from src.problems.base.components import BaseSolution, BaseOperator
-from src.util.util import search_file
+from src.util.util import load_heuristic, search_file
 
 
 class BaseEnv:
@@ -12,14 +11,11 @@ class BaseEnv:
         self.data_path = search_file(data_name, problem)
         self.data_ref_name = data_name.split(os.sep)[-1]
         assert self.data_path is not None
-        self.data: tuple = self.load_data(self.data_path)
-        self.current_solution: BaseSolution = None
-        self.instance_state: dict = None
-        self.solution_state: dict = None
+        self.instance_data: tuple = self.load_data(self.data_path)
+        self.current_solution: BaseSolution = self.init_solution()
         self.algorithm_data: dict = None
         self.recording: list[tuple] = None
         self.output_dir: str = None
-        self.time_cost: float = 0
         # Maximum step to constructive a complete solution
         self.construction_steps: int = None
         # Key item in state to compare the solution
@@ -27,6 +23,18 @@ class BaseEnv:
         # Returns the advantage of the first and second key value 
         # A return value greater than 0 indicates that first is better and the larger the number, the greater the advantage.
         self.compare: callable = None
+
+        self.instance_problem_state_function = load_heuristic("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
+        self.solution_problem_state_function = load_heuristic("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
+        self.problem_state = {
+            **self.instance_data,
+            "current_solution": self.current_solution,
+            self.key_item: self.key_value,
+            **self.instance_problem_state_function(self.instance_data),
+            **self.solution_problem_state_function(self.instance_data, self.current_solution),
+            "solution_problem_state_function": self.solution_problem_state_function,
+            "validation_solution": self.validation_solution
+        }
 
     @property
     def is_complete_solution(self) -> bool:
@@ -42,15 +50,17 @@ class BaseEnv:
 
     @property
     def key_value(self) -> float:
-        return self.solution_state[self.key_item]
+        pass
 
     def reset(self, experiment_name: str=None):
         self.current_solution = self.init_solution()
-        self.instance_state = self.get_instance_state()
-        self.solution_state = self.get_solution_state()
+        self.problem_state = {
+            **self.instance_problem_state_function(self.instance_data),
+            **self.solution_problem_state_function(self.instance_data, self.current_solution),
+            self.key_item: self.key_value
+        }
         self.algorithm_data = {}
         self.recording = []
-        self.time_cost = 0
         if experiment_name:
             if os.sep in experiment_name:
                 self.output_dir = experiment_name
@@ -59,26 +69,10 @@ class BaseEnv:
                 self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, experiment_name)
             os.makedirs(self.output_dir, exist_ok=True)
 
-    def load_data(self, data_path: str) -> None:
+    def load_data(self, data_path: str) -> dict:
         pass
 
     def init_solution(self) -> None:
-        pass
-
-    def get_instance_state(self) -> dict:
-        """Retrieve the static instance problem state data as a dictionary.
-
-        Returns:
-            dict: A dictionary containing the static instance problem state data.
-        """
-        pass
-
-    def get_solution_state(self, solution: BaseSolution=None) -> dict:
-        """Retrieve the dynamic solution problem state data as a dictionary.
-
-        Returns:
-            dict: A dictionary containing the dynamic solution problem state data.
-        """
         pass
 
     def validation_solution(self, solution: BaseSolution=None) -> bool:
@@ -87,20 +81,16 @@ class BaseEnv:
 
     def run_heuristic(self, heuristic: callable, parameters:dict={}, inplace: bool=True) -> BaseOperator:
         try:
-            start_time = time.time()
             operator, delta = heuristic(
-                global_data=self.instance_state,
-                state_data=self.solution_state,
+                problem_state=self.problem_state,
                 algorithm_data=self.algorithm_data,
-                get_state_data_function=self.get_solution_state,
+                get_state_data_function=self.solution_problem_state_function,
                 **parameters
             )
-            end_time = time.time()
             if operator is not None:
                 result = self.run_operator(operator, inplace, heuristic.__name__)
                 if result:
                     self.algorithm_data.update(delta)
-                    self.time_cost += end_time - start_time
                     return operator
             return None
         except Exception as e:
