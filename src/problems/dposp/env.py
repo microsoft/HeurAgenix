@@ -57,8 +57,8 @@ class Env(BaseEnv):
     def init_solution(self) -> Solution:
         return Solution(production_schedule=[[] for _ in range(self.production_line_num)])
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -72,7 +72,7 @@ class Env(BaseEnv):
                 - "order_deadline" (numpy.array): 1D array of the deadline for each order.
         """
 
-        global_data_dict = {
+        instance_state_dict = {
             "product_num": self.product_num,
             "production_line_num": self.production_line_num,
             "order_num": self.order_num,
@@ -82,10 +82,10 @@ class Env(BaseEnv):
             "order_quantity": self.order_quantity,
             "order_deadline": self.order_deadline,
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -197,7 +197,7 @@ class Env(BaseEnv):
                 if feasible:
                     break
 
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "fulfilled_order_num": len(fulfilled_orders),
             "fulfilled_orders": fulfilled_orders,
@@ -208,7 +208,7 @@ class Env(BaseEnv):
             "get_time_cost_delta": self.get_time_cost_delta,
             "validation_solution": self.validation_solution
         }
-        return state_data_dict
+        return solution_state_dict
 
     def validation_single_production_schedule(self, line_id: int, production_schedule: list[int]) -> bool:
         if production_schedule == []:
@@ -279,9 +279,9 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:
         return {
-            "Total Time Cost For All Production Lines": sum(self.state_data["total_time_cost_per_production_line"]),
-            "Feasible Orders To Fulfill Num": sum(self.state_data["feasible_orders_to_fulfill"]),
-            "Fulfilled Order Num": self.state_data["fulfilled_order_num"],
+            "Total Time Cost For All Production Lines": sum(self.solution_state["total_time_cost_per_production_line"]),
+            "Feasible Orders To Fulfill Num": sum(self.solution_state["feasible_orders_to_fulfill"]),
+            "Fulfilled Order Num": self.solution_state["fulfilled_order_num"],
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:

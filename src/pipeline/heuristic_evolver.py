@@ -160,7 +160,7 @@ class HeuristicEvolver:
             globals()[name] = getattr(module, name)
 
         # Load env data
-        prompt_dict.update(env.global_data)
+        prompt_dict.update(env.instance_state)
 
         # Load solution
         positive_result = parse_text_to_dict(open(positive_result_file).read())
@@ -185,7 +185,7 @@ class HeuristicEvolver:
         prompt_dict["function_code"] = function_code
         prompt_dict["function_introduction"] = function_introduction
         prompt_dict["heuristic_name"] = heuristic_name
-        prompt_dict["global_data"] = filter_dict_to_str(env.global_data)
+        prompt_dict["global_data"] = filter_dict_to_str(env.instance_state)
 
         # Analysis solution difference 
         self.llm_client.load("compare_solution", prompt_dict)
@@ -216,7 +216,7 @@ class HeuristicEvolver:
             env.reset()
             for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator(parameter)"]:
                 env.run_operator(eval(previous_operation))
-            prompt_dict["state_data"] = filter_dict_to_str(env.state_data)
+            prompt_dict["state_data"] = filter_dict_to_str(env.solution_state)
 
             # Propose another operation
             self.llm_client.load("propose_operation", prompt_dict)

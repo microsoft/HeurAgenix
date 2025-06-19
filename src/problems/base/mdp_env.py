@@ -2,7 +2,7 @@ from src.problems.base.env import BaseEnv
 from src.problems.base.mdp_components import Solution, ActionOperator
 
 class MDPEnv(BaseEnv):
-    """Multi-agents env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """Multi-agents env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, env_class: type, problem: str, **kwargs):
         super().__init__(data_name, problem)
         self.gym_env = env_class(self.data_path)
@@ -34,7 +34,7 @@ class MDPEnv(BaseEnv):
         global_data = self.gym_env.get_global_data()
         return global_data
 
-    def get_state_data(self) -> dict:
+    def get_state_data(self, solution: Solution) -> dict:
         state_data = self.gym_env.get_state_data()
         state_data["total_reward"] = self.gym_env.get_reward()
         return state_data

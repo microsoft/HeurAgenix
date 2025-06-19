@@ -253,11 +253,11 @@ class HeuristicGenerator:
         env = Env(data_name=smoke_data)
         for _ in range(max_try_times):
             env.reset()
-            prompt_dict["smoke_global_data"] = filter_dict_to_str(env.global_data)
+            prompt_dict["smoke_global_data"] = filter_dict_to_str(env.instance_state)
             for previous_operation in previous_operations:
                 env.run_operator(eval(previous_operation.strip()))
             prompt_dict["smoke_solution"] = env.current_solution
-            prompt_dict["smoke_state_data"] = filter_dict_to_str(env.state_data)
+            prompt_dict["smoke_state_data"] = filter_dict_to_str(env.solution_state)
             try:
                 # Load heuristic and run once
                 heuristic = load_heuristic(heuristic_code, function_name=function_name)
@@ -273,7 +273,7 @@ class HeuristicGenerator:
                 # Actual result
                 prompt_dict["output_result"] = str(operator)
                 prompt_dict["updated_smoke_solution"] = env.current_solution
-                prompt_dict["updated_smoke_state_data"] = filter_dict_to_str(env.state_data)
+                prompt_dict["updated_smoke_state_data"] = filter_dict_to_str(env.solution_state)
 
                 # Compare
                 prompt_dict["expected_result"] = expected_result

@@ -3,7 +3,7 @@ from src.problems.base.env import BaseEnv
 from src.problems.online_bpp.components import Solution
 
 class Env(BaseEnv):
-    """Online bpp env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """Online bpp env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "online_bpp")
         self.capacity, self.item_num, self.item_sizes = self.data
@@ -28,8 +28,8 @@ class Env(BaseEnv):
     def init_solution(self) -> None:
         return Solution([[] for _ in range(self.item_num)], 0)
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -37,14 +37,14 @@ class Env(BaseEnv):
                 - "item_num" (int): Total item number.
         """
 
-        global_data_dict = {
+        instance_state_dict = {
             "capacity": self.capacity,
             "item_num": self.item_num,
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -67,7 +67,7 @@ class Env(BaseEnv):
         num_items_in_box = solution.current_item
         num_items_not_in_box = self.item_num - solution.current_item
         
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "current_item_size": current_item_size,
             "used_bin_num": used_bin_num,
@@ -77,7 +77,7 @@ class Env(BaseEnv):
             "num_items_not_in_box": num_items_not_in_box,
             "validation_solution": self.validation_solution
         }
-        return state_data_dict
+        return solution_state_dict
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """
@@ -114,15 +114,15 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:
         return {
-            "Used Bin Num": self.state_data["used_bin_num"],
-            "Num Items In Box": self.state_data["num_items_in_box"],
-            "Num Items Not In Box": self.state_data["num_items_not_in_box"]
+            "Used Bin Num": self.solution_state["used_bin_num"],
+            "Num Items In Box": self.solution_state["num_items_in_box"],
+            "Num Items Not In Box": self.solution_state["num_items_not_in_box"]
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "item_num": self.item_num,
-            "num_items_in_box": self.state_data["num_items_in_box"]
+            "num_items_in_box": self.solution_state["num_items_in_box"]
         }
         content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
         return content

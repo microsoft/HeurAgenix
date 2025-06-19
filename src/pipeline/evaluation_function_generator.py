@@ -93,7 +93,7 @@ class EvaluationFunctionGenerator:
         try:
             # Load global data feature extractor and run
             global_data_feature_extractor = load_heuristic(global_data_feature_code, function_name="get_global_data_feature")
-            global_data_feature = global_data_feature_extractor(env.global_data)
+            global_data_feature = global_data_feature_extractor(env.instance_state)
             assert global_data_feature is not None
         except Exception as e:
             error_message = traceback.format_exc()
@@ -101,7 +101,7 @@ class EvaluationFunctionGenerator:
         try:
             # Load state data feature extractor and run
             state_data_feature_extractor = load_heuristic(state_data_feature_code, function_name="get_state_data_feature")
-            state_data_feature = state_data_feature_extractor(env.global_data, env.state_data)
+            state_data_feature = state_data_feature_extractor(env.instance_state, env.solution_state)
             assert state_data_feature is not None
         except Exception as e:
             error_message = traceback.format_exc()

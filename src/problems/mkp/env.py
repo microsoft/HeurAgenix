@@ -3,7 +3,7 @@ from src.problems.base.env import BaseEnv
 from src.problems.mkp.components import Solution
 
 class Env(BaseEnv):
-    """MKP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """MKP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "mkp")
         self.item_num, self.resource_num, self.profits, self.weights, self.capacities = self.data
@@ -28,8 +28,8 @@ class Env(BaseEnv):
     def init_solution(self) -> Solution:
         return Solution([False] * self.item_num)
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -41,17 +41,17 @@ class Env(BaseEnv):
         """
 
 
-        global_data_dict = {
+        instance_state_dict = {
             "item_num": self.item_num,
             "resource_num": self.resource_num,
             "profits": self.profits,
             "weights": self.weights,
             "capacities": self.capacities,
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -89,7 +89,7 @@ class Env(BaseEnv):
             if np.all(remaining_capacity >= self.weights[:, item_index]):
                 feasible_items_to_add.append(item_index)
 
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "current_profit": current_profit,
             "current_weights": current_weights,
@@ -101,7 +101,7 @@ class Env(BaseEnv):
             "feasible_items_to_add": feasible_items_to_add,
             "validation_solution": self.validation_solution
         }
-        return state_data_dict
+        return solution_state_dict
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
@@ -130,15 +130,15 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:
         return {
-            "Item Inclusion Count": len(self.state_data["items_in_knapsack"]),
-            "Profit": self.state_data["current_profit"],
+            "Item Inclusion Count": len(self.solution_state["items_in_knapsack"]),
+            "Profit": self.solution_state["current_profit"],
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "item_num": self.item_num,
             "resource_num": self.resource_num,
-            "selected_item_num": self.state_data["items_in_knapsack"]
+            "selected_item_num": self.solution_state["items_in_knapsack"]
         }
         content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
         return content

@@ -8,7 +8,7 @@ from src.problems.cvrp.components import Solution
 
 
 class Env(BaseEnv):
-    """CVRP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """CVRP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "cvrp")
         self.node_num, self.distance_matrix, self.depot, self.vehicle_num, self.capacity, self.demands = self.data
@@ -18,7 +18,7 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        return len(self.state_data["visited_nodes"]) == self.node_num
+        return len(self.solution_state["visited_nodes"]) == self.node_num
 
     def load_data(self, data_path: str) -> None:
         problem = tsplib95.load(data_path)
@@ -49,8 +49,8 @@ class Env(BaseEnv):
     def init_solution(self) -> Solution:
         return Solution(routes=[[self.depot] for _ in range(self.vehicle_num)], depot=self.depot)
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -61,7 +61,7 @@ class Env(BaseEnv):
                 - "depot" (int): The index for depot node.
                 - "demands" (numpy.ndarray): The demand of each node.
         """
-        global_data_dict = {
+        instance_state_dict = {
             "node_num": self.node_num,
             "distance_matrix": self.distance_matrix,
             "vehicle_num": self.vehicle_num,
@@ -69,10 +69,10 @@ class Env(BaseEnv):
             "depot": self.depot,
             "demands": self.demands
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -170,15 +170,15 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:
         return {
-            "Visited Node Num": self.state_data["visited_num"],
-            "Current Cost": self.state_data["total_current_cost"],
-            "Fulfilled Demands": sum([self.demands[node] for node in self.state_data["visited_nodes"]])
+            "Visited Node Num": self.solution_state["visited_num"],
+            "Current Cost": self.solution_state["total_current_cost"],
+            "Fulfilled Demands": sum([self.demands[node] for node in self.solution_state["visited_nodes"]])
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
-            "visited_num": self.state_data["visited_num"]
+            "visited_num": self.solution_state["visited_num"]
         }
         content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
         return content

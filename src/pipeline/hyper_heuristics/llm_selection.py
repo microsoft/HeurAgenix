@@ -39,7 +39,6 @@ class LLMSelectionHyperHeuristic:
     def run(self, env:BaseEnv) -> bool:
         max_steps = int(env.construction_steps * self.iterations_scale_factor)
         selection_round = 0
-        max_steps = max_steps if max_steps is not None else env.construction_steps * 3
         hidden_heuristics = []
         heuristic_traject = []
 
@@ -47,7 +46,7 @@ class LLMSelectionHyperHeuristic:
         prompt_dict = self.llm_client.load_background(self.problem)
 
         # Generate global heuristic value
-        global_data = env.global_data
+        global_data = env.instance_state
         global_data_feature = self.get_global_data_feature_function(global_data)
         prompt_dict["global_data_feature"] = filter_dict_to_str([global_data, global_data_feature], self.data_feature_content_threshold)
 
@@ -65,7 +64,7 @@ class LLMSelectionHyperHeuristic:
                 prompt_dict["heuristic_pool_introduction"] = heuristic_pool_doc
 
                 # Generate state heuristic value
-                state_data = env.state_data
+                state_data = env.solution_state
                 state_data_feature = self.get_state_data_feature_function(global_data, state_data)
                 prompt_dict["state_data_feature"] = filter_dict_to_str([state_data, state_data_feature], self.data_feature_content_threshold)
 
@@ -76,12 +75,12 @@ class LLMSelectionHyperHeuristic:
                     heuristic_trajectory_str = "\n".join([f"-----\n" + "\n".join(f"{key}: {value}" for key, value in items.items()) for items in heuristic_traject[-5:]])
                 prompt_dict["discuss_round"] = str(selection_round)
                 prompt_dict["heuristic_traject"] = heuristic_trajectory_str
-                state_data_feature = self.get_state_data_feature_function(env.global_data, env.state_data)
-                state_data_feature.update(env.state_data)
+                state_data_feature = self.get_state_data_feature_function(env.instance_state, env.solution_state)
+                state_data_feature.update(env.solution_state)
                 for key, value in global_data_feature.items():  
                     if len(str(key) + str(value)) <= self.data_feature_content_threshold:  
                         prompt_dict[key] = value
-                        prompt_dict.update(env.global_data)
+                        prompt_dict.update(env.instance_state)
                 prompt_dict["selection_frequency"] = self.steps_per_selection
                 prompt_dict["num_candidate_heuristics"] = self.num_candidate_heuristics
                 prompt_dict["demo_heuristic_str"] = ",".join([f"heuristic_name_{i + 1}"for i in range(self.num_candidate_heuristics)])
@@ -99,7 +98,15 @@ class LLMSelectionHyperHeuristic:
                 assert len(matched_candidate_heuristics) > 0
                 
                 # TTS selection
-                selected_heuristic_name = tts_bon(env, matched_candidate_heuristics, self.heuristic_pool, self.steps_per_selection, self.rollout_budget, self.problem)
+                selected_heuristic_name = tts_bon(
+                    env,
+                    matched_candidate_heuristics,
+                    self.heuristic_pool,
+                    self.problem,
+                    self.iterations_scale_factor,
+                    self.steps_per_selection,
+                    self.rollout_budget,
+                )
                 pre_status = env.get_observation()
                 if pre_status:
                     for _ in range(self.steps_per_selection):

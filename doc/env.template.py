@@ -5,7 +5,7 @@ from src.problems.base.env import BaseEnv
 
 
 class Env(BaseEnv):
-    """xxx env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """xxx env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         # 1. Init the Env. xxx is the problem name.
         super().__init__(data_name, "xxx")
@@ -80,8 +80,8 @@ class Env(BaseEnv):
         # Implement the validation code here.
         pass
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -89,10 +89,10 @@ class Env(BaseEnv):
                 - "xx" (xx type): xxxx
         """
 
-        global_data_dict = {
+        instance_state_dict = {
             # add global data here
         }
-        return global_data_dict
+        return instance_state_dict
 
     def get_state_data(self, solution=None) -> dict:
         """Retrieve the current dynamic state data as a dictionary.
@@ -107,12 +107,12 @@ class Env(BaseEnv):
         if solution is None:
             solution = self.current_solution
 
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "validation_solution": self.validation_solution,
             # add other state data here
         }
-        return state_data_dict
+        return solution_state_dict
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {

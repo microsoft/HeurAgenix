@@ -14,8 +14,8 @@ class BaseEnv:
         assert self.data_path is not None
         self.data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = None
-        self.global_data: dict = None
-        self.state_data: dict = None
+        self.instance_state: dict = None
+        self.solution_state: dict = None
         self.algorithm_data: dict = None
         self.recording: list[tuple] = None
         self.output_dir: str = None
@@ -42,12 +42,12 @@ class BaseEnv:
 
     @property
     def key_value(self) -> float:
-        return self.state_data[self.key_item]
+        return self.solution_state[self.key_item]
 
     def reset(self, experiment_name: str=None):
         self.current_solution = self.init_solution()
-        self.global_data = self.get_global_data()
-        self.state_data = self.get_state_data()
+        self.instance_state = self.get_instance_state()
+        self.solution_state = self.get_solution_state()
         self.algorithm_data = {}
         self.recording = []
         self.time_cost = 0
@@ -65,19 +65,19 @@ class BaseEnv:
     def init_solution(self) -> None:
         pass
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state data as a dictionary.
 
         Returns:
-            dict: A dictionary containing the global static information data.
+            dict: A dictionary containing the static instance problem state data.
         """
         pass
 
-    def get_state_data(self) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: BaseSolution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
-            dict: A dictionary containing the current dynamic state data.
+            dict: A dictionary containing the dynamic solution problem state data.
         """
         pass
 
@@ -89,10 +89,10 @@ class BaseEnv:
         try:
             start_time = time.time()
             operator, delta = heuristic(
-                global_data=self.global_data,
-                state_data=self.state_data,
+                global_data=self.instance_state,
+                state_data=self.solution_state,
                 algorithm_data=self.algorithm_data,
-                get_state_data_function=self.get_state_data,
+                get_state_data_function=self.get_solution_state,
                 **parameters
             )
             end_time = time.time()
@@ -114,7 +114,7 @@ class BaseEnv:
             if inplace:
                 self.current_solution = solution
                 self.recording.append((str(heuristic_name), operator))
-            self.state_data = self.get_state_data()
+            self.solution_state = self.get_solution_state()
             return operator
         return None
 

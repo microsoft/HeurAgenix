@@ -4,7 +4,7 @@ from src.problems.base.env import BaseEnv
 from src.problems.jssp.components import Solution
 
 class Env(BaseEnv):
-    """JSSP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """JSSP env that stores the instance data, current solution, and problem state to support algorithm."""
 
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "jssp")
@@ -15,7 +15,7 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        return self.state_data["unfinished_jobs"] == []
+        return self.solution_state["unfinished_jobs"] == []
 
     def load_data(self, data_path: str) -> tuple:
         with open(data_path, "r") as file:
@@ -33,8 +33,8 @@ class Env(BaseEnv):
     def init_solution(self) -> Solution:
         return Solution(job_sequences=[[] for _ in range(self.machine_num)], job_operation_sequence=self.job_operation_sequence, job_operation_index=[0] * self.job_num)
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -44,17 +44,17 @@ class Env(BaseEnv):
                 - "machine_num" (int): The total number of machines in the problem, also as operation num.
         """
 
-        global_data_dict = {
+        instance_state_dict = {
             "job_num": self.job_num,
             "machine_num": self.machine_num,
             "job_operation_sequence": self.job_operation_sequence,
             "job_operation_time": self.job_operation_time,
             "total_operation_num": self.job_num * self.machine_num,
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -116,7 +116,7 @@ class Env(BaseEnv):
         current_makespan = max(machine_last_operation_end_times)
 
         # Compile the state data dictionary
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "finished_jobs": finished_jobs,
             "unfinished_jobs": unfinished_jobs,
@@ -128,7 +128,7 @@ class Env(BaseEnv):
             "current_makespan": current_makespan,
             "validation_solution": self.validation_solution
         }
-        return state_data_dict
+        return solution_state_dict
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
@@ -155,9 +155,9 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:
         return {
-            "current_makespan": self.state_data["current_makespan"],
-            "Finished Job Num": len(self.state_data["finished_jobs"]),
-            "Finished Operation Num": self.state_data["finished_operation_num"],
+            "current_makespan": self.solution_state["current_makespan"],
+            "Finished Job Num": len(self.solution_state["finished_jobs"]),
+            "Finished Operation Num": self.solution_state["finished_operation_num"],
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:

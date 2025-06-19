@@ -255,8 +255,8 @@ class HeuristicEvolver:
         env.reset()
 
         # Load data feature
-        prompt_dict["global_data"] = filter_dict_to_str(env.global_data)
-        prompt_dict["global_data_feature"] = filter_dict_to_str(self.get_global_data_feature_function(env.global_data))
+        prompt_dict["global_data"] = filter_dict_to_str(env.instance_state)
+        prompt_dict["global_data_feature"] = filter_dict_to_str(self.get_global_data_feature_function(env.instance_state))
 
         # Load solution
         positive_result = parse_text_to_dict(positive_result)
@@ -304,8 +304,8 @@ class HeuristicEvolver:
         for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator(parameter)"]:
             env.run_operator(eval(previous_operation))
         prompt_dict["bottleneck_operation"] = bottleneck_operation
-        prompt_dict["state_data"] = filter_dict_to_str(env.state_data)
-        prompt_dict["state_data_feature"] = filter_dict_to_str(self.get_state_data_feature_function(env.global_data, env.state_data))
+        prompt_dict["state_data"] = filter_dict_to_str(env.solution_state)
+        prompt_dict["state_data_feature"] = filter_dict_to_str(self.get_state_data_feature_function(env.instance_state, env.solution_state))
 
         # Try to provide suggestion
         self.llm_client.load("extract_suggestion_v2", prompt_dict)

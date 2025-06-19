@@ -6,7 +6,7 @@ from src.problems.tsp.components import Solution
 
 
 class Env(BaseEnv):
-    """TSP env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """TSP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "tsp")
         self.node_num, self.distance_matrix = self.data
@@ -28,8 +28,8 @@ class Env(BaseEnv):
         return Solution(tour=[])
 
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -38,15 +38,15 @@ class Env(BaseEnv):
                 - "std_dev_distance" (float): The standard deviation of the distances.
         """
 
-        global_data_dict = {
+        instance_state_dict = {
             "distance_matrix": self.distance_matrix,
             "node_num": self.node_num,
             "std_dev_distance": np.std(self.distance_matrix)
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -76,7 +76,7 @@ class Env(BaseEnv):
         # The last visited node 
         last_visited = None if not solution.tour else solution.tour[-1]
 
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "visited_nodes": visited_nodes,
             "visited_num": len(visited_nodes),
@@ -86,7 +86,7 @@ class Env(BaseEnv):
             "last_visited": last_visited,
             "validation_solution": self.validation_solution
         }
-        return state_data_dict
+        return solution_state_dict
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """
@@ -121,14 +121,14 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:  
         return {
-            "Visited Node": self.state_data["visited_num"],
-            "Current Cost": self.state_data["current_cost"]
+            "Visited Node": self.solution_state["visited_num"],
+            "Current Cost": self.solution_state["current_cost"]
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
-            "visited_num": self.state_data["visited_num"]
+            "visited_num": self.solution_state["visited_num"]
         }
         content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
         return content

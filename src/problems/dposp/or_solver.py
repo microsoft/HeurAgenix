@@ -98,4 +98,4 @@ class ORSolver:
                         result = env.run_operator(AppendOperator(vehicle, order))
                         assert result is True
                     index = routing_result.Value(routing.NextVar(index))
-        return env.state_data
+        return env.solution_state

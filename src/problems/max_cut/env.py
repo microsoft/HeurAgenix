@@ -5,7 +5,7 @@ from src.problems.max_cut.components import Solution
 
 
 class Env(BaseEnv):
-    """MaxCut env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """MaxCut env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "max_cut")
         self.node_num, self.weight_matrix = self.data
@@ -30,8 +30,8 @@ class Env(BaseEnv):
     def init_solution(self) -> Solution:
         return Solution(set_a=set(), set_b=set())
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
+    def get_instance_state(self) -> dict:
+        """Retrieve the static instance problem state as a dictionary.
 
         Returns:
             dict: A dictionary containing the global static information data with:
@@ -39,14 +39,14 @@ class Env(BaseEnv):
                 - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
         """
 
-        global_data_dict = {
+        instance_state_dict = {
             "node_num": self.node_num,
             "weight_matrix": self.weight_matrix,
         }
-        return global_data_dict
+        return instance_state_dict
 
-    def get_state_data(self, solution: Solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
+    def get_solution_state(self, solution: Solution=None) -> dict:
+        """Retrieve the dynamic solution problem state data as a dictionary.
 
         Returns:
             dict: A dictionary containing the current dynamic state data with:
@@ -69,7 +69,7 @@ class Env(BaseEnv):
             for node_b in solution.set_b:
                 current_cut_value += self.weight_matrix[node_a][node_b]
 
-        state_data_dict = {
+        solution_state_dict = {
             "current_solution": solution,
             "set_a_count": len(solution.set_a),
             "set_b_count": len(solution.set_b),
@@ -80,7 +80,7 @@ class Env(BaseEnv):
             "current_cut_value": current_cut_value,
             "validation_solution": self.validation_solution
         }
-        return state_data_dict
+        return solution_state_dict
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
@@ -101,15 +101,15 @@ class Env(BaseEnv):
 
     def get_observation(self) -> dict:
         return {
-            "Selected Node": self.state_data["set_a_count"] + self.state_data["set_b_count"],
-            "Cut Value": self.state_data["current_cut_value"],
+            "Selected Node": self.solution_state["set_a_count"] + self.solution_state["set_b_count"],
+            "Cut Value": self.solution_state["current_cut_value"],
         }
 
     def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content_dict = {
             "node_num": self.node_num,
-            "set_a_count": self.state_data["set_a_count"],
-            "set_b_count": self.state_data["set_b_count"]
+            "set_a_count": self.solution_state["set_a_count"],
+            "set_b_count": self.solution_state["set_b_count"]
         }
         content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
         return content
