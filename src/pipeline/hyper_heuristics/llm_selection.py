@@ -1,7 +1,7 @@
 import os
 import traceback
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
+from src.util.util import find_closest_match, load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 from src.util.tts_bon import tts_bon
 
@@ -91,11 +91,15 @@ class LLMSelectionHyperHeuristic:
                 self.llm_client.dump(f"step_{selection_round}")
 
                 candidate_heuristics = extract(response, key="Selected heuristic", sep=",")
+                matched_candidate_heuristics = []
                 for heuristic in candidate_heuristics:
-                    assert heuristic in self.heuristic_pool
+                    matched_candidate_heuristic = find_closest_match(heuristic, self.heuristic_pool)
+                    if matched_candidate_heuristic:
+                        matched_candidate_heuristics.append(matched_candidate_heuristic)
+                assert len(matched_candidate_heuristics) > 0
                 
                 # TTS selection
-                selected_heuristic_name = tts_bon(env, candidate_heuristics, self.heuristic_pool, self.steps_per_selection, self.rollout_budget, self.problem)
+                selected_heuristic_name = tts_bon(env, matched_candidate_heuristics, self.heuristic_pool, self.steps_per_selection, self.rollout_budget, self.problem)
                 pre_status = env.get_observation()
                 if pre_status:
                     for _ in range(self.steps_per_selection):

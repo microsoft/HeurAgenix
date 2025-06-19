@@ -83,6 +83,12 @@ def main():
     for data_name in test_case:
         env = Env(data_name=data_name)
         env.reset(output_dir)
+
+        paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 
+        paras += f"\ndata_path={env.data_path}"
+        with open(os.path.join(env.output_dir, "para.txt"), 'w') as file:
+            file.write(paras)
+
         if heuristic == "llm_hh":
             llm_client.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)
