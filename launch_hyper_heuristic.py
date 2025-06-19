@@ -18,7 +18,7 @@ def parse_arguments():
     parser.add_argument("-t", "--test_case", type=str, default=None, help="Data or directory name for test case(s).")
     parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file in llm_hh.")
     parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor for determining total heuristic steps based on problem size")
-    parser.add_argument("-m", "--steps_per_selection", type=int, default=5.0, help="Number of steps each heuristic selection should execute in llm_hh mode.")
+    parser.add_argument("-m", "--steps_per_selection", type=int, default=5, help="Number of steps each heuristic selection should execute in llm_hh mode.")
     parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics from llm in llm_hh mode.")
     parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluation for each heuristic in llm_hh mode.")
 

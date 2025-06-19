@@ -5,6 +5,8 @@ import io
 import hashlib
 import numpy as np
 import pandas as pd
+import difflib
+
 
 def extract(message: str, key: str, sep=None) -> list[str]:
     formats = [
@@ -30,6 +32,10 @@ def extract(message: str, key: str, sep=None) -> list[str]:
         return []
     else:
         return None
+
+def find_closest_match(input_string, string_list):
+    matches = difflib.get_close_matches(input_string, string_list, n=1, cutoff=0.0)
+    return matches[0] if matches else None 
 
 def parse_text_to_dict(text):
     lines = text.split("\n")
