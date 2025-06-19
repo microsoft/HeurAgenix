@@ -1,18 +1,17 @@
 from src.problems.cvrp.components import *
 import numpy as np
 
-def nearest_neighbor_54a9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def nearest_neighbor_54a9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """ Enhanced Nearest Neighbor Heuristic for CVRP.
 
     This heuristic prioritizes nodes with higher demands that can fit into the vehicle's remaining capacity, especially when the number of unvisited nodes is low. It also periodically applies a 2-opt heuristic to improve route compactness.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - distance_matrix (numpy.ndarray): 2D array representing distances between nodes.
             - demands (numpy.ndarray): Array of demands for each node.
             - capacity (int): Capacity of each vehicle.
             - depot (int): Index of the depot node.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): Current routes for all vehicles.
             - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
             - last_visited (list[int]): Last visited node for each vehicle.
@@ -26,15 +25,15 @@ def nearest_neighbor_54a9(global_data: dict, state_data: dict, algorithm_data: d
         dict: Updated algorithm data if any.
     """
     # Extract required data
-    distance_matrix = global_data["distance_matrix"]
-    demands = global_data["demands"]
-    capacity = global_data["capacity"]
-    depot = global_data["depot"]
+    distance_matrix = problem_state["distance_matrix"]
+    demands = problem_state["demands"]
+    capacity = problem_state["capacity"]
+    depot = problem_state["depot"]
 
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    last_visited = state_data["last_visited"]
-    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    last_visited = problem_state["last_visited"]
+    vehicle_remaining_capacity = problem_state["vehicle_remaining_capacity"]
 
     # Hyper-parameters
     high_demand_threshold = kwargs.get("high_demand_threshold", 6)

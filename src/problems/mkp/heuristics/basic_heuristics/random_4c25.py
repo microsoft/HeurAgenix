@@ -1,16 +1,15 @@
 from src.problems.mkp.components import *
 import random
 
-def random_4c25(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AddOperator, dict]:
+def random_4c25(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
     Random Heuristic for the Multidimensional Knapsack Problem.
     Randomly selects items to add to the knapsack until no further items can be added without violating resource constraints.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.            - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
 
     Returns:
@@ -18,10 +17,10 @@ def random_4c25(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         dict: An empty dictionary as this heuristic does not update the algorithm data.
     """
     # Extract necessary data from global_data and state_data
-    weights = global_data["weights"]
-    capacities = global_data["capacities"]
-    remaining_capacity = state_data["remaining_capacity"]
-    items_not_in_knapsack = state_data["items_not_in_knapsack"]
+    weights = problem_state["weights"]
+    capacities = problem_state["capacities"]
+    remaining_capacity = problem_state["remaining_capacity"]
+    items_not_in_knapsack = problem_state["items_not_in_knapsack"]
 
     # Shuffle the list of items not in the knapsack to ensure random selection
     random.shuffle(items_not_in_knapsack)

@@ -1,6 +1,6 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def most_work_remaining_930e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def most_work_remaining_930e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Most Work Remaining heuristic for JSSP.
     Selects the unfinished job with the maximum remaining work (total processing time of remaining operations) and returns an AdvanceOperator for that job to proceed with the next operation in sequence.
     
@@ -21,8 +21,8 @@ def most_work_remaining_930e(global_data: dict, state_data: dict, algorithm_data
     # Determine the job with the most work remaining
     max_remaining_work = -1
     selected_job_id = None
-    for job_id in state_data['unfinished_jobs']:
-        remaining_operations = global_data['job_operation_time'][job_id][state_data['job_operation_index'][job_id]:]
+    for job_id in problem_state['unfinished_jobs']:
+        remaining_operations = problem_state['job_operation_time'][job_id][problem_state['job_operation_index'][job_id]:]
         remaining_work = sum(remaining_operations)
         if remaining_work > max_remaining_work:
             max_remaining_work = remaining_work

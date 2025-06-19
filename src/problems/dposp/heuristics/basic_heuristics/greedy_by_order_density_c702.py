@@ -1,16 +1,15 @@
 from src.problems.dposp.components import *
 
-def greedy_by_order_density_c702(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def greedy_by_order_density_c702(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
     This heuristic for DPOSP selects the next order to schedule based on an 'order density' metric, defined as the ratio of the order's value to the combined time taken for production and transition. For each unscheduled order, compute the order density as 1 divided by the sum of the production time on the assigned production line and the transition time from the last scheduled product. Select the order with the highest density value that can be completed before its deadline and append it to the corresponding production line schedule.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "production_rate" (numpy.array): 2D array of production time for each product on each production line.
             - "transition_time" (numpy.array): 3D array of transition time between products on each production line.
             - "order_product" (numpy.array): 1D array mapping each order to its required product.
             - "order_deadline" (numpy.array): 1D array of the deadline for each order.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): Current scheduling solution.
             - "feasible_orders_to_fulfill" (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
             - "validation_single_production_schedule" (callable): Function to check whether the production schedule is valid.
@@ -25,15 +24,15 @@ def greedy_by_order_density_c702(global_data: dict, state_data: dict, algorithm_
     best_production_line_id = None
 
     # Get necessary data from global_data
-    production_rate = global_data["production_rate"]
-    transition_time = global_data["transition_time"]
-    order_product = global_data["order_product"]
-    order_deadline = global_data["order_deadline"]
+    production_rate = problem_state["production_rate"]
+    transition_time = problem_state["transition_time"]
+    order_product = problem_state["order_product"]
+    order_deadline = problem_state["order_deadline"]
 
     # Get necessary data from state_data
-    current_solution = state_data["current_solution"]
-    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    current_solution = problem_state["current_solution"]
+    feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
 
     # Iterate through each feasible order
     for order_id in feasible_orders_to_fulfill:

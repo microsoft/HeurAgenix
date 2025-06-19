@@ -1,6 +1,6 @@
 from src.problems.cvrp.components import *
 
-def variable_neighborhood_search_614b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[BaseOperator, dict]:
+def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[BaseOperator, dict]:
     """ Variable Neighborhood Search heuristic algorithm for CVRP.
     This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions.
     It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
@@ -46,7 +46,7 @@ def variable_neighborhood_search_614b(global_data: dict, state_data: dict, algor
         for node_index in range(len(unvisited_nodes)):
             node = unvisited_nodes[node_index]
             # Check if adding this node to the route exceeds the vehicle's capacity
-            if vehicle_loads[vehicle_id] + global_data['demands'][node] <= capacity:
+            if vehicle_loads[vehicle_id] + problem_state['demands'][node] <= capacity:
                 for position in range(len(current_solution.routes[vehicle_id]) + 1):
                     # Calculate the cost of inserting the node at the current position
                     if position == 0:

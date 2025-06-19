@@ -1,18 +1,17 @@
 from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator
 import numpy as np
 
-def farthest_insertion_4e1d(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def farthest_insertion_4e1d(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """ Farthest Insertion heuristic for the CVRP.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "node_num" (int): The total number of nodes in the problem.
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
             - "vehicle_num" (int): The total number of vehicles.
             - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
             - "depot" (int): The index for depot node.
             - "demands" (numpy.ndarray): The demand of each node.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current set of routes for all vehicles.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
             - "vehicle_loads" (list[int]): The current load of each vehicle.
@@ -24,13 +23,13 @@ def farthest_insertion_4e1d(global_data: dict, state_data: dict, algorithm_data:
         AppendOperator: An operator that represents the insertion of a node into the route.
         dict: An empty dictionary since this heuristic does not update algorithm_data.
     """
-    distance_matrix = global_data["distance_matrix"]
-    depot = global_data["depot"]
-    demands = global_data["demands"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    vehicle_loads = state_data["vehicle_loads"]
-    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
-    current_solution = state_data["current_solution"]
+    distance_matrix = problem_state["distance_matrix"]
+    depot = problem_state["depot"]
+    demands = problem_state["demands"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    vehicle_loads = problem_state["vehicle_loads"]
+    vehicle_remaining_capacity = problem_state["vehicle_remaining_capacity"]
+    current_solution = problem_state["current_solution"]
 
     # If all nodes are visited, return None
     if not unvisited_nodes:

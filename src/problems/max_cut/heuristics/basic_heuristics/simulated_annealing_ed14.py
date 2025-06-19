@@ -2,7 +2,7 @@ from src.problems.max_cut.components import *
 import random
 import math
 
-def simulated_annealing_ed14(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Simulated Annealing heuristic for the Max Cut problem. It probabilistically chooses to swap a node from one set to another,
     potentially accepting worse solutions early on to escape local optima, with the probability of accepting worse solutions
@@ -37,15 +37,15 @@ def simulated_annealing_ed14(global_data: dict, state_data: dict, algorithm_data
     cooling_rate = algorithm_data.get('cooling_rate', alpha)
 
     # Current solution and cut value
-    current_solution = state_data['current_solution']
-    current_cut_value = state_data['current_cut_value']
+    current_solution = problem_state['current_solution']
+    current_cut_value = problem_state['current_cut_value']
 
     # If the temperature is already below the final temperature, do not perform any operation
     if temperature <= final_temperature:
         return None, {}
 
     # Select a random node to swap
-    node = random.randint(0, global_data['node_num'] - 1)
+    node = random.randint(0, problem_state['node_num'] - 1)
 
     # Create a new solution with the node swapped
     new_solution = SwapOperator([node]).run(current_solution)
@@ -58,7 +58,7 @@ def simulated_annealing_ed14(global_data: dict, state_data: dict, algorithm_data
         return None, {}
 
     # Calculate the new cut value
-    new_cut_value = new_state_data['current_cut_value']
+    new_cut_value = new_problem_state['current_cut_value']
 
     # Calculate the change in cut value
     delta = new_cut_value - current_cut_value

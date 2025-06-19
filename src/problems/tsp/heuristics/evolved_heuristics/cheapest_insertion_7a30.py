@@ -1,17 +1,16 @@
 from src.problems.tsp.components import *
 import numpy as np
 
-def cheapest_insertion_7a30(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def cheapest_insertion_7a30(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """ An enhanced heuristic algorithm for cheapest insertion in the Traveling Salesman Problem (TSP).
 
     This heuristic incorporates specific rules based on the current state of the tour and certain global data metrics to optimize the solution.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - distance_matrix (numpy.ndarray): 2D array representing the distances between nodes.
             - node_num (int): The total number of nodes in the problem.
             - std_dev_distance (float): Standard deviation of distances to detect high variance.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): An instance of the Solution class representing the current solution.
             - unvisited_nodes (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
             - last_visited (int or None): The last visited node, or None if no nodes have been visited yet.
@@ -25,12 +24,12 @@ def cheapest_insertion_7a30(global_data: dict, state_data: dict, algorithm_data:
         InsertOperator: The operator to insert the chosen node into the current solution.
         dict: Updated algorithm data if any.
     """
-    distance_matrix = global_data["distance_matrix"]
-    node_num = global_data["node_num"]
-    std_dev_distance = global_data["std_dev_distance"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    last_visited = state_data["last_visited"]
+    distance_matrix = problem_state["distance_matrix"]
+    node_num = problem_state["node_num"]
+    std_dev_distance = problem_state["std_dev_distance"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    last_visited = problem_state["last_visited"]
 
     threshold_factor = kwargs.get("threshold_factor", 0.70)
     percentage_range = kwargs.get("percentage_range", 0.20)

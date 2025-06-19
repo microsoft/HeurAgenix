@@ -1,7 +1,7 @@
 from src.problems.tsp.components import *
 import numpy as np
 
-def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def nearest_neighbor_e8a4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """Enhanced nearest neighbor heuristic for the Traveling Salesman Problem (TSP).
 
     This heuristic begins at a node with the second-lowest average distance to all other nodes if the tour is initially empty.
@@ -27,11 +27,11 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
         dict: Updated algorithm data, if any.
     """
     # Extract necessary data
-    distance_matrix = global_data["distance_matrix"]
-    node_num = global_data["node_num"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    last_visited = state_data["last_visited"]
+    distance_matrix = problem_state["distance_matrix"]
+    node_num = problem_state["node_num"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    last_visited = problem_state["last_visited"]
 
     # Set default hyper-parameters
     threshold_factor = kwargs.get("threshold_factor", 0.70)
@@ -105,7 +105,7 @@ def nearest_neighbor_e8a4(global_data: dict, state_data: dict, algorithm_data: d
                 next_node = current_solution.tour[i]
                 immediate_impact = distance_matrix[prev_node][node] + distance_matrix[node][next_node] - distance_matrix[prev_node][next_node]
 
-            score = immediate_impact + state_data["visited_num"] / node_num / node_num * future_impact
+            score = immediate_impact + problem_state["visited_num"] / node_num / node_num * future_impact
             if score < best_score:
                 best_score = score
                 best_node = node

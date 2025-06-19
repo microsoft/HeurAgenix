@@ -2,16 +2,15 @@ from src.problems.mkp.components import *
 import numpy as np
 import itertools
 
-def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, max_k: int = 2, epsilon: float = 0.01, **kwargs) -> tuple[BaseOperator, dict]:
+def greedy_by_profit_1597(problem_state: dict, algorithm_data: dict, max_k: int = 2, epsilon: float = 0.01, **kwargs) -> tuple[BaseOperator, dict]:
     """Greedy heuristic for the Multidimensional Knapsack Problem, enhanced with opportunity cost scoring, k-flip exploration, and swap optimization.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "profits" (numpy.array): The profit value associated with each item.
             - "weights" (list of lists): A 2D list where each sublist represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
             - "resource_num" (int): The number of resource dimensions.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension.
             - "items_in_knapsack" (list[int]): A list of item indices that are currently included in the knapsack.
             - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
@@ -28,16 +27,16 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
         dict: An empty dictionary as no algorithm data is updated.
     """
     # Extract necessary data from global_data
-    profits = global_data["profits"]
-    weights = global_data["weights"]
-    resource_num = global_data["resource_num"]
+    profits = problem_state["profits"]
+    weights = problem_state["weights"]
+    resource_num = problem_state["resource_num"]
 
     # Extract necessary data from state_data
-    remaining_capacity = state_data["remaining_capacity"]
-    items_in_knapsack = state_data["items_in_knapsack"]
-    feasible_items_to_add = state_data["feasible_items_to_add"]
-    current_solution = state_data["current_solution"]
-    current_profit = state_data["current_profit"]
+    remaining_capacity = problem_state["remaining_capacity"]
+    items_in_knapsack = problem_state["items_in_knapsack"]
+    feasible_items_to_add = problem_state["feasible_items_to_add"]
+    current_solution = problem_state["current_solution"]
+    current_profit = problem_state["current_profit"]
 
     # Initialize variables to track the best operator and its corresponding score
     best_operator = None
@@ -76,7 +75,7 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
                 new_solution[index] = not new_solution[index]
 
             new_state_data = get_state_data_function(Solution(new_solution))
-            if new_state_data and new_state_data["current_profit"] > best_profit:
+            if new_state_data and new_problem_state["current_profit"] > best_profit:
                 return FlipBlockOperator(list(indices_to_flip)), {}
 
     # Swap Optimization
@@ -86,7 +85,7 @@ def greedy_by_profit_1597(global_data: dict, state_data: dict, algorithm_data: d
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
 
             new_state_data = get_state_data_function(Solution(new_solution))
-            if new_state_data and new_state_data["current_profit"] > best_profit:
+            if new_state_data and new_problem_state["current_profit"] > best_profit:
                 return SwapOperator(item_in, item_out), {}
 
     # If no operator improves the solution, return None

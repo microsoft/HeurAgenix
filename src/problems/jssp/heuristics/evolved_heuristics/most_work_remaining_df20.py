@@ -1,14 +1,13 @@
 from src.problems.jssp.components import Solution, AdvanceOperator, SwapOperator, ShiftOperator
 
-def most_work_remaining_df20(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def most_work_remaining_df20(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Most Work Remaining Heuristic with Dynamic Scoring and Local Optimization for JSSP.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in their target sequence.
             - "job_operation_time" (list[list[int]]): The time cost for each operation in each job.
             - "machine_num" (int): Total number of machines in the problem.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
@@ -35,13 +34,13 @@ def most_work_remaining_df20(global_data: dict, state_data: dict, algorithm_data
     iteration = algorithm_data.get("iteration", 0)
 
     # Extract necessary data
-    unfinished_jobs = state_data["unfinished_jobs"]
-    machine_last_end_times = state_data["machine_last_operation_end_times"]
-    job_operation_index = state_data["job_operation_index"]
-    job_last_end_times = state_data["job_last_operation_end_times"]
-    job_operation_sequence = global_data["job_operation_sequence"]
-    current_solution = state_data["current_solution"]
-    machine_num = global_data["machine_num"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    machine_last_end_times = problem_state["machine_last_operation_end_times"]
+    job_operation_index = problem_state["job_operation_index"]
+    job_last_end_times = problem_state["job_last_operation_end_times"]
+    job_operation_sequence = problem_state["job_operation_sequence"]
+    current_solution = problem_state["current_solution"]
+    machine_num = problem_state["machine_num"]
 
     # If no unfinished jobs, return None
     if not unfinished_jobs:
@@ -90,7 +89,7 @@ def most_work_remaining_df20(global_data: dict, state_data: dict, algorithm_data
                     new_state = get_state_data_function(new_solution)
                     if new_state is None:
                         continue
-                    delta = new_state["current_makespan"] - state_data["current_makespan"]
+                    delta = new_state["current_makespan"] - problem_state["current_makespan"]
                     if delta < best_delta:
                         best_operator = SwapOperator(machine_id, job_id1, job_id2)
                         best_delta = delta
@@ -105,7 +104,7 @@ def most_work_remaining_df20(global_data: dict, state_data: dict, algorithm_data
                     new_state = get_state_data_function(new_solution)
                     if new_state is None:
                         continue
-                    delta = new_state["current_makespan"] - state_data["current_makespan"]
+                    delta = new_state["current_makespan"] - problem_state["current_makespan"]
                     if delta < best_delta:
                         best_operator = ShiftOperator(machine_id, job_id, new_position)
                         best_delta = delta

@@ -1,6 +1,6 @@
 from src.problems.max_cut.components import *
 
-def highest_delta_node_b31b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def highest_delta_node_b31b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """
     This heuristic selects the unselected node that, when added to one of the sets (A or B),
     would result in the largest increase in the total cut weight. The node is then inserted into
@@ -22,9 +22,9 @@ def highest_delta_node_b31b(global_data: dict, state_data: dict, algorithm_data:
     """
 
     # Extract necessary information from global_data and state_data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
 
     # Initialize variables to keep track of the best node and delta
     best_node = None

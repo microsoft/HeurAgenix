@@ -1,7 +1,7 @@
 from src.problems.dposp.components import *
 import numpy as np
 
-def _2opt_production_sequence_8e5e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+def _2opt_production_sequence_8e5e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """The 2-opt Production Sequence heuristic adapts the 2-opt approach from TSP to the context of DPOSP. 
     It aims to improve the sequence of production orders on each production line by swapping two non-adjacent orders and re-evaluating the schedule's efficiency.
     By considering the production rates, transition times, and order deadlines, this heuristic explores alternative sequences that could lead to a higher number of completed orders or reduced total production and transition time.
@@ -9,13 +9,12 @@ def _2opt_production_sequence_8e5e(global_data: dict, state_data: dict, algorith
     If a more efficient sequence is identified, the heuristic generates a ReverseSegmentOperator that applies this improved order sequence to the production line.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production time for each product on each production line.
             - transition_time (numpy.array): 3D array of transition time between products on each production line.
             - order_product (numpy.array): 1D array mapping each order to its required product.
             - order_quantity (numpy.array): 1D array of the quantity required for each order.
             - order_deadline (numpy.array): 1D array of the deadline for each order.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): Current scheduling solution.
             - validation_single_production_schedule (callable): Function to check whether the production schedule is valid.
         get_state_data_function (callable): Function to get the state data for a new solution.
@@ -24,14 +23,14 @@ def _2opt_production_sequence_8e5e(global_data: dict, state_data: dict, algorith
         ReverseSegmentOperator: The operator that reverse two nodes in the solution to achieve a shorter production schedule.
         dict: Empty dictionary as this algorithm does not update algorithm_data.
     """
-    production_rate = global_data["production_rate"]
-    transition_time = global_data["transition_time"]
-    order_product = global_data["order_product"]
-    order_quantity = global_data["order_quantity"]
-    order_deadline = global_data["order_deadline"]
+    production_rate = problem_state["production_rate"]
+    transition_time = problem_state["transition_time"]
+    order_product = problem_state["order_product"]
+    order_quantity = problem_state["order_quantity"]
+    order_deadline = problem_state["order_deadline"]
     
-    current_solution = state_data["current_solution"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    current_solution = problem_state["current_solution"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
     
     best_delta = 0
     best_pair = None

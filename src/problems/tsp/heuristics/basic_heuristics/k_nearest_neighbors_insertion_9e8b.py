@@ -1,14 +1,13 @@
 from src.problems.tsp.components import *
 
-def k_nearest_neighbors_insertion_9e8b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, k: int = 1, **kwargs) -> tuple[InsertOperator, dict]:
+def k_nearest_neighbors_insertion_9e8b(problem_state: dict, algorithm_data: dict, k: int = 1, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Heuristic that builds a tour by inserting the nearest unvisited neighbor to the last visited node.
     If multiple nearest neighbors are considered (k > 1), one is chosen based on a certain criterion.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
             - "last_visited" (int): The last visited node in the current solution.
@@ -20,10 +19,10 @@ def k_nearest_neighbors_insertion_9e8b(global_data: dict, state_data: dict, algo
         dict: Empty dictionary as this algorithm does not update algorithm_data.
     """
     # Extract necessary data from global_data and state_data
-    distance_matrix = global_data["distance_matrix"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    last_visited = state_data["last_visited"]
+    distance_matrix = problem_state["distance_matrix"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    last_visited = problem_state["last_visited"]
 
     # If the current solution is empty, start from first unvisited node.
     if not current_solution.tour:

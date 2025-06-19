@@ -1,6 +1,6 @@
 from src.problems.dposp.components import *
 
-def maximum_remaining_work_order_ec9c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def maximum_remaining_work_order_ec9c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
     Heuristic that selects the order with the most remaining work that can be feasibly scheduled on any production line
     without violating existing order deadlines. The chosen order is then appended or inserted into the most appropriate
@@ -23,10 +23,10 @@ def maximum_remaining_work_order_ec9c(global_data: dict, state_data: dict, algor
     """
     # Calculate the remaining work for each feasible order based on production rate and order quantity
     remaining_work_for_orders = {
-        order_id: global_data['order_quantity'][order_id] / global_data['production_rate'][prod_line_id, global_data['order_product'][order_id]]
-        for order_id in state_data['feasible_orders_to_fulfill']
-        for prod_line_id in range(global_data['production_line_num'])
-        if global_data['production_rate'][prod_line_id, global_data['order_product'][order_id]] > 0
+        order_id: problem_state['order_quantity'][order_id] / problem_state['production_rate'][prod_line_id, problem_state['order_product'][order_id]]
+        for order_id in problem_state['feasible_orders_to_fulfill']
+        for prod_line_id in range(problem_state['production_line_num'])
+        if problem_state['production_rate'][prod_line_id, problem_state['order_product'][order_id]] > 0
     }
 
     # Select the order with the maximum remaining work
@@ -37,11 +37,11 @@ def maximum_remaining_work_order_ec9c(global_data: dict, state_data: dict, algor
         return None, {}
 
     # Find a production line where the order can be feasibly scheduled
-    for prod_line_id in range(global_data['production_line_num']):
-        if global_data['production_rate'][prod_line_id, global_data['order_product'][max_work_order_id]] > 0:
+    for prod_line_id in range(problem_state['production_line_num']):
+        if problem_state['production_rate'][prod_line_id, problem_state['order_product'][max_work_order_id]] > 0:
             # Check if appending the order is valid
-            validation_function = state_data['validation_single_production_schedule']
-            new_schedule = state_data['current_solution'].production_schedule[prod_line_id] + [max_work_order_id]
+            validation_function = problem_state['validation_single_production_schedule']
+            new_schedule = problem_state['current_solution'].production_schedule[prod_line_id] + [max_work_order_id]
             if validation_function(prod_line_id, new_schedule):
                 # Return the AppendOperator for the selected order and production line
                 return AppendOperator(prod_line_id, max_work_order_id), {}

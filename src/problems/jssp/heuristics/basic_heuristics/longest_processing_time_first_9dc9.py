@@ -1,6 +1,6 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def longest_processing_time_first_9dc9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def longest_processing_time_first_9dc9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
     
     Args:
@@ -27,11 +27,11 @@ def longest_processing_time_first_9dc9(global_data: dict, state_data: dict, algo
     # No additional information from algorithm_data or kwargs is used in this heuristic.
     
     # Extract necessary information from global_data
-    job_operation_time = global_data["job_operation_time"]
+    job_operation_time = problem_state["job_operation_time"]
     
     # Extract necessary information from state_data
-    unfinished_jobs = state_data["unfinished_jobs"]
-    current_solution = state_data["current_solution"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    current_solution = problem_state["current_solution"]
     
     # Initialize variables to keep track of the job with the longest next operation time
     max_time = -1

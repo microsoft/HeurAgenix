@@ -1,18 +1,17 @@
 from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator
 import numpy as np
 
-def min_cost_insertion_048f(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def min_cost_insertion_048f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """ Min-Cost Insertion heuristic for the CVRP.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "node_num" (int): Total number of nodes.
             - "distance_matrix" (numpy.ndarray): 2D array representing distances between nodes.
             - "vehicle_num" (int): Total number of vehicles.
             - "capacity" (int): Capacity for each vehicle.
             - "depot" (int): Index for depot node.
             - "demands" (numpy.ndarray): Demand of each node.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): Current set of routes.
             - "unvisited_nodes" (list[int]): Nodes not yet visited.
             - "vehicle_loads" (list[int]): Current load of each vehicle.
@@ -26,14 +25,14 @@ def min_cost_insertion_048f(global_data: dict, state_data: dict, algorithm_data:
     """
 
     # Extract necessary data
-    distance_matrix = global_data["distance_matrix"]
-    depot = global_data["depot"]
-    demands = global_data["demands"]
+    distance_matrix = problem_state["distance_matrix"]
+    depot = problem_state["depot"]
+    demands = problem_state["demands"]
     
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    vehicle_loads = state_data["vehicle_loads"]
-    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    vehicle_loads = problem_state["vehicle_loads"]
+    vehicle_remaining_capacity = problem_state["vehicle_remaining_capacity"]
 
     # Initialize variables to track the best insertion
     best_increase = float('inf')

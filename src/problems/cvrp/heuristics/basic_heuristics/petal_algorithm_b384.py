@@ -1,20 +1,19 @@
 from src.problems.cvrp.components import Solution, InsertOperator
 import math
 
-def petal_algorithm_b384(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def petal_algorithm_b384(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Petal construction heuristic algorithm for the CVRP. This heuristic attempts to build feasible routes (petals) around the depot and combine them into a set of vehicle routes.
     Each petal starts and ends at the depot, creating a loop that can serve as an individual route for a vehicle.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
             - "demands" (numpy.ndarray): The demand of each node.
             - "capacity" (int): The capacity for each vehicle.
             - "vehicle_num" (int): The total number of vehicles.
             - "node_num" (int): The total number of nodes in the problem.
 
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current set of routes for all vehicles.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
             - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
@@ -24,12 +23,12 @@ def petal_algorithm_b384(global_data: dict, state_data: dict, algorithm_data: di
         dict: Updated algorithm data, empty in this case as this heuristic doesn't utilize it.
     """
 
-    distance_matrix = global_data["distance_matrix"]
-    demands = global_data["demands"]
-    vehicle_capacity = global_data["capacity"]
-    vehicle_remaining_capacity = state_data["vehicle_remaining_capacity"].copy()
-    current_solution = state_data["current_solution"].routes
-    unvisited_nodes = state_data["unvisited_nodes"].copy()
+    distance_matrix = problem_state["distance_matrix"]
+    demands = problem_state["demands"]
+    vehicle_capacity = problem_state["capacity"]
+    vehicle_remaining_capacity = problem_state["vehicle_remaining_capacity"].copy()
+    current_solution = problem_state["current_solution"].routes
+    unvisited_nodes = problem_state["unvisited_nodes"].copy()
 
     if not unvisited_nodes:
         # No more nodes to visit, return None.

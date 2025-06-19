@@ -1,6 +1,6 @@
 from src.problems.cvrp.components import *
 
-def two_opt_0554(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+def two_opt_0554(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """
     Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
 
@@ -15,13 +15,13 @@ def two_opt_0554(global_data: dict, state_data: dict, algorithm_data: dict, get_
     """
 
     # Retrieve the necessary data from global_data
-    distance_matrix = global_data["distance_matrix"]
-    node_num = global_data["node_num"]
-    depot = global_data["depot"]
+    distance_matrix = problem_state["distance_matrix"]
+    node_num = problem_state["node_num"]
+    depot = problem_state["depot"]
 
     # Retrieve the current solution from state_data
-    current_solution = state_data["current_solution"]
-    visited_nodes = state_data["visited_nodes"]
+    current_solution = problem_state["current_solution"]
+    visited_nodes = problem_state["visited_nodes"]
 
     # Initialize variables for the best move found
     best_delta = 0

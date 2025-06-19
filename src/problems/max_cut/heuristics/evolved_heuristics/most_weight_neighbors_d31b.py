@@ -1,7 +1,7 @@
 from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
 import numpy as np
 
-def most_weight_neighbors_d31b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, scaling_factor: float = 0.5, swap_frequency: int = 5, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def most_weight_neighbors_d31b(problem_state: dict, algorithm_data: dict, scaling_factor: float = 0.5, swap_frequency: int = 5, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """The most_weight_neighbors_d31b heuristic selects an unselected node based on both immediate and future impacts 
     on the cut value and periodically considers swaps to further improve the solution.
 
@@ -25,9 +25,9 @@ def most_weight_neighbors_d31b(global_data: dict, state_data: dict, algorithm_da
     """
 
     # Extract necessary data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     set_a, set_b = current_solution.set_a, current_solution.set_b
     operation_count = algorithm_data.get("operation_count", 0)
 

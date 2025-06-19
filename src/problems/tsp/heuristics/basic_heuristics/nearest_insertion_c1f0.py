@@ -1,13 +1,12 @@
 from src.problems.tsp.components import *
 
-def nearest_insertion_c1f0(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def nearest_insertion_c1f0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
             - "visited_nodes" (list[int]): A list of integers representing the IDs of nodes that have been visited.
@@ -16,11 +15,11 @@ def nearest_insertion_c1f0(global_data: dict, state_data: dict, algorithm_data: 
         InsertOperator: The operator to insert the nearest non-tour city into the current tour.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from the global and state dictionaries
-    distance_matrix = global_data["distance_matrix"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    visited_nodes = state_data["visited_nodes"]
+    # Extract necessary data from the problem state dictionaries
+    distance_matrix = problem_state["distance_matrix"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    visited_nodes = problem_state["visited_nodes"]
 
     # Initialize variables to store the best insertion
     best_increase = float('inf')

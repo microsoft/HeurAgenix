@@ -1,14 +1,13 @@
 from src.problems.online_bpp.components import Solution, AssignBinOperator, NewBinOperator
 import random
 
-def random_5094(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator, dict]:
+def random_5094(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AssignBinOperator, dict]:
     """ Randomly assign the current item to one of the existing bins that have enough remaining capacity, 
     or place it in a new bin if no such bin exists.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - capacity (int): The capacity for each bin.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): The current solution object representing the bins and items.
             - current_item_size (int): The size of the current item to be packed.
             - remaining_capacity (list[int]): List of remaining capacities for each bin.
@@ -18,9 +17,9 @@ def random_5094(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         An instance of AssignBinOperator or NewBinOperator, based on the decision made by the heuristic.
         An empty dictionary as no algorithm data is updated in this heuristic.
     """
-    current_item_size = state_data["current_item_size"]
-    remaining_capacity = state_data["remaining_capacity"]
-    current_solution = state_data["current_solution"]
+    current_item_size = problem_state["current_item_size"]
+    remaining_capacity = problem_state["remaining_capacity"]
+    current_solution = problem_state["current_solution"]
 
     # If there is no current item to pack, return None
     if current_item_size is None:

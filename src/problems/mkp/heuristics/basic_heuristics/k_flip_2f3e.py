@@ -2,7 +2,7 @@ from src.problems.mkp.components import *
 from itertools import combinations
 import random
 
-def k_flip_2f3e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, k: int = 2) -> tuple[FlipBlockOperator, dict]:
+def k_flip_2f3e(problem_state: dict, algorithm_data: dict, k: int = 2) -> tuple[FlipBlockOperator, dict]:
     """ K-flip heuristic that flips the inclusion status of k items.
 
     Args:
@@ -17,13 +17,13 @@ def k_flip_2f3e(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         dict: Empty dictionary as the algorithm data is not updated.
     """
     # Extract necessary data from global_data
-    item_num = global_data['item_num']
+    item_num = problem_state['item_num']
     all_indices = range(item_num)
 
     # Extract necessary data from state_data
-    current_solution = state_data['current_solution']
-    current_profit = state_data['current_profit']
-    validation_solution = state_data['validation_solution']
+    current_solution = problem_state['current_solution']
+    current_profit = problem_state['current_profit']
+    validation_solution = problem_state['validation_solution']
 
     # Generate all possible combinations of k indices
     all_combinations = list(combinations(all_indices, k))
@@ -43,7 +43,7 @@ def k_flip_2f3e(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         # Check if the new solution is valid and calculate its state data
         if validation_solution(Solution(new_solution)):  # Only proceed if the solution is valid
             new_state_data = get_state_data_function(Solution(new_solution))
-            new_profit = new_state_data['current_profit']
+            new_profit = new_problem_state['current_profit']
 
             # If the new solution is better, update best_operator and best_profit
             if new_profit > best_profit:

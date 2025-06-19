@@ -1,7 +1,7 @@
 from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
 import numpy as np
 
-def balanced_cut_c0e6(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def balanced_cut_c0e6(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """Balanced Cut heuristic for the Max Cut problem with improvements to ensure balanced partitions, 
     future impact consideration, and periodic swap operations.
 
@@ -27,9 +27,9 @@ def balanced_cut_c0e6(global_data: dict, state_data: dict, algorithm_data: dict,
         dict: Updated algorithm data with the sorted list of nodes and operation count.
     """
     # Extract necessary data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     set_a, set_b = current_solution.set_a, current_solution.set_b
     operation_count = algorithm_data.get("operation_count", 0)
     sorted_nodes = algorithm_data.get("sorted_nodes", [])

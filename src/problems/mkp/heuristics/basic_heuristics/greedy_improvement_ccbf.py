@@ -1,6 +1,6 @@
 from src.problems.mkp.components import *
 
-def greedy_improvement_ccbf(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def greedy_improvement_ccbf(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Greedy Improvement heuristic for the Multidimensional Knapsack Problem.
     This heuristic tries to improve the current solution by swapping an included item with an excluded item
@@ -17,15 +17,15 @@ def greedy_improvement_ccbf(global_data: dict, state_data: dict, algorithm_data:
         dict: An empty dictionary as this heuristic does not update algorithm_data.
     """
     # Extract necessary data from global_data
-    profits = global_data['profits']
-    weights = global_data['weights']
-    capacities = global_data['capacities']
+    profits = problem_state['profits']
+    weights = problem_state['weights']
+    capacities = problem_state['capacities']
 
     # Extract necessary data from state_data
-    current_solution = state_data['current_solution']
-    current_weights = state_data['current_weights']
-    items_in_knapsack = state_data['items_in_knapsack']
-    items_not_in_knapsack = state_data['items_not_in_knapsack']
+    current_solution = problem_state['current_solution']
+    current_weights = problem_state['current_weights']
+    items_in_knapsack = problem_state['items_in_knapsack']
+    items_not_in_knapsack = problem_state['items_not_in_knapsack']
 
     # Initialize variables to track the best swap
     best_profit_increase = 0

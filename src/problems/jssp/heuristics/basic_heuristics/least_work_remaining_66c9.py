@@ -1,6 +1,6 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def least_work_remaining_66c9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def least_work_remaining_66c9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """
     Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
 
@@ -16,11 +16,11 @@ def least_work_remaining_66c9(global_data: dict, state_data: dict, algorithm_dat
         dict: Empty dictionary as no algorithm data is updated.
     """
     # Extract necessary information from global_data
-    job_operation_time = global_data["job_operation_time"]
+    job_operation_time = problem_state["job_operation_time"]
 
     # Extract necessary state data
-    unfinished_jobs = state_data["unfinished_jobs"]
-    job_operation_index = state_data["job_operation_index"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    job_operation_index = problem_state["job_operation_index"]
 
     # Initialize the least work remaining and corresponding job ID
     min_work_remaining = float('inf')

@@ -1,6 +1,6 @@
 from src.problems.mkp.components import *
 
-def greedy_by_profitto_weight_ratio_3aad(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AddOperator, dict]:
+def greedy_by_profitto_weight_ratio_3aad(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
     Greedy heuristic that selects items based on the highest profit-to-weight ratio without violating resource constraints.
     
@@ -23,14 +23,14 @@ def greedy_by_profitto_weight_ratio_3aad(global_data: dict, state_data: dict, al
     """
     
     # Extract necessary data from global_data
-    weights = global_data["weights"]
-    profits = global_data["profits"]
-    item_num = global_data["item_num"]
-    capacities = global_data["capacities"]
+    weights = problem_state["weights"]
+    profits = problem_state["profits"]
+    item_num = problem_state["item_num"]
+    capacities = problem_state["capacities"]
     
     # Extract necessary data from state_data
-    current_solution = state_data["current_solution"]
-    remaining_capacity = state_data["remaining_capacity"]
+    current_solution = problem_state["current_solution"]
+    remaining_capacity = problem_state["remaining_capacity"]
     
     profit_to_weight_ratio = [
         [p / w if w != 0 else 0 for w in weights_dim]

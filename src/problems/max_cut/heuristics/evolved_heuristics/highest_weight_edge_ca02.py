@@ -1,13 +1,12 @@
 from src.problems.max_cut.components import *
 import numpy as np
 
-def highest_weight_edge_ca02(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def highest_weight_edge_ca02(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """ Heuristic algorithm to maximize cut value by evaluating the impact of placing each unselected node into set A or B.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current solution of the MaxCut problem.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
             - "set_a" (set[int]): The set of nodes in partition A.
@@ -23,11 +22,11 @@ def highest_weight_edge_ca02(global_data: dict, state_data: dict, algorithm_data
         dict: Empty dictionary as no algorithm data is updated.
     """
     # Extract necessary information
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
-    set_a = state_data["current_solution"].set_a
-    set_b = state_data["current_solution"].set_b
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
+    set_a = problem_state["current_solution"].set_a
+    set_b = problem_state["current_solution"].set_b
     k = kwargs.get("k", 3)  # Frequency of swap operations, default is 3
     
     # If there are no unselected nodes, return None

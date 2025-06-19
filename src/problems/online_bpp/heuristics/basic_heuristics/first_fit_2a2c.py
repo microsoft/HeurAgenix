@@ -1,13 +1,12 @@
 from src.problems.online_bpp.components import Solution, AssignBinOperator, NewBinOperator
 
-def first_fit_2a2c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator or NewBinOperator, dict]:
+def first_fit_2a2c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AssignBinOperator or NewBinOperator, dict]:
     """ FirstFit heuristic algorithm for the Online Bin Packing Problem.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "capacity" (int): The capacity for each bin.
             - "item_num" (int): Total item number.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "current_item_size" (int): The size of current item to pack.
             - "remaining_capacity" (list[int]): List of remaining capacity for each bin.
@@ -18,8 +17,8 @@ def first_fit_2a2c(global_data: dict, state_data: dict, algorithm_data: dict, ge
         An empty dictionary as this algorithm does not update algorithm data.
     """
     # Retrieve necessary data from state_data
-    current_item_size = state_data["current_item_size"]
-    remaining_capacity = state_data["remaining_capacity"]
+    current_item_size = problem_state["current_item_size"]
+    remaining_capacity = problem_state["remaining_capacity"]
 
     # If there is no current item to pack, return None
     if current_item_size is None:

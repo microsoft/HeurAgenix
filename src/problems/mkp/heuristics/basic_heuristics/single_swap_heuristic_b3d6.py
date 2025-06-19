@@ -1,6 +1,6 @@
 from src.problems.mkp.components import *
 
-def single_swap_heuristic_b3d6(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def single_swap_heuristic_b3d6(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     SingleSwapHeuristic tries to find the best single swap of items that increases the total profit
     of the knapsack without violating resource constraints.
@@ -31,14 +31,14 @@ def single_swap_heuristic_b3d6(global_data: dict, state_data: dict, algorithm_da
     best_profit_increase = 0
 
     # Retrieve necessary data from global_data and state_data
-    weights = global_data["weights"]
-    profits = global_data["profits"]
-    capacities = global_data["capacities"]
-    current_solution = state_data["current_solution"]
-    current_profit = state_data["current_profit"]
-    items_in_knapsack = state_data["items_in_knapsack"]
-    items_not_in_knapsack = state_data["items_not_in_knapsack"]
-    validation_solution = state_data["validation_solution"]
+    weights = problem_state["weights"]
+    profits = problem_state["profits"]
+    capacities = problem_state["capacities"]
+    current_solution = problem_state["current_solution"]
+    current_profit = problem_state["current_profit"]
+    items_in_knapsack = problem_state["items_in_knapsack"]
+    items_not_in_knapsack = problem_state["items_not_in_knapsack"]
+    validation_solution = problem_state["validation_solution"]
 
 
     # Iterate over all pairs of items (one in the knapsack and one not in the knapsack)
@@ -53,11 +53,11 @@ def single_swap_heuristic_b3d6(global_data: dict, state_data: dict, algorithm_da
                 new_state_data = get_state_data_function(Solution(new_solution))
 
                 # Calculate the profit increase for this swap
-                new_profit = new_state_data["current_profit"]
+                new_profit = new_problem_state["current_profit"]
                 profit_increase = new_profit - current_profit
 
                 # Check if this swap is the best so far and update if necessary
-                if profit_increase > best_profit_increase and all(new <= cap for new, cap in zip(new_state_data["current_weights"], capacities)):
+                if profit_increase > best_profit_increase and all(new <= cap for new, cap in zip(new_problem_state["current_weights"], capacities)):
                     best_profit_increase = profit_increase
                     best_swap_operator = SwapOperator(item_in, item_out)
 

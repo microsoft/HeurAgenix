@@ -1,6 +1,6 @@
 from src.problems.cvrp.components import Solution, InsertOperator
 
-def greedy_f4c4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def greedy_f4c4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Greedy heuristic algorithm for the CVRP.
     This algorithm attempts to construct a solution by iteratively adding the closest unvisited node to a vehicle's route until all nodes are visited or the vehicle reaches its capacity.
@@ -22,13 +22,13 @@ def greedy_f4c4(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         dict: Empty dictionary as the algorithm does not update any algorithm-specific data.
     """
     
-    distance_matrix = global_data['distance_matrix']
-    demands = global_data['demands']
-    vehicle_num = global_data['vehicle_num']
-    vehicle_capacity = global_data['capacity']
+    distance_matrix = problem_state['distance_matrix']
+    demands = problem_state['demands']
+    vehicle_num = problem_state['vehicle_num']
+    vehicle_capacity = problem_state['capacity']
     
-    unvisited_nodes = state_data['unvisited_nodes']
-    vehicle_remaining_capacity = state_data['vehicle_remaining_capacity']
+    unvisited_nodes = problem_state['unvisited_nodes']
+    vehicle_remaining_capacity = problem_state['vehicle_remaining_capacity']
     
     # Start with the first unvisited node and the first vehicle
     for vehicle_id in range(vehicle_num):
@@ -49,7 +49,7 @@ def greedy_f4c4(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         
         if closest_node is not None:
             # Create an InsertOperator to add this node to the solution
-            return InsertOperator(vehicle_id, closest_node, len(state_data['current_solution'].routes[vehicle_id])), {}
+            return InsertOperator(vehicle_id, closest_node, len(problem_state['current_solution'].routes[vehicle_id])), {}
     
     # If all nodes are visited or no capacity is left to visit any node, return None
     return None, {}

@@ -1,15 +1,14 @@
 from src.problems.cvrp.components import Solution, MergeRoutesOperator
 
-def saving_algorithm_710e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, merge_threshold: float = 0.0, **kwargs) -> tuple[MergeRoutesOperator, dict]:
+def saving_algorithm_710e(problem_state: dict, algorithm_data: dict, merge_threshold: float = 0.0, **kwargs) -> tuple[MergeRoutesOperator, dict]:
     """ Saving Algorithm heuristic for CVRP.
     Calculates savings for combining two routes into one for each pair of end nodes of existing routes and sorts these savings in descending order. Routes are then merged by the highest savings while considering vehicle capacity constraints.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): The distance matrix between nodes.
             - "vehicle_num" (int): The total number of vehicles.
             - "capacity" (int): The capacity for each vehicle.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current set of routes for all vehicles.
             - "vehicle_loads" (list[int]): The current load of each vehicle.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
@@ -20,11 +19,11 @@ def saving_algorithm_710e(global_data: dict, state_data: dict, algorithm_data: d
         MergeRoutesOperator: The chosen operator to merge two routes if a saving above the threshold is found.
         dict: Empty dictionary as no algorithm_data is updated.
     """
-    distance_matrix = global_data["distance_matrix"]
-    vehicle_capacity = global_data["capacity"]
-    depot = global_data["depot"]
-    vehicle_loads = state_data["vehicle_loads"]
-    current_solution = state_data["current_solution"]
+    distance_matrix = problem_state["distance_matrix"]
+    vehicle_capacity = problem_state["capacity"]
+    depot = problem_state["depot"]
+    vehicle_loads = problem_state["vehicle_loads"]
+    current_solution = problem_state["current_solution"]
 
     best_saving = merge_threshold
     best_operator = None

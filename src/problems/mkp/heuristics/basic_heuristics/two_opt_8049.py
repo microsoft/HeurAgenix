@@ -1,6 +1,6 @@
 from src.problems.mkp.components import *
 
-def two_opt_8049(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def two_opt_8049(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Two-Opt heuristic that iteratively evaluates potential swaps of two items' inclusion statuses in the knapsack. 
     It retains the swap if it leads to a solution with a higher profit without violating any resource constraints.
@@ -10,7 +10,6 @@ def two_opt_8049(global_data: dict, state_data: dict, algorithm_data: dict, get_
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
             
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current solution instance.
             - "items_in_knapsack" (list[int]): List of item indices currently in the knapsack.
             - "items_not_in_knapsack" (list[int]): List of item indices not in the knapsack.
@@ -25,18 +24,18 @@ def two_opt_8049(global_data: dict, state_data: dict, algorithm_data: dict, get_
     """
     
     best_operator = None
-    best_profit = state_data["current_profit"]
-    items_in_knapsack = state_data["items_in_knapsack"]
-    items_not_in_knapsack = state_data["items_not_in_knapsack"]
-    validation_solution = state_data["validation_solution"]
-    weights = global_data["weights"]
-    capacities = global_data["capacities"]
+    best_profit = problem_state["current_profit"]
+    items_in_knapsack = problem_state["items_in_knapsack"]
+    items_not_in_knapsack = problem_state["items_not_in_knapsack"]
+    validation_solution = problem_state["validation_solution"]
+    weights = problem_state["weights"]
+    capacities = problem_state["capacities"]
 
     # Iterate through pairs of items: one in the knapsack and one not in the knapsack
     for item_in in items_in_knapsack:
         for item_out in items_not_in_knapsack:
             # Create a new solution by swapping the two items
-            new_solution = state_data["current_solution"].item_inclusion[:]
+            new_solution = problem_state["current_solution"].item_inclusion[:]
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
             temp_solution = Solution(new_solution)
             
@@ -45,9 +44,9 @@ def two_opt_8049(global_data: dict, state_data: dict, algorithm_data: dict, get_
                 new_state_data = get_state_data_function(Solution(temp_solution))
 
                 # If the new solution is valid and has a higher profit, store it as the best solution
-                if new_state_data and new_state_data["current_profit"] > best_profit:
+                if new_state_data and new_problem_state["current_profit"] > best_profit:
                     best_operator = SwapOperator(item_in, item_out)
-                    best_profit = new_state_data["current_profit"]
+                    best_profit = new_problem_state["current_profit"]
     
     # Return the best swap operator found and an empty dictionary for algorithm data
     return (best_operator, {}) if best_operator else (None, {})

@@ -1,6 +1,6 @@
 from src.problems.jssp.components import Solution, SwapOperator
 
-def _3opt_6ee0(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def _3opt_6ee0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """3-opt heuristic for Job Shop Scheduling Problem (JSSP).
     This function does not generate a complete 3-opt operator since JSSP requires operations within a job to be executed in sequence and does not allow reordering of these operations.The heuristic is adapted to generate a series of 2-opt swaps (using the SwapOperator) which approximate a 3-opt move.
 
@@ -24,19 +24,19 @@ def _3opt_6ee0(global_data: dict, state_data: dict, algorithm_data: dict, get_st
     """
     
     # Check if we have enough jobs to perform a 3-opt move
-    if global_data['job_num'] < 3:
+    if problem_state['job_num'] < 3:
         return None, {}  # Not enough jobs to perform a 3-opt
     
     # Extract necessary information from the state data
-    current_solution = state_data['current_solution']
-    machine_last_operation_end_times = state_data['machine_last_operation_end_times']
+    current_solution = problem_state['current_solution']
+    machine_last_operation_end_times = problem_state['machine_last_operation_end_times']
     
     # Initialize variables to store the best swap operator and its corresponding makespan improvement
     best_operator = None
     best_improvement = 0
     
     # Iterate over all machines
-    for machine_id in range(global_data['machine_num']):
+    for machine_id in range(problem_state['machine_num']):
         job_sequence = current_solution.job_sequences[machine_id]
         num_jobs = len(job_sequence)
         
@@ -53,7 +53,7 @@ def _3opt_6ee0(global_data: dict, state_data: dict, algorithm_data: dict, get_st
                     new_state = get_state_data_function(new_solution)
                     if new_state == None:
                         continue
-                    improvement = state_data['current_makespan'] - new_state['current_makespan']
+                    improvement = problem_state['current_makespan'] - new_state['current_makespan']
                     
                     # Update the best operator if this swap results in a better makespan
                     if improvement > best_improvement:

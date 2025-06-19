@@ -1,6 +1,6 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def shortest_processing_time_first_c374(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def shortest_processing_time_first_c374(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Implements the Shortest Processing Time first heuristic for the JSSP.
     
     This heuristic selects the unfinished job with the shortest next operation processing time and uses an AdvanceOperator to schedule it on the corresponding machine.
@@ -25,11 +25,11 @@ def shortest_processing_time_first_c374(global_data: dict, state_data: dict, alg
     """
     
     # Extract necessary data from global_data
-    job_operation_time = global_data["job_operation_time"]
+    job_operation_time = problem_state["job_operation_time"]
     
     # Extract necessary data from state_data
-    unfinished_jobs = state_data["unfinished_jobs"]
-    job_operation_index = state_data["job_operation_index"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    job_operation_index = problem_state["job_operation_index"]
     
     # Initialize variables to store the job with minimum processing time and its time
     min_time = float('inf')

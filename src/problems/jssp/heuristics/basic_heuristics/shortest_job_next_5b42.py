@@ -1,6 +1,6 @@
 from src.problems.jssp.components import AdvanceOperator
 
-def shortest_job_next_5b42(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def shortest_job_next_5b42(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Implements the Shortest Job Next heuristic for the Job Shop Scheduling Problem.
     This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
 
@@ -21,9 +21,9 @@ def shortest_job_next_5b42(global_data: dict, state_data: dict, algorithm_data: 
     """
 
     # Retrieve the necessary information from the global and state data
-    job_operation_time = global_data["job_operation_time"]
-    unfinished_jobs = state_data["unfinished_jobs"]
-    job_operation_index = state_data["current_solution"].job_operation_index
+    job_operation_time = problem_state["job_operation_time"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    job_operation_index = problem_state["current_solution"].job_operation_index
 
     # Check if there are any unfinished jobs
     if not unfinished_jobs:

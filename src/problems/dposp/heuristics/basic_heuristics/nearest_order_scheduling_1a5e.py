@@ -1,6 +1,6 @@
 from src.problems.dposp.components import *
 
-def nearest_order_scheduling_1a5e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def nearest_order_scheduling_1a5e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
     Implements the nearest order scheduling heuristic for DPOSP. Starting from an initial order, the heuristic builds
     a production schedule by selecting and appending the next order that minimizes the combined criteria of setup time
@@ -34,15 +34,15 @@ def nearest_order_scheduling_1a5e(global_data: dict, state_data: dict, algorithm
     """
 
     # Unpack necessary data from global_data
-    transition_time = global_data["transition_time"]
-    production_rate = global_data["production_rate"]
-    order_deadline = global_data["order_deadline"]
-    order_product = global_data["order_product"]
+    transition_time = problem_state["transition_time"]
+    production_rate = problem_state["production_rate"]
+    order_deadline = problem_state["order_deadline"]
+    order_product = problem_state["order_product"]
 
     # Unpack necessary data from state_data
-    current_solution = state_data["current_solution"]
-    feasible_orders = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    current_solution = problem_state["current_solution"]
+    feasible_orders = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
 
     # Start heuristic logic
     if not feasible_orders:

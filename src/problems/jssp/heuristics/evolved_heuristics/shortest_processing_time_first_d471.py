@@ -1,17 +1,16 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def shortest_processing_time_first_d471(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def shortest_processing_time_first_d471(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP.
 
     This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability,
     alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_sequence" (list[list[int]]): A list of jobs where each job is a list of operations in their target sequence.
             - "job_operation_time" (list[list[int]]): The time cost for each operation in each job.
             - "machine_num" (int): Total number of machines in the problem.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
@@ -34,15 +33,15 @@ def shortest_processing_time_first_d471(global_data: dict, state_data: dict, alg
     diversity_threshold = kwargs.get("diversity_threshold", 5)
 
     # Check if there are any unfinished jobs. If not, return None.
-    if not state_data["unfinished_jobs"]:
+    if not problem_state["unfinished_jobs"]:
         return None, {}
 
     # Extract necessary information from global and state data
-    unfinished_jobs = state_data["unfinished_jobs"]
-    machine_last_end_times = state_data["machine_last_operation_end_times"]
-    job_operation_index = state_data["job_operation_index"]
-    job_last_end_times = state_data["job_last_operation_end_times"]
-    job_operation_sequence = global_data["job_operation_sequence"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    machine_last_end_times = problem_state["machine_last_operation_end_times"]
+    job_operation_index = problem_state["job_operation_index"]
+    job_last_end_times = problem_state["job_last_operation_end_times"]
+    job_operation_sequence = problem_state["job_operation_sequence"]
     job_diversity = state_data.get("job_diversity", 1)  # Default to 1 if not provided
 
     # Determine if fallback to a simpler logic is necessary based on dataset characteristics

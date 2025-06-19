@@ -1,6 +1,6 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def longest_job_next_2e23(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def longest_job_next_2e23(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """Longest Job Next heuristic for JSSP.
     
     Prioritizes the job with the longest total processing time remaining. It uses the
@@ -29,9 +29,9 @@ def longest_job_next_2e23(global_data: dict, state_data: dict, algorithm_data: d
         (dict): Empty dictionary as no algorithm data is updated.
     """
     # Extract necessary data from the global and state dictionaries.
-    job_operation_time = global_data["job_operation_time"]
-    unfinished_jobs = state_data["unfinished_jobs"]
-    job_operation_index = state_data["job_operation_index"]
+    job_operation_time = problem_state["job_operation_time"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    job_operation_index = problem_state["job_operation_index"]
     
     # Check if there are any unfinished jobs. If not, return None.
     if not unfinished_jobs:

@@ -1,7 +1,7 @@
 from src.problems.dposp.components import *
 import random
 
-def random_c05a(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, max_attempts: int = 100) -> tuple[AppendOperator, dict]:
+def random_c05a(problem_state: dict, algorithm_data: dict, max_attempts: int = 100) -> tuple[AppendOperator, dict]:
     """Random Order Selection Heuristic for DPOSP.
     
     This heuristic randomly selects an unfulfilled order from the list of feasible orders and attempts to append it
@@ -9,10 +9,9 @@ def random_c05a(global_data: dict, state_data: dict, algorithm_data: dict, get_s
     maintains a valid schedule respecting all production and transition constraints.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "production_line_num" (int): Total number of production lines.
             - "order_num" (int): Total number of orders.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): Current scheduling solution.
             - "unfulfilled_orders" (list[int]): List of unfulfilled orders.
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
@@ -26,9 +25,9 @@ def random_c05a(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         dict: Empty dictionary as no algorithm data is updated.
     """
     # Extract necessary data from state_data
-    current_solution = state_data["current_solution"]
-    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    current_solution = problem_state["current_solution"]
+    feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
 
     # Check if there are any feasible orders to fulfill
     if not feasible_orders_to_fulfill:
@@ -39,7 +38,7 @@ def random_c05a(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         # Randomly select an order from the feasible list
         order_id = random.choice(feasible_orders_to_fulfill)
         # Randomly select a production line
-        production_line_id = random.randrange(global_data["production_line_num"])
+        production_line_id = random.randrange(problem_state["production_line_num"])
         # Generate a new schedule by appending the order to the selected production line
         new_schedule = current_solution.production_schedule[production_line_id][:]
         new_schedule.append(order_id)

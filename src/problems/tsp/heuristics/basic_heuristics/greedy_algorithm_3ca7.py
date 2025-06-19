@@ -1,14 +1,13 @@
 from src.problems.tsp.components import *
 
-def greedy_algorithm_3ca7(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def greedy_algorithm_3ca7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Greedy algorithm heuristic for TSP. Constructs a tour by repeatedly selecting the shortest edge and adding it to the tour.
     This implementation assumes that the Solution class represents a tour and that the InsertOperator is used to add new nodes to the Solution.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
 
@@ -16,10 +15,10 @@ def greedy_algorithm_3ca7(global_data: dict, state_data: dict, algorithm_data: d
         InsertOperator: The operator to insert the next node into the current solution.
         dict: Empty dictionary as this algorithm does not update the algorithm data.
     """
-    distance_matrix = global_data['distance_matrix']
-    current_solution = state_data['current_solution']
-    unvisited_nodes = state_data['unvisited_nodes']
-    last_visited = state_data["last_visited"]
+    distance_matrix = problem_state['distance_matrix']
+    current_solution = problem_state['current_solution']
+    unvisited_nodes = problem_state['unvisited_nodes']
+    last_visited = problem_state["last_visited"]
 
     # If the current solution is empty, start from first unvisited node.
     if not current_solution.tour:

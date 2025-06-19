@@ -1,6 +1,6 @@
 from src.problems.cvrp.components import *
 
-def three_opt_e8d7(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+def three_opt_e8d7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
 
     Args:
@@ -13,9 +13,9 @@ def three_opt_e8d7(global_data: dict, state_data: dict, algorithm_data: dict, ge
         dict: Updated algorithm dictionary.
     """
     # Retrieve data from global_data and state_data
-    distance_matrix = global_data["distance_matrix"]
-    depot = global_data["depot"]
-    current_solution = state_data["current_solution"]
+    distance_matrix = problem_state["distance_matrix"]
+    depot = problem_state["depot"]
+    current_solution = problem_state["current_solution"]
 
     # Initialize variables for the best move found
     best_delta = 0

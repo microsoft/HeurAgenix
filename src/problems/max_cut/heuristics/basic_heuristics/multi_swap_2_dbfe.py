@@ -1,15 +1,14 @@
 from src.problems.max_cut.components import *
 
-def multi_swap_2_dbfe(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def multi_swap_2_dbfe(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     This heuristic evaluates all possible pairs of nodes for swapping between set A and set B.
     It performs the swap that leads to the highest increase in the cut value, considering the combined effect
     of swapping two nodes simultaneously rather than one at a time. It utilizes numpy operations for efficient computation.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current solution of the Max Cut problem.
         algorithm_data (dict): Not used in this heuristic.
         get_state_data_function (callable): Function to get the state data for a new solution.
@@ -19,8 +18,8 @@ def multi_swap_2_dbfe(global_data: dict, state_data: dict, algorithm_data: dict,
         dict: Empty dictionary as no algorithm data is updated.
     """
 
-    current_solution = state_data['current_solution']
-    weight_matrix = global_data['weight_matrix']
+    current_solution = problem_state['current_solution']
+    weight_matrix = problem_state['weight_matrix']
     best_increase = 0
     best_pair = None
 

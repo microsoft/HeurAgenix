@@ -1,17 +1,16 @@
 from src.problems.dposp.components import *
 import numpy as np
 
-def least_order_remaining_27ca(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def least_order_remaining_27ca(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """ Heuristic to prioritize orders based on a weighted score incorporating deadline proximity, production feasibility, and potential to maximize fulfilled orders.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production speeds for each product on each production line.
             - order_deadline (numpy.array): 1D array of deadlines for each order.
             - order_quantity (numpy.array): 1D array of quantities required for each order.
             - order_product (numpy.array): 1D array mapping each order to its product.
             - production_line_num (int): Total number of production lines.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): Current scheduling solution.
             - feasible_orders_to_fulfill (list[int]): List of feasible orders that can be fulfilled.
             - validation_single_production_schedule (callable): Function to validate a single production schedule.
@@ -28,16 +27,16 @@ def least_order_remaining_27ca(global_data: dict, state_data: dict, algorithm_da
         dict: Updated algorithm data, if any.
     """
     # Extract necessary data from global_data and state_data
-    production_rate = global_data["production_rate"]
-    order_deadline = global_data["order_deadline"]
-    order_quantity = global_data["order_quantity"]
-    order_product = global_data["order_product"]
-    production_line_num = global_data["production_line_num"]
+    production_rate = problem_state["production_rate"]
+    order_deadline = problem_state["order_deadline"]
+    order_quantity = problem_state["order_quantity"]
+    order_product = problem_state["order_product"]
+    production_line_num = problem_state["production_line_num"]
 
-    current_solution = state_data["current_solution"]
-    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
-    get_time_cost_delta = state_data["get_time_cost_delta"]
+    current_solution = problem_state["current_solution"]
+    feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
+    get_time_cost_delta = problem_state["get_time_cost_delta"]
 
     # Hyper-parameters
     swap_frequency = kwargs.get("swap_frequency", 10)

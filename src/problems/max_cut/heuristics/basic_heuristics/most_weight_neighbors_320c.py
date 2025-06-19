@@ -1,6 +1,6 @@
 from src.problems.max_cut.components import Solution, InsertNodeOperator
 
-def most_weight_neighbors_320c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def most_weight_neighbors_320c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """
     This heuristic selects an unselected node that has the highest sum of weights connected to it and inserts it into one of the sets (A or B) in the Solution, aiming to maximize the cut value.
     It stores the sorted list of unselected nodes based on the sum of weights for future use.
@@ -20,9 +20,9 @@ def most_weight_neighbors_320c(global_data: dict, state_data: dict, algorithm_da
         (dict): Updated algorithm data with the sorted list of nodes.
     """
     
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     
     # Check if we already have a sorted list of nodes in algorithm_data
     if "sorted_nodes" not in algorithm_data or not algorithm_data["sorted_nodes"]:

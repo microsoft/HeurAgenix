@@ -1,14 +1,14 @@
 from src.problems.dposp.components import *
 import numpy as np
 
-def shortest_operation_ae31(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def shortest_operation_ae31(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """Shortest Operation Heuristic with Optimization (AE31) for DPOSP.
 
     This heuristic aims to maximize the number of fulfilled orders by prioritizing orders based on deadlines, feasibility, and production times. 
     It dynamically searches for better insertion positions, shifts orders, and periodically optimizes through swaps.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "production_line_num" (int): Total number of production lines.
             - "order_num" (int): Total number of orders.
             - "order_quantity" (list[int]): Quantity required for each order.
@@ -16,7 +16,6 @@ def shortest_operation_ae31(global_data: dict, state_data: dict, algorithm_data:
             - "order_product" (list[int]): Product associated with each order.
             - "production_rate" (numpy.array): 2D array of production speeds for each product on each production line.
             - "transition_time" (numpy.array): 3D array of transition times between products for each production line.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): Current scheduling solution.
             - "unfulfilled_orders" (list[int]): List of unfulfilled orders.
             - "feasible_orders_to_fulfill" (list[int]): List of feasible orders that can be fulfilled.
@@ -34,17 +33,17 @@ def shortest_operation_ae31(global_data: dict, state_data: dict, algorithm_data:
         dict: Updated algorithm data, if any.
     """
     # Extract necessary data from global_data and state_data
-    production_line_num = global_data["production_line_num"]
-    order_deadline = global_data["order_deadline"]
-    order_quantity = global_data["order_quantity"]
-    order_product = global_data["order_product"]
-    production_rate = global_data["production_rate"]
-    transition_time = global_data["transition_time"]
+    production_line_num = problem_state["production_line_num"]
+    order_deadline = problem_state["order_deadline"]
+    order_quantity = problem_state["order_quantity"]
+    order_product = problem_state["order_product"]
+    production_rate = problem_state["production_rate"]
+    transition_time = problem_state["transition_time"]
 
-    current_solution = state_data["current_solution"]
-    feasible_orders_to_fulfill = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
-    get_time_cost_delta = state_data["get_time_cost_delta"]
+    current_solution = problem_state["current_solution"]
+    feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
+    get_time_cost_delta = problem_state["get_time_cost_delta"]
 
     # Hyper-parameters
     swap_frequency = kwargs.get("swap_frequency", 10)

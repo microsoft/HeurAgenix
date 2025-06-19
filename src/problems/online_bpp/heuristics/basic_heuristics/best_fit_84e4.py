@@ -1,12 +1,11 @@
 from src.problems.online_bpp.components import Solution, AssignBinOperator, NewBinOperator
 
-def best_fit_84e4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AssignBinOperator or NewBinOperator, dict]:
+def best_fit_84e4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AssignBinOperator or NewBinOperator, dict]:
     """ BestFit heuristic algorithm for the Online Bin Packing Problem.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "capacity" (int): The fixed capacity for each bin.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "current_item_size" (int): The size of the current item to pack.
             - "remaining_capacity" (list[int]): List of remaining capacity for each bin.
@@ -15,9 +14,9 @@ def best_fit_84e4(global_data: dict, state_data: dict, algorithm_data: dict, get
         AssignBinOperator or NewBinOperator: The operator that assigns the item to the best-fit bin or a new bin if no existing bin can accommodate the item.
         dict: An empty dictionary as no algorithm-specific data updates are needed.
     """
-    current_item_size = state_data["current_item_size"]
-    remaining_capacity = state_data["remaining_capacity"]
-    capacity = global_data["capacity"]
+    current_item_size = problem_state["current_item_size"]
+    remaining_capacity = problem_state["remaining_capacity"]
+    capacity = problem_state["capacity"]
 
     # If there is no current item to pack, return None
     if current_item_size is None:

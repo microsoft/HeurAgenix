@@ -1,6 +1,6 @@
 from src.problems.max_cut.components import Solution, SwapOperator
 
-def greedy_swap_5bb5(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def greedy_swap_5bb5(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Greedy Swap Heuristic for the Max Cut problem.
     Iteratively evaluates the delta in cut value for all possible single-node swaps between set A and set B,
@@ -21,8 +21,8 @@ def greedy_swap_5bb5(global_data: dict, state_data: dict, algorithm_data: dict, 
         SwapOperator: The operator that swaps a single node between sets to improve the cut value.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    current_solution = state_data['current_solution']
-    weight_matrix = global_data['weight_matrix']
+    current_solution = problem_state['current_solution']
+    weight_matrix = problem_state['weight_matrix']
     best_increase = 0
     best_node = None
 

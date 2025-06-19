@@ -1,12 +1,11 @@
 from src.problems.online_bpp.components import Solution, AssignBinOperator, NewBinOperator
 
-def next_fit_58fd(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[NewBinOperator, dict]:
+def next_fit_58fd(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[NewBinOperator, dict]:
     """ NextFit heuristic algorithm for the Online Bin Packing Problem.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - capacity (int): The capacity for each bin.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): An instance of the Solution class representing the current solution.
             - current_item_size (int): The size of the current item to pack.
             - used_bin_num (int): The number of bins that have been used.
@@ -18,10 +17,10 @@ def next_fit_58fd(global_data: dict, state_data: dict, algorithm_data: dict, get
         An empty dictionary, as this heuristic does not update algorithm data.
     """
     # Extract necessary data from the input dictionaries
-    capacity = global_data["capacity"]
-    current_item_size = state_data["current_item_size"]
-    used_capacity = state_data["used_capacity"]
-    used_bin_num = state_data["used_bin_num"]
+    capacity = problem_state["capacity"]
+    current_item_size = problem_state["current_item_size"]
+    used_capacity = problem_state["used_capacity"]
+    used_bin_num = problem_state["used_bin_num"]
 
     # If there is no current item to pack, return None
     if current_item_size is None:
