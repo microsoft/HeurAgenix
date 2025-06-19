@@ -117,6 +117,17 @@ class BaseEnv:
     def summarize_env(self) -> str:
         pass
 
+    def __getstate__(self):  
+        state = self.__dict__.copy()  
+        state.pop("get_instance_problem_state", None)
+        state.pop("get_solution_problem_state", None)
+        return state  
+  
+    def __setstate__(self, state):  
+        self.__dict__.update(state)  
+        self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
+        self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
+
     def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
         content = f"-data: {self.data_path}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
@@ -146,3 +157,4 @@ class BaseEnv:
                 file.write(content) 
         
         return content
+
