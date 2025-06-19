@@ -26,15 +26,7 @@ class BaseEnv:
 
         self.instance_problem_state_function = load_heuristic("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
         self.solution_problem_state_function = load_heuristic("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
-        self.problem_state = {
-            **self.instance_data,
-            "current_solution": self.current_solution,
-            self.key_item: self.key_value,
-            **self.instance_problem_state_function(self.instance_data),
-            **self.solution_problem_state_function(self.instance_data, self.current_solution),
-            "solution_problem_state_function": self.solution_problem_state_function,
-            "validation_solution": self.validation_solution
-        }
+        self.problem_state = self.get_problem_state()
 
     @property
     def is_complete_solution(self) -> bool:
@@ -50,15 +42,16 @@ class BaseEnv:
 
     @property
     def key_value(self) -> float:
+        """Get the key value of the current solution."""
+        return self.get_key_value(self.current_solution)
+
+    def get_key_value(self, solution: BaseSolution=None) -> float:
+        """Get the key value of the solution."""
         pass
 
     def reset(self, experiment_name: str=None):
         self.current_solution = self.init_solution()
-        self.problem_state = {
-            **self.instance_problem_state_function(self.instance_data),
-            **self.solution_problem_state_function(self.instance_data, self.current_solution),
-            self.key_item: self.key_value
-        }
+        self.problem_state = self.get_problem_state()
         self.algorithm_data = {}
         self.recording = []
         if experiment_name:
@@ -75,6 +68,20 @@ class BaseEnv:
     def init_solution(self) -> None:
         pass
 
+    def get_problem_state(self, solution: BaseSolution=None) -> dict:
+        if solution is None:
+            solution = self.current_solution
+        problem_state = {
+            **self.instance_data,
+            "current_solution": solution,
+            self.key_item: self.key_value,
+            **self.instance_problem_state_function(self.instance_data),
+            **self.solution_problem_state_function(self.instance_data, solution, self.get_key_value),
+            "get_problem_state": self.get_problem_state,
+            "validation_solution": self.validation_solution
+        }
+        return problem_state
+
     def validation_solution(self, solution: BaseSolution=None) -> bool:
         """Check the validation of this solution"""
         pass
@@ -84,7 +91,6 @@ class BaseEnv:
             operator, delta = heuristic(
                 problem_state=self.problem_state,
                 algorithm_data=self.algorithm_data,
-                get_state_data_function=self.solution_problem_state_function,
                 **parameters
             )
             if operator is not None:
@@ -104,7 +110,7 @@ class BaseEnv:
             if inplace:
                 self.current_solution = solution
                 self.recording.append((str(heuristic_name), operator))
-            self.solution_state = self.get_solution_state()
+            self.problem_state = self.get_problem_state()
             return operator
         return None
 

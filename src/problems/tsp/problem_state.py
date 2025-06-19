@@ -1,17 +1,18 @@
-# This file is generated generate_evaluation_function.py and to renew the function, run "python generate_evaluation_function.py"
+# This file is generated generate_evaluation_function.py.
+from src.problems.tsp.components import Solution
 
 import numpy as np
 
-def get_global_data_feature(global_data: dict) -> dict:
-    """Extract features from the global data of a TSP instance.
+def get_instance_problem_state(instance_data: dict) -> dict:
+    """Extract instance problem state from instance data.
 
     Args:
-        global_data (dict): Contains the global static information data with:
+        instance_data (dict): The dictionary contains the instance data with:
             - "node_num" (int): The total number of nodes in the problem.
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
 
     Returns:
-        dict: A dictionary with the following keys and values:
+        dict: The dictionary contains the instance problem state with:
             - "average_distance" (float): The average distance between all pairs of nodes.
             - "min_distance" (float): The minimum non-zero distance between any two nodes.
             - "max_distance" (float): The maximum distance between any two nodes.
@@ -19,8 +20,8 @@ def get_global_data_feature(global_data: dict) -> dict:
             - "density" (float): The density of the graph, calculated as the ratio of non-zero distances to possible edges.
             - "centroid" (int): The node index that has the smallest sum of distances to all other nodes.
     """
-    distance_matrix = global_data["distance_matrix"]
-    node_num = global_data["node_num"]
+    distance_matrix = instance_data["distance_matrix"]
+    node_num = len(distance_matrix)
     
     # Compute the average distance while ignoring the diagonal (self-loops)
     average_distance = np.sum(distance_matrix) / (node_num * (node_num - 1))
@@ -42,62 +43,77 @@ def get_global_data_feature(global_data: dict) -> dict:
         "node_num": node_num
     }
 
-import numpy as np
-
-def get_state_data_feature(global_data: dict, state_data: dict) -> dict:
-    """Extract features from the state data of a TSP instance.
+def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_value: callable) -> dict:
+    """Extract solution problem state from instance data and solution.
 
     Args:
-        global_data (dict): The global data dict containing:
+        instance_data (dict): The dictionary contains the instance data with:
             - "node_num" (int): The total number of nodes in the problem.
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state data dict containing:
-            - "current_solution" (Solution): The current solution instance.
-            - "visited_nodes" (list[int]): The list of visited node IDs.
-            - "unvisited_nodes" (list[int]): The list of unvisited node IDs.
-            - "current_cost" (int): The total cost of the current solution.
-            - "last_visited" (int): The ID of the last visited node.
-            - "validation_solution" (callable): Function to validate the solution.
+        solution (Solution): The target solution instance.
 
     Returns:
-        dict: A dictionary with the following keys and values representing the state features:
+        dict: The dictionary contains the solution problem state with:
+            - "visited_nodes" (list[int]): The list of visited node IDs.
+            - "unvisited_nodes" (list[int]): The list of unvisited node IDs.
+            - "last_visited" (int): The ID of the last visited node.
             - "current_path_length" (int): The number of nodes in the current path.
             - "remaining_nodes" (int): The number of nodes that remain unvisited.
-            - "current_cost" (int): The total cost of the current solution.
             - "average_edge_cost" (float): The average cost per edge in the current solution.
             - "last_edge_cost" (float): The cost of the last edge added to the current solution.
             - "std_dev_edge_cost" (float): The standard deviation of edge costs in the current solution.
-            - "solution_validity" (int): 1 if the current solution is valid, 0 otherwise.
             - "min_edge_cost_remaining" (float): The minimum edge cost to any unvisited node from the last visited node.
             - "max_edge_cost_remaining" (float): The maximum edge cost to any unvisited node from the last visited node.
     """
-    distance_matrix = global_data["distance_matrix"]
-    tour = state_data["current_solution"].tour
-    current_cost = state_data["current_cost"]
-    last_visited = state_data["last_visited"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    validation_solution = state_data["validation_solution"]
+    distance_matrix = instance_data["distance_matrix"]
+    node_num = instance_data["node_num"]
+
+    # A list of integers representing the IDs of nodes that have been visited.
+    tour = solution.tour
+
+    # A list of integers representing the IDs of nodes that have not yet been visited.
+    unvisited_nodes = [node for node in range(node_num) if node not in tour]
+
+    # The last visited node 
+    last_visited = None if not solution.tour else solution.tour[-1]
+
+    visited_num = len(tour)
+    unvisited_num = len(unvisited_nodes)
+
+    current_cost = get_key_value(solution)
+
     
-    current_path_length = len(tour)
-    remaining_nodes = len(unvisited_nodes)
-    
-    average_edge_cost = current_cost / current_path_length if current_path_length > 0 else float('inf')
+    average_edge_cost = current_cost / visited_num if visited_num > 0 else float('inf')
     last_edge_cost = distance_matrix[last_visited, tour[0]] if tour else 0
     edge_costs = [distance_matrix[i, j] for i, j in zip(tour[:-1], tour[1:])] if len(tour) > 1 else [0]
     std_dev_edge_cost = np.std(edge_costs) if edge_costs else 0
-    solution_validity = int(validation_solution(state_data["current_solution"]))
     
     min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float('inf')
     max_edge_cost_remaining = np.max([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else 0
     
     return {
-        "current_path_length": current_path_length,
-        "remaining_nodes": remaining_nodes,
-        "current_cost": current_cost,
+        "visited_nodes": tour,
+        "unvisited_nodes": unvisited_nodes,
+        "last_visited": last_visited,
+        "visited_num": visited_num,
+        "unvisited_num": unvisited_num,
         "average_edge_cost": average_edge_cost,
         "last_edge_cost": last_edge_cost,
         "std_dev_edge_cost": std_dev_edge_cost,
-        "solution_validity": solution_validity,
         "min_edge_cost_remaining": min_edge_cost_remaining,
         "max_edge_cost_remaining": max_edge_cost_remaining
+    }
+
+def get_observation(problem_state: dict) -> dict:
+    """Extract core problem state to records the current observation.
+
+    Args:
+        problem_state (dict): The dictionary contains the problem state.
+
+    Returns:
+        dict: The dictionary contains the core problem state.
+    """
+    return {
+        "visited_num": problem_state["visited_num"],
+        "average_edge_cost": problem_state["average_edge_cost"]
     }

@@ -20,7 +20,7 @@ def get_instance_problem_state(instance_data: dict) -> dict:
         # instance problem state
     }
 
-def get_solution_problem_state(instance_data: dict, solution: BaseSolution) -> dict:
+def get_solution_problem_state(instance_data: dict, solution: BaseSolution, get_key_value: callable) -> dict:
     """Extract instance problem state from the instance data and solution.
 
     Args:
