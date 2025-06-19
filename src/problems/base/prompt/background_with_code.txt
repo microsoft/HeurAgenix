@@ -3,6 +3,12 @@ I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
 Currently, I am working on {problem} problem:
 {problem_description}
 
+To support different heuristic algorithms, I build the Solution and Operator framework.
+The Solution is designed as:
+{solution_class}
+Operator servers as a mechanism to modify solution, which enables the application of heuristic algorithms. 
+To support heuristic algorithm, we have build the following operators:
+{operator_class}
 
 In pursuit of augmenting our heuristic algorithmic suite, we require the following standardized heuristic function signature:
 def heuristic(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: call, **kwargs) -> tuple[TargetOperatorType, dict]:
