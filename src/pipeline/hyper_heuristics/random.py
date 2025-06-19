@@ -2,7 +2,7 @@ import os
 import random
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
 class RandomHyperHeuristic:
     def __init__(
@@ -11,7 +11,7 @@ class RandomHyperHeuristic:
         problem: str,
         iterations_scale_factor: float=2.0,
     ) -> None:
-        self.heuristic_pools = [load_heuristic(heuristic, problem=problem) for heuristic in heuristic_pool]
+        self.heuristic_pools = [load_function(heuristic, problem=problem) for heuristic in heuristic_pool]
         self.iterations_scale_factor = iterations_scale_factor
 
     def run(self, env:BaseEnv) -> bool:

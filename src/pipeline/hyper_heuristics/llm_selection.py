@@ -1,7 +1,6 @@
-import os
 import traceback
 from src.problems.base.env import BaseEnv
-from src.util.util import find_closest_match, load_heuristic, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
+from src.util.util import find_closest_match, load_function, extract_function_with_short_docstring, extract, filter_dict_to_str, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 from src.util.tts_bon import tts_bon
 
@@ -16,7 +15,7 @@ class LLMSelectionHyperHeuristic:
         steps_per_selection: int=5,
         num_candidate_heuristics: int=3,
         rollout_budget: int=10,
-        data_feature_content_threshold: int=1000,
+        problem_state_content_threshold: int=1000,
     ) -> None:
         self.llm_client = llm_client
         self.problem = problem
@@ -25,16 +24,17 @@ class LLMSelectionHyperHeuristic:
         self.steps_per_selection = steps_per_selection
         self.num_candidate_heuristics = num_candidate_heuristics
         self.rollout_budget = rollout_budget
-        self.data_feature_content_threshold = data_feature_content_threshold
+        self.problem_state_content_threshold = problem_state_content_threshold
 
         self.heuristic_docs = {
             heuristic: extract_function_with_short_docstring(open(search_file(heuristic + ".py", problem)).read(), heuristic) 
             for heuristic in self.heuristic_pool}
         self.heuristic_functions = {
-            heuristic.split(".")[0]: load_heuristic(heuristic, problem=self.problem)
+            heuristic.split(".")[0]: load_function(heuristic, problem=self.problem)
             for heuristic in self.heuristic_pool}
-        self.get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
-        self.get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
+        self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
+        self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
+        self.get_observation_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_observation_problem_state")
 
     def run(self, env:BaseEnv) -> bool:
         max_steps = int(env.construction_steps * self.iterations_scale_factor)
@@ -46,10 +46,11 @@ class LLMSelectionHyperHeuristic:
         prompt_dict = self.llm_client.load_background(self.problem)
 
         # Generate global heuristic value
-        global_data = env.instance_state
-        global_data_feature = self.get_global_data_feature_function(global_data)
-        prompt_dict["global_data_feature"] = filter_dict_to_str([global_data, global_data_feature], self.data_feature_content_threshold)
+        instance_data = env.instance_data
+        instance_problem_state = self.get_instance_problem_state(instance_data)
+        prompt_dict["instance_problem_state"] = filter_dict_to_str([instance_data, instance_problem_state], self.problem_state_content_threshold)
 
+        next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution, env.get_key_value)
         while selection_round * self.steps_per_selection <= max_steps and env.continue_run:
             try:
                 if env.is_complete_solution:
@@ -64,9 +65,9 @@ class LLMSelectionHyperHeuristic:
                 prompt_dict["heuristic_pool_introduction"] = heuristic_pool_doc
 
                 # Generate state heuristic value
-                state_data = env.solution_state
-                state_data_feature = self.get_state_data_feature_function(global_data, state_data)
-                prompt_dict["state_data_feature"] = filter_dict_to_str([state_data, state_data_feature], self.data_feature_content_threshold)
+                solution_data = {"current_solution": env.current_solution, env.key_item: env.key_value}
+                solution_problem_state = next_solution_problem_state
+                prompt_dict["solution_problem_state"] = filter_dict_to_str([solution_data, solution_problem_state], self.problem_state_content_threshold)
 
                 # Generate trajectory
                 if heuristic_traject == []:
@@ -75,12 +76,6 @@ class LLMSelectionHyperHeuristic:
                     heuristic_trajectory_str = "\n".join([f"-----\n" + "\n".join(f"{key}: {value}" for key, value in items.items()) for items in heuristic_traject[-5:]])
                 prompt_dict["discuss_round"] = str(selection_round)
                 prompt_dict["heuristic_traject"] = heuristic_trajectory_str
-                state_data_feature = self.get_state_data_feature_function(env.instance_state, env.solution_state)
-                state_data_feature.update(env.solution_state)
-                for key, value in global_data_feature.items():  
-                    if len(str(key) + str(value)) <= self.data_feature_content_threshold:  
-                        prompt_dict[key] = value
-                        prompt_dict.update(env.instance_state)
                 prompt_dict["selection_frequency"] = self.steps_per_selection
                 prompt_dict["num_candidate_heuristics"] = self.num_candidate_heuristics
                 prompt_dict["demo_heuristic_str"] = ",".join([f"heuristic_name_{i + 1}"for i in range(self.num_candidate_heuristics)])
@@ -107,17 +102,18 @@ class LLMSelectionHyperHeuristic:
                     self.steps_per_selection,
                     self.rollout_budget,
                 )
-                pre_status = env.get_observation()
-                if pre_status:
-                    for _ in range(self.steps_per_selection):
-                        env.run_heuristic(self.heuristic_functions[selected_heuristic_name])
-                    cur_status = env.get_observation()
-                    heuristic_dict = {
-                        "Selection Index": selection_round,
-                        "Heuristic": selected_heuristic_name,
-                    }
-                    for key in pre_status.keys():
-                        heuristic_dict["Delta of " + key] = cur_status[key] - pre_status[key]
+                # Record selection and observation
+                pre_observation = self.get_observation_problem_state(solution_problem_state)
+                for _ in range(self.steps_per_selection):
+                    env.run_heuristic(self.heuristic_functions[selected_heuristic_name])
+                next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution, env.get_key_value)
+                next_observation = self.get_observation_problem_state(next_solution_problem_state)
+                heuristic_dict = {
+                    "Selection Index": selection_round,
+                    "Heuristic": selected_heuristic_name,
+                }
+                for key in pre_observation.keys():
+                    heuristic_dict["Delta of " + key] = pre_observation[key] - next_observation[key]
                 heuristic_traject.append(heuristic_dict)
                 selection_round += 1
             except Exception as e:

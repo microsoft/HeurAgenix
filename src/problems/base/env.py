@@ -1,7 +1,7 @@
 import os
 import traceback
 from src.problems.base.components import BaseSolution, BaseOperator
-from src.util.util import load_heuristic, search_file
+from src.util.util import load_function, search_file
 
 
 class BaseEnv:
@@ -24,8 +24,8 @@ class BaseEnv:
         # A return value greater than 0 indicates that first is better and the larger the number, the greater the advantage.
         self.compare: callable = None
 
-        self.instance_problem_state_function = load_heuristic("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
-        self.solution_problem_state_function = load_heuristic("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
+        self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
+        self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
         self.problem_state = self.get_problem_state()
 
     @property
@@ -75,8 +75,8 @@ class BaseEnv:
             **self.instance_data,
             "current_solution": solution,
             self.key_item: self.key_value,
-            **self.instance_problem_state_function(self.instance_data),
-            **self.solution_problem_state_function(self.instance_data, solution, self.get_key_value),
+            **self.get_instance_problem_state(self.instance_data),
+            **self.get_solution_problem_state(self.instance_data, solution, self.get_key_value),
             "get_problem_state": self.get_problem_state,
             "validation_solution": self.validation_solution
         }
@@ -113,9 +113,6 @@ class BaseEnv:
             self.problem_state = self.get_problem_state()
             return operator
         return None
-
-    def get_observation(self) -> dict:
-        pass
 
     def summarize_env(self) -> str:
         pass

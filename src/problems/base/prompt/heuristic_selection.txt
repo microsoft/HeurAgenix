@@ -4,11 +4,11 @@ These are the heuristics in format: heuristic_name(parameter=default_value, ..):
 
 
 The global data with some heuristic values for this problem:
-{global_data_feature}
+{instance_problem_state}
 Note: Some data are omitted due to space constraints.
 
-The state data some heuristic values for current stage:
-{state_data_feature}
+The solution data some heuristic values for current stage:
+{solution_problem_state}
 Note: Some data are omitted due to space constraints.
 
 We want to switch heuristics in real time to solve the problem. Each selected heuristic will be executed {selection_frequency} steps.

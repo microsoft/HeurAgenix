@@ -1,7 +1,7 @@
 import os
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
 
 class SingleHyperHeuristic:
@@ -10,7 +10,7 @@ class SingleHyperHeuristic:
         heuristic: str,
         problem: str,
     ) -> None:
-        self.heuristic = load_heuristic(heuristic, problem=problem)
+        self.heuristic = load_function(heuristic, problem=problem)
 
     def run(self, env:BaseEnv, **kwargs) -> bool:
         current_steps = 0

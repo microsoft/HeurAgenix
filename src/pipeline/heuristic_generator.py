@@ -4,7 +4,7 @@ import importlib
 import traceback
 from copy import deepcopy
 from src.problems.base.components import BaseOperator
-from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
+from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_function, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
@@ -260,7 +260,7 @@ class HeuristicGenerator:
             prompt_dict["smoke_state_data"] = filter_dict_to_str(env.solution_state)
             try:
                 # Load heuristic and run once
-                heuristic = load_heuristic(heuristic_code, function_name=function_name)
+                heuristic = load_function(heuristic_code, function_name=function_name)
                 operator = env.run_heuristic(heuristic)
             except Exception as e:
                 operator = traceback.format_exc()

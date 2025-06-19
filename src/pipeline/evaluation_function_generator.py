@@ -1,7 +1,7 @@
 import os
 import importlib
 import traceback
-from src.util.util import extract, load_heuristic, search_file
+from src.util.util import extract, load_function, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
@@ -92,7 +92,7 @@ class EvaluationFunctionGenerator:
             env.run_operator(eval(previous_operation.strip()))
         try:
             # Load global data feature extractor and run
-            global_data_feature_extractor = load_heuristic(global_data_feature_code, function_name="get_global_data_feature")
+            global_data_feature_extractor = load_function(global_data_feature_code, function_name="get_global_data_feature")
             global_data_feature = global_data_feature_extractor(env.instance_state)
             assert global_data_feature is not None
         except Exception as e:
@@ -100,7 +100,7 @@ class EvaluationFunctionGenerator:
             return f"We got error when run get_global_data_feature:\n{error_message}. Please fix up the get_global_data_feature function in same format.", None
         try:
             # Load state data feature extractor and run
-            state_data_feature_extractor = load_heuristic(state_data_feature_code, function_name="get_state_data_feature")
+            state_data_feature_extractor = load_function(state_data_feature_code, function_name="get_state_data_feature")
             state_data_feature = state_data_feature_extractor(env.instance_state, env.solution_state)
             assert state_data_feature is not None
         except Exception as e:

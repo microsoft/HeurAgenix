@@ -8,7 +8,7 @@ from src.problems.base.env import BaseEnv
 from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
-from src.util.util import df_to_str, extract, filter_dict_to_str, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
+from src.util.util import df_to_str, extract, filter_dict_to_str, parse_text_to_dict, load_function, extract_function_with_short_docstring, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 class HeuristicEvolver:
     def __init__(
@@ -24,8 +24,8 @@ class HeuristicEvolver:
         validation_dir = validation_dir if validation_dir is not None else os.path.join("src", "problems", problem, "data", "validation_data")
         self.train_cases = [os.path.join(train_dir, f) for f in os.listdir(train_dir)]
         self.validation_cases = [os.path.join(validation_dir, f) for f in os.listdir(validation_dir)]
-        self.get_global_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
-        self.get_state_data_feature_function = load_heuristic("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
+        self.get_global_data_feature_function = load_function("evaluation_function.py", problem=self.problem, function_name="get_global_data_feature")
+        self.get_state_data_feature_function = load_function("evaluation_function.py", problem=self.problem, function_name="get_state_data_feature")
 
         # Load env
         module = importlib.import_module(f"src.problems.{problem}.env")
@@ -131,7 +131,7 @@ class HeuristicEvolver:
 
                 prompt_dict = self.llm_client.load_background(self.problem, "background_with_code")
                 prompt_dict["all_heuristic_docs"] = all_heuristic_docs
-                self.load_heuristic_code(basic_heuristic_file, prompt_dict)
+                self.load_function_code(basic_heuristic_file, prompt_dict)
 
                 # Identity bottlenecks
                 bottlenecks = self.identity_bottlenecks(
@@ -234,7 +234,7 @@ class HeuristicEvolver:
                 break
         return negative_result, positive_result
 
-    def load_heuristic_code(self, heuristic_file: str, prompt_dict: dict) -> str:
+    def load_function_code(self, heuristic_file: str, prompt_dict: dict) -> str:
         heuristic_file = search_file(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
         function_code = open(heuristic_file).read()

@@ -1,7 +1,7 @@
 import os
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
 
 class SingleConstructiveSingleImproveHyperHeuristic:
@@ -12,8 +12,8 @@ class SingleConstructiveSingleImproveHyperHeuristic:
         problem: str,
         iterations_scale_factor: float = 2.0
     ) -> None:
-        self.constructive_heuristic = load_heuristic(constructive_heuristic_file, problem=problem)
-        self.improve_heuristic = load_heuristic(improve_heuristic_file, problem=problem)
+        self.constructive_heuristic = load_function(constructive_heuristic_file, problem=problem)
+        self.improve_heuristic = load_function(improve_heuristic_file, problem=problem)
         self.iterations_scale_factor = iterations_scale_factor
 
     def run(self, env:BaseEnv) -> bool:

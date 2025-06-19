@@ -66,17 +66,3 @@ class Env(BaseEnv):
                     if self.distance_matrix[node][next_node] == np.inf:
                         return False
         return True
-
-    def get_observation(self) -> dict:  
-        return {
-            "Visited Node": self.problem_state["visited_num"],
-            "Current Cost": self.problem_state["current_cost"]
-        }
-
-    def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
-        content_dict = {
-            "node_num": self.node_num,
-            "visited_num": self.problem_state["visited_num"]
-        }
-        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
-        return content

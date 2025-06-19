@@ -6,7 +6,7 @@ import multiprocessing
 import multiprocessing.managers
 from copy import deepcopy
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
-from src.util.util import load_heuristic
+from src.util.util import load_function
 from src.util.compare_heuristics import compare_heuristics
 
 
@@ -68,7 +68,7 @@ class HeuristicSelectionDataCollector:
         saved_env = deepcopy(env)
 
         for heuristic_file in heuristic_pool:
-            heuristic = load_heuristic(heuristic_file, problem=problem)
+            heuristic = load_function(heuristic_file, problem=problem)
             key_value = None
             deterministic_flag = True
             for _ in range(try_times):

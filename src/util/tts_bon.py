@@ -2,11 +2,11 @@ import concurrent
 import dill
 import multiprocessing
 import multiprocessing.managers
-import azure.identity
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
+dill.settings['recurse'] = True
 
 def run_random_hh(
         env_serialized: bytes,
@@ -39,7 +39,7 @@ def evaluate_heuristic(
         best_result_proxy: multiprocessing.managers.ValueProxy,
 ) -> tuple[float, str, bytes]:
     env = dill.loads(env_serialized)
-    heuristic = load_heuristic(heuristic_name, problem)
+    heuristic = load_function(heuristic_name, problem)
     operators = []
     for _ in range(steps_per_selection):
         operators.append(env.run_heuristic(heuristic))

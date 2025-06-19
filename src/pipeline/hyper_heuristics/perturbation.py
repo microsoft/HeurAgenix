@@ -2,7 +2,7 @@ import os
 import random
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
 class PerturbationHyperHeuristic:
     def __init__(
@@ -13,8 +13,8 @@ class PerturbationHyperHeuristic:
         perturbation_ratio: float=0.1,
         iterations_scale_factor: float = 2.0
     ) -> None:
-        self.main_heuristic = load_heuristic(main_heuristic_file, problem=problem)
-        self.perturbation_heuristic = load_heuristic(perturbation_heuristic_file, problem=problem)
+        self.main_heuristic = load_function(main_heuristic_file, problem=problem)
+        self.perturbation_heuristic = load_function(perturbation_heuristic_file, problem=problem)
         self.perturbation_ratio = perturbation_ratio
         self.iterations_scale_factor = iterations_scale_factor
 

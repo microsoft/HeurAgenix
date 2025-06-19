@@ -12,7 +12,7 @@ from src.problems.base.env import BaseEnv
 from src.pipeline.heuristic_generator import HeuristicGenerator
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
-from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_heuristic, extract_function_with_short_docstring, search_file
+from src.util.util import extract, filter_dict_to_str, sanitize_function_name, parse_text_to_dict, load_function, extract_function_with_short_docstring, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 
 class HeuristicEvolver:
@@ -176,7 +176,7 @@ class HeuristicEvolver:
 
         # Load heuristic
         heuristic_file = search_file(heuristic_file, problem=self.problem)
-        heuristic = load_heuristic(heuristic_file, problem=self.problem)
+        heuristic = load_function(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
         function_code = open(heuristic_file).read()
         function_introduction = extract_function_with_short_docstring(function_code, function_name)

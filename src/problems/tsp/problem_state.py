@@ -82,7 +82,6 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
 
     current_cost = get_key_value(solution)
 
-    
     average_edge_cost = current_cost / visited_num if visited_num > 0 else float('inf')
     last_edge_cost = distance_matrix[last_visited, tour[0]] if tour else 0
     edge_costs = [distance_matrix[i, j] for i, j in zip(tour[:-1], tour[1:])] if len(tour) > 1 else [0]
@@ -104,8 +103,8 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
         "max_edge_cost_remaining": max_edge_cost_remaining
     }
 
-def get_observation(problem_state: dict) -> dict:
-    """Extract core problem state to records the current observation.
+def get_observation_problem_state(problem_state: dict) -> dict:
+    """Extract core problem state as observation.
 
     Args:
         problem_state (dict): The dictionary contains the problem state.
