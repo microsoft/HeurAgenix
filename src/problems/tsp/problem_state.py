@@ -82,12 +82,12 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
 
     current_cost = get_key_value(solution)
 
-    average_edge_cost = current_cost / visited_num if visited_num > 0 else float('inf')
+    average_edge_cost = current_cost / visited_num if visited_num > 0 else float('0')
     last_edge_cost = distance_matrix[last_visited, tour[0]] if tour else 0
     edge_costs = [distance_matrix[i, j] for i, j in zip(tour[:-1], tour[1:])] if len(tour) > 1 else [0]
     std_dev_edge_cost = np.std(edge_costs) if edge_costs else 0
     
-    min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float('inf')
+    min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float('0')
     max_edge_cost_remaining = np.max([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else 0
     
     return {

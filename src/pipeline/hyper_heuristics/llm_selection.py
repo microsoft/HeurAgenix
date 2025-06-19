@@ -104,16 +104,18 @@ class LLMSelectionHyperHeuristic:
                 )
                 # Record selection and observation
                 pre_observation = self.get_observation_problem_state(solution_problem_state)
+                pre_observation[env.key_item] = env.key_value
                 for _ in range(self.steps_per_selection):
                     env.run_heuristic(self.heuristic_functions[selected_heuristic_name])
                 next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution, env.get_key_value)
                 next_observation = self.get_observation_problem_state(next_solution_problem_state)
+                next_observation[env.key_item] = env.key_value
                 heuristic_dict = {
                     "Selection Index": selection_round,
                     "Heuristic": selected_heuristic_name,
                 }
                 for key in pre_observation.keys():
-                    heuristic_dict["Delta of " + key] = pre_observation[key] - next_observation[key]
+                    heuristic_dict["Delta of " + key] = next_observation[key] - pre_observation[key]
                 heuristic_traject.append(heuristic_dict)
                 selection_round += 1
             except Exception as e:
