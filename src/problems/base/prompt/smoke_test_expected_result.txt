@@ -1,14 +1,14 @@
 To verify whether the code is correct, we conducted a smoke test.
 This is the test data:
-{smoke_global_data}
+{smoke_instance_problem_state}
 
 We run the following operations:
 {previous_operations}
 
 The current solution are
 {smoke_solution}
-with detailed data
-{smoke_state_data}
+with related problem state
+{smoke_solution_problem_state}
 
 Now we run {function_name} once and think about what the expected output is.
 

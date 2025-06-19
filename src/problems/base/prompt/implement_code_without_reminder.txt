@@ -1,15 +1,10 @@
-In fact we run the {function_name} once, and now we got the output operation from {function_name}:
-{output_result}
+Based on previous discuss, we get the heuristic {heuristic_name}:
+{description}
 
-The updated solution are
-{updated_smoke_solution}
-with detailed data
-{updated_smoke_solution_problem_state}
+Now please implement it in python function {function_name}.
 
-Please compare with your expected result: {expected_result}
-1. If the result is aligned with your target output, respond to me ***python_code:correct*** and we will save the code and finish this generation.
-2. If the result is not aligned with your target output and you can not generate correct one, respond to me ***python_code:None*** and we will stop this generation.
-3. If the result is not aligned with your target output and you can fix up this issues, please respond to me in this format:
+
+The response format is very important. For better communication, please respond to me in this format:
 ***python_code:
 from {components_file} import *
 import other_library (if necessary)

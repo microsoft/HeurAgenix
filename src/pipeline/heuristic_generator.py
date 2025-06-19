@@ -189,7 +189,7 @@ class HeuristicGenerator:
                 heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
         return heuristic_files
 
-    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None, compress=False) -> str:
+    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None, reminder=True) -> str:
         # Special remind
         special_remind_file = os.path.join("src", "problems", self.problem, "prompt", "special_remind.txt")
         special_remind = "None"
@@ -207,10 +207,10 @@ class HeuristicGenerator:
             prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
         else:
             prompt_dict["components_file"] = f"src.problems.base.mdp_components"
-        if compress:
-            self.llm_client.load("implement_code_compress", prompt_dict)
+        if reminder:
+            self.llm_client.load("implement_code_with_reminder", prompt_dict)
         else:
-            self.llm_client.load("implement_code", prompt_dict)
+            self.llm_client.load("implement_code_without_reminder", prompt_dict)
         response = self.llm_client.chat()
         code = extract(response, "python_code")
 
@@ -232,6 +232,10 @@ class HeuristicGenerator:
 
     def smoke_test(self, heuristic_code: str, function_name: str, max_try_times: int=5) -> str:
         prompt_dict = {}
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
+            prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
+        else:
+            prompt_dict["components_file"] = f"src.problems.base.mdp_components"
         # Load smoke data
         smoke_data_dir = search_file("smoke_data", problem=self.problem)
         previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
@@ -253,11 +257,11 @@ class HeuristicGenerator:
         env = Env(data_name=smoke_data)
         for _ in range(max_try_times):
             env.reset()
-            prompt_dict["smoke_global_data"] = filter_dict_to_str(env.instance_state)
+            prompt_dict["smoke_instance_problem_state"] = filter_dict_to_str(env.get_instance_problem_state(env.instance_data))
             for previous_operation in previous_operations:
                 env.run_operator(eval(previous_operation.strip()))
             prompt_dict["smoke_solution"] = env.current_solution
-            prompt_dict["smoke_state_data"] = filter_dict_to_str(env.solution_state)
+            prompt_dict["smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution, env.get_key_value))
             try:
                 # Load heuristic and run once
                 heuristic = load_function(heuristic_code, function_name=function_name)
@@ -273,7 +277,7 @@ class HeuristicGenerator:
                 # Actual result
                 prompt_dict["output_result"] = str(operator)
                 prompt_dict["updated_smoke_solution"] = env.current_solution
-                prompt_dict["updated_smoke_state_data"] = filter_dict_to_str(env.solution_state)
+                prompt_dict["updated_smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution, env.get_key_value))
 
                 # Compare
                 prompt_dict["expected_result"] = expected_result

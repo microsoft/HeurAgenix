@@ -376,7 +376,7 @@ class HeuristicEvolver:
             prompt_dict["suggestion"] = suggestion
             description = f"Now, based on these suggestions:\n{suggestion}\nUpdate the {last_heuristic_name}."
             env_summarize = prompt_dict["env_summarize"]
-            output_heuristic_file = HeuristicGenerator(self.llm_client, self.problem).generate(heuristic_name, description, env_summarize, smoke_test, compress=True)
+            output_heuristic_file = HeuristicGenerator(self.llm_client, self.problem).generate(heuristic_name, description, env_summarize, smoke_test, reminder=False)
             output_heuristic_name = output_heuristic_file.split(os.sep)[-1].split(".")[0]
             self.llm_client.dump(f"{previous_heuristic_name}_to_{output_heuristic_name}")
             if output_heuristic_file:
