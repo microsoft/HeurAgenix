@@ -18,7 +18,7 @@ Before this discuss, we have already {discuss_round} rounds discuss and the most
 
 Now we hope to select heuristic for next {selection_frequency} steps.
 
-Please select {num_candidate_heuristics} heuristics and put the one you think is most reasonable first
+Please select {num_candidate_heuristics} heuristics as candidate heuristic for current state and put the one you think is most reasonable first.
 
 
 The response format is very important. For better communication, please respond to me in this format:

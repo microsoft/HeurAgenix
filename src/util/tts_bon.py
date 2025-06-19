@@ -96,6 +96,7 @@ def tts_bon(
     for future in concurrent.futures.as_completed(futures):
         heuristic_name, results  = future.result()
         average_score = None if len(results) <= 0 else sum(results) / len(results)
+        best_heuristic_name = candidate_heuristics[0]
         if average_score is not None:
             if best_average_score is None or env.compare(average_score, best_average_score) > 0:
                 best_heuristic_name = heuristic_name

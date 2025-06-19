@@ -113,7 +113,7 @@ class LLMSelectionHyperHeuristic:
                         env.run_heuristic(self.heuristic_functions[selected_heuristic_name])
                     cur_status = env.get_observation()
                     heuristic_dict = {
-                        "Selection Index": selection_round + 1,
+                        "Selection Index": selection_round,
                         "Heuristic": selected_heuristic_name,
                     }
                     for key in pre_status.keys():
