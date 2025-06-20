@@ -31,18 +31,24 @@ class RoadCharging(gym.Env):
 		trip_params = config.get("trip_params")
 		if trip_params is None:
 			trip_params = {
-				"customer_arrivals_fname": os.path.join(env_data, "customer_arrivals_most_trips_15min.csv"),
-				"per_minute_rates_fname": None,
+				"customer_arrivals": None,
+				"per_minute_rates": None,
 				"saved_trips_fname": None,
 				"trip_records_fname": None,
 				"operation_start_hour": 0,
 				"dt": 15
 			}
 		else:
-			trip_params["customer_arrivals_fname"] = os.path.join(env_data, trip_params["customer_arrivals_fname"])
-			trip_params["per_minute_rates_fname"] = os.path.join(env_data, trip_params["per_minute_rates_fname"])
-			trip_params["saved_trips_fname"] = os.path.join(os.path.dirname(config_fname), trip_params["saved_trips_fname"])
-			trip_params["trip_records_fname"] = os.path.join(env_data, trip_params["trip_records_fname"])
+			# trip_params["customer_arrivals_fname"] = os.path.join(env_data, trip_params["customer_arrivals_fname"])
+			# trip_params["per_minute_rates_fname"] = os.path.join(env_data, trip_params["per_minute_rates_fname"])
+			saved_fname = trip_params.get("saved_trips_fname")
+			records_fname = trip_params.get("trip_records_fname")
+			
+			if saved_fname is not None:
+				trip_params["saved_trips_fname"] = os.path.join(os.path.dirname(config_fname), saved_fname)
+
+			trip_params["trip_records_fname"] = os.path.join(env_data, records_fname)
+			
 		self.trip_requests = TripRequests(trip_params)
 		self.charging_stations = ChargingStations(config["charging_params"])
 		
@@ -77,13 +83,13 @@ class RoadCharging(gym.Env):
 		self.current_timepoint = 0
 		self.states = self.evs.get_all_states()
   
-		self.trip_requests.rescale_customer_arrivals(int(self.N*self.demand_scaling))
+		# self.trip_requests.rescale_customer_arrivals(int(self.N*self.demand_scaling))
 		# self.trip_requests.customer_arrivals = [int(np.ceil(x/200*self.N)) for x in self.trip_requests.customer_arrivals]
 		
 		if stoch_step: # if stoch_step, resample init SoCs and real time prices for each episode
 			self.evs.reset_init_SoCs()
 			self.charging_stations.update_real_time_prices() 
-   
+			
 		if stoch_step is False:
 			self.trip_requests.load_saved_trip_data()
 

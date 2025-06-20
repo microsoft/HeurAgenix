@@ -8,6 +8,7 @@ from src.problems.base.mdp_components import Solution
 from src.problems.road_charging.gym_env import RoadCharging
 
 
+
 class Env(MDPEnv):
 	"""RoadCharging env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
 	def __init__(self, data_name: str, **kwargs):
@@ -102,7 +103,7 @@ class Env(MDPEnv):
 
   
 def main():
-	config_filename = "train_config.json"
+	config_filename = os.path.join("config.json")
 	
 	env = Env(config_filename) 
 	env.gym_env.reset(stoch_step=True)

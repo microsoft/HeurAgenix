@@ -6,8 +6,8 @@ from src.problems.road_charging.utils import csv_to_list, load_file
 
 class TripRequests:
 	def __init__(self, config=None):
-		self.customer_arrivals = csv_to_list(config.get("customer_arrivals_fname"))
-		self.per_minute_rates = csv_to_list(config.get("per_minute_rates_fname"))
+		self.customer_arrivals = config.get("customer_arrivals")
+		self.per_minute_rates = config.get("per_minute_rates")
 		self.saved_data = load_file(config.get("saved_trips_fname"))
 		self.trip_records = load_file(config.get("trip_records_fname"))
 		self.start_hour = config.get("operation_start_hour", 6)
@@ -20,13 +20,23 @@ class TripRequests:
   
 		self.rng = rng
   
-	def rescale_customer_arrivals(self, target):
-		# Find the maximum value in customer_arrivals
-		max_arrival = max(self.customer_arrivals)
+	def update_customer_arrivals(self, std=0.05):
+     
+		data = np.array(self.customer_arrivals)
+		noise_std = std * data  # 5% of each element as std deviation
+		simulated_data = self.rng.normal(loc=data, scale=noise_std)
 
-		# Rescale the values so that the largest value becomes self.N
-		self.customer_arrivals = [
-			int(np.ceil(x / max_arrival * target)) for x in self.customer_arrivals]
+		simulated_data = np.clip(simulated_data, a_min=0, a_max=None)
+		simulated_data = np.ceil(simulated_data).astype(int)
+		self.customer_arrivals = data
+  
+	# def rescale_customer_arrivals(self, target):
+	# 	# Find the maximum value in customer_arrivals
+	# 	max_arrival = max(self.customer_arrivals)
+
+	# 	# Rescale the values so that the largest value becomes self.N
+	# 	self.customer_arrivals = [
+	# 		int(np.ceil(x / max_arrival * target)) for x in self.customer_arrivals]
 
 
 	def load_saved_trip_data(self):

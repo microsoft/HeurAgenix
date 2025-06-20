@@ -12,7 +12,8 @@ class EVFleet:
 				"min_SoC": 0.1,
 				"max_SoC": 1.0,
 				"travel_cost": 3, # per minute
-				"idle_cost": 3 # per minute
+				"idle_cost": 3, # per minute
+				"init_SoC_range": [0.75, 0.8]
 			}
 
 		self.N = config.get("N", 5)
@@ -26,6 +27,7 @@ class EVFleet:
 		# self.idle_cost = config.get("idle_cost", 0.8)
 		self.travel_cost = 0.0
 		self.idle_cost = 0.0
+		self.init_SoC_range = config.get("init_SoC_range", [0.75, 0.8])
 
 		self.all_states = None  # Initialize placeholder
 		
