@@ -1,7 +1,8 @@
 import os
+import yaml
 import importlib
 import traceback
-from src.util.util import extract, load_function, search_file
+from src.util.util import extract, load_function, parse_text_to_dict, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
@@ -16,10 +17,16 @@ class ProblemStateGenerator:
         self.output_dir = self.llm_client.output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
+
+
     def generate_problem_state(self, smoke_test: bool=False, max_try_times: int=5) -> str:
         prompt_dict = self.llm_client.load_background(self.problem, "background_without_code")
-        instance_data_file = search_file("instance_data.txt", problem=self.problem)
-        prompt_dict["instance_data_introduction"] = open(instance_data_file).read()
+        problem_state_description_file = search_file("problem_state_description.txt", problem=self.problem)
+        problem_state_description = parse_text_to_dict(open(problem_state_description_file).read())
+
+        prompt_dict["instance_data_introduction"] = problem_state_description["instance_data"]
+        prompt_dict["key_item"] = problem_state_description["key_item"].split(":")[0].split("(")[0].replace("-", "").replace(" ", "").replace("\"", "").replace("\"", "")
+        prompt_dict["key_item_description"] = problem_state_description["key_item"].split(":")[-1]
 
         # Get instance problem state
         self.llm_client.load("extract_instance_problem_state", prompt_dict)
@@ -82,13 +89,31 @@ class ProblemStateGenerator:
                 if instance_error_message or solution_error_message or observation_error_message:
                     self.llm_client.dump(f"problem_state_abandoned")
                     return None
-        # Save the code
-        problem_state_file = os.path.join(self.output_dir, "problem_state.py")
+        # Save problem state code
+        problem_state_code_file = os.path.join(self.output_dir, "problem_state.py")
         node = "# This file is generated generate_evaluation_function.py and to renew the function, run \"python generate_evaluation_function.py\""
-        with open(problem_state_file, "w") as fp:
-            fp.write("\n\n".join([node, instance_problem_state_code, solution_problem_state_code, observation_problem_state_code]))
-        print(f"Save problem state in {problem_state_file}")
-        return problem_state_file
+        problem_state_code = "\n\n".join([node, instance_problem_state_code, solution_problem_state_code, observation_problem_state_code])
+        with open(problem_state_code_file, "w") as fp:
+            fp.write(problem_state_code)
+        print(f"Save problem state in {problem_state_code_file}")
+
+        # Save problem state description
+        instance_problem_state_description = self.get_problem_state_description(instance_problem_state_code)
+        solution_problem_state_description = self.get_problem_state_description(solution_problem_state_code)
+        problem_state_description["instance_problem_state"] = instance_problem_state_description
+        problem_state_description["solution_problem_state"] = solution_problem_state_description
+        problem_state_descriptions = [line.lstrip() for line in "\n".join(problem_state_description.values()).split("\n")]
+        node = "problem_state (dict): The dictionary contains the problem state with:\n    "
+        problem_state_description_str = node + "\n    ".join(problem_state_descriptions)
+        problem_state_description_file = os.path.join(self.output_dir, "problem_state.txt")
+        with open(problem_state_description_file, "w") as fp:
+            fp.write(problem_state_description_str)
+        return problem_state_code_file
+
+    def get_problem_state_description(self, problem_state_code: str) -> None:
+        description = problem_state_code.split("\"\"\"")[1].split("problem state with:\n")[-1].strip()
+        return description
+
 
     def smoke_test(self, instance_problem_state_code: str, solution_problem_state_code: str, observation_problem_state_code: str) -> str:
         # Load smoke data

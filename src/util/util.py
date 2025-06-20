@@ -45,7 +45,7 @@ def parse_text_to_dict(text):
     for line in lines:
         if len(line) > 0 and line[0] == "-" and ":" in line:
             if current_key:
-                result[current_key] = "\n".join(current_content).strip()
+                result[current_key.replace(" ", "")] = "\n".join(current_content).strip()
             current_key = line[1:].split(":")[0]
             current_content = []
             if len(line.split(":")) > 0:
@@ -53,7 +53,7 @@ def parse_text_to_dict(text):
         elif current_key:
             current_content.append(line)
     if current_key:
-        result[current_key] = "\n".join(current_content).strip()
+        result[current_key.replace(" ", "")] = "\n".join(current_content).strip()
     return result
 
 def load_function(file:str, problem: str="base", function_name: str=None) -> callable:

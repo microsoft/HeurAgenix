@@ -7,9 +7,7 @@ def get_instance_problem_state(instance_data: dict) -> dict:
     """Extract instance problem state from instance data.
 
     Args:
-        instance_data (dict): The dictionary contains the instance data with:
-            - "node_num" (int): The total number of nodes in the problem.
-            - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+        instance_data (dict): The dictionary contains the instance data.
 
     Returns:
         dict: The dictionary contains the instance problem state with:
@@ -49,6 +47,7 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     Args:
         instance_data (dict): The dictionary contains the instance data.
         solution (Solution): The target solution instance.
+        get_key_value (callable): The function to get current_cost.
 
     Returns:
         dict: The dictionary contains the solution problem state with:
@@ -66,25 +65,31 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     distance_matrix = instance_data["distance_matrix"]
     node_num = instance_data["node_num"]
 
-    # A list of integers representing the IDs of nodes that have been visited.
+    # Retrieve the tour from the solution, representing the order of nodes visited
     tour = solution.tour
 
-    # A list of integers representing the IDs of nodes that have not yet been visited.
+    # Identifying nodes that have not been visited yet
     unvisited_nodes = [node for node in range(node_num) if node not in tour]
 
-    # The last visited node 
+    # Identifying the last node that was visited
     last_visited = None if not solution.tour else solution.tour[-1]
 
+    # Calculate number of nodes visited and unvisited
     visited_num = len(tour)
     unvisited_num = len(unvisited_nodes)
 
+    # Use provided function to get the current cost of the tour
     current_cost = get_key_value(solution)
 
+    # Calculate average cost per visited edge
     average_edge_cost = current_cost / visited_num if visited_num > 0 else float('0')
+    # Retrieve the cost of the most recent edge
     last_edge_cost = distance_matrix[last_visited, tour[0]] if tour else 0
+    # Compute edge costs for standard deviation calculation
     edge_costs = [distance_matrix[i, j] for i, j in zip(tour[:-1], tour[1:])] if len(tour) > 1 else [0]
     std_dev_edge_cost = np.std(edge_costs) if edge_costs else 0
     
+    # Calculate minimum and maximum edge cost to any unvisited node from the last visited node
     min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float('0')
     max_edge_cost_remaining = np.max([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else 0
     

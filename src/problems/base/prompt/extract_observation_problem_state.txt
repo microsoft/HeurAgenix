@@ -7,8 +7,8 @@ In determining the optimal problem states to represent instance, we must adhere 
 
 The response format is very important. For better communication, please respond to me in this format:
 ***observation_problem_state:
-feature_name;
-feature_name;
+problem_state_name;
+problem_state_name;
 ....
 ***
 Ensure there is no other content inside the ***, and analysis outside *** is welcome.

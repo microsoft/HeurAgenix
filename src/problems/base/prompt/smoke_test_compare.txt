@@ -3,7 +3,7 @@ In fact we run the {function_name} once, and now we got the output operation fro
 
 The updated solution are
 {updated_smoke_solution}
-with detailed data
+with related problem state
 {updated_smoke_solution_problem_state}
 
 Please compare with your expected result: {expected_result}
