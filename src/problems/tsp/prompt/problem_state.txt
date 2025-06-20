@@ -1,8 +1,8 @@
 problem_state (dict): The dictionary contains the problem state with:
-    - "node_num": Instance data.
-    - "distance_matrix": Instance data.
-    - "current_solution": The current solution instance.
-    - "current_cost": The key value to evaluate the solution.
+    - "node_num" (int): The total number of nodes in the problem.
+    - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+    - "current_solution" (Solution): The current solution instance.
+    - "current_cost" (float): The key value to evaluate the solution.
     - "average_distance" (float): The average distance between all pairs of nodes.
     - "min_distance" (float): The minimum non-zero distance between any two nodes.
     - "max_distance" (float): The maximum distance between any two nodes.

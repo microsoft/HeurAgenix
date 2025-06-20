@@ -9,7 +9,7 @@ class Env(BaseEnv):
     """TSP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "tsp")
-        self.node_num, self.distance_matrix= self.instance_data["node_num"], self.instance_data["distance_matrix"]
+        self.node_num, self.distance_matrix = self.instance_data["node_num"], self.instance_data["distance_matrix"]
         self.construction_steps = self.node_num
         self.key_item = "current_cost"
         self.compare = lambda x, y: y - x

@@ -1,0 +1,34 @@
+Try to implement the get_observation_problem_state function in python:
+def get_observation_problem_state(solution_problem_state: dict) -> dict:
+
+The input is solution_problem_state.
+
+The output is algo a dict, which contains the following problem states as keys: {observation_problem_states}.
+
+Please note:
+1. Just take it from solution_problem_state without modify it.
+2. The name of function must be get_observation_problem_state.
+3. No any omissions or placeholders, I'm just going to use the code.
+4. Comments in the code are very important.
+
+
+The response format is very important. For better communication, please respond to me in this format:
+***python_code:
+import library (if necessary)
+
+def get_observation_problem_state(solution_problem_state: dict) -> dict:
+    """Extract core problem state as observation.
+
+    Args:
+        solution_problem_state (dict): The dictionary contains the solution problem state.
+
+    Returns:
+        dict: The dictionary contains the core problem state.
+    """
+    return {
+        "xxx": problem_state_name["xxx"],
+        "xxx": problem_state_name["xxx"],
+    }
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

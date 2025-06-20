@@ -47,9 +47,7 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     """Extract solution problem state from instance data and solution.
 
     Args:
-        instance_data (dict): The dictionary contains the instance data with:
-            - "node_num" (int): The total number of nodes in the problem.
-            - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+        instance_data (dict): The dictionary contains the instance data.
         solution (Solution): The target solution instance.
 
     Returns:

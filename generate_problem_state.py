@@ -1,6 +1,6 @@
 import argparse
 import os
-from src.pipeline.evaluation_function_generator import EvaluationFunctionGenerator
+from src.pipeline.problem_state_generator import ProblemStateGenerator
 from src.util.llm_client.get_llm_client import get_llm_client
 
 
@@ -10,7 +10,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Benchmark evaluation")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
     parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
-    parser.add_argument("-l", "--llm_config_file", type=str, default="AzureGPT", help="LLM config file to use.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file to use.")
 
     return parser.parse_args()
 
@@ -21,11 +21,11 @@ def main():
     llm_config_file = args.llm_config_file
 
     prompt_dir=os.path.join("src", "problems", "base", "prompt")
-    output_dir=output_dir=os.path.join("output", problem, "generate_evaluation_function")
+    output_dir=output_dir=os.path.join("output", problem, "generate_problem_state")
     llm_client = get_llm_client(llm_config_file, prompt_dir, output_dir)
 
-    evaluation_function_generator = EvaluationFunctionGenerator(llm_client=llm_client, problem=problem)
-    evaluation_function_generator.generate_evaluation_function(smoke_test=smoke_test)
+    problem_state_generator = ProblemStateGenerator(llm_client=llm_client, problem=problem)
+    problem_state_generator.generate_problem_state(smoke_test=smoke_test)
 
 if __name__ == "__main__":
     main()

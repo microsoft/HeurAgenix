@@ -114,8 +114,9 @@ class HeuristicGenerator:
         prompt_dict = self.llm_client.load_background(self.problem, "background_with_code", reference_data)
 
         # Find similar problem
+        problem_description_file = search_file("problem_description.txt", problem=self.problem)
         description_dict = {
-            problem: open(os.path.join("src", "problems", problem, "prompt", "problem_description.txt")).read()
+            problem: open(problem_description_file).read()
             for problem in related_problems
         }
         studied_problems = "\n\n".join([
