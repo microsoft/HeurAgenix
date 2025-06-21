@@ -17,7 +17,7 @@ def balanced_cut_c0e6(problem_state: dict, algorithm_data: dict, **kwargs) -> tu
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
             - operation_count (int): The number of operations performed so far. Default is 0.
             - sorted_nodes (list of tuples): A sorted list of (node, future_impact) in descending order. Default is empty.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
         kwargs (dict): Hyperparameters for the heuristic:
             - scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
             - swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.

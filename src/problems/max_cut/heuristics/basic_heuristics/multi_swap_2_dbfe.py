@@ -11,7 +11,7 @@ def multi_swap_2_dbfe(problem_state: dict, algorithm_data: dict, **kwargs) -> tu
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
             - "current_solution" (Solution): The current solution of the Max Cut problem.
         algorithm_data (dict): Not used in this heuristic.
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
 
     Returns:
         SwapOperator: The operator that swaps a pair of nodes between sets to improve the cut value.

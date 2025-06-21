@@ -17,7 +17,7 @@ def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs
         algorithm_data (dict): Contains the data specific to the simulated annealing algorithm.
             - "temperature" (float): The current temperature for the simulated annealing process.
             - "cooling_rate" (float): The rate at which the temperature decreases.
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
         **kwargs: Hyperparameters for the algorithm.
             - "initial_temperature" (float): The starting temperature for the annealing process.
             - "final_temperature" (float): The temperature at which the annealing process stops.
@@ -51,10 +51,10 @@ def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs
     new_solution = SwapOperator([node]).run(current_solution)
 
     # Get the state data for the new solution
-    new_state_data = get_state_data_function(new_solution)
+    new_problem_state = problem_state["get_problem_state"](new_solution)
 
     # If the new solution is invalid, return no operation
-    if new_state_data is None:
+    if new_problem_state is None:
         return None, {}
 
     # Calculate the new cut value

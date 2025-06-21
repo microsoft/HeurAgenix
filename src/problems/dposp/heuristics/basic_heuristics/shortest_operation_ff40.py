@@ -18,7 +18,7 @@ def shortest_operation_ff40(problem_state: dict, algorithm_data: dict, **kwargs)
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
             - "validation_single_production_schedule" (callable): Function to check if a production schedule is valid.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This heuristic does not use algorithm_data.
-        get_state_data_function (callable): Function that returns the state dictionary for new solution. Not used in this heuristic.
+        problem_state["get_problem_state"] (callable): Function that returns the state dictionary for new solution. Not used in this heuristic.
     
     Returns:
         InsertOperator: The operator to insert the selected order into the selected production line.

@@ -5,9 +5,8 @@ def least_work_remaining_66c9(problem_state: dict, algorithm_data: dict, **kwarg
     Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
 
     Args:
-        global_data (dict): The global data dict containing the global data. For this algorithm, we need:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in target job.
-        state_data (dict): The state dictionary containing the current state information. For this algorithm, we need:
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
 
@@ -15,10 +14,8 @@ def least_work_remaining_66c9(problem_state: dict, algorithm_data: dict, **kwarg
         AdvanceOperator: Operator to advance the selected job's next operation.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary information from global_data
+    # Extract necessary information from problem_state
     job_operation_time = problem_state["job_operation_time"]
-
-    # Extract necessary state data
     unfinished_jobs = problem_state["unfinished_jobs"]
     job_operation_index = problem_state["job_operation_index"]
 

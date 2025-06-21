@@ -11,7 +11,7 @@ def random_5094(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[As
             - current_solution (Solution): The current solution object representing the bins and items.
             - current_item_size (int): The size of the current item to be packed.
             - remaining_capacity (list[int]): List of remaining capacities for each bin.
-        get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
 
     Returns:
         An instance of AssignBinOperator or NewBinOperator, based on the decision made by the heuristic.

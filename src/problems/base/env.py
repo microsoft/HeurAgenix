@@ -74,15 +74,19 @@ class BaseEnv:
     def get_problem_state(self, solution: BaseSolution=None) -> dict:
         if solution is None:
             solution = self.current_solution
-        problem_state = {
-            **self.instance_data,
-            "current_solution": solution,
-            self.key_item: self.key_value,
-            **self.get_instance_problem_state(self.instance_data),
-            **self.get_solution_problem_state(self.instance_data, solution, self.get_key_value),
-            "get_problem_state": self.get_problem_state,
-            "validation_solution": self.validation_solution
-        }
+        instance_problem_state = self.get_instance_problem_state(self.instance_data)
+        solution_problem_state = self.get_solution_problem_state(self.instance_data, solution, self.get_key_value)
+        problem_state = None
+        if solution_problem_state:
+            problem_state = {
+                **self.instance_data,
+                "current_solution": solution,
+                self.key_item: self.key_value,
+                "get_problem_state": self.get_problem_state,
+                "validation_solution": self.validation_solution,
+                **instance_problem_state,
+                **solution_problem_state,
+            }
         return problem_state
 
     def validation_solution(self, solution: BaseSolution=None) -> bool:

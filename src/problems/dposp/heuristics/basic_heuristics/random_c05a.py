@@ -17,7 +17,7 @@ def random_c05a(problem_state: dict, algorithm_data: dict, max_attempts: int = 1
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
             - "validation_single_production_schedule" (callable): Function to check if a production schedule is valid.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This heuristic does not use algorithm_data.
-        get_state_data_function (callable): Function that returns the state dictionary for new solution. Not used in this heuristic.
+        problem_state["get_problem_state"] (callable): Function that returns the state dictionary for new solution. Not used in this heuristic.
         max_attempts (int): Maximum number of attempts to find a valid operation. Defaults to 100.
 
     Returns:

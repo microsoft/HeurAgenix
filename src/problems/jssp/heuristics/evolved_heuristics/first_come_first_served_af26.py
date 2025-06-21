@@ -15,7 +15,7 @@ def first_come_first_served_af26(problem_state: dict, algorithm_data: dict, **kw
             - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
             - "job_diversity" (int): Diversity of jobs based on the dataset (optional but improves adaptability).
         algorithm_data (dict): Not used in this heuristic.
-        get_state_data_function (callable): Function to get the state data for a new solution (not used in this heuristic).
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution (not used in this heuristic).
         kwargs (optional): Hyperparameters for fine-tuning:
             - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
             - diversity_threshold (int, default=5): A threshold to determine when to adapt scoring based on job diversity.

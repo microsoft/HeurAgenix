@@ -18,7 +18,6 @@ def shortest_processing_time_first_d471(problem_state: dict, algorithm_data: dic
             - "current_solution" (Solution): The current solution state.
             - "job_diversity" (int): Diversity of jobs in the dataset (default to 1 if not provided).
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. Not used in this heuristic.
-        get_state_data_function (callable): Function to get the state data for a new solution. Not used in this heuristic.
         kwargs: Optional hyperparameters for fine-tuning:
             - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
             - diversity_threshold (int, default=5): A threshold to determine when to adapt scoring based on job diversity.

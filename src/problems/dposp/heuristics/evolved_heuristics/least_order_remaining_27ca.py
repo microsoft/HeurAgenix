@@ -17,7 +17,7 @@ def least_order_remaining_27ca(problem_state: dict, algorithm_data: dict, **kwar
             - get_time_cost_delta (callable): Function to compute the time cost delta for inserting an order.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
             - operation_count (int): The number of operations performed so far. Defaults to 0.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
         kwargs: Hyper-parameters for the heuristic:
             - swap_frequency (int, default=10): Frequency (in terms of operations) at which swap optimization is performed.
             - shift_frequency (int, default=5): Frequency (in terms of operations) at which order shifting is performed.

@@ -14,7 +14,7 @@ def greedy_swap_5bb5(problem_state: dict, algorithm_data: dict, **kwargs) -> tup
             - "current_solution" (Solution): The current solution of the Max Cut problem.
             - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
         algorithm_data (dict): Not used in this heuristic.
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
         **kwargs: Additional hyperparameters, not used in this heuristic.
 
     Returns:

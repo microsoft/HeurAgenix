@@ -16,7 +16,6 @@ def nearest_neighbor_e8a4(problem_state: dict, algorithm_data: dict, **kwargs) -
             - "current_solution" (Solution): Current TSP solution.
             - "unvisited_nodes" (list[int]): IDs of nodes not yet visited.
             - "last_visited" (int or None): Last visited node, or None if the tour is empty.
-        get_state_data_function (callable): Function to generate state data for a new solution without modifying the original.
         **kwargs: Optional parameters for the heuristic:
             - "threshold_factor" (float, default=0.70): Determines if a node's distance is significantly shorter.
             - "percentage_range" (float, default=0.20): Range within which distances are considered comparable.

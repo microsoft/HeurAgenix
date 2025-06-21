@@ -15,7 +15,7 @@ def most_weight_neighbors_d31b(problem_state: dict, algorithm_data: dict, scalin
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
             - "sorted_nodes" (list of tuples): A sorted list of (node, future_impact) in descending order.
             - "operation_count" (int): The number of operations performed so far.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
         scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
         swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.
 

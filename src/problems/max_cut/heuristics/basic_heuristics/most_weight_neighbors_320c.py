@@ -13,7 +13,7 @@ def most_weight_neighbors_320c(problem_state: dict, algorithm_data: dict, **kwar
             - "unselected_nodes" (set[int]): The set of unselected nodes.
         algorithm_data (dict): Contains the algorithm-specific data. For this algorithm, we use:
             - "sorted_nodes" (list of tuples): A sorted list of (node, weight_sum) in descending order.
-        get_state_data_function (callable): Function to get state data for a new solution; not used directly in this algorithm.
+        problem_state["get_problem_state"] (callable): Function to get state data for a new solution; not used directly in this algorithm.
         
     Returns:
         (InsertNodeOperator): Operator to insert the selected node into one of the sets.

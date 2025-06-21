@@ -1,0 +1,21 @@
+- instance_data:
+    - job_operation_sequence (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
+    - job_operation_time (numpy.ndarray): The time cost for each operation in target job.
+    - job_num (int): The total number of jobs in the problem.
+    - machine_num (int): The total number of machines in the problem, also as operation num.
+
+- solution:
+    - current_solution (Solution): Current solution instance.
+
+- key_item:
+    - current_makespan (int): The time cost for current operation jobs, also known as the current_makespan.
+
+- helper_function:
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+
+- instance_problem_state:
+    ...
+
+- solution_problem_state:
+    ...

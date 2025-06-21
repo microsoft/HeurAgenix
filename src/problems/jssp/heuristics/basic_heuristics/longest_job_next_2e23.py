@@ -8,19 +8,15 @@ def longest_job_next_2e23(problem_state: dict, algorithm_data: dict, **kwargs) -
     remaining processing time.
 
     Args:
-        global_data (dict): Contains global data about the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
             - "job_num" (int): The total number of jobs in the problem.
-            
-        state_data (dict): Contains the current state of the solution.
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
             - "current_solution" (Solution): The current state of the job sequences on each machine.
             
         algorithm_data (dict): Contains data necessary for this algorithm.
             (No specific data needed for this algorithm; can be omitted or passed as an empty dict)
-            
-        get_state_data_function (callable): Function that takes a Solution instance and returns its state data.
         
         **kwargs: Additional hyperparameters (not used in this algorithm).
 

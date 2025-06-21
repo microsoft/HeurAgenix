@@ -84,8 +84,8 @@ def greedy_by_profit_1597(problem_state: dict, algorithm_data: dict, max_k: int 
             new_solution = current_solution.item_inclusion[:]
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
 
-            new_state_data = get_state_data_function(Solution(new_solution))
-            if new_state_data and new_problem_state["current_profit"] > best_profit:
+            new_problem_state = problem_state["get_problem_state"](Solution(new_solution))
+            if new_problem_state and new_problem_state["current_profit"] > best_profit:
                 return SwapOperator(item_in, item_out), {}
 
     # If no operator improves the solution, return None

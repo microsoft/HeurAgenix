@@ -13,9 +13,9 @@ def most_work_remaining_df20(problem_state: dict, algorithm_data: dict, **kwargs
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
             - "job_last_operation_end_times" (list[int]): The end time of the last operation for each job.
             - "current_solution" (Solution): The current solution state.
+            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
             - "iteration" (int): The current iteration count for the heuristic.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the original solution.
         kwargs (optional): Hyperparameters for fine-tuning:
             - bias_weight (float, default=50.0): The weight to prioritize jobs aligning with the positive solution trajectory.
             - k_flip_frequency (int, default=10): Frequency (iterations) for applying k-flip optimization.
@@ -86,7 +86,7 @@ def most_work_remaining_df20(problem_state: dict, algorithm_data: dict, **kwargs
                     job_id1 = current_solution.job_sequences[machine_id][i]
                     job_id2 = current_solution.job_sequences[machine_id][j]
                     new_solution = SwapOperator(machine_id, job_id1, job_id2).run(current_solution)
-                    new_state = get_state_data_function(new_solution)
+                    new_state = problem_state["get_problem_state"](new_solution)
                     if new_state is None:
                         continue
                     delta = new_state["current_makespan"] - problem_state["current_makespan"]
@@ -101,7 +101,7 @@ def most_work_remaining_df20(problem_state: dict, algorithm_data: dict, **kwargs
                     if current_position == new_position:
                         continue
                     new_solution = ShiftOperator(machine_id, job_id, new_position).run(current_solution)
-                    new_state = get_state_data_function(new_solution)
+                    new_state = problem_state["get_problem_state"](new_solution)
                     if new_state is None:
                         continue
                     delta = new_state["current_makespan"] - problem_state["current_makespan"]

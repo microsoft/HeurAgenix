@@ -14,7 +14,6 @@ def cheapest_insertion_7a30(problem_state: dict, algorithm_data: dict, **kwargs)
             - current_solution (Solution): An instance of the Solution class representing the current solution.
             - unvisited_nodes (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
             - last_visited (int or None): The last visited node, or None if no nodes have been visited yet.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, and it will not modify the original solution.
         **kwargs: Hyper-parameters for the heuristic algorithm.
             - threshold_factor (float, default=0.70): The factor to determine whether a node's distance is significantly shorter than the average distance of unvisited nodes.
             - percentage_range (float, default=0.20): The percentage range within which multiple nodes' distances are considered comparable.

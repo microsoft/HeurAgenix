@@ -1,0 +1,35 @@
+problem_state (dict): The dictionary contains the problem state with:
+    - node_num (int): The total number of nodes in the problem.
+    - distance_matrix (numpy.ndarray): A 2D array representing the distances between nodes.
+    - vehicle_num (int): The total number of vehicles.
+    - capacity (int): The capacity for each vehicle and all vehicles share the same value.
+    - depot (int): The index for depot node.
+    - demands (numpy.ndarray): The demand of each node.
+    - current_solution (Solution): Current solution instance.
+    - total_current_cost (int): The total cost of the current solution for all vehicles.
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+    - average_demand (float): The average demand per node.
+    - demand_variance (float): The variance in demand across all nodes.
+    - average_distance (float): The average distance between nodes.
+    - max_distance (float): The maximum distance between any two nodes.
+    - min_distance (float): The minimum distance between any two nodes.
+    - distance_variance (float): The variance of the distances.
+    - vehicle_capacity_utilization (float): The ratio of total demand to vehicle capacity across all vehicles.
+    - node_to_vehicle_ratio (float): The ratio of the number of nodes to the number of vehicles.
+    - visited_nodes (list[int]): A list of lists representing the nodes visited by each vehicle.
+    - visited_num (int): Number of nodes visited by each vehicle.
+    - last_visited (list[int]): The last visited node for each vehicle.
+    - vehicle_loads (list[int]): The current load of each vehicle.
+    - vehicle_remaining_capacity (list[int]): The remaining capacity for each vehicle.
+    - average_route_length (float): The average length of all routes.
+    - max_route_length (int): The maximum length of any route.
+    - min_route_length (int): The minimum length of any route.
+    - std_dev_route_length (float): The standard deviation of the route lengths.
+    - average_route_cost (float): The average cost of all routes.
+    - total_demand_served (int): The cumulative demand served across all routes.
+    - average_vehicle_load (float): The average load across all vehicles.
+    - average_remaining_vehicle_capacity (float): The average remaining capacity for all vehicles.
+    - number_of_unvisited_nodes (int): The count of nodes that have not been visited.
+    - average_unvisited_node_demand (float): The average demand of unvisited nodes.
+    - total_remaining_demand (int): The cumulative demand of unvisited nodes.

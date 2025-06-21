@@ -23,7 +23,7 @@ def shortest_operation_ae31(problem_state: dict, algorithm_data: dict, **kwargs)
             - "get_time_cost_delta" (callable): Function to compute the time cost delta for inserting an order.
             - "total_time_cost_per_production_line" (list[float]): Total time cost for each production line.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This heuristic does not use algorithm_data.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the original solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the original solution.
         **kwargs: Hyper-parameters for the heuristic:
             - swap_frequency (int, default=10): Frequency (in terms of operations) at which swap optimization is performed.
             - shift_frequency (int, default=5): Frequency (in terms of operations) at which order shifting is performed.

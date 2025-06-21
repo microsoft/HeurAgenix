@@ -5,11 +5,9 @@ def first_come_first_served_6c4f(problem_state: dict, algorithm_data: dict, **kw
     This heuristic schedules the jobs in the order they arrive, without considering their processing times or other characteristics.
 
     Args:
-        global_data (dict): Not used in this heuristic.
-        state_data (dict): The state dictionary containing the current state information. For this algorithm, we use:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
         algorithm_data (dict): Not used in this heuristic.
-        get_state_data_function (callable): Function to get the state data for a new solution.
         **kwargs: Additional hyperparameters (not used in this heuristic).
 
     Returns:

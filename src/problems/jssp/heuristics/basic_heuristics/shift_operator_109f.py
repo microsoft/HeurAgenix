@@ -11,7 +11,7 @@ def shift_operator_109f(problem_state: dict, algorithm_data: dict, **kwargs) -> 
             - "machine_num" (int): The total number of machines.
             - "current_solution" (Solution): The current solution state.
             - "current_makespan" (int): The current makespan of the schedule.
-        get_state_data_function (callable): Function to get the new state data given a Solution instance.
+        problem_state["get_problem_state"] (callable): Function to get the new state data given a Solution instance.
 
     Returns:
         ShiftOperator: An operator that shifts a job in the schedule to achieve a local improvement.
@@ -35,7 +35,7 @@ def shift_operator_109f(problem_state: dict, algorithm_data: dict, **kwargs) -> 
                 
                 # Create a new solution with the operation shifted to the new position
                 new_solution = ShiftOperator(machine_id, job_id, new_position).run(current_solution)
-                new_state = get_state_data_function(new_solution)
+                new_state = problem_state["get_problem_state"](new_solution)
                 
                 # If the new solution is valid, evaluate its makespan
                 if new_state is not None:

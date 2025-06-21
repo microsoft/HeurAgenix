@@ -38,7 +38,7 @@ def k_flip_2f3e(problem_state: dict, algorithm_data: dict, k: int = 2) -> tuple[
 
         # Check if the new solution is valid and calculate its state data
         if validation_solution(Solution(new_solution)):  # Only proceed if the solution is valid
-            new_state_data = get_state_data_function(Solution(new_solution))
+            new_problem_state = problem_state["get_problem_state"](Solution(new_solution))
             new_profit = new_problem_state['current_profit']
 
             # If the new solution is better, update best_operator and best_profit

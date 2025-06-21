@@ -10,7 +10,7 @@ def first_fit_2a2c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "current_item_size" (int): The size of current item to pack.
             - "remaining_capacity" (list[int]): List of remaining capacity for each bin.
-        get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
 
     Returns:
         An operator (AssignBinOperator or NewBinOperator) that modifies the solution to include the current item in the appropriate bin.

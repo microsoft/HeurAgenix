@@ -5,13 +5,11 @@ def most_work_remaining_930e(problem_state: dict, algorithm_data: dict, **kwargs
     Selects the unfinished job with the maximum remaining work (total processing time of remaining operations) and returns an AdvanceOperator for that job to proceed with the next operation in sequence.
     
     Args:
-        global_data (dict): Contains global static problem information. This heuristic requires:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
-        state_data (dict): Contains the current state of the solution. This heuristic requires:
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
         algorithm_data (dict): Contains data specific to this algorithm. Not used in this heuristic.
-        get_state_data_function (callable): A function to get the state data for a new solution. Not used in this heuristic.
         **kwargs: Any additional hyperparameters. Not used in this heuristic.
     
     Returns:

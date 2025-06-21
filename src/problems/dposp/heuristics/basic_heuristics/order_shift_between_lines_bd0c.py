@@ -8,7 +8,7 @@ def order_shift_between_lines_bd0c(problem_state: dict, algorithm_data: dict, **
         global_data (dict): Contains the global static information about the problem.
         state_data (dict): Contains the current dynamic state data of the problem.
         algorithm_data (dict): Contains data specific to the algorithm (unused in this heuristic).
-        get_state_data_function (callable): Function that generates state data for a given solution.
+        problem_state["get_problem_state"] (callable): Function that generates state data for a given solution.
     
     Returns:
         (RelocateOperator, dict): The operator to shift an order between production lines and an empty dictionary, as the heuristic does not update algorithm_data.
@@ -56,7 +56,7 @@ def order_shift_between_lines_bd0c(problem_state: dict, algorithm_data: dict, **
                     new_production_schedule = [schedule[:] for schedule in current_solution.production_schedule]
                     new_production_schedule[target_line_id] = trial_target_schedule
                     new_production_schedule[source_line_id] = trial_source_schedule
-                    state_data_for_trial = get_state_data_function(Solution(new_production_schedule))
+                    state_data_for_trial = problem_state["get_problem_state"](Solution(new_production_schedule))
                     delta_time_cost = state_data_for_trial["total_time_cost_per_production_line"][target_line_id] + state_data_for_trial["total_time_cost_per_production_line"][source_line_id] - problem_state["total_time_cost_per_production_line"][target_line_id] - problem_state["total_time_cost_per_production_line"][source_line_id]
 
                     # Check if this shift leads to a better solution

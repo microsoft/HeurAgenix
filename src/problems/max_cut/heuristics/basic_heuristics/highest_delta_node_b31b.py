@@ -14,7 +14,7 @@ def highest_delta_node_b31b(problem_state: dict, algorithm_data: dict, **kwargs)
             - "unselected_count" (int): The number of nodes not yet selected into either set A or B.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
         algorithm_data (dict): Not used in this heuristic.
-        get_state_data_function (callable): Function to get state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get state data for a new solution.
 
     Returns:
         InsertNodeOperator: The operator to insert the node into the appropriate set.

@@ -10,7 +10,7 @@ def next_fit_58fd(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[
             - current_item_size (int): The size of the current item to pack.
             - used_bin_num (int): The number of bins that have been used.
             - used_capacity (list[int]): List of used capacities for each bin.
-        (Optional and can be omitted if no used) get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, and it will not modify the original solution.
+        (Optional and can be omitted if no used) problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution, and it will not modify the original solution.
 
     Returns:
         The operator used to place the current item in the appropriate bin, either using the existing bin or creating a new one if necessary.

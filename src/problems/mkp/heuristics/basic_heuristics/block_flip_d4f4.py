@@ -12,7 +12,7 @@ def block_flip_d4f4(problem_state: dict, algorithm_data: dict, block_size: int =
             - "current_solution" (Solution): The current solution instance.
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.        algorithm_data (dict): Contains the data necessary for the algorithm. Not used in this function.
             - "validation_solution" (callable): validation solution.
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
         block_size (int): The size of the block to consider for flipping. Defaults to 2.
 
     Returns:
@@ -45,13 +45,13 @@ def block_flip_d4f4(problem_state: dict, algorithm_data: dict, block_size: int =
         new_solution = FlipBlockOperator(block).run(current_solution)
         
         # Get the state data for the new solution
-        new_state_data = get_state_data_function(new_solution)
+        new_problem_state = problem_state["get_problem_state"](new_solution)
         
         # If the new solution is valid and improves the profit, update the best_operator
         if validation_solution(new_solution) and new_problem_state['current_profit'] > best_profit:
             best_profit = new_problem_state['current_profit']
             best_operator = FlipBlockOperator(block)
-            best_state_data = new_state_data
+            best_state_data = new_problem_state
     
     # If no improvement is found, return None
     if not best_operator:

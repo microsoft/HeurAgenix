@@ -14,7 +14,6 @@ def farthest_insertion_54db(problem_state: dict, algorithm_data: dict, **kwargs)
             - current_solution (Solution): The current solution of the TSP.
             - unvisited_nodes (list[int]): The list of nodes that have not been visited.
             - last_visited (int or None): The last visited node, or None if no nodes have been visited yet.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for new solution, and it will not modify the original solution.
         **kwargs: Hyper-parameters for the heuristic algorithm.
             - apply_2opt_frequency (int, default=5): The frequency (number of insertions) at which to apply the 2-opt heuristic.
             - high_disparity_threshold (float, default=1.0): The threshold for high disparity in distances.

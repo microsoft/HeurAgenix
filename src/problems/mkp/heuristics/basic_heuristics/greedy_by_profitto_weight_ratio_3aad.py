@@ -52,10 +52,10 @@ def greedy_by_profitto_weight_ratio_3aad(problem_state: dict, algorithm_data: di
         if item_fits:
             new_solution = current_solution.item_inclusion[:]
             new_solution[item_index] = True
-            new_state_data = get_state_data_function(Solution(new_solution))
+            new_problem_state = problem_state["get_problem_state"](Solution(new_solution))
             
             # If the new solution is valid, return the operator and an empty algorithm data dictionary
-            if new_state_data is not None:
+            if new_problem_state is not None:
                 return AddOperator(item_index), {}
     
     # If no item can be added without violating constraints, return None

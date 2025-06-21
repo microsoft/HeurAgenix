@@ -31,7 +31,7 @@ def _2opt_f9c1(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swa
 
                 # Calculate the makespan change if the swap is performed
                 new_solution = SwapOperator(machine_id, job_id1, job_id2).run(current_solution)
-                new_state = get_state_data_function(new_solution)
+                new_state = problem_state["get_problem_state"](new_solution)
                 if new_state == None:
                     continue
                 delta = new_state['current_makespan'] - problem_state['current_makespan']

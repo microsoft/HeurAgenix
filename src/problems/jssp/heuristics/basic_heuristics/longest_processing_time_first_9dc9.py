@@ -4,18 +4,14 @@ def longest_processing_time_first_9dc9(problem_state: dict, algorithm_data: dict
     """Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
     
     Args:
-        global_data (dict): Contains the global data for the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
             - "job_num" (int): The total number of jobs.
             - "machine_num" (int): The total number of machines.
-        
-        state_data (dict): Contains the current state information.
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "current_solution" (Solution): The current solution state.
         
         algorithm_data (dict): Contains data specific to the algorithm (unused in this heuristic).
-        
-        get_state_data_function (callable): Function to get the state data for a new solution (unused in this heuristic).
         
         **kwargs: Additional hyperparameters (unused in this heuristic).
     
@@ -26,10 +22,8 @@ def longest_processing_time_first_9dc9(problem_state: dict, algorithm_data: dict
     
     # No additional information from algorithm_data or kwargs is used in this heuristic.
     
-    # Extract necessary information from global_data
+    # Extract necessary information from problem_state
     job_operation_time = problem_state["job_operation_time"]
-    
-    # Extract necessary information from state_data
     unfinished_jobs = problem_state["unfinished_jobs"]
     current_solution = problem_state["current_solution"]
     

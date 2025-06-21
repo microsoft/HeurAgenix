@@ -17,7 +17,7 @@ def greedy_by_order_density_de77(problem_state: dict, algorithm_data: dict, **kw
             - validation_single_production_schedule (callable): Function to validate a single production schedule.
             - get_time_cost_delta (callable): Function to compute the time cost delta for inserting an order.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This algorithm does not modify algorithm data.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
+        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
         kwargs: Hyper-parameters for the heuristic:
             - flexibility_weight (float, default=1.0): Weight for the flexibility factor in the scoring system.
 

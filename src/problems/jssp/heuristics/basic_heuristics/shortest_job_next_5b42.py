@@ -5,15 +5,12 @@ def shortest_job_next_5b42(problem_state: dict, algorithm_data: dict, **kwargs) 
     This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
 
     Args:
-        global_data (dict): Contains global static information about the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in each job.
-            
-        state_data (dict): Contains the current state information of the solution.
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "current_solution" (Solution): The current solution state.
             
         algorithm_data (dict): Contains data necessary for the algorithm's state, not used in this heuristic.
-        get_state_data_function (callable): A function to get the state data for a given solution.
 
     Returns:
         AdvanceOperator: The operator to advance the next operation of the selected job.

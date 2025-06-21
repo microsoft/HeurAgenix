@@ -17,7 +17,7 @@ def exchange_production_orders_eda2(problem_state: dict, algorithm_data: dict, *
             - feasible_orders_to_fulfill (list): List of feasible orders that can be fulfilled without delaying other planned orders.
             - validation_single_production_schedule (callable): Function to check if a production schedule is valid for a given production line.
         algorithm_data (dict): Used for storing data necessary for the algorithm.
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
 
     Returns:
         SwapOperator: Operator that swaps two orders in the production schedule.
@@ -52,7 +52,7 @@ def exchange_production_orders_eda2(problem_state: dict, algorithm_data: dict, *
                     continue
 
                 # Get the state data for the new solution
-                new_problem_state = get_state_data_function(Solution(new_schedule))
+                new_problem_state = problem_state["get_problem_state"](Solution(new_schedule))
 
                 # Calculate the time cost difference
                 old_time_cost = problem_state["total_time_cost_per_production_line"][line]
