@@ -1,7 +1,7 @@
 import argparse
 import os
 import re
-from src.pipeline.heuristic_evolver_v2 import HeuristicEvolver
+from src.pipeline.heuristic_evolver import HeuristicEvolver
 from src.util.util import search_file
 from src.util.llm_client.get_llm_client import get_llm_client
 
@@ -12,7 +12,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Evolve heuristic")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
     parser.add_argument("-e", "--basic_heuristic", type=str, required=True, help="Name or path of the basic heuristic.")
-    parser.add_argument("-t", "--train_dir", type=str, default="train_data", help="Directory for the training dataset.")
+    parser.add_argument("-t", "--train_dir", type=str, default="evolution_data", help="Directory for the training dataset.")
     parser.add_argument("-v", "--validation_dir", type=str, default="validation_data", help="Directory for the validation dataset.")
     parser.add_argument("-pe", "--perturbation_heuristic", type=str, default=None, help="Name or path of the perturbation heuristic.")
     parser.add_argument("-pr", "--perturbation_ratio", type=float, default=0.1, help="Ratio of perturbation.")
@@ -21,7 +21,7 @@ def parse_arguments():
     parser.add_argument("-f", "--filter_num", type=int, default=1, help="Number of heuristics to keep after each validation.")
     parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Number of evolution rounds.")
     parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
-    parser.add_argument("-l", "--llm_config_file", type=str, default="AzureGPT", help="LLM config file to use.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file to use.")
 
     return parser.parse_args()
 
@@ -59,7 +59,7 @@ def main():
     llm_client = get_llm_client(llm_config_file, prompt_dir, None)
 
     heuristic_evolver = HeuristicEvolver(llm_client, problem, train_dir, validation_dir)
-    evolved_heuristics = heuristic_evolver.evolution(
+    evolved_heuristics = heuristic_evolver.evolve(
         basic_heuristic_file,
         perturbation_heuristic_file,
         perturbation_ratio=perturbation_ratio,
