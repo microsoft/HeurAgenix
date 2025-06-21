@@ -1,5 +1,5 @@
 To assess the performance of the evolved heuristics, I have tested both the original heuristic {basic_heuristic_name} and the evolved heuristic {last_heuristic_name}.
-The following table presents a comparative analysis of these heuristics. The first {problem_state} columns represent the features of the testing data, while the remaining columns show the results.
+The following table presents a comparative analysis of these heuristics. The first {problem_state_num} columns represent the features of the testing data, while the remaining columns show the results.
 A {compare} result indicates better performance, and the improvement ratio (in brackets, positive means to improve and negative means decline) reflects the enhancement relative to {basic_heuristic_name}.
 
 {benchmark_result}

@@ -29,7 +29,7 @@ class ProblemStateGenerator:
         prompt_dict["key_item_description"] = problem_state_description["key_item"].split(":")[-1]
 
         # Get instance problem state
-        self.llm_client.load("extract_instance_problem_state", prompt_dict)
+        self.llm_client.load("generate_instance_problem_state", prompt_dict)
         response = self.llm_client.chat()
         instance_problem_states = extract(response, "instance_problem_state", "\n")
         instance_problem_states = ",".join([instance_problem_state.split(";")[0] for instance_problem_state in instance_problem_states])
@@ -42,7 +42,7 @@ class ProblemStateGenerator:
         self.llm_client.dump(f"instance_problem_state")
 
         # Get solution problem state
-        self.llm_client.load("extract_solution_problem_state", prompt_dict)
+        self.llm_client.load("generate_solution_problem_state", prompt_dict)
         response = self.llm_client.chat()
         solution_problem_states = extract(response, "solution_problem_state", "\n")
         solution_problem_states = ",".join([solution_problem_state.split(";")[0] for solution_problem_state in solution_problem_states])
@@ -56,7 +56,7 @@ class ProblemStateGenerator:
         self.llm_client.dump(f"solution_problem_state")
 
         # Get observation problem state
-        self.llm_client.load("extract_observation_problem_state", prompt_dict)
+        self.llm_client.load("generate_observation_problem_state", prompt_dict)
         response = self.llm_client.chat()
         observation_problem_states = extract(response, "observation_problem_state", "\n")
         observation_problem_states = ",".join([observation_problem_state.split(";")[0] for observation_problem_state in observation_problem_states])
