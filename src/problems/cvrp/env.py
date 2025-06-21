@@ -11,14 +11,13 @@ class Env(BaseEnv):
     """CVRP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "cvrp")
-        self.node_num, self.distance_matrix, self.depot, self.vehicle_num, self.capacity, self.demands = self.data
-        self.construction_steps = self.node_num
+        self.construction_steps = self.instance_data["node_num"]
         self.key_item = "total_current_cost"
         self.compare = lambda x, y: y - x
 
     @property
     def is_complete_solution(self) -> bool:
-        return len(self.solution_state["visited_nodes"]) == self.node_num
+        return len(set([node for route in self.current_solution.routes for node in route])) == self.instance_data["node_num"]
 
     def load_data(self, data_path: str) -> None:
         problem = tsplib95.load(data_path)
@@ -44,92 +43,24 @@ class Env(BaseEnv):
             raise NotImplementedError("Vehicle number error")
         capacity = problem.capacity
         demands = np.array(list(problem.demands.values()))
-        return node_num, distance_matrix, depot, vehicle_num, capacity, demands
+        return {"node_num": node_num, "distance_matrix": distance_matrix, "depot": depot, "vehicle_num": vehicle_num, "capacity": capacity, "demands": demands}
 
     def init_solution(self) -> Solution:
-        return Solution(routes=[[self.depot] for _ in range(self.vehicle_num)], depot=self.depot)
+        return Solution(routes=[[self.instance_data["depot"]] for _ in range(self.instance_data["vehicle_num"])], depot=self.instance_data["depot"])
 
-    def get_instance_state(self) -> dict:
-        """Retrieve the static instance problem state as a dictionary.
-
-        Returns:
-            dict: A dictionary containing the global static information data with:
-                - "node_num" (int): The total number of nodes in the problem.
-                - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-                - "vehicle_num" (int): The total number of vehicles.
-                - "capacity" (int): The capacity for each vehicle and all vehicles share the same value.
-                - "depot" (int): The index for depot node.
-                - "demands" (numpy.ndarray): The demand of each node.
-        """
-        instance_state_dict = {
-            "node_num": self.node_num,
-            "distance_matrix": self.distance_matrix,
-            "vehicle_num": self.vehicle_num,
-            "capacity": self.capacity,
-            "depot": self.depot,
-            "demands": self.demands
-        }
-        return instance_state_dict
-
-    def get_solution_state(self, solution: Solution=None) -> dict:
-        """Retrieve the dynamic solution problem state data as a dictionary.
-
-        Returns:
-            dict: A dictionary containing the current dynamic state data with:
-                - "current_solution" (Solution): The current set of routes for all vehicles.
-                - "visited_nodes" (list[int]): A list of lists representing the nodes visited by each vehicle.
-                - "visited_num" (int): Number of nodes visited by each vehicle.
-                - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
-                - "visited_num" (int): Number of nodes have not been visited by each vehicle.
-                - "total_current_cost" (int): The total cost of the current solution.
-                - "last_visited" (list[int]): The last visited node for each vehicle.
-                - "vehicle_loads" (list[int]): The current load of each vehicle.
-                - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
-                - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
-        """
+    def get_key_value(self, solution: Solution=None) -> float:
+        """Get the key value of the current solution based on the key item."""
         if solution is None:
             solution = self.current_solution
-
-        # A list of integers representing the IDs of nodes that have been visited.
-        visited_nodes = list(set([node for route in solution.routes for node in route]))
-
-        # A list of integers representing the IDs of nodes that have not yet been visited.
-        unvisited_nodes = [node for node in range(self.node_num) if node not in visited_nodes]
-
-        last_visited = []
-        vehicle_loads = []
-        vehicle_remaining_capacity = []
         total_current_cost = 0
-        for vehicle_index in range(self.vehicle_num):
+        for vehicle_index in range(self.instance_data["vehicle_num"]):
             route = solution.routes[vehicle_index]
             # The cost of the current solution for each vehicle.
-            cost_for_vehicle = sum([self.distance_matrix[route[index]][route[index + 1]] for index in range(len(route) - 1)])
+            cost_for_vehicle = sum([self.instance_data["distance_matrix"][route[index]][route[index + 1]] for index in range(len(route) - 1)])
             if len(route) > 0:
-                cost_for_vehicle += self.distance_matrix[route[-1]][route[0]]
+                cost_for_vehicle += self.instance_data["distance_matrix"][route[-1]][route[0]]
             total_current_cost += cost_for_vehicle
-            # The last visited node for each vehicle.
-            if len(route) == 0:
-                last_visited.append("None")
-            else:
-                last_visited.append(route[-1])
-            # The current load of each vehicle.
-            vehicle_loads.append(sum([self.demands[node] for node in route]))
-            # The remaining capacity for each vehicle.
-            vehicle_remaining_capacity.append(self.capacity - sum([self.demands[node] for node in route]))
-
-        state_dict = {
-            "current_solution": solution,
-            "visited_nodes": visited_nodes,
-            "visited_num": len(visited_nodes),
-            "unvisited_nodes": unvisited_nodes,
-            "unvisited_num": len(unvisited_nodes),
-            "total_current_cost": total_current_cost,
-            "last_visited": last_visited,
-            "vehicle_loads": vehicle_loads,
-            "vehicle_remaining_capacity": vehicle_remaining_capacity,
-            "validation_solution": self.validation_solution
-        }
-        return state_dict
+        return total_current_cost
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """
@@ -148,37 +79,22 @@ class Env(BaseEnv):
         # Check node existence
         for route in solution.routes:
             for node in route:
-                if not (0 <= node < self.node_num):
+                if not (0 <= node < self.instance_data["node_num"]):
                     return False
 
         # Check uniqueness
-        all_nodes = [node for route in solution.routes for node in route if node != self.depot] + [self.depot]
+        all_nodes = [node for route in solution.routes for node in route if node != self.instance_data["depot"]] + [self.instance_data["depot"]]
         if len(all_nodes) != len(set(all_nodes)):
             return False
 
         for route in solution.routes:
             # Check include depot
-            if self.depot not in route:
+            if self.instance_data["depot"] not in route:
                 return False
 
             # Check vehicle load capacity constraints
-            load = sum(self.demands[node] for node in route)
-            if load > self.capacity:
+            load = sum(self.instance_data["demands"][node] for node in route)
+            if load > self.instance_data["capacity"]:
                 return False
 
         return True
-
-    def get_observation(self) -> dict:
-        return {
-            "Visited Node Num": self.solution_state["visited_num"],
-            "Current Cost": self.solution_state["total_current_cost"],
-            "Fulfilled Demands": sum([self.demands[node] for node in self.solution_state["visited_nodes"]])
-        }
-
-    def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
-        content_dict = {
-            "node_num": self.node_num,
-            "visited_num": self.solution_state["visited_num"]
-        }
-        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
-        return content

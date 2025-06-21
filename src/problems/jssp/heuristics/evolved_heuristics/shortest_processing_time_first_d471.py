@@ -42,7 +42,7 @@ def shortest_processing_time_first_d471(problem_state: dict, algorithm_data: dic
     job_operation_index = problem_state["job_operation_index"]
     job_last_end_times = problem_state["job_last_operation_end_times"]
     job_operation_sequence = problem_state["job_operation_sequence"]
-    job_diversity = state_data.get("job_diversity", 1)  # Default to 1 if not provided
+    job_diversity = problem_state.get("job_diversity", 1)  # Default to 1 if not provided
 
     # Determine if fallback to a simpler logic is necessary based on dataset characteristics
     if job_diversity <= diversity_threshold and len(unfinished_jobs) == 1:

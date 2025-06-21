@@ -1,0 +1,200 @@
+# This file is generated generate_evaluation_function.py and to renew the function, run "python generate_evaluation_function.py"
+from src.problems.cvrp.components import Solution
+
+import numpy as np
+
+def get_instance_problem_state(instance_data: dict) -> dict:
+    """Extract instance problem state from instance data.
+
+    Args:
+        instance_data (dict): The dictionary contains the instance data.
+
+    Returns:
+        dict: The dictionary contains the instance problem state with:
+            - average_demand (float): The average demand per node.
+            - demand_variance (float): The variance in demand across all nodes.
+            - average_distance (float): The average distance between nodes.
+            - max_distance (float): The maximum distance between any two nodes.
+            - min_distance (float): The minimum distance between any two nodes.
+            - distance_variance (float): The variance of the distances.
+            - vehicle_capacity_utilization (float): The ratio of total demand to vehicle capacity across all vehicles.
+            - node_to_vehicle_ratio (float): The ratio of the number of nodes to the number of vehicles.
+    """
+    # Calculate the average demand per node
+    average_demand = np.mean(instance_data["demands"])
+    
+    # Calculate the variance in demand across all nodes
+    demand_variance = np.var(instance_data["demands"])
+    
+    # Extract the upper triangle of the distance matrix to avoid duplicate distances
+    upper_triangle_indices = np.triu_indices(instance_data["node_num"], k=1)
+    upper_triangle_distances = instance_data["distance_matrix"][upper_triangle_indices]
+    
+    # Calculate the average distance between nodes
+    average_distance = np.mean(upper_triangle_distances)
+    
+    # Find the maximum distance between any two nodes
+    max_distance = np.max(upper_triangle_distances)
+    
+    # Find the minimum distance between any two nodes
+    min_distance = np.min(upper_triangle_distances)
+    
+    # Calculate the variance of the distances
+    distance_variance = np.var(upper_triangle_distances)
+    
+    # Compute vehicle capacity utilization
+    vehicle_capacity_utilization = np.sum(instance_data["demands"]) / (instance_data["vehicle_num"] * instance_data["capacity"])
+    
+    # Compute the ratio of the number of nodes to the number of vehicles
+    node_to_vehicle_ratio = instance_data["node_num"] / instance_data["vehicle_num"]
+    
+    return {
+        "average_demand": average_demand,
+        "demand_variance": demand_variance,
+        "average_distance": average_distance,
+        "max_distance": max_distance,
+        "min_distance": min_distance,
+        "distance_variance": distance_variance,
+        "vehicle_capacity_utilization": vehicle_capacity_utilization,
+        "node_to_vehicle_ratio": node_to_vehicle_ratio,
+    }
+
+import numpy as np
+
+def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_value:callable) -> dict:
+    """Extract solution problem state from instance data and solution.
+
+    Args:
+        global_data (dict): The dictionary contains global instance data.
+        state_data (dict): The dictionary contains specific solution-related state data.
+
+    Returns:
+        dict: The dictionary contains the solution problem state with:
+            - visited_nodes (list[int]): A list of lists representing the nodes visited by each vehicle.
+            - visited_num (int): Number of nodes visited by each vehicle.
+            - total_current_cost (int): The total cost of the current solution.
+            - last_visited (list[int]): The last visited node for each vehicle.
+            - vehicle_loads (list[int]): The current load of each vehicle.
+            - vehicle_remaining_capacity (list[int]): The remaining capacity for each vehicle.
+            - average_route_length (float): The average length of all routes.
+            - max_route_length (int): The maximum length of any route.
+            - min_route_length (int): The minimum length of any route.
+            - std_dev_route_length (float): The standard deviation of the route lengths.
+            - average_route_cost (float): The average cost of all routes.
+            - total_demand_served (int): The cumulative demand served across all routes.
+            - average_vehicle_load (float): The average load across all vehicles.
+            - average_remaining_vehicle_capacity (float): The average remaining capacity for all vehicles.
+            - number_of_unvisited_nodes (int): The count of nodes that have not been visited.
+            - average_unvisited_node_demand (float): The average demand of unvisited nodes.
+            - total_remaining_demand (int): The cumulative demand of unvisited nodes.
+    """
+    node_num = instance_data["node_num"]
+    vehicle_num = instance_data["vehicle_num"]
+    distance_matrix = instance_data["distance_matrix"]
+    demands = instance_data["demands"]
+    capacity = instance_data["capacity"]
+
+    # A list of integers representing the IDs of nodes that have been visited.
+    visited_nodes = list(set([node for route in solution.routes for node in route]))
+    visited_num = len(visited_nodes)
+
+    # A list of integers representing the IDs of nodes that have not yet been visited.
+    unvisited_nodes = [node for node in range(node_num) if node not in visited_nodes]
+    unvisited_num = len(unvisited_nodes)
+
+    last_visited = []
+    vehicle_loads = []
+    vehicle_remaining_capacity = []
+    total_current_cost = 0
+    for vehicle_index in range(vehicle_num):
+        route = solution.routes[vehicle_index]
+        # The cost of the current solution for each vehicle.
+        cost_for_vehicle = sum([distance_matrix[route[index]][route[index + 1]] for index in range(len(route) - 1)])
+        if len(route) > 0:
+            cost_for_vehicle += distance_matrix[route[-1]][route[0]]
+        total_current_cost += cost_for_vehicle
+        # The last visited node for each vehicle.
+        if len(route) == 0:
+            last_visited.append("None")
+        else:
+            last_visited.append(route[-1])
+        # The current load of each vehicle.
+        vehicle_loads.append(sum([demands[node] for node in route]))
+        # The remaining capacity for each vehicle.
+        vehicle_remaining_capacity.append(capacity - sum([demands[node] for node in route]))
+
+    # Calculate route lengths and costs
+    route_lengths = [len(route) for route in solution.routes]
+    route_costs = [sum(distance_matrix[route[i]][route[i+1]] 
+                       for i in range(len(route)-1)) 
+                   for route in solution.routes 
+                   if len(route) > 1]
+    
+    # Calculate average route length
+    average_route_length = np.mean(route_lengths) if route_lengths else 0
+    
+    # Calculate max and min route length
+    max_route_length = max(route_lengths, default=0)
+    min_route_length = min(route_lengths, default=0)
+    
+    # Calculate standard deviation of route length
+    std_dev_route_length = np.std(route_lengths) if route_lengths else 0
+    
+    # Calculate average route cost
+    average_route_cost = np.mean(route_costs) if route_costs else 0
+    
+    # Calculate total demand served
+    total_demand_served = sum(demands[node] for route in solution.routes for node in route)
+    
+    # Calculate average vehicle load
+    average_vehicle_load = np.mean(vehicle_loads) if vehicle_loads else 0
+    
+    # Calculate average remaining vehicle capacity
+    average_remaining_vehicle_capacity = np.mean(vehicle_remaining_capacity) if vehicle_remaining_capacity else capacity
+    
+    # Count the number of unvisited nodes
+    number_of_unvisited_nodes = len(unvisited_nodes)
+    
+    # Calculate average unvisited node demand
+    average_unvisited_node_demand = np.mean(demands[unvisited_nodes]) if unvisited_nodes else 0
+    
+    # Calculate total remaining demand
+    total_remaining_demand = sum(demands[node] for node in unvisited_nodes)
+    
+    
+    return {
+        "visited_nodes": visited_nodes,
+        "visited_num": visited_num,
+        "unvisited_nodes": unvisited_nodes,
+        "unvisited_num": unvisited_num,
+        "last_visited": last_visited,
+        "vehicle_loads": vehicle_loads,
+        "vehicle_remaining_capacity": vehicle_remaining_capacity,
+        "average_route_length": average_route_length,
+        "max_route_length": max_route_length,
+        "min_route_length": min_route_length,
+        "std_dev_route_length": std_dev_route_length,
+        "average_route_cost": average_route_cost,
+        "total_demand_served": total_demand_served,
+        "average_vehicle_load": average_vehicle_load,
+        "average_remaining_vehicle_capacity": average_remaining_vehicle_capacity,
+        "number_of_unvisited_nodes": number_of_unvisited_nodes,
+        "average_unvisited_node_demand": average_unvisited_node_demand,
+        "total_remaining_demand": total_remaining_demand,
+    }
+
+
+def get_observation_problem_state(problem_state: dict) -> dict:
+    """Extract core problem state as observation.
+
+    Args:
+        problem_state (dict): The dictionary contains the problem state.
+
+    Returns:
+        dict: The dictionary contains the core problem state.
+    """
+    return {
+        "visited_num": problem_state["visited_num"],
+        "total_demand_served": problem_state["total_demand_served"],
+        "average_vehicle_load": problem_state["average_vehicle_load"]
+    }

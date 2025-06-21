@@ -9,23 +9,13 @@ class Env(BaseEnv):
     """TSP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "tsp")
-        self.node_num, self.distance_matrix = self.instance_data["node_num"], self.instance_data["distance_matrix"]
-        self.construction_steps = self.node_num
+        self.construction_steps = self.instance_data["node_num"]
         self.key_item = "current_cost"
         self.compare = lambda x, y: y - x
 
     @property
     def is_complete_solution(self) -> bool:
-        return len(set(self.current_solution.tour)) == self.node_num
-
-    def get_key_value(self, solution: Solution=None) -> float:
-        """Get the key value of the current solution based on the key item."""
-        if solution is None:
-            solution = self.current_solution
-        current_cost = sum([self.distance_matrix[solution.tour[index]][solution.tour[index + 1]] for index in range(len(solution.tour) - 1)])
-        if len(solution.tour) > 0:
-            current_cost += self.distance_matrix[solution.tour[-1]][solution.tour[0]]
-        return current_cost
+        return len(set(self.current_solution.tour)) == self.instance_data["node_num"]
 
     def load_data(self, data_path: str) -> None:
         problem = tsplib95.load(data_path)
@@ -35,6 +25,15 @@ class Env(BaseEnv):
 
     def init_solution(self) -> None:
         return Solution(tour=[])
+
+    def get_key_value(self, solution: Solution=None) -> float:
+        """Get the key value of the current solution based on the key item."""
+        if solution is None:
+            solution = self.current_solution
+        current_cost = sum([self.instance_data["distance_matrix"][solution.tour[index]][solution.tour[index + 1]] for index in range(len(solution.tour) - 1)])
+        if len(solution.tour) > 0:
+            current_cost += self.instance_data["distance_matrix"][solution.tour[-1]][solution.tour[0]]
+        return current_cost
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """
@@ -52,7 +51,7 @@ class Env(BaseEnv):
         if solution is not None and solution.tour is not None:
             for index, node in enumerate(solution.tour):
                 # Check node existence
-                if not (0 <= node < self.node_num):
+                if not (0 <= node < self.instance_data["node_num"]):
                     return False
 
                 # Check uniqueness
@@ -63,6 +62,6 @@ class Env(BaseEnv):
                 # Check connectivity if not the last node
                 if index < len(solution.tour) - 1:
                     next_node = solution.tour[index + 1]
-                    if self.distance_matrix[node][next_node] == np.inf:
+                    if self.instance_data["distance_matrix"][node][next_node] == np.inf:
                         return False
         return True

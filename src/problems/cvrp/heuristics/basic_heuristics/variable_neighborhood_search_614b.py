@@ -24,15 +24,15 @@ def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict,
     """
 
     # Retrieve necessary data from state_data
-    current_solution = state_data.get('current_solution')
-    vehicle_loads = state_data.get('vehicle_loads')
-    unvisited_nodes = state_data.get('unvisited_nodes')
+    current_solution = problem_state.get('current_solution')
+    vehicle_loads = problem_state.get('vehicle_loads')
+    unvisited_nodes = problem_state.get('unvisited_nodes')
 
     # Retrieve necessary data from global_data
-    depot = global_data.get('depot')
-    capacity = global_data.get('capacity')
-    vehicle_num = global_data.get('vehicle_num')
-    distance_matrix = global_data.get('distance_matrix')
+    depot = problem_state.get('depot')
+    capacity = problem_state.get('capacity')
+    vehicle_num = problem_state.get('vehicle_num')
+    distance_matrix = problem_state.get('distance_matrix')
 
     # Define hyperparameters (with default values)
     neighborhood_size = kwargs.get('neighborhood_size', 10)

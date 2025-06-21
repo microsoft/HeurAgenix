@@ -170,8 +170,9 @@ class HeuristicGenerator:
                 reference_heuristic_code = open(reference_heuristic_file).read()
                 prompt_dict["referenced_heuristic"] = reference_heuristic
                 prompt_dict["referenced_heuristic_code"] = reference_heuristic_code
-                prompt_dict["referenced_global_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "global_data.txt")).read()
-                prompt_dict["referenced_state_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "state_data.txt")).read()
+                referenced_problem_state_introduction = search_file("problem_state.txt", problem=referenced_problem)
+                if referenced_problem_state_introduction:
+                    prompt_dict["referenced_problem_state_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "problem_state.txt")).read()
                 self.llm_client.load("mapping_component_in_heuristic", prompt_dict)
                 response = self.llm_client.chat()
                 similarities_in_heuristics = extract(response, "similarities", "\n")
