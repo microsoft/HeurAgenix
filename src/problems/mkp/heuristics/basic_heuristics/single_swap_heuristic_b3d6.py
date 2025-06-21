@@ -16,7 +16,7 @@ def single_swap_heuristic_b3d6(problem_state: dict, algorithm_data: dict, **kwar
             - "items_in_knapsack" (list[int]): Indices of items currently in the knapsack.
             - "items_not_in_knapsack" (list[int]): Indices of items currently not in the knapsack.
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.
-            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict): Not used in this heuristic.
 
     Returns:

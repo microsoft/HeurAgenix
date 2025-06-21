@@ -11,8 +11,8 @@ class ORSolver:
         pass
     
     def run(self, env: Env, time_limitation: int=600, **kwargs) -> None:
-        vehicles = list(range(env.production_line_num))
-        orders = list(range(env.order_num))
+        vehicles = list(range(env.instance_data["production_line_num"]))
+        orders = list(range(env.instance_data["order_num"]))
         vehicle_num = len(vehicles)
         task_num = len(orders) + 1  # +1 for the depot
 
@@ -21,21 +21,21 @@ class ORSolver:
         routing = pywrapcp.RoutingModel(manager)
 
         # Set the longest task duration as inf.
-        inf = int(env.order_deadline.max()) + 1
+        inf = int(env.instance_data["order_deadline"].max()) + 1
 
         def _travel_time(src_order, dst_order, production_line):
             if src_order is None or dst_order is None:
                 return 0
-            if env.transition_time[production_line, env.order_product[src_order], env.order_product[dst_order]] == np.inf:
+            if env.instance_data["transition_time"][production_line, env.instance_data["order_product"][src_order], env.instance_data["order_product"][dst_order]] == np.inf:
                 return inf
-            return env.transition_time[production_line, env.order_product[src_order], env.order_product[dst_order]]
+            return env.instance_data["transition_time"][production_line, env.instance_data["order_product"][src_order], env.instance_data["order_product"][dst_order]]
 
         def _service_time(dst_order, production_line):
             if dst_order is None:
                 return 0
-            if env.production_rate[production_line, env.order_product[dst_order]] == 0:
+            if env.instance_data["production_rate"][production_line, env.instance_data["order_product"][dst_order]] == 0:
                 return inf
-            return env.order_quantity[dst_order] / env.production_rate[production_line, env.order_product[dst_order]]
+            return env.instance_data["order_quantity"][dst_order] / env.instance_data["production_rate"][production_line, env.instance_data["order_product"][dst_order]]
 
         def _time_callback(src_task, dst_task, vehicle):
             src_node = manager.IndexToNode(src_task)
@@ -79,7 +79,7 @@ class ORSolver:
         time_dimension = routing.GetDimensionOrDie('Time')
         for order in orders:
             index = manager.NodeToIndex(order + 1)
-            time_dimension.CumulVar(index).SetRange(0, int(env.order_deadline[order]))
+            time_dimension.CumulVar(index).SetRange(0, int(env.instance_data["order_deadline"][order]))
 
         # Search solution with time limitation
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
@@ -98,4 +98,4 @@ class ORSolver:
                         result = env.run_operator(AppendOperator(vehicle, order))
                         assert result is True
                     index = routing_result.Value(routing.NextVar(index))
-        return env.solution_state
+        return env.is_complete_solution and env.is_valid_solution

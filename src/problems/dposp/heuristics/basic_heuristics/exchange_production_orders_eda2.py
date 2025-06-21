@@ -8,16 +8,15 @@ def exchange_production_orders_eda2(problem_state: dict, algorithm_data: dict, *
     transition times, order deadlines, and production line capabilities.
 
     Args:
-        global_data (dict): Contains the static problem data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production time for each product on each production line.
             - transition_time (numpy.array): 3D array of transition time between products on each production line.
             - order_product (numpy.array): 1D array mapping each order to its required product.
-        state_data (dict): Contains the current dynamic state data. In this algorithm, the following items are necessary:
             - current_solution (Solution): The current scheduling solution.
             - feasible_orders_to_fulfill (list): List of feasible orders that can be fulfilled without delaying other planned orders.
             - validation_single_production_schedule (callable): Function to check if a production schedule is valid for a given production line.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict): Used for storing data necessary for the algorithm.
-        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
 
     Returns:
         SwapOperator: Operator that swaps two orders in the production schedule.

@@ -17,7 +17,6 @@ def least_order_remaining_27ca(problem_state: dict, algorithm_data: dict, **kwar
             - get_time_cost_delta (callable): Function to compute the time cost delta for inserting an order.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
             - operation_count (int): The number of operations performed so far. Defaults to 0.
-        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution, without modifying the origin solution.
         kwargs: Hyper-parameters for the heuristic:
             - swap_frequency (int, default=10): Frequency (in terms of operations) at which swap optimization is performed.
             - shift_frequency (int, default=5): Frequency (in terms of operations) at which order shifting is performed.
@@ -26,7 +25,7 @@ def least_order_remaining_27ca(problem_state: dict, algorithm_data: dict, **kwar
         AppendOperator: The operator to append the selected order to a production line's schedule.
         dict: Updated algorithm data, if any.
     """
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     production_rate = problem_state["production_rate"]
     order_deadline = problem_state["order_deadline"]
     order_quantity = problem_state["order_quantity"]
@@ -101,7 +100,7 @@ def least_order_remaining_27ca(problem_state: dict, algorithm_data: dict, **kwar
 
                         # Calculate time cost
                         delta_time_cost = get_time_cost_delta(target_line_id, order_id, position)
-                        if delta_time_cost < 0 and current_solution.routes[source_line_id][source_schedule.index(order_id)] != current_solution.depot:  # Improvement
+                        if delta_time_cost < 0:  # Improvement
                             best_operator = RelocateOperator(
                                 source_production_line_id=source_line_id,
                                 source_position=source_schedule.index(order_id),

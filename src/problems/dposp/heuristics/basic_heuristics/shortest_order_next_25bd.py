@@ -4,12 +4,10 @@ def shortest_order_next_25bd(problem_state: dict, algorithm_data: dict, **kwargs
     """Shortest Order Next heuristic for DPOSP selects the unfulfilled order with the shortest processing time and inserts it into the best position in the production schedule.
     
     Args:
-        global_data (dict): Contains static information about the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production time for each product on each production line.
             - order_product (numpy.array): 1D array mapping each order to its required product.
             - order_quantity (numpy.array): 1D array of the quantity required for each order.
-            
-        state_data (dict): Contains dynamic state information of the solution.
             - current_solution (Solution): The current solution state.
             - unfulfilled_orders (list[int]): List of unfulfilled orders.
             - feasible_orders_to_fulfill (list): The feasible orders that can be fulfilled based on the current solution.

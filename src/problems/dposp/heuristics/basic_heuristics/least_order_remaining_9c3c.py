@@ -6,14 +6,13 @@ def least_order_remaining_9c3c(problem_state: dict, algorithm_data: dict, **kwar
     The heuristic identifies the order with the shortest processing time left from the unfulfilled orders list and appends it to a production line.
 
     Args:
-        global_data (dict): Contains global static information including production rates and transition times.
-        state_data (dict): Contains current dynamic state data including the current solution and unfulfilled orders.
+        problem_state (dict): The dictionary contains the problem state.
 
     Returns:
         AppendOperator: Operator that appends the chosen order to the production line's schedule.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from global_data
+    # Extract necessary data from problem_state
     production_rate = problem_state["production_rate"]
     order_quantity = problem_state["order_quantity"]
     feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]

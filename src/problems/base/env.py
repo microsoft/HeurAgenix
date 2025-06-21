@@ -71,19 +71,22 @@ class BaseEnv:
     def init_solution(self) -> None:
         pass
 
+    def helper_function(self) -> dict:
+        return {"get_problem_state": self.get_problem_state, "validation_solution": self.validation_solution}
+
     def get_problem_state(self, solution: BaseSolution=None) -> dict:
         if solution is None:
             solution = self.current_solution
         instance_problem_state = self.get_instance_problem_state(self.instance_data)
         solution_problem_state = self.get_solution_problem_state(self.instance_data, solution, self.get_key_value)
+        helper_function = self.helper_function()
         problem_state = None
         if solution_problem_state:
             problem_state = {
                 **self.instance_data,
                 "current_solution": solution,
                 self.key_item: self.key_value,
-                "get_problem_state": self.get_problem_state,
-                "validation_solution": self.validation_solution,
+                **helper_function,
                 **instance_problem_state,
                 **solution_problem_state,
             }

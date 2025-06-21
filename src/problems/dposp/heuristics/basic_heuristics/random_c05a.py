@@ -24,7 +24,7 @@ def random_c05a(problem_state: dict, algorithm_data: dict, max_attempts: int = 1
         AppendOperator: The operator to append the selected order to the selected production line.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from state_data
+    # Extract necessary data from problem_state
     current_solution = problem_state["current_solution"]
     feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
     validation_single_production_schedule = problem_state["validation_single_production_schedule"]

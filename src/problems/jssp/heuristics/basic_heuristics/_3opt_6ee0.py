@@ -11,7 +11,7 @@ def _3opt_6ee0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swa
             - "current_solution" (Solution): The current solution state.
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "machine_last_operation_end_times" (list[int]): The end time of the last operation for each machine.
-            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
             
         algorithm_data (dict): Not used in this heuristic.
     

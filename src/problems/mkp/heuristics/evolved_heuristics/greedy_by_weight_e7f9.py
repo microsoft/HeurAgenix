@@ -15,9 +15,8 @@ def greedy_by_weight_e7f9(problem_state: dict, algorithm_data: dict, k_flip_rang
             - "items_in_knapsack" (list[int]): List of indices of items currently in the knapsack.
             - "items_not_in_knapsack" (list[int]): List of indices of items not currently in the knapsack.
             - "feasible_items_to_add" (list[int]): List of indices of items that can be added without violating constraints.
-            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This is not updated in this heuristic.
-        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution.
         k_flip_range (tuple, optional): The range of k values to explore for k-flip. Default is (2, 3).
 
     Returns:

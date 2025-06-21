@@ -14,7 +14,7 @@ def two_opt_8049(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[S
             - "items_not_in_knapsack" (list[int]): List of item indices not in the knapsack.
             - "current_weights" (numpy.array): The total resource consumption for each dimension in the current solution.
             - "current_profit" (float): The total profit of items in the current solution.
-            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
 
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This algorithm does not use algorithm_data.
 

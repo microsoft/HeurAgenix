@@ -18,8 +18,8 @@ def get_instance_problem_state(instance_data: dict) -> dict:
             - machine_utilization_variance (float): The variance in operation times for each machine.
             - critical_machine (int): The machine with the highest total operation time.
     """
-    node_num = instance_data['node_num']
-    weight_matrix = instance_data['weight_matrix']
+    node_num = instance_data["node_num"]
+    weight_matrix = instance_data["weight_matrix"]
 
     # Ensure the weight matrix is a numpy array
     weight_matrix = np.array(weight_matrix)
@@ -39,13 +39,13 @@ def get_instance_problem_state(instance_data: dict) -> dict:
 
     # Construct the feature dictionary
     problem_states = {
-        'average_node_degree': average_node_degree,
-        'edge_density': edge_density,
-        'average_edge_weight': average_edge_weight,
-        'max_edge_weight': max_edge_weight,
-        'min_edge_weight': min_edge_weight,
-        'standard_deviation_edge_weight': standard_deviation_edge_weight,
-        'weighted_degree_distribution': weighted_degree_distribution
+        "average_node_degree": average_node_degree,
+        "edge_density": edge_density,
+        "average_edge_weight": average_edge_weight,
+        "max_edge_weight": max_edge_weight,
+        "min_edge_weight": min_edge_weight,
+        "standard_deviation_edge_weight": standard_deviation_edge_weight,
+        "weighted_degree_distribution": weighted_degree_distribution
     }
 
     return problem_states
@@ -74,8 +74,8 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
             - scheduling_efficiency (float): Ratio of completed operations to total possible operations.
             - remaining_jobs (int): Number of jobs still in progress or not started.
     """
-    node_num = instance_data['node_num']
-    weight_matrix = instance_data['weight_matrix']
+    node_num = instance_data["node_num"]
+    weight_matrix = instance_data["weight_matrix"]
     current_solution = solution
     set_a_count = len(solution.set_a)
     set_b_count = len(solution.set_b)
@@ -105,12 +105,12 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
         "unselected_nodes": unselected_nodes,
         "unselected_num": len(unselected_nodes),
         "current_cut_value": current_cut_value,
-        'imbalance_ratio': imbalance_ratio,
-        'average_cut_edge_weight': average_cut_edge_weight,
-        'selected_nodes_ratio': selected_nodes_ratio,
-        'unselected_nodes_ratio': unselected_nodes_ratio,
-        'edge_weight_variance_within_sets': edge_weight_variance_within_sets,
-        'boundary_node_ratio': boundary_node_ratio
+        "imbalance_ratio": imbalance_ratio,
+        "average_cut_edge_weight": average_cut_edge_weight,
+        "selected_nodes_ratio": selected_nodes_ratio,
+        "unselected_nodes_ratio": unselected_nodes_ratio,
+        "edge_weight_variance_within_sets": edge_weight_variance_within_sets,
+        "boundary_node_ratio": boundary_node_ratio
     }
 
     return problem_states

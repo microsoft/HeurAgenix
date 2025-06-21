@@ -28,13 +28,11 @@ def nearest_order_scheduling_1a5e(problem_state: dict, algorithm_data: dict, **k
         dict: Updated algorithm_data containing any new information for future iterations.
     """
 
-    # Unpack necessary data from global_data
+    # Unpack necessary data from problem_state
     transition_time = problem_state["transition_time"]
     production_rate = problem_state["production_rate"]
     order_deadline = problem_state["order_deadline"]
     order_product = problem_state["order_product"]
-
-    # Unpack necessary data from state_data
     current_solution = problem_state["current_solution"]
     feasible_orders = problem_state["feasible_orders_to_fulfill"]
     validation_single_production_schedule = problem_state["validation_single_production_schedule"]

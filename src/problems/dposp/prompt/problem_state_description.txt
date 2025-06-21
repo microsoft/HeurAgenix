@@ -1,0 +1,27 @@
+- instance_data:
+    - product_num (int): Total number of unique products.
+    - production_line_num (int): Total number of production lines.
+    - order_num (int): Total number of orders to be scheduled.
+    - production_rate (numpy.array): 2D array of production time for each product on each production line.
+    - transition_time (numpy.array): 3D array of transition time between products on each production line.
+    - order_product (numpy.array): 1D array mapping each order to its required product.
+    - order_quantity (numpy.array): 1D array of the quantity required for each order.
+    - order_deadline (numpy.array): 1D array of the deadline for each order.
+
+- solution:
+    - current_solution (Solution): Current solution instance.
+
+- key_item:
+    - fulfilled_order_num (int): Number of fulfilled orders.
+
+- helper_function:
+    - validation_single_production_schedule (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
+    - get_time_cost_delta (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+
+- instance_problem_state:
+    ...
+
+- solution_problem_state:
+    ...

@@ -15,7 +15,6 @@ def greedy_deadline_proximity_ac6e(problem_state: dict, algorithm_data: dict, **
             - order_product (numpy.array): 1D array mapping each order to its required product.
             - order_quantity (numpy.array): 1D array of the quantity required for each order.
             - order_deadline (numpy.array): 1D array of the deadline for each order.
-        
             - current_solution (Solution): Current scheduling solution.
             - feasible_orders_to_fulfill (list[int]): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
             - validation_single_production_schedule (callable): Function to check whether the production schedule is valid.
@@ -25,7 +24,7 @@ def greedy_deadline_proximity_ac6e(problem_state: dict, algorithm_data: dict, **
         dict: Empty dictionary as the algorithm does not update any algorithm-specific data.
     """
     
-    # Extract required data from global_data and state_data
+    # Extract required data from problem_state
     production_rate = problem_state['production_rate']
     transition_time = problem_state['transition_time']
     order_product = problem_state['order_product']

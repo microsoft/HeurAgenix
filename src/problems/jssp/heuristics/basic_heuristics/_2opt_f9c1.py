@@ -11,6 +11,7 @@ def _2opt_f9c1(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swa
             - "machine_num" (int): The total number of machines.
             - "current_solution" (Solution): The current solution state.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
 
     Returns:
         (SwapOperator, dict): A tuple where the first element is the selected operator that performs the best swap found,

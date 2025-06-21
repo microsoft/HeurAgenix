@@ -82,7 +82,7 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     current_cost = get_key_value(solution)
 
     # Calculate average cost per visited edge
-    average_edge_cost = current_cost / visited_num if visited_num > 0 else float('0')
+    average_edge_cost = current_cost / visited_num if visited_num > 0 else float("0")
     # Retrieve the cost of the most recent edge
     last_edge_cost = distance_matrix[last_visited, tour[0]] if tour else 0
     # Compute edge costs for standard deviation calculation
@@ -90,7 +90,7 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     std_dev_edge_cost = np.std(edge_costs) if edge_costs else 0
     
     # Calculate minimum and maximum edge cost to any unvisited node from the last visited node
-    min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float('0')
+    min_edge_cost_remaining = np.min([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else float("0")
     max_edge_cost_remaining = np.max([distance_matrix[last_visited, j] for j in unvisited_nodes]) if unvisited_nodes else 0
     
     return {

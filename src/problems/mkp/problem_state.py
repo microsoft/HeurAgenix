@@ -23,24 +23,24 @@ def get_instance_problem_state(instance_data: dict) -> dict:
     problem_states = {}
 
     # Calculate the average profit of items
-    problem_states['average_profit'] = np.mean(instance_data["profits"])
+    problem_states["average_profit"] = np.mean(instance_data["profits"])
 
     # Calculate the variance of the profit values
-    problem_states['profit_variance'] = np.var(instance_data["profits"])
+    problem_states["profit_variance"] = np.var(instance_data["profits"])
 
     # Calculate the average weight per resource and weight variance per resource
-    problem_states['average_weight_per_resource'] = np.mean(instance_data["weights"], axis=0).tolist()
-    problem_states['weight_variance_per_resource'] = np.var(instance_data["weights"], axis=0).tolist()
+    problem_states["average_weight_per_resource"] = np.mean(instance_data["weights"], axis=0).tolist()
+    problem_states["weight_variance_per_resource"] = np.var(instance_data["weights"], axis=0).tolist()
 
     # Calculate the capacity to weight ratio for each resource
     total_weights = np.sum(instance_data["weights"], axis=1)
-    problem_states['capacity_to_weight_ratio'] = instance_data["capacities"] / total_weights
+    problem_states["capacity_to_weight_ratio"] = instance_data["capacities"] / total_weights
 
     # Calculate the profit to weight ratio for each item
     # Prevent division by zero by adding a small epsilon where weights are zero
     epsilon = 1e-10
     weights_with_epsilon = np.where(np.sum(instance_data["weights"], axis=0) == 0, epsilon, np.sum(instance_data["weights"], axis=0))
-    problem_states['profit_to_weight_ratio'] = instance_data["profits"] / weights_with_epsilon
+    problem_states["profit_to_weight_ratio"] = instance_data["profits"] / weights_with_epsilon
 
     return problem_states
 
@@ -96,28 +96,28 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     problem_states["feasible_items_to_add"] = feasible_items_to_add
 
     # Calculate the current solution value (total profit)
-    problem_states['current_solution_value'] = current_profit
+    problem_states["current_solution_value"] = current_profit
 
     # Calculate the solution density (ratio of items in the knapsack to total items)
-    problem_states['solution_density'] = len(items_in_knapsack) / instance_data['item_num']
+    problem_states["solution_density"] = len(items_in_knapsack) / instance_data["item_num"]
 
     # Calculate the average remaining capacity across all resources
-    problem_states['average_remaining_capacity'] = np.mean(remaining_capacity)
+    problem_states["average_remaining_capacity"] = np.mean(remaining_capacity)
 
     # Calculate the variance of the remaining capacities
-    problem_states['remaining_capacity_variance'] = np.var(remaining_capacity)
+    problem_states["remaining_capacity_variance"] = np.var(remaining_capacity)
 
     # Calculate the feasibility ratio (feasible items to add vs total remaining items)
-    total_remaining_items = instance_data['item_num'] - len(items_in_knapsack)
-    problem_states['feasibility_ratio'] = len(feasible_items_to_add) / total_remaining_items if total_remaining_items > 0 else 0
+    total_remaining_items = instance_data["item_num"] - len(items_in_knapsack)
+    problem_states["feasibility_ratio"] = len(feasible_items_to_add) / total_remaining_items if total_remaining_items > 0 else 0
 
     # Calculate the utilized capacity ratio for each resource
-    problem_states['utilized_capacity_ratio'] = current_weights / instance_data['capacities']
+    problem_states["utilized_capacity_ratio"] = current_weights / instance_data["capacities"]
 
     # Calculate the average profit of items included in the current solution
     included_items = np.array(solution.item_inclusion, dtype=bool)
-    included_profits = instance_data['profits'][included_items]
-    problem_states['item_profitability_in_solution'] = np.mean(included_profits) if included_items.any() else 0
+    included_profits = instance_data["profits"][included_items]
+    problem_states["item_profitability_in_solution"] = np.mean(included_profits) if included_items.any() else 0
 
     return problem_states
 

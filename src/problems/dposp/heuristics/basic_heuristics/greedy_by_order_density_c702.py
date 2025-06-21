@@ -23,7 +23,7 @@ def greedy_by_order_density_c702(problem_state: dict, algorithm_data: dict, **kw
     best_order_id = None
     best_production_line_id = None
 
-    # Get necessary data from global_data
+    # Get necessary data from problem_state
     production_rate = problem_state["production_rate"]
     transition_time = problem_state["transition_time"]
     order_product = problem_state["order_product"]

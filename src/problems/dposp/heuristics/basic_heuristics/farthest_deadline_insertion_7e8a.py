@@ -12,13 +12,11 @@ def farthest_deadline_insertion_7e8a(problem_state: dict, algorithm_data: dict, 
     while ensuring that all orders are completed before their respective deadlines.
 
     Args:
-        global_data (dict): Contains the global static information data.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "production_rate" (numpy.array): 2D array of production times for each product on each line.
             - "transition_time" (numpy.array): 3D array of transition times between products on each line.
             - "order_deadline" (numpy.array): 1D array of the deadline for each order.
             - "production_line_num" (int): Total number of production lines.
-
-        state_data (dict): Contains the current dynamic state data.
             - "current_solution" (Solution): Current scheduling solution.
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
             - "validation_single_production_schedule" (callable): Function to check if a production schedule is valid.
@@ -27,13 +25,11 @@ def farthest_deadline_insertion_7e8a(problem_state: dict, algorithm_data: dict, 
         InsertOperator: Operator to insert the selected order at the best position found.
         dict: Empty dictionary as no additional algorithm data is updated by this heuristic.
     """
-    # Retrieve necessary data from global_data
+    # Retrieve necessary data from problem_state
     order_deadline = problem_state['order_deadline']
     production_line_num = problem_state['production_line_num']
     production_rate = problem_state['production_rate']
     transition_time = problem_state['transition_time']
-    
-    # Retrieve necessary data from state_data
     current_solution = problem_state['current_solution']
     feasible_orders_to_fulfill = problem_state['feasible_orders_to_fulfill']
     validation_single_production_schedule = problem_state['validation_single_production_schedule']

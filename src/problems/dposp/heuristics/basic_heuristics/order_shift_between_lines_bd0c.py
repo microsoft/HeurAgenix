@@ -5,19 +5,15 @@ def order_shift_between_lines_bd0c(problem_state: dict, algorithm_data: dict, **
     This heuristic attempts to shift an unfulfilled order from one production line to another while adhering to machine capabilities, transition rules, and order deadlines.
     
     Args:
-        global_data (dict): Contains the global static information about the problem.
-        state_data (dict): Contains the current dynamic state data of the problem.
+        problem_state (dict): The dictionary contains the problem state.
         algorithm_data (dict): Contains data specific to the algorithm (unused in this heuristic).
-        problem_state["get_problem_state"] (callable): Function that generates state data for a given solution.
     
     Returns:
         (RelocateOperator, dict): The operator to shift an order between production lines and an empty dictionary, as the heuristic does not update algorithm_data.
     """
-    # Retrieve necessary data from global_data
+    # Retrieve necessary data from problem_state
     production_rate = problem_state["production_rate"]
     transition_time = problem_state["transition_time"]
-    
-    # Retrieve necessary data from state_data
     current_solution = problem_state["current_solution"]
     feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
     validation_single_production_schedule = problem_state["validation_single_production_schedule"]
@@ -60,7 +56,7 @@ def order_shift_between_lines_bd0c(problem_state: dict, algorithm_data: dict, **
                     delta_time_cost = state_data_for_trial["total_time_cost_per_production_line"][target_line_id] + state_data_for_trial["total_time_cost_per_production_line"][source_line_id] - problem_state["total_time_cost_per_production_line"][target_line_id] - problem_state["total_time_cost_per_production_line"][source_line_id]
 
                     # Check if this shift leads to a better solution
-                    if delta_time_cost < best_delta_time_cost and current_solution.routes[source_line_id][position] != current_solution.depot:
+                    if delta_time_cost < best_delta_time_cost:
                         best_order_id = order_id
                         best_source_line_id = source_line_id
                         best_target_line_id = target_line_id

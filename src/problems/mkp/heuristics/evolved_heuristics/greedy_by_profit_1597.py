@@ -17,7 +17,7 @@ def greedy_by_profit_1597(problem_state: dict, algorithm_data: dict, max_k: int 
             - "feasible_items_to_add" (list[int]): A list of item indices that can be added without violating constraints.
             - "current_solution" (Solution): The current solution object.
             - "current_profit" (float): The current total profit of the solution.
-            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict, optional): The algorithm dictionary for current algorithm only. In this algorithm, no specific data is necessary.
         max_k (int, optional): The maximum number of items to flip in k-flip exploration. Defaults to 2.
         epsilon (float, optional): A small constant added to the denominator to avoid division by zero. Defaults to 0.01.

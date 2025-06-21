@@ -7,12 +7,11 @@ def maximum_remaining_work_order_ec9c(problem_state: dict, algorithm_data: dict,
     production line's schedule, aiming to maximize the number of orders fulfilled before their respective deadlines.
     
     Args:
-        global_data (dict): Contains global static problem information, including:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production time for each product on each production line.
             - transition_time (numpy.array): 3D array of transition time between products on each production line.
             - order_quantity (numpy.array): 1D array of the quantity required for each order.
             - order_deadline (numpy.array): 1D array of the deadline for each order.
-        state_data (dict): Contains the current state of the solution, including:
             - current_solution (Solution): Current scheduling solution.
             - feasible_orders_to_fulfill (list): The feasible orders that can be fulfilled based on the current solution.
             - validation_single_production_schedule (callable): Function to check if a production schedule is valid.

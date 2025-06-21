@@ -24,7 +24,7 @@ def shortest_operation_ff40(problem_state: dict, algorithm_data: dict, **kwargs)
         InsertOperator: The operator to insert the selected order into the selected production line.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from state_data
+    # Extract necessary data from problem_state
     current_solution = problem_state["current_solution"]
     unfulfilled_orders = problem_state["unfulfilled_orders"]
     feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]

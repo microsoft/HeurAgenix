@@ -69,17 +69,11 @@ def main():
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
 
-    if test_case is None:
-        test_case = os.path.join("output", problem, "data", "test_data")
-    
-    test_case = search_file(test_case, problem)
-    if os.path.isdir(test_case):
-        test_case = os.listdir(test_case)
-    elif os.path.isfile(test_case):
-        test_case = [test_case]
+    if test_case:
+        test_case = [search_file(test_case, problem)]
     else:
-        raise ValueError(f"Invalid test case: {test_case}")
-    
+        test_case = os.listdir(os.path.join("output", problem, "data", "test_data"))
+
     for data_name in test_case:
         env = Env(data_name=data_name)
         env.reset(output_dir)
@@ -96,7 +90,7 @@ def main():
             env.dump_result()
             print(os.path.join(env.output_dir, "result.txt"), heuristic, data_name, env.key_item, env.key_value)
         else:
-            print("Invalid solution", heuristic, test_case)
+            print("Invalid solution", heuristic, data_name)
 
 
 if __name__ == "__main__":
