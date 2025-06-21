@@ -16,7 +16,7 @@ def random_4c25(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Ad
         TargetOperatorType: The operator that modifies the current solution towards the heuristic's goal.
         dict: An empty dictionary as this heuristic does not update the algorithm data.
     """
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     weights = problem_state["weights"]
     capacities = problem_state["capacities"]
     remaining_capacity = problem_state["remaining_capacity"]

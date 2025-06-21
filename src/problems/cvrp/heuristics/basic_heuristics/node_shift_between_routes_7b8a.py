@@ -18,12 +18,10 @@ def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **
     Returns:
         (RelocateOperator, dict): The operator to shift a node between routes and an empty dictionary, as the heuristic does not update algorithm_data.
     """
-    # Extract required data from global_data
+    # Extract required data from problem_state
     distance_matrix = problem_state["distance_matrix"]
     capacity = problem_state["capacity"]
     depot = problem_state["depot"]
-    
-    # Extract required data from state_data
     current_solution = problem_state["current_solution"]
     vehicle_loads = problem_state["vehicle_loads"]
     # Find the best position to insert the node in the target route

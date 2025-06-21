@@ -26,12 +26,10 @@ def greedy_by_profit_1597(problem_state: dict, algorithm_data: dict, max_k: int 
         BaseOperator: The operator to apply to the current solution (e.g., AddOperator, RemoveOperator, FlipBlockOperator, SwapOperator).
         dict: An empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from global_data
+    # Extract necessary data from problem_state
     profits = problem_state["profits"]
     weights = problem_state["weights"]
     resource_num = problem_state["resource_num"]
-
-    # Extract necessary data from state_data
     remaining_capacity = problem_state["remaining_capacity"]
     items_in_knapsack = problem_state["items_in_knapsack"]
     feasible_items_to_add = problem_state["feasible_items_to_add"]

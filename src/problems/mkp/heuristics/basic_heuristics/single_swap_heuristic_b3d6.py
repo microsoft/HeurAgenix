@@ -28,7 +28,7 @@ def single_swap_heuristic_b3d6(problem_state: dict, algorithm_data: dict, **kwar
     best_swap_operator = None
     best_profit_increase = 0
 
-    # Retrieve necessary data from global_data and state_data
+    # Retrieve necessary data from problem_state
     weights = problem_state["weights"]
     profits = problem_state["profits"]
     capacities = problem_state["capacities"]

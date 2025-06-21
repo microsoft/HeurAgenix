@@ -8,6 +8,8 @@ class MDPEnv(BaseEnv):
         self.gym_env = env_class(self.data_path)
         self.done = False
         self.reward = 0
+        self.key_item = "total_reward"
+        self.compare = lambda x, y: y - x
 
 
     @property
@@ -30,14 +32,9 @@ class MDPEnv(BaseEnv):
     def init_solution(self) -> None:
         return Solution()
 
-    def get_global_data(self) -> dict:
-        global_data = self.gym_env.get_global_data()
-        return global_data
-
-    def get_state_data(self, solution: Solution) -> dict:
-        state_data = self.gym_env.get_state_data()
-        state_data["total_reward"] = self.gym_env.get_reward()
-        return state_data
+    def get_key_value(self, solution: Solution=None) -> float:
+        """Get the key value of the current solution based on the key item."""
+        return self.reward
 
     def validation_solution(self, solution: Solution=None) -> bool:
         pass
@@ -55,14 +52,8 @@ class MDPEnv(BaseEnv):
                 self.reward += reward
             elif isinstance(reward, list):
                 self.reward += sum(reward)
-            self.state_data = self.get_state_data()
             return True
         return False
-
-    def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
-        content_dict = self.get_state_data()
-        content = super().dump_result(content_dict=content_dict, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
-        return content
     
     def summarize_env(self) -> str:
         if hasattr(self.gym_env, "summarize_env"):

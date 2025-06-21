@@ -18,7 +18,7 @@ def k_nearest_neighbors_insertion_9e8b(problem_state: dict, algorithm_data: dict
         InsertOperator: The operator to insert the chosen node into the current solution.
         dict: Empty dictionary as this algorithm does not update algorithm_data.
     """
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     distance_matrix = problem_state["distance_matrix"]
     current_solution = problem_state["current_solution"]
     unvisited_nodes = problem_state["unvisited_nodes"]

@@ -31,7 +31,7 @@ def shortest_operation_ae31(problem_state: dict, algorithm_data: dict, **kwargs)
         InsertOperator: The operator to insert the selected order into the selected production line.
         dict: Updated algorithm data, if any.
     """
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     production_line_num = problem_state["production_line_num"]
     order_deadline = problem_state["order_deadline"]
     order_quantity = problem_state["order_quantity"]

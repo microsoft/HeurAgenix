@@ -23,7 +23,7 @@ def exchange_production_orders_eda2(problem_state: dict, algorithm_data: dict, *
         dict: Empty dictionary, as this algorithm does not update algorithm_data.
     """
 
-    # Retrieve necessary information from global_data and state_data
+    # Retrieve necessary information from problem_state
     production_rate = problem_state["production_rate"]
     transition_time = problem_state["transition_time"]
     order_product = problem_state["order_product"]

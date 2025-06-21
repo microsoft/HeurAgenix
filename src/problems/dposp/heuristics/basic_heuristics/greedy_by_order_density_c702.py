@@ -28,8 +28,6 @@ def greedy_by_order_density_c702(problem_state: dict, algorithm_data: dict, **kw
     transition_time = problem_state["transition_time"]
     order_product = problem_state["order_product"]
     order_deadline = problem_state["order_deadline"]
-
-    # Get necessary data from state_data
     current_solution = problem_state["current_solution"]
     feasible_orders_to_fulfill = problem_state["feasible_orders_to_fulfill"]
     validation_single_production_schedule = problem_state["validation_single_production_schedule"]

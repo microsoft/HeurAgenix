@@ -9,10 +9,9 @@ def nearest_neighbor_e8a4(problem_state: dict, algorithm_data: dict, **kwargs) -
     Additionally, it periodically applies the 2-opt heuristic to optimize the tour by reducing crossings.
 
     Args:
-        global_data (dict): Contains essential global data:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): 2D array of distances between nodes.
             - "node_num" (int): Total number of nodes.
-        state_data (dict): Contains current state information:
             - "current_solution" (Solution): Current TSP solution.
             - "unvisited_nodes" (list[int]): IDs of nodes not yet visited.
             - "last_visited" (int or None): Last visited node, or None if the tour is empty.

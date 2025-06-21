@@ -21,10 +21,8 @@ def shortest_processing_time_first_c374(problem_state: dict, algorithm_data: dic
         dict: An empty dictionary as this heuristic does not update algorithm_data.
     """
     
-    # Extract necessary data from global_data
+    # Extract necessary data from problem_state
     job_operation_time = problem_state["job_operation_time"]
-    
-    # Extract necessary data from state_data
     unfinished_jobs = problem_state["unfinished_jobs"]
     job_operation_index = problem_state["job_operation_index"]
     

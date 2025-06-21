@@ -16,7 +16,7 @@ def random_pairwise_insertion_7493(problem_state: dict, algorithm_data: dict, **
         dict: Empty dictionary as no algorithm data is updated.
     """
 
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     distance_matrix = problem_state["distance_matrix"]
     current_solution = problem_state["current_solution"]
     unvisited_nodes = problem_state["unvisited_nodes"]
