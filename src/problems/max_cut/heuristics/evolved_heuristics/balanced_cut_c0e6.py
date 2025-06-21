@@ -6,9 +6,8 @@ def balanced_cut_c0e6(problem_state: dict, algorithm_data: dict, **kwargs) -> tu
     future impact consideration, and periodic swap operations.
 
     Args:
-        global_data (dict): The global data dict containing the following items:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - weight_matrix (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): The state dictionary containing the current state information:
             - current_solution (Solution): The current partition of the graph into sets A and B.
             - unselected_nodes (set[int]): The set of nodes that have not yet been selected.
             - set_a (set[int]): The set of nodes in partition A.
@@ -16,8 +15,7 @@ def balanced_cut_c0e6(problem_state: dict, algorithm_data: dict, **kwargs) -> tu
             - current_cut_value (float): The current cut value of the solution.
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
             - operation_count (int): The number of operations performed so far. Default is 0.
-            - sorted_nodes (list of tuples): A sorted list of (node, future_impact) in descending order. Default is empty.
-        problem_state["get_problem_state"] (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+            - sorted_nodes (list of tuples): A sorted list of (node, future_impact) in descending order. Default is empty.the original solution.
         kwargs (dict): Hyperparameters for the heuristic:
             - scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
             - swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.

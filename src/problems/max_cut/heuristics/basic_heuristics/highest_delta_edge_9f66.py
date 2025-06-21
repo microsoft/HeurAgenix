@@ -4,9 +4,8 @@ def highest_delta_edge_9f66(problem_state: dict, algorithm_data: dict, **kwargs)
     """Selects the unselected edge that maximizes the increase in cut weight when added to the solution.
 
     Args:
-        global_data (dict): Contains global information about the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): The current partition of the graph into sets A and B.
             - "selected_nodes" (set[int]): The set of selected nodes.
 

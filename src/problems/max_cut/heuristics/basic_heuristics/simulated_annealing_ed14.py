@@ -9,9 +9,8 @@ def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs
     decreasing over time.
 
     Args:
-        global_data (dict): Contains the global data of the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "total_nodes" (int): The total number of vertices in the graph.
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current solution of the Max Cut problem.
             - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
         algorithm_data (dict): Contains the data specific to the simulated annealing algorithm.

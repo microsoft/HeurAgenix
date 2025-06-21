@@ -12,7 +12,6 @@ def highest_weight_edge_ca02(problem_state: dict, algorithm_data: dict, **kwargs
             - "set_a" (set[int]): The set of nodes in partition A.
             - "set_b" (set[int]): The set of nodes in partition B.
         algorithm_data (dict): Not used in this algorithm.
-        problem_state["get_problem_state"] (callable): Not used in this algorithm.
 
     Kwargs:
         k (int, optional): Frequency of applying swap operations. Default is 3.

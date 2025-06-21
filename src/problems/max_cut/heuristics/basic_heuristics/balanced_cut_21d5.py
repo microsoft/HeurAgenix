@@ -12,7 +12,6 @@ def balanced_cut_21d5(problem_state: dict, algorithm_data: dict, max_iterations:
             - "current_solution" (Solution): The current solution of the Max Cut problem.
             - "unselected_nodes" (set[int]): The set of nodes that have not been selected into either set A or set B.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. Not used in this heuristic.
-        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
         max_iterations (int): The maximum number of iterations to perform. Defaults to 100.
 
     Returns:

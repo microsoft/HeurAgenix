@@ -8,13 +8,11 @@ def greedy_swap_5bb5(problem_state: dict, algorithm_data: dict, **kwargs) -> tup
     If no swap improves the cut value, no operator is returned.
 
     Args:
-        global_data (dict): Contains the global data of the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current solution of the Max Cut problem.
             - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
         algorithm_data (dict): Not used in this heuristic.
-        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
         **kwargs: Additional hyperparameters, not used in this heuristic.
 
     Returns:

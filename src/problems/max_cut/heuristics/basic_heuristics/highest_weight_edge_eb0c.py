@@ -6,10 +6,8 @@ def highest_weight_edge_eb0c(problem_state: dict, algorithm_data: dict, **kwargs
     choosing the set that maximizes the cut value increase for each node.
 
     Args:
-        global_data (dict): Contains the global information about the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): The current solution of the MaxCut problem.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
 
@@ -19,7 +17,7 @@ def highest_weight_edge_eb0c(problem_state: dict, algorithm_data: dict, **kwargs
         dict: Empty dictionary as no algorithm data is updated.
     """
     
-    # Extract necessary information from global_data and state_data
+    # Extract necessary information from problem_state
     weight_matrix = problem_state["weight_matrix"]
     current_solution = problem_state["current_solution"]
     unselected_nodes = problem_state["unselected_nodes"]

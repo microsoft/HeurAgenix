@@ -86,7 +86,7 @@ def main():
 
         paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 
         paras += f"\ndata_path={env.data_path}"
-        with open(os.path.join(env.output_dir, "para.txt"), 'w') as file:
+        with open(os.path.join(env.output_dir, "parameters.txt"), 'w') as file:
             file.write(paras)
 
         if heuristic == "llm_hh":

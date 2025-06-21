@@ -5,10 +5,8 @@ def random_5c59(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[In
     """Random node insertion heuristic for Max Cut.
 
     Args:
-        global_data (dict): Contains the global data about the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "node_num" (int): The total number of vertices in the graph.
-            
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current solution instance.
             - "unselected_count" (int): The number of unselected nodes.
     

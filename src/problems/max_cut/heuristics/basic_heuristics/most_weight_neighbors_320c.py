@@ -6,9 +6,8 @@ def most_weight_neighbors_320c(problem_state: dict, algorithm_data: dict, **kwar
     It stores the sorted list of unselected nodes based on the sum of weights for future use.
     
     Args:
-        global_data (dict): Contains the global data of the graph. For this algorithm, we require:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): Contains the current state information. For this algorithm, we require:
             - "current_solution" (Solution): The current partition of the graph.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
         algorithm_data (dict): Contains the algorithm-specific data. For this algorithm, we use:
