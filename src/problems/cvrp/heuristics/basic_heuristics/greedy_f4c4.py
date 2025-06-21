@@ -7,13 +7,11 @@ def greedy_f4c4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[In
     It starts with an empty route for each vehicle and selects nodes based on the shortest distance from the last node in the route.
 
     Args:
-        global_data (dict): Contains the global problem data, including:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): The distances between nodes.
             - "demands" (numpy.ndarray): The demand of each node.
             - "vehicle_num" (int): The total number of vehicles.
             - "capacity" (int): The capacity for each vehicle.
-        
-        state_data (dict): Contains the current state of the solution, including:
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited.
             - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
 

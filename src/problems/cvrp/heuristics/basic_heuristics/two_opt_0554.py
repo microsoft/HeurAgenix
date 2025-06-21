@@ -5,23 +5,21 @@ def two_opt_0554(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[R
     Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
 
     Args:
-        global_data (dict): Contains the global data with necessary information like distance_matrix.
-        state_data (dict): Contains the current state information with the current_solution.
-        algorithm_data (dict): Contains the data necessary for this algorithm.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
+            - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+            - "depot" (int): The index for depot node.
+            - "current_solution" (Solution): The current set of routes for all vehicles.
 
     Returns:
         TwoOptOperator: The operator that represents the best 2-opt move found.
         dict: Updated algorithm dictionary.
     """
 
-    # Retrieve the necessary data from global_data
+    # Retrieve the necessary data from problem_state
     distance_matrix = problem_state["distance_matrix"]
-    node_num = problem_state["node_num"]
     depot = problem_state["depot"]
 
-    # Retrieve the current solution from state_data
     current_solution = problem_state["current_solution"]
-    visited_nodes = problem_state["visited_nodes"]
 
     # Initialize variables for the best move found
     best_delta = 0

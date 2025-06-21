@@ -6,21 +6,17 @@ def k_flip_2f3e(problem_state: dict, algorithm_data: dict, k: int = 2) -> tuple[
     """ K-flip heuristic that flips the inclusion status of k items.
 
     Args:
-        global_data (dict): Global data needed for the heuristic.
-        state_data (dict): Current state data needed to evaluate the flips.
+        problem_state (dict): The dictionary contains the problem state.
         algorithm_data (dict): Not used in this algorithm.
-        get_state_data_function (callable): Function to calculate state data for a new solution.
         k (int): The number of items to flip. Defaults to 2, can be increased as needed.
 
     Returns:
         FlipBlockOperator: The operator that flips k items if it results in a valid and improved solution.
         dict: Empty dictionary as the algorithm data is not updated.
     """
-    # Extract necessary data from global_data
+    # Extract necessary data from problem_state
     item_num = problem_state['item_num']
     all_indices = range(item_num)
-
-    # Extract necessary data from state_data
     current_solution = problem_state['current_solution']
     current_profit = problem_state['current_profit']
     validation_solution = problem_state['validation_solution']

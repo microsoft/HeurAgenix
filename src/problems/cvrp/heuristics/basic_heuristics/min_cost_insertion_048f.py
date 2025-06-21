@@ -16,7 +16,6 @@ def min_cost_insertion_048f(problem_state: dict, algorithm_data: dict, **kwargs)
             - "unvisited_nodes" (list[int]): Nodes not yet visited.
             - "vehicle_loads" (list[int]): Current load of each vehicle.
             - "vehicle_remaining_capacity" (list[int]): Remaining capacity for each vehicle.
-        get_state_data_function (callable): Function to get state data for a new solution.
         kwargs: Additional hyper-parameters for the algorithm. Default values should be set here if needed.
 
     Returns:

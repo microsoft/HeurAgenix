@@ -16,7 +16,6 @@ def nearest_neighbor_54a9(problem_state: dict, algorithm_data: dict, **kwargs) -
             - unvisited_nodes (list[int]): Nodes not yet visited by any vehicle.
             - last_visited (list[int]): Last visited node for each vehicle.
             - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
-        get_state_data_function (callable): Function to calculate state data for a new solution.
         **kwargs: Hyper-parameters for the heuristic algorithm.
             - high_demand_threshold (int, default=6): Threshold for considering the number of unvisited nodes as low.
 

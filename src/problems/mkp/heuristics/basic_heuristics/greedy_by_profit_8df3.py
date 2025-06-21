@@ -1,6 +1,6 @@
 from src.problems.mkp.components import *
 
-def greedy_by_profit_8df3(problem_state: dict, algorithm_data: dict, get_state_data_function: callable) -> tuple[AddOperator, dict]:
+def greedy_by_profit_8df3(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
     Greedy by Profit Heuristic for the Multidimensional Knapsack Problem.
     This heuristic selects items based on the highest profit value until no further items can be added without violating resource constraints.
@@ -17,12 +17,10 @@ def greedy_by_profit_8df3(problem_state: dict, algorithm_data: dict, get_state_d
         AddOperator: The operator to add the selected item to the knapsack.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from global_data
+    # Extract necessary data from problem_state
     profits = problem_state["profits"]
     weights = problem_state["weights"]
     capacities = problem_state["capacities"]
-
-    # Extract necessary data from state_data
     current_solution = problem_state["current_solution"]
     remaining_capacity = problem_state["remaining_capacity"]
     items_not_in_knapsack = problem_state["items_not_in_knapsack"]

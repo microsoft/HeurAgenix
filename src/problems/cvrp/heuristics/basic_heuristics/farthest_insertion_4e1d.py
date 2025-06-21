@@ -17,7 +17,6 @@ def farthest_insertion_4e1d(problem_state: dict, algorithm_data: dict, **kwargs)
             - "vehicle_loads" (list[int]): The current load of each vehicle.
             - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
             - "validation_solution" (callable): A function to check whether a new solution is valid.
-        get_state_data_function (callable): The function that receives the new solution as input and returns the state dictionary for the new solution, without modifying the original solution.
 
     Returns:
         AppendOperator: An operator that represents the insertion of a node into the route.

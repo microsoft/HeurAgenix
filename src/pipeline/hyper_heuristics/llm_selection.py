@@ -115,7 +115,7 @@ class LLMSelectionHyperHeuristic:
                     "Heuristic": selected_heuristic_name,
                 }
                 for key in pre_observation.keys():
-                    heuristic_dict["Delta of " + key] = next_observation[key] - pre_observation[key]
+                    heuristic_dict["Delta of " + key] = f"From {pre_observation[key]} to {next_observation[key]}"
                 heuristic_traject.append(heuristic_dict)
                 selection_round += 1
             except Exception as e:

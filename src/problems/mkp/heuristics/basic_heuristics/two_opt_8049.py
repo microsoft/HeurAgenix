@@ -6,17 +6,17 @@ def two_opt_8049(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[S
     It retains the swap if it leads to a solution with a higher profit without violating any resource constraints.
 
     Args:
-        global_data (dict): The global data dict containing the problem's constants. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
-            
             - "current_solution" (Solution): The current solution instance.
             - "items_in_knapsack" (list[int]): List of item indices currently in the knapsack.
             - "items_not_in_knapsack" (list[int]): List of item indices not in the knapsack.
-            - "current_weights" (numpy.array): The total resource consumption for each dimension in the current solution.            - "current_profit" (float): The total profit of items in the current solution.
+            - "current_weights" (numpy.array): The total resource consumption for each dimension in the current solution.
+            - "current_profit" (float): The total profit of items in the current solution.
+            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
 
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This algorithm does not use algorithm_data.
-        get_state_data_function (callable): Function that takes a new Solution instance and returns the corresponding state data without modifying the original solution.
 
     Returns:
         SwapOperator: The operator to apply to the current solution if an improvement is found.
@@ -41,10 +41,10 @@ def two_opt_8049(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[S
             
             # Get the state data for the new solution
             if validation_solution(Solution(temp_solution)):
-                new_state_data = get_state_data_function(Solution(temp_solution))
+                new_problem_state = problem_state["get_problem_state"](Solution(temp_solution))
 
                 # If the new solution is valid and has a higher profit, store it as the best solution
-                if new_state_data and new_problem_state["current_profit"] > best_profit:
+                if new_problem_state and new_problem_state["current_profit"] > best_profit:
                     best_operator = SwapOperator(item_in, item_out)
                     best_profit = new_problem_state["current_profit"]
     

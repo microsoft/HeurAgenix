@@ -7,6 +7,8 @@ problem_state (dict): The dictionary contains the problem state with:
     - demands (numpy.ndarray): The demand of each node.
     - current_solution (Solution): Current solution instance.
     - total_current_cost (int): The total cost of the current solution for all vehicles.
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
     - average_demand (float): The average demand per node.
     - demand_variance (float): The variance in demand across all nodes.
     - average_distance (float): The average distance between nodes.
@@ -17,7 +19,6 @@ problem_state (dict): The dictionary contains the problem state with:
     - node_to_vehicle_ratio (float): The ratio of the number of nodes to the number of vehicles.
     - visited_nodes (list[int]): A list of lists representing the nodes visited by each vehicle.
     - visited_num (int): Number of nodes visited by each vehicle.
-    - total_current_cost (int): The total cost of the current solution.
     - last_visited (list[int]): The last visited node for each vehicle.
     - vehicle_loads (list[int]): The current load of each vehicle.
     - vehicle_remaining_capacity (list[int]): The remaining capacity for each vehicle.

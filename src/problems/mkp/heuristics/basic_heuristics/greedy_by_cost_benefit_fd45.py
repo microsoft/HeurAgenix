@@ -18,7 +18,7 @@ def greedy_by_cost_benefit_fd45(problem_state: dict, algorithm_data: dict, **kwa
         AddOperator: The operator to add the selected item to the knapsack.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     profits = problem_state['profits']
     weights = problem_state['weights']
     remaining_capacity = problem_state['remaining_capacity']

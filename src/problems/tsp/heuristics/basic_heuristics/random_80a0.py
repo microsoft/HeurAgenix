@@ -8,7 +8,6 @@ def random_80a0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Ap
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - unvisited_nodes (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
-        get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
 
     Returns:
         AppendOperator: An operator that appends the selected node to the current solution.

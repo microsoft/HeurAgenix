@@ -6,10 +6,9 @@ def block_flip_d4f4(problem_state: dict, algorithm_data: dict, block_size: int =
     Flips the inclusion status of a contiguous block of items to test for an improved solution.
     
     Args:
-        global_data (dict): Contains the global data of the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current solution instance.
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.        algorithm_data (dict): Contains the data necessary for the algorithm. Not used in this function.
             - "validation_solution" (callable): validation solution.
@@ -21,7 +20,7 @@ def block_flip_d4f4(problem_state: dict, algorithm_data: dict, block_size: int =
         dict: Empty dictionary as no algorithm data is updated.
     """
 
-    # Extract necessary data from global_data and state_data
+    # Extract necessary data from problem_state
     weights = problem_state['weights']
     capacities = problem_state['capacities']
     current_solution = problem_state['current_solution']

@@ -17,7 +17,6 @@ def farthest_insertion_6308(problem_state: dict, algorithm_data: dict, **kwargs)
             - last_visited (list[int or None]): Last visited node for each vehicle.
             - vehicle_remaining_capacity (list[int]): Remaining capacity for each vehicle.
         algorithm_data (dict): Algorithm-specific data, updated with any new information during execution.
-        get_state_data_function (callable): Function to evaluate the state of a new solution without modifying the original state.
         kwargs: Hyper-parameters for the heuristic algorithm.
             - spread_penalty_weight (float, default=1.0): Weight for penalizing spread in the scoring mechanism.
             - capacity_utilization_weight (float, default=1.0): Weight for vehicle capacity utilization in the scoring mechanism.

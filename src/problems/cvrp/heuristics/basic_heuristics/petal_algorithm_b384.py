@@ -13,7 +13,6 @@ def petal_algorithm_b384(problem_state: dict, algorithm_data: dict, **kwargs) ->
             - "capacity" (int): The capacity for each vehicle.
             - "vehicle_num" (int): The total number of vehicles.
             - "node_num" (int): The total number of nodes in the problem.
-
             - "current_solution" (Solution): The current set of routes for all vehicles.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
             - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.

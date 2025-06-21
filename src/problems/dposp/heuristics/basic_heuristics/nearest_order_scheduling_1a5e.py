@@ -11,21 +11,16 @@ def nearest_order_scheduling_1a5e(problem_state: dict, algorithm_data: dict, **k
     deadline constraints.
 
     Args:
-        global_data (dict): Contains static information for the DPOSP. Relevant keys:
+        problem_state (dict): Contains static information for the DPOSP. Relevant keys:
             - "transition_time" (numpy.array): 3D array of transition time between products on each production line.
             - "production_rate" (numpy.array): 2D array of production time for each product on each production line.
             - "order_deadline" (numpy.array): 1D array of the deadline for each order.
             - "order_product" (numpy.array): 1D array mapping each order to its required product.
-
-        state_data (dict): Contains dynamic state information for the DPOSP. Relevant keys:
             - "current_solution" (Solution): Current scheduling solution.
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
             - "validation_single_production_schedule" (callable): Function to check whether a production schedule is valid.
 
         algorithm_data (dict): Contains data necessary for the heuristic, which may be updated and returned.
-
-        get_state_data_function (callable): Function to get the state data for a new solution.
-
         **kwargs: Optional hyperparameters for the heuristic, which can be used to tweak its behavior.
 
     Returns:

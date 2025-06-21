@@ -6,11 +6,9 @@ def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **
     It considers the capacity constraints and ensures that the move is beneficial before applying it.
 
     Args:
-        global_data (dict): Contains the global information about the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): The matrix of distances between nodes.
             - "capacity" (int): The capacity for each vehicle.
-            
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): The current set of routes.
             - "vehicle_loads" (list[int]): The current load of each vehicle.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited.

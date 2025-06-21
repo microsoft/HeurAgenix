@@ -52,7 +52,7 @@ def exchange_production_orders_eda2(problem_state: dict, algorithm_data: dict, *
                     continue
 
                 # Get the state data for the new solution
-                new_state_data = get_state_data_function(Solution(new_schedule))
+                new_problem_state = get_state_data_function(Solution(new_schedule))
 
                 # Calculate the time cost difference
                 old_time_cost = problem_state["total_time_cost_per_production_line"][line]

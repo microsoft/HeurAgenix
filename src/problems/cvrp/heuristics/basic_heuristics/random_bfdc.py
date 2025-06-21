@@ -7,11 +7,10 @@ def random_bfdc(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Ap
     This process is repeated for each vehicle until all nodes have been included in a route.
 
     Args:
-        global_data (dict): The global data dict containing the global data. 
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "demands" (numpy.ndarray): The demand of each node.
             - "vehicle_num" (int): The total number of vehicles.
             - "capacity" (int): The capacity for each vehicle.
-        state_data (dict): The state dictionary containing the current state information.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
             - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
             - "current_solution" (Solution): The current set of routes for all vehicles.

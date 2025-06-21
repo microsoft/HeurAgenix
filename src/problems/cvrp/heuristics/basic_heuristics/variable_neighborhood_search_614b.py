@@ -6,12 +6,11 @@ def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict,
     It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
 
     Args:
-        global_data (dict): Global data containing problem parameters.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): Distance between nodes.
             - "vehicle_num" (int): Number of vehicles.
             - "capacity" (int): Capacity of each vehicle.
             - "depot" (int): Index of the depot node.
-        state_data (dict): State data containing the current state of the solution.
             - "current_solution" (Solution): The current set of routes for all vehicles.
             - "vehicle_loads" (list[int]): The current load of each vehicle.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
@@ -23,12 +22,10 @@ def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict,
         dict: Empty dictionary as this function does not update algorithm_data.
     """
 
-    # Retrieve necessary data from state_data
+    # Retrieve necessary data from problem_state
     current_solution = problem_state.get('current_solution')
     vehicle_loads = problem_state.get('vehicle_loads')
     unvisited_nodes = problem_state.get('unvisited_nodes')
-
-    # Retrieve necessary data from global_data
     depot = problem_state.get('depot')
     capacity = problem_state.get('capacity')
     vehicle_num = problem_state.get('vehicle_num')

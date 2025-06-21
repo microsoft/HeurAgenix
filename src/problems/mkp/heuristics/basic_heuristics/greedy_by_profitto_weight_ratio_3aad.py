@@ -5,30 +5,24 @@ def greedy_by_profitto_weight_ratio_3aad(problem_state: dict, algorithm_data: di
     Greedy heuristic that selects items based on the highest profit-to-weight ratio without violating resource constraints.
     
     Args:
-        global_data (dict): Contains global information about the problem instance.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "sorted_items_by_ratio" (list[int]): Sorted item indices by their profit-to-weight ratio.
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
-            
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): Current solution instance.
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.            
-        algorithm_data (dict): Contains data specific to the algorithm's execution. Not used in this heuristic.
-        
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        algorithm_data (dict): Contains data specific to the algorithm's execution. Not used in this heuristic.        
         
     Returns:
         AddOperator: Operator to add the selected item to the current solution.
         dict: Empty dictionary as no algorithm data is updated.
     """
     
-    # Extract necessary data from global_data
+    # Extract necessary data from problem_state
     weights = problem_state["weights"]
     profits = problem_state["profits"]
     item_num = problem_state["item_num"]
     capacities = problem_state["capacities"]
-    
-    # Extract necessary data from state_data
     current_solution = problem_state["current_solution"]
     remaining_capacity = problem_state["remaining_capacity"]
     

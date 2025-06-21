@@ -15,6 +15,7 @@ def greedy_by_weight_e7f9(problem_state: dict, algorithm_data: dict, k_flip_rang
             - "items_in_knapsack" (list[int]): List of indices of items currently in the knapsack.
             - "items_not_in_knapsack" (list[int]): List of indices of items not currently in the knapsack.
             - "feasible_items_to_add" (list[int]): List of indices of items that can be added without violating constraints.
+            - "get_problem_state" (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This is not updated in this heuristic.
         get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution.
         k_flip_range (tuple, optional): The range of k values to explore for k-flip. Default is (2, 3).
@@ -59,8 +60,8 @@ def greedy_by_weight_e7f9(problem_state: dict, algorithm_data: dict, k_flip_rang
                 new_solution[index] = not new_solution[index]
 
             # Check if the new solution is valid and calculate its state data
-            new_state_data = get_state_data_function(Solution(new_solution))
-            if new_state_data is not None:  # Only proceed if the solution is valid
+            new_problem_state = problem_state["get_problem_state"](Solution(new_solution))
+            if new_problem_state is not None:  # Only proceed if the solution is valid
                 new_profit = new_problem_state['current_profit']
                 # If the new solution is better, update best_operator and best_profit
                 if new_profit > best_profit:
@@ -75,8 +76,8 @@ def greedy_by_weight_e7f9(problem_state: dict, algorithm_data: dict, k_flip_rang
             new_solution[item_in], new_solution[item_out] = new_solution[item_out], new_solution[item_in]
 
             # Get the state data for the new solution
-            new_state_data = get_state_data_function(Solution(new_solution))
-            if new_state_data is not None:  # Only proceed if the solution is valid
+            new_problem_state = problem_state["get_problem_state"](Solution(new_solution))
+            if new_problem_state is not None:  # Only proceed if the solution is valid
                 new_profit = new_problem_state["current_profit"]
                 if new_profit > best_profit:
                     best_operator = SwapOperator(item_in, item_out)

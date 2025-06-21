@@ -17,7 +17,6 @@ def _2opt_production_sequence_8e5e(problem_state: dict, algorithm_data: dict, **
             - order_deadline (numpy.array): 1D array of the deadline for each order.
             - current_solution (Solution): Current scheduling solution.
             - validation_single_production_schedule (callable): Function to check whether the production schedule is valid.
-        get_state_data_function (callable): Function to get the state data for a new solution.
 
     Returns:
         ReverseSegmentOperator: The operator that reverse two nodes in the solution to achieve a shorter production schedule.

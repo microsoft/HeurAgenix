@@ -5,10 +5,8 @@ def cheapest_insertion_605f(problem_state: dict, algorithm_data: dict, **kwargs)
     This heuristic selects the non-tour city that, when inserted into the current tour, results in the smallest possible increase in the total tour cost. It then returns an operator that performs this insertion.
 
     Args:
-        global_data (dict): Contains the global data necessary for the heuristic.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): 2D array with distances between nodes.
-            
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current tour solution.
             - "unvisited_nodes" (list[int]): List of node IDs that have not been visited.
             
