@@ -6,7 +6,7 @@ Now please implement it in python function {function_name}.
 To implement this heuristic function in python, please note:
 1. We can assume that Solution and all Operators are imported.
 2. The operator type must be defined previously, do not create a new one in your code.
-3. Never modify the data in global, state and algorithm data.
+3. Never modify the data in problem_state.
 4. All hyper parameters in kwargs should be set a default value.
 5. Any reasonable partial solution may be used as input, such as an empty solution.
 6. Comments in the code are very important. They must clearly explain which hyper-parameters are required by the algorithm (i.e., the parameters in **kwargs), how the algorithm proceeds, and under what circumstances it will not return any operator or will return an empty operator. We hope that people can understand the principles and workflow of the algorithm clearly just by reading the comments, without needing to look at the code.
@@ -16,6 +16,8 @@ To implement this heuristic function in python, please note:
 10. For the circumstances that algorithm return empty operator, please return None, {}.
 11. Do not forget to check whether the content is empty when calculating the min/max/average/std/..., such as when using min([distance[node][other] for other in nodes if other != node]).
 12. Make the result must be valid.
+13. Do not forget the input problem_state:
+{problem_state_introduction}
 
 For {problem} problem, take about following:
 {special_remind}

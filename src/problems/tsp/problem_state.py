@@ -11,12 +11,12 @@ def get_instance_problem_state(instance_data: dict) -> dict:
 
     Returns:
         dict: The dictionary contains the instance problem state with:
-            - "average_distance" (float): The average distance between all pairs of nodes.
-            - "min_distance" (float): The minimum non-zero distance between any two nodes.
-            - "max_distance" (float): The maximum distance between any two nodes.
-            - "std_dev_distance" (float): The standard deviation of the distances.
-            - "density" (float): The density of the graph, calculated as the ratio of non-zero distances to possible edges.
-            - "centroid" (int): The node index that has the smallest sum of distances to all other nodes.
+            - average_distance (float): The average distance between all pairs of nodes.
+            - min_distance (float): The minimum non-zero distance between any two nodes.
+            - max_distance (float): The maximum distance between any two nodes.
+            - std_dev_distance (float): The standard deviation of the distances.
+            - density (float): The density of the graph, calculated as the ratio of non-zero distances to possible edges.
+            - centroid (int): The node index that has the smallest sum of distances to all other nodes.
     """
     distance_matrix = instance_data["distance_matrix"]
     node_num = len(distance_matrix)
@@ -51,16 +51,16 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
 
     Returns:
         dict: The dictionary contains the solution problem state with:
-            - "visited_nodes" (list[int]): The list of visited node IDs.
-            - "unvisited_nodes" (list[int]): The list of unvisited node IDs.
-            - "last_visited" (int): The ID of the last visited node.
-            - "current_path_length" (int): The number of nodes in the current path.
-            - "remaining_nodes" (int): The number of nodes that remain unvisited.
-            - "average_edge_cost" (float): The average cost per edge in the current solution.
-            - "last_edge_cost" (float): The cost of the last edge added to the current solution.
-            - "std_dev_edge_cost" (float): The standard deviation of edge costs in the current solution.
-            - "min_edge_cost_remaining" (float): The minimum edge cost to any unvisited node from the last visited node.
-            - "max_edge_cost_remaining" (float): The maximum edge cost to any unvisited node from the last visited node.
+            - visited_nodes (list[int]): The list of visited node IDs.
+            - unvisited_nodes (list[int]): The list of unvisited node IDs.
+            - last_visited (int): The ID of the last visited node.
+            - current_path_length (int): The number of nodes in the current path.
+            - remaining_nodes (int): The number of nodes that remain unvisited.
+            - average_edge_cost (float): The average cost per edge in the current solution.
+            - last_edge_cost (float): The cost of the last edge added to the current solution.
+            - std_dev_edge_cost (float): The standard deviation of edge costs in the current solution.
+            - min_edge_cost_remaining (float): The minimum edge cost to any unvisited node from the last visited node.
+            - max_edge_cost_remaining (float): The maximum edge cost to any unvisited node from the last visited node.
     """
     distance_matrix = instance_data["distance_matrix"]
     node_num = instance_data["node_num"]

@@ -4,7 +4,7 @@ import re
 import base64
 import importlib
 from time import sleep
-from src.util.util import compress_numbers, extract, load_framework_description
+from src.util.util import compress_numbers, extract, load_framework_description, search_file
 
 
 class BaseLLMClient:
@@ -66,11 +66,14 @@ class BaseLLMClient:
             globals()["Env"] = getattr(module, "Env")
             env = Env(reference_data)
             env_summarize = env.summarize_env()
+        problem_description_file = search_file("problem_description.txt", problem)
+        problem_state_file = search_file("problem_state.txt", problem)
+        assert os.path.exists(problem_dir), f"Problem description file {problem_description_file} does not exist"
 
         prompt_dict = {
             "problem": problem,
-            "problem_description": open(os.path.join(problem_dir, "problem_description.txt"), encoding="utf-8").read(),
-            "problem_state_introduction": open(os.path.join(problem_dir, "problem_state.txt"), encoding="utf-8").read(),
+            "problem_description": open(problem_description_file, encoding="utf-8").read(),
+            "problem_state_introduction": open(problem_state_file, encoding="utf-8").read() if problem_state_file else "",
             "solution_class": solution_class_str,
             "operator_class": operator_class_str,
             "env_summarize": env_summarize

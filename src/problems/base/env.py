@@ -24,8 +24,10 @@ class BaseEnv:
         # A return value greater than 0 indicates that first is better and the larger the number, the greater the advantage.
         self.compare: callable = None
 
-        self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
-        self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
+        problem_state_file = search_file("problem_state.py", problem=self.problem)
+        assert problem_state_file is not None, f"Problem state code file {problem_state_file} does not exist"
+        self.get_instance_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_instance_problem_state")
+        self.get_solution_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_solution_problem_state")
         self.problem_state = self.get_problem_state()
 
     @property

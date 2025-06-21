@@ -114,11 +114,12 @@ class HeuristicGenerator:
         prompt_dict = self.llm_client.load_background(self.problem, "background_with_code", reference_data)
 
         # Find similar problem
-        problem_description_file = search_file("problem_description.txt", problem=self.problem)
-        description_dict = {
-            problem: open(problem_description_file).read()
-            for problem in related_problems
-        }
+        description_dict = {}
+        for problem in related_problems:
+            related_problem_description_file = search_file("problem_description.txt", problem=problem)
+            if related_problem_description_file:
+                description_dict[problem] = open(related_problem_description_file).read()
+
         studied_problems = "\n\n".join([
             f"problem name: {problem}\ndescription: {description_dict[problem]}"
             for problem in related_problems
@@ -169,7 +170,8 @@ class HeuristicGenerator:
                 reference_heuristic_code = open(reference_heuristic_file).read()
                 prompt_dict["referenced_heuristic"] = reference_heuristic
                 prompt_dict["referenced_heuristic_code"] = reference_heuristic_code
-                prompt_dict["referenced_problem_state_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "problem_state.txt")).read()
+                prompt_dict["referenced_global_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "global_data.txt")).read()
+                prompt_dict["referenced_state_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "state_data.txt")).read()
                 self.llm_client.load("mapping_component_in_heuristic", prompt_dict)
                 response = self.llm_client.chat()
                 similarities_in_heuristics = extract(response, "similarities", "\n")

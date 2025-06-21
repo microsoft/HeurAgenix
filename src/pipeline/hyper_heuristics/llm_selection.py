@@ -43,7 +43,7 @@ class LLMSelectionHyperHeuristic:
         heuristic_traject = []
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem)
+        prompt_dict = self.llm_client.load_background(self.problem, background_file="background_without_code.txt")
 
         # Generate global heuristic value
         instance_data = env.instance_data

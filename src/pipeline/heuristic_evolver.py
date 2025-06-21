@@ -99,9 +99,7 @@ class HeuristicEvolver:
             max_refinement_round: int=5,
             smoke_test: bool=True
     ) -> list[tuple[str, list[float]]]:
-        # try:
-        # TODO
-        if True:
+        try:
             env = Env(data_name=train_data)
             basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
             output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", env.data_ref_name)
@@ -190,8 +188,7 @@ class HeuristicEvolver:
                                 last_suggestion = suggestion
                                 last_heuristic_name = refined_heuristic_file.split(os.sep)[-1].split(".")[0]
                                 last_heuristic_result = refined_result
-        else:
-        # except Exception as e:
+        except Exception as e:
             trace_string = traceback.format_exc()
             print(trace_string)
 
