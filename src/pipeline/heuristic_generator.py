@@ -264,7 +264,7 @@ class HeuristicGenerator:
             for previous_operation in previous_operations:
                 env.run_operator(eval(previous_operation.strip()))
             prompt_dict["smoke_solution"] = env.current_solution
-            prompt_dict["smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution, env.get_key_value))
+            prompt_dict["smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution))
             try:
                 # Load heuristic and run once
                 heuristic = load_function(heuristic_code, function_name=function_name)
@@ -280,7 +280,7 @@ class HeuristicGenerator:
                 # Actual result
                 prompt_dict["output_result"] = str(operator)
                 prompt_dict["updated_smoke_solution"] = env.current_solution
-                prompt_dict["updated_smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution, env.get_key_value))
+                prompt_dict["updated_smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution))
 
                 # Compare
                 prompt_dict["expected_result"] = expected_result

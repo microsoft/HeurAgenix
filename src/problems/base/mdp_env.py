@@ -20,11 +20,11 @@ class MDPEnv(BaseEnv):
     def continue_run(self) -> bool:
         return not self.done
 
-    def reset(self, experiment_name: str=None):
+    def reset(self, output_dir: str=None):
         self.gym_env.reset()
         self.done = False
         self.reward = 0
-        super().reset(experiment_name)
+        super().reset(output_dir)
 
     def load_data(self, data_path: str) -> None:
         pass

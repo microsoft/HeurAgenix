@@ -41,13 +41,12 @@ def get_instance_problem_state(instance_data: dict) -> dict:
         "node_num": node_num
     }
 
-def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_value: callable) -> dict:
+def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     """Extract solution problem state from instance data and solution.
 
     Args:
         instance_data (dict): The dictionary contains the instance data.
         solution (Solution): The target solution instance.
-        get_key_value (callable): The function to get current_cost.
 
     Returns:
         dict: The dictionary contains the solution problem state with:
@@ -78,8 +77,10 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     visited_num = len(tour)
     unvisited_num = len(unvisited_nodes)
 
-    # Use provided function to get the current cost of the tour
-    current_cost = get_key_value(solution)
+    # Get the current cost of the tour
+    current_cost = sum([instance_data["distance_matrix"][solution.tour[index]][solution.tour[index + 1]] for index in range(len(solution.tour) - 1)])
+    if len(solution.tour) > 0:
+        current_cost += instance_data["distance_matrix"][solution.tour[-1]][solution.tour[0]]
 
     # Calculate average cost per visited edge
     average_edge_cost = current_cost / visited_num if visited_num > 0 else float("0")

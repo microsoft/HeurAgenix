@@ -149,7 +149,7 @@ class ProblemStateGenerator:
         try:
             # Load solution problem state and run
             get_solution_problem_state = load_function(solution_problem_state_code, function_name="get_solution_problem_state")
-            solution_problem_state = get_solution_problem_state(env.instance_data, env.current_solution, env.get_key_value)
+            solution_problem_state = get_solution_problem_state(env.instance_data, env.current_solution)
             assert solution_problem_state is not None
         except Exception as e:
             error_message = traceback.format_exc()

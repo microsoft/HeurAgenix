@@ -10,25 +10,27 @@ def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
 
     parser = argparse.ArgumentParser(description="Evolve heuristic")
-    parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
-    parser.add_argument("-e", "--basic_heuristic", type=str, required=True, help="Name or path of the basic heuristic.")
-    parser.add_argument("-t", "--train_dir", type=str, default="evolution_data", help="Directory for the training dataset.")
-    parser.add_argument("-v", "--validation_dir", type=str, default="validation_data", help="Directory for the validation dataset.")
-    parser.add_argument("-pe", "--perturbation_heuristic", type=str, default=None, help="Name or path of the perturbation heuristic.")
-    parser.add_argument("-pr", "--perturbation_ratio", type=float, default=0.1, help="Ratio of perturbation.")
-    parser.add_argument("-pt", "--perturbation_time", type=float, default=1000, help="Maximum number of perturbation times.")
-    parser.add_argument("-i", "--max_refinement_round", type=int, default=5, help="Number of refinement rounds.")
-    parser.add_argument("-f", "--filter_num", type=int, default=1, help="Number of heuristics to keep after each validation.")
-    parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Number of evolution rounds.")
-    parser.add_argument("-m", "--smoke_test", action='store_true', help="Run a smoke test.")
-    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file to use.")
+    parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Specifies the type of combinatorial optimization problem.")
+    parser.add_argument("-m", "--smoke_test", action='store_true', help="Optional flag to conduct a preliminary smoke test.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="Path to the language model configuration file. Default is azure_gpt_4o.json.")
+    parser.add_argument("-e", "--seed_heuristic", type=str, required=True, help="The initial seed heuristic to be evolved.")
+    parser.add_argument("-ed", "--evolution_dir", type=str, default="evolution_data", help="Directory containing the training dataset used for heuristic evolution.")
+    parser.add_argument("-vd", "--validation_dir", type=str, default=None, help="Directory containing the validation dataset used to evaluate heuristic performance.")
+    parser.add_argument("-pe", "--perturbation_heuristic", type=str, default=None, help="Optional name or path of an additional perturbation heuristic to explore more diverse strategies. Default is random_xxxx.py in src\problems\{problem}\heuristic\basic_heuristic")
+    parser.add_argument("-pr", "--perturbation_ratio", type=float, default=0.1, help="Proportion of operations to be randomly altered during each perturbation cycle. Default is 0.1.")
+    parser.add_argument("-pt", "--perturbation_time", type=float, default=1000, help="Maximum number of perturbation cycles performed per evolution round.Default is 1000.")
+    parser.add_argument("-i", "--max_refinement_round", type=int, default=5, help="Total number of refinement rounds to iteratively improve heuristics. Default is 5.")
+    parser.add_argument("-f", "--filter_num", type=int, default=1, help="Number of top-performing heuristics to retain after each validation phase. Default is 3.")
+    parser.add_argument("-r", "--evolution_rounds", type=int, default=3, help="Total number of evolutionary iterations to perform. Default is 3.")
 
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
     problem = args.problem
-    basic_heuristic_file = args.basic_heuristic
+    basic_heuristic_file = args.seed_heuristic
+    evolution_dir = args.evolution_dir
+    validation_dir = args.validation_dir if args.validation_dir else args.evolution_dir
     perturbation_heuristic_file = args.perturbation_heuristic
     perturbation_ratio = args.perturbation_ratio
     perturbation_time = args.perturbation_time
@@ -38,10 +40,8 @@ def main():
     smoke_test = args.smoke_test
     llm_config_file = args.llm_config_file
 
-    train_dir = search_file(args.train_dir, problem)
-    validation_dir = search_file(args.validation_dir, problem)
-    if args.validation_dir is None:
-        validation_dir = args.train_dir
+    evolution_dir = search_file(evolution_dir, problem)
+    validation_dir = search_file(validation_dir, problem)
     if not basic_heuristic_file.endswith(".py"):
         basic_heuristic_file += ".py"
     basic_heuristic_file = search_file(basic_heuristic_file, problem)
@@ -58,7 +58,7 @@ def main():
     prompt_dir=os.path.join("src", "problems", "base", "prompt")
     llm_client = get_llm_client(llm_config_file, prompt_dir, None)
 
-    heuristic_evolver = HeuristicEvolver(llm_client, problem, train_dir, validation_dir)
+    heuristic_evolver = HeuristicEvolver(llm_client, problem, evolution_dir, validation_dir)
     evolved_heuristics = heuristic_evolver.evolve(
         basic_heuristic_file,
         perturbation_heuristic_file,

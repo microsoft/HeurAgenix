@@ -15,14 +15,12 @@ class HeuristicEvolver:
         self,
         llm_client: BaseLLMClient,
         problem: str,
-        train_dir: str=None,
-        validation_dir: str=None,
+        evolution_dir: str,
+        validation_dir: str,
     ) -> None:
         self.llm_client = llm_client
         self.problem = problem
-        train_dir = train_dir if train_dir is not None else os.path.join("src", "problems", problem, "data", "train_data")
-        validation_dir = validation_dir if validation_dir is not None else os.path.join("src", "problems", problem, "data", "validation_data")
-        self.train_cases = [os.path.join(train_dir, f) for f in os.listdir(train_dir)]
+        self.evolution_cases = [os.path.join(evolution_dir, f) for f in os.listdir(evolution_dir)]
         self.validation_cases = [os.path.join(validation_dir, f) for f in os.listdir(validation_dir)]
         self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
         self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
@@ -74,9 +72,9 @@ class HeuristicEvolver:
             # Filter the best heuristics
             filtered_heuristic_benchmarks = sorted(total_heuristic_benchmarks, key=lambda x: x[1], reverse=True)[: filtered_num]
             for basic_heuristic_file, _ in filtered_heuristic_benchmarks:
-                for data_name in self.train_cases:
+                for data_name in self.evolution_cases:
                     evolved_heuristic_with_improvements = self.evolution_single(
-                        train_data=data_name,
+                        evolution_data=data_name,
                         basic_heuristic_file=basic_heuristic_file,
                         perturbation_heuristic_file=perturbation_heuristic_file,
                         all_heuristic_docs=heuristic_introduction_docs,
@@ -90,7 +88,7 @@ class HeuristicEvolver:
 
     def evolution_single(
             self,
-            train_data: str,
+            evolution_data: str,
             basic_heuristic_file: str,
             perturbation_heuristic_file: str,
             all_heuristic_docs: str,
@@ -100,7 +98,7 @@ class HeuristicEvolver:
             smoke_test: bool=True
     ) -> list[tuple[str, list[float]]]:
         try:
-            env = Env(data_name=train_data)
+            env = Env(data_name=evolution_data)
             basic_heuristic_name = basic_heuristic_file.split(os.sep)[-1].split(".")[0]
             output_dir = os.path.join("output", self.problem, "evolution_result", f"{basic_heuristic_name}.evolution", env.data_ref_name)
             self.llm_client.reset(output_dir)
@@ -117,7 +115,7 @@ class HeuristicEvolver:
 
             refined_heuristic_benchmarks = []
             if positive_result:
-                print(f"Evolution {basic_heuristic_name} on {train_data}")
+                print(f"Evolution {basic_heuristic_name} on {evolution_data}")
 
                 prompt_dict = self.llm_client.load_background(self.problem, "background_with_code")
                 prompt_dict["all_heuristic_docs"] = all_heuristic_docs
@@ -292,7 +290,7 @@ class HeuristicEvolver:
             env.run_operator(eval(previous_operation))
         prompt_dict["bottleneck_operation"] = bottleneck_operation
         prompt_dict["solution_before_bottleneck"] = str(env.current_solution)
-        prompt_dict["solution_problem_state_before_bottleneck"] = filter_dict_to_str(self.get_solution_problem_state(env.instance_data, env.current_solution, env.get_key_value))
+        prompt_dict["solution_problem_state_before_bottleneck"] = filter_dict_to_str(self.get_solution_problem_state(env.instance_data, env.current_solution))
 
         # Try to provide suggestion
         self.llm_client.load("extract_suggestion", prompt_dict)

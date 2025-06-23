@@ -50,7 +50,7 @@ class LLMSelectionHyperHeuristic:
         instance_problem_state = self.get_instance_problem_state(instance_data)
         prompt_dict["instance_problem_state"] = filter_dict_to_str([instance_data, instance_problem_state], self.problem_state_content_threshold)
 
-        next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution, env.get_key_value)
+        next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution)
         while selection_round * self.steps_per_selection <= max_steps and env.continue_run:
             try:
                 if env.is_complete_solution:
@@ -107,7 +107,7 @@ class LLMSelectionHyperHeuristic:
                 pre_observation[env.key_item] = env.key_value
                 for _ in range(self.steps_per_selection):
                     env.run_heuristic(self.heuristic_functions[selected_heuristic_name])
-                next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution, env.get_key_value)
+                next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution)
                 next_observation = self.get_observation_problem_state(next_solution_problem_state)
                 next_observation[env.key_item] = env.key_value
                 heuristic_dict = {

@@ -12,15 +12,16 @@ def parse_arguments():
     problem_pool = [problem for problem in os.listdir(os.path.join("src", "problems")) if problem != "base"]
 
     parser = argparse.ArgumentParser(description="Generate heuristic")
-    parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
-    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'llm_hh' / 'llm_deep_hh' /'random_hh' for LLM/random selection from the heuristic directory, and 'or_solver' for OR result.")
-    parser.add_argument("-d", "--heuristic_dir", type=str, default="basic_heuristics", help="Directory containing heuristic functions.")
-    parser.add_argument("-t", "--test_case", type=str, default=None, help="Data or directory name for test case(s).")
-    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file in llm_hh.")
-    parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor for determining total heuristic steps based on problem size")
-    parser.add_argument("-m", "--steps_per_selection", type=int, default=5, help="Number of steps each heuristic selection should execute in llm_hh mode.")
-    parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics from llm in llm_hh mode.")
-    parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluation for each heuristic in llm_hh mode.")
+    parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Specifies the type of combinatorial optimization problem.")
+    parser.add_argument("-e", "--heuristic", type=str, required=True, help=": Specifies which heuristic function or strategy to apply. 'heuristic_function_name': Directly specify a heuristic function. 'llm_hh': Utilizes LLM for rapid heuristic selection from the directory. 'random_hh': Randomly selects a heuristic from the directory. 'or_solver': Uses an exact OR solver, where applicable.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="Path to the language model configuration file. Default is azure_gpt_4o.json.")
+    parser.add_argument("-d", "--heuristic_dir", type=str, default="basic_heuristics", help="Directory containing heuristics for llm_hh or random_hh. Default is 'basic_heuristics'.")
+    parser.add_argument("-t", "--test_data", type=str, default=None, help="Name or path of test data or directory for test cases. Defaults to the complete set in `test_data`.")
+    parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor determining total heuristic steps relative to problem size. Default is 2.0.")
+    parser.add_argument("-m", "--steps_per_selection", type=int, default=5, help="Number of steps executed per heuristic selection in LLM mode. Default is 5.")
+    parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.")
+    parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.")
+    parser.add_argument("-r", "--result_dir", type=str, default="result", help="Target directory for saving results. Default is 'result'.")
 
     return parser.parse_args()
 
@@ -29,22 +30,25 @@ def main():
     problem = args.problem
     heuristic = args.heuristic
     heuristic_dir = args.heuristic_dir
-    test_case = args.test_case
+    test_data = args.test_data
     llm_config_file = args.llm_config_file
     iterations_scale_factor = args.iterations_scale_factor
     steps_per_selection = args.steps_per_selection
     num_candidate_heuristics = args.num_candidate_heuristics
     rollout_budget = args.rollout_budget
+    result_dir = args.result_dir
 
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
     heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_dir))
 
+    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+
     if heuristic == "llm_hh":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
         llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
-        output_dir = f"{heuristic}.{heuristic_dir}.{llm_name}.{datetime_str}"
+        experiment_name = f"{heuristic}.{heuristic_dir}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMSelectionHyperHeuristic(
             llm_client=llm_client,
             heuristic_pool=heuristic_pool,
@@ -55,27 +59,28 @@ def main():
             rollout_budget=rollout_budget,
         )
     elif heuristic == "random_hh":
-        output_dir = f"{heuristic}.{heuristic_dir}.{datetime_str}"
+        experiment_name = f"{heuristic}.{heuristic_dir}.{datetime_str}"
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem, iterations_scale_factor=iterations_scale_factor)
     elif heuristic == "or_solver":
-        output_dir = "or_solver"
+        experiment_name = "or_solver"
         module = importlib.import_module(f"src.problems.{problem}.or_solver")
         globals()["ORSolver"] = getattr(module, "ORSolver")
         hyper_heuristic = ORSolver(problem=problem)
     else:
-        output_dir = heuristic
+        experiment_name = heuristic
         hyper_heuristic = SingleHyperHeuristic(heuristic=heuristic, problem=problem)
 
     module = importlib.import_module(f"src.problems.{problem}.env")
     globals()["Env"] = getattr(module, "Env")
 
-    if test_case:
-        test_case = [search_file(test_case, problem)]
+    if test_data:
+        test_data = [search_file(test_data, problem)]
     else:
-        test_case = os.listdir(os.path.join("output", problem, "data", "test_data"))
+        test_data = os.listdir(os.path.join("output", problem, "data", "test_data"))
 
-    for data_name in test_case:
+    for data_name in test_data:
         env = Env(data_name=data_name)
+        output_dir = os.path.join(base_output_dir, problem, result_dir, env.data_ref_name, experiment_name)
         env.reset(output_dir)
 
         paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 

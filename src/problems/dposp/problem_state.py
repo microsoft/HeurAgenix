@@ -59,13 +59,12 @@ def get_instance_problem_state(instance_data: dict) -> dict:
 
 import numpy as np
 
-def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_value: callable) -> dict:
+def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     """Extract solution problem state from instance data and solution.
 
     Args:
         instance_data (dict): The dictionary contains the instance data.
         solution (Solution): The target solution instance.
-        get_key_value (callable): The function to get current_cost.
 
     Returns:
         dict: A dictionary with calculated problem_states for the current state:
@@ -195,8 +194,6 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
 
 
     return {
-        "current_solution": solution,
-        "fulfilled_order_num": len(fulfilled_orders),
         "fulfilled_orders": fulfilled_orders,
         "unfulfilled_orders": unfulfilled_orders,
         "total_time_cost": np.sum(total_time_cost_per_production_line),

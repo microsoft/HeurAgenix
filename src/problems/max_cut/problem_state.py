@@ -52,13 +52,12 @@ def get_instance_problem_state(instance_data: dict) -> dict:
 
 import numpy as np
 
-def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_value: callable) -> dict:
+def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     """Extract solution problem state from instance data and solution.
 
     Args:
         instance_data (dict): The dictionary contains the instance data.
         solution (Solution): The target solution instance.
-        get_key_value (callable): The function to get current_cost.
 
     Returns:
         dict: A dictionary with calculated problem_states for the current state:
@@ -83,7 +82,10 @@ def get_solution_problem_state(instance_data: dict, solution: Solution, get_key_
     unselected_nodes = set(range(node_num)) - solution.set_a - solution.set_b
 
     # Calculate problem states
-    current_cut_value = get_key_value(solution)
+    current_cut_value = 0
+    for node_a in solution.set_a:
+        for node_b in solution.set_b:
+            current_cut_value += instance_data["weight_matrix"][node_a][node_b]
     imbalance_ratio = abs(set_a_count - set_b_count) / node_num
     average_cut_edge_weight = current_cut_value / len(selected_nodes) if selected_nodes else 0
     selected_nodes_ratio = len(selected_nodes) / node_num

@@ -52,17 +52,17 @@ class BaseEnv:
         """Get the key value of the solution."""
         pass
 
-    def reset(self, experiment_name: str=None):
+    def reset(self, output_dir: str=None):
         self.current_solution = self.init_solution()
         self.problem_state = self.get_problem_state()
         self.algorithm_data = {}
         self.recording = []
-        if experiment_name:
-            if os.sep in experiment_name:
-                self.output_dir = experiment_name
+        if output_dir:
+            if os.sep in output_dir:
+                self.output_dir = output_dir
             else:
                 base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
-                self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, experiment_name)
+                self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, output_dir)
             os.makedirs(self.output_dir, exist_ok=True)
 
     def load_data(self, data_path: str) -> dict:
@@ -78,7 +78,7 @@ class BaseEnv:
         if solution is None:
             solution = self.current_solution
         instance_problem_state = self.get_instance_problem_state(self.instance_data)
-        solution_problem_state = self.get_solution_problem_state(self.instance_data, solution, self.get_key_value)
+        solution_problem_state = self.get_solution_problem_state(self.instance_data, solution)
         helper_function = self.helper_function()
         problem_state = None
         if solution_problem_state:
