@@ -3,11 +3,11 @@ These are the heuristics in format: heuristic_name(parameter=default_value, ..):
 {heuristic_pool_introduction}
 
 
-The global data with some heuristic values for this problem:
+The instance problem state:
 {instance_problem_state}
 Note: Some data are omitted due to space constraints.
 
-The solution data some heuristic values for current stage:
+The solution problem state:
 {solution_problem_state}
 Note: Some data are omitted due to space constraints.
 
