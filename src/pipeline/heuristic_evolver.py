@@ -206,7 +206,7 @@ class HeuristicEvolver:
         # Generate negative result from basic heuristic
         hyper_heuristic = SingleHyperHeuristic(basic_heuristic_file, problem=self.problem)
         hyper_heuristic.run(env)
-        negative_result = env.dump_result(dump_trajectory=True, dump_heuristic=False, result_file="negative_solution.txt")
+        negative_result = env.dump_result(dump_records=["operation_id", "operator"], result_file="negative_solution.txt")
         negative_value = env.key_value
 
         # Generate positive result by perturbation heuristic
@@ -216,7 +216,7 @@ class HeuristicEvolver:
             hyper_heuristic = PerturbationHyperHeuristic(basic_heuristic_file, perturbation_heuristic_file, self.problem, perturbation_ratio)
             hyper_heuristic.run(env)
             if env.compare(env.key_value, negative_value) > 0:
-                positive_result = env.dump_result(dump_trajectory=True, dump_heuristic=False, result_file="positive_solution.txt")
+                positive_result = env.dump_result(dump_records=["operation_id", "operator"], result_file="positive_solution.txt")
                 break
         return negative_result, positive_result
 
@@ -284,9 +284,9 @@ class HeuristicEvolver:
         prompt_dict["proposed_operation"] = proposed_operation
         prompt_dict["reason"] = reason
         negative_trajectory_df = pd.read_csv(StringIO(prompt_dict["negative_trajectory"]), sep="\t")
-        bottleneck_operation = list(negative_trajectory_df[negative_trajectory_df["operation_id"] == bottleneck_operation_id]["operator(parameter)"])[0]
+        bottleneck_operation = list(negative_trajectory_df[negative_trajectory_df["operation_id"] == bottleneck_operation_id]["operator"])[0]
 
-        for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator(parameter)"]:
+        for previous_operation in negative_trajectory_df[negative_trajectory_df["operation_id"] < bottleneck_operation_id]["operator"]:
             env.run_operator(eval(previous_operation))
         prompt_dict["bottleneck_operation"] = bottleneck_operation
         prompt_dict["solution_before_bottleneck"] = str(env.current_solution)
@@ -371,8 +371,7 @@ class HeuristicEvolver:
     def validation(
             self,
             validation_cases: list[str],
-            heuristic_file: str,
-            dump_result: bool=False
+            heuristic_file: str
         ) -> list[float]:
         validation_results = []
         heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
@@ -382,8 +381,6 @@ class HeuristicEvolver:
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
             is_complete_valid_solution = hyper_heuristic.run(env)
             result = env.key_value if is_complete_valid_solution else None
-            if dump_result:
-                env.dump_result()
             validation_results.append(result)
         return validation_results
     

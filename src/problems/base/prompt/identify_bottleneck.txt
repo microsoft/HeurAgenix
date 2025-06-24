@@ -35,8 +35,8 @@ Please note:
 
 The response format is very important. For better communication, please respond to me in this format:
 ***bottleneck_operations:
-negative_operator_id; proposed_better_operator; reason
-negative_operator_id; proposed_better_operator; reason
+negative_operation_id; proposed_better_operator; reason
+negative_operation_id; proposed_better_operator; reason
 ....
 ***
 Ensure there is no other content inside the ***, and analysis outside *** is welcome.

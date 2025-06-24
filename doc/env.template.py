@@ -79,12 +79,12 @@ class Env(BaseEnv):
         # Implement the validation code here.
         pass
 
-    def dump_result(self, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, content_dict: dict={}, dump_records: list=["operation_id", "operator", "heuristic"], result_file: str="result.txt") -> str:
         # Optional: Dump the result of the env.
         # Instance data, solution, key item, trajectory with heuristic and operation are dumped by default.
         content_dict = {
             # The data name, current solution, complete flag, validation flag and trajectory will be added by super().dump_result(content_dict)
             # add other information to dump.
         }
-        content = super().dump_result(content_dict=content, dump_trajectory=dump_trajectory, dump_heuristic=dump_heuristic, result_file=result_file)
+        content = super().dump_result(content_dict=content, dump_records=dump_records, result_file=result_file)
         return content

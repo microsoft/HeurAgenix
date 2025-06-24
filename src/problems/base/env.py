@@ -14,7 +14,7 @@ class BaseEnv:
         self.instance_data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = self.init_solution()
         self.algorithm_data: dict = None
-        self.recording: list[tuple] = None
+        self.recordings: list[tuple] = None
         self.output_dir: str = None
         # Maximum step to constructive a complete solution
         self.construction_steps: int = None
@@ -56,7 +56,7 @@ class BaseEnv:
         self.current_solution = self.init_solution()
         self.problem_state = self.get_problem_state()
         self.algorithm_data = {}
-        self.recording = []
+        self.recordings = []
         if output_dir:
             if os.sep in output_dir:
                 self.output_dir = output_dir
@@ -96,33 +96,30 @@ class BaseEnv:
         """Check the validation of this solution"""
         pass
 
-    def run_heuristic(self, heuristic: callable, parameters:dict={}, inplace: bool=True) -> BaseOperator:
+    def run_heuristic(self, heuristic: callable, parameters:dict={}, add_record_item: dict={}) -> BaseOperator:
         try:
             operator, delta = heuristic(
                 problem_state=self.problem_state,
                 algorithm_data=self.algorithm_data,
                 **parameters
             )
-            if operator is not None:
-                result = self.run_operator(operator, inplace, heuristic.__name__)
-                if result:
-                    self.algorithm_data.update(delta)
-                    return operator
-            return None
+            if isinstance(operator, BaseOperator):
+                self.run_operator(operator)
+                self.algorithm_data.update(delta)
+            record_item = {"operation_id": len(self.recordings), "heuristic": heuristic.__name__, "operator": operator}
+            record_item.update(add_record_item)
+            self.recordings.append(record_item)
+            return operator
         except Exception as e:
             trace_string = traceback.format_exc()
             print(trace_string)
             return trace_string
 
-    def run_operator(self, operator: BaseOperator, inplace: bool=True, heuristic_name: str=None) -> bool:
+    def run_operator(self, operator: BaseOperator) -> bool:
         if isinstance(operator, BaseOperator):
-            solution = operator.run(self.current_solution)
-            if inplace:
-                self.current_solution = solution
-                self.recording.append((str(heuristic_name), operator))
+            self.current_solution = operator.run(self.current_solution)
             self.problem_state = self.get_problem_state()
-            return operator
-        return None
+        return operator
 
     def summarize_env(self) -> str:
         pass
@@ -138,7 +135,7 @@ class BaseEnv:
         self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
         self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
 
-    def dump_result(self, content_dict: dict={}, dump_trajectory: bool=True, dump_heuristic: bool=True, result_file: str="result.txt") -> str:
+    def dump_result(self, content_dict: dict={}, dump_records: list=["operation_id", "operator", "heuristic"], result_file: str="result.txt") -> str:
         content = f"-data: {self.data_path}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
@@ -146,20 +143,14 @@ class BaseEnv:
         content += f"-{self.key_item}: {self.key_value}\n"
         for item, value in content_dict.items():
             content += f"-{item}: {value}\n"
-        if dump_trajectory:
-            if dump_heuristic:
-                trajectory_str = "\n".join([
-                    str(index) + "\t" + heuristic_name + "\t" + str(operator)
-                    for index, (heuristic_name, operator) in enumerate(self.recording)
-                ])
-                content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\n{trajectory_str}\n"
-            else:
-                trajectory_str = "\n".join([
-                    str(index) + "\t" + str(operator)
-                    for index, (heuristic_name, operator) in enumerate(self.recording)
-                ])
-                content += f"-trajectory:\noperation_id\toperator(parameter)\n{trajectory_str}\n"
-
+        if dump_records and len(dump_records) > 0 and len(self.recordings) > 0 and len(self.recordings[0].keys()) > 0:
+            dump_records = [item for item in dump_records if item in self.recordings[0].keys()]
+            content += "-trajectory:\n" + "\t".join(dump_records) + "\n"
+            trajectory_str = "\n".join([
+                "\t".join([str(recording_item.get(item, "None")) for item in dump_records])
+                for recording_item in self.recordings
+            ])
+            content += trajectory_str
 
         if self.output_dir != None and result_file != None:
             output_file = os.path.join(self.output_dir, result_file)

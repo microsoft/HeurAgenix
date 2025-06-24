@@ -106,7 +106,7 @@ class LLMSelectionHyperHeuristic:
                 pre_observation = self.get_observation_problem_state(solution_problem_state)
                 pre_observation[env.key_item] = env.key_value
                 for _ in range(self.steps_per_selection):
-                    env.run_heuristic(self.heuristic_functions[selected_heuristic_name])
+                    env.run_heuristic(self.heuristic_functions[selected_heuristic_name], add_record_item={"step": selection_round})
                 next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution)
                 next_observation = self.get_observation_problem_state(next_solution_problem_state)
                 next_observation[env.key_item] = env.key_value
