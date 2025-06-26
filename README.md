@@ -232,7 +232,7 @@ Parameters:
   - `'random_hh'`: Randomly selects a heuristic from the directory.
   - `'or_solver'`: Uses an exact OR solver, where applicable.
 - `-d`, `--heuristic_dir`: Directory containing heuristics for llm_hh or random_hh. Default is 'basic_heuristics'.
-- `-t`, `--test_data`: Name or path of test data or directory for test cases. Defaults to the complete set in `test_data`.
+- `-t`, `--test_data`: Path to a specific test data file. Defaults to testing all files in the `test_data` directory if not specified.
 - `-l`, `--llm_config_file`: Path to LLM configuration. Defaults is `azure_gpt_4o.json`.
 - `-n`, `--iterations_scale_factor`: Scale factor determining total heuristic steps relative to problem size. Default is 2.0.
 - `-m`, `--steps_per_selection`: Number of steps executed per heuristic selection in LLM mode. Default is 5.
