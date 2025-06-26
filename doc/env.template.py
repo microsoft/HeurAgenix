@@ -1,47 +1,43 @@
 from src.problems.base.env import BaseEnv
-# Import Solution from problems
-# For example for tsp
-# from src.problems.tsp.components import Solution
+from src.problems.base.components import BaseSolution
 
 
 class Env(BaseEnv):
-    """xxx env that stores the static global data, current solution, dynamic state and provide necessary support to the algorithm."""
+    """xxx env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         # 1. Init the Env. xxx is the problem name.
         super().__init__(data_name, "xxx")
 
-        # 2. Get the data by . The data should align with output from function def load_data.
-        self.data1, self.data2, ... = self.data
-
-        # 3. Clarity the key item that indicates the performance. xxx is the key item in state_data (defined in get_state_data function)
+        # 2. Clarity the key item that indicates the performance. (calculated by get_key_value)
         self.key_item = "xxx"
 
-        # 4. Clarity the comparison function. (higher is better of lower is better)
+        # 3. Clarity the comparison function. (higher is better of lower is better)
         # self.compare = lambda x, y: y - x # lower is better
         self.compare = lambda x, y: x - y # higher is better
 
-        # 5. Clarity the construction steps for the (Optional)
+        # 4. Clarity the construction steps for the (Optional)
         self.construction_steps = ...
 
-        # Other necessary varibles/state_data for special problem
+        # Other necessary logic for special problem
 
         # For example, for tsp:
         # super().__init__(data_name, "tsp")
-        # self.node_num, self.distance_matrix = self.data
         # self.construction_steps = self.node_num
         # self.key_item = "current_cost"
         # self.compare = lambda x, y: y - x
+        # The data load by load_data can be used as self.instance_data[xxx]
+        # Such as self.instance_data["node_num"] and self.instance_data["distance_matrix"]
     
 
-    def load_data(self, data_path: str) -> None:
-        # load data and return them.
+    def load_data(self, data_path: str) -> dict:
+        # load data and return by dict.
         pass
 
         # For example, for tsp:
         # problem = tsplib95.load(data_path)
         # distance_matrix = nx.to_numpy_array(problem.get_graph())
         # node_num = len(distance_matrix)
-        # return node_num, distance_matrix
+        # return {"node_num": node_num, "distance_matrix": distance_matrix}
 
 
     @property
@@ -51,13 +47,16 @@ class Env(BaseEnv):
         # For example, for the TSP problem, we need to visit all nodes
         # return len(set(self.current_solution.tour)) == self.node_num
         # For some problem we do not care about or cannot judge the completeness of the solution, just return True.
-        # For example, for the knapsack problem, we do not need to worry about completeness, because it is possible that not even one item can be loaded. 
         pass
 
     def init_solution(self) -> None:
         # Init the solution for special problem
         # For example, for TSP
         # return Solution(tour=[])
+        pass
+
+    def get_key_value(self, solution: BaseSolution=None):
+        # Get the value of key item that indicates the performance.
         pass
 
     def validation_solution(self, solution=None) -> bool:
@@ -80,44 +79,12 @@ class Env(BaseEnv):
         # Implement the validation code here.
         pass
 
-    def get_global_data(self) -> dict:
-        """Retrieve the global static information data as a dictionary.
-
-        Returns:
-            dict: A dictionary containing the global static information data with:
-                - "xx" (xx type): xxxx
-                - "xx" (xx type): xxxx
-        """
-
-        global_data_dict = {
-            # add global data here
-        }
-        return global_data_dict
-
-    def get_state_data(self, solution=None) -> dict:
-        """Retrieve the current dynamic state data as a dictionary.
-
-        Returns:
-            dict: A dictionary containing the current dynamic state data with:
-                - "current_solution" (Solution): An instance of the Solution class representing the current solution.
-                - "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
-                - "xx" (xx type): xxxx
-                - "xx" (xx type): xxxx
-        """
-        if solution is None:
-            solution = self.current_solution
-
-        state_data_dict = {
-            "current_solution": solution,
-            "validation_solution": self.validation_solution,
-            # add other state data here
-        }
-        return state_data_dict
-
-    def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
+    def dump_result(self, content_dict: dict={}, dump_records: list=["operation_id", "operator", "heuristic"], result_file: str="result.txt") -> str:
+        # Optional: Dump the result of the env.
+        # Instance data, solution, key item, trajectory with heuristic and operation are dumped by default.
         content_dict = {
             # The data name, current solution, complete flag, validation flag and trajectory will be added by super().dump_result(content_dict)
             # add other information to dump.
         }
-        content = super().dump_result(content_dict=content, dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
+        content = super().dump_result(content_dict=content, dump_records=dump_records, result_file=result_file)
         return content

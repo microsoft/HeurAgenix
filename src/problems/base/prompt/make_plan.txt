@@ -1,9 +1,0 @@
-We have classified our heuristics into the following categories (note that some heuristics may belong to multiple categories): {category_names}
-{classified_heuristic_introduction}
-
-We aim to solve this problem using the following data:
-{global_data_feature}
-
-In the next conversation, I will provide detailed data, past solution steps, and the current solution status. Based on this information, you'll assess the performance of previous heuristics and select the appropriate heuristic category and execution steps. I will then choose a specific heuristic from the selected category and then run {running_step} to test its performance.
-
-Please develop a strategic guide for selecting heuristic categories and defining execution steps for each phase. Not every category needs to be utilized; this guide will serve as a framework for our future decisions. Our goal is to alternate between different heuristics during the construction and improvement phases, rather than depending on a single heuristic consistently. Our approach will be iterative, enabling us to experiment with various algorithm types to assess their effectiveness. Initially, avoid relying solely on construction heuristics; test them briefly, evaluate their performance, and switch as necessary.

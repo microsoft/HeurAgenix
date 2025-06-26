@@ -1,14 +1,12 @@
 from src.problems.tsp.components import *
 
-def cheapest_insertion_605f(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def cheapest_insertion_605f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     This heuristic selects the non-tour city that, when inserted into the current tour, results in the smallest possible increase in the total tour cost. It then returns an operator that performs this insertion.
 
     Args:
-        global_data (dict): Contains the global data necessary for the heuristic.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): 2D array with distances between nodes.
-            
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current tour solution.
             - "unvisited_nodes" (list[int]): List of node IDs that have not been visited.
             
@@ -18,9 +16,9 @@ def cheapest_insertion_605f(global_data: dict, state_data: dict, algorithm_data:
         InsertOperator: The operator to insert the cheapest node into the current solution.
         dict: Empty dictionary as this heuristic does not update algorithm_data.
     """
-    distance_matrix = global_data['distance_matrix']
-    current_solution = state_data['current_solution']
-    unvisited_nodes = state_data['unvisited_nodes']
+    distance_matrix = problem_state['distance_matrix']
+    current_solution = problem_state['current_solution']
+    unvisited_nodes = problem_state['unvisited_nodes']
 
     # If the current solution is empty, start from first unvisited node.
     if not current_solution.tour:

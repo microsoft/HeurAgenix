@@ -5,6 +5,8 @@ import io
 import hashlib
 import numpy as np
 import pandas as pd
+import difflib
+
 
 def extract(message: str, key: str, sep=None) -> list[str]:
     formats = [
@@ -31,6 +33,10 @@ def extract(message: str, key: str, sep=None) -> list[str]:
     else:
         return None
 
+def find_closest_match(input_string, string_list):
+    matches = difflib.get_close_matches(input_string, string_list, n=1, cutoff=0.0)
+    return matches[0] if matches else None 
+
 def parse_text_to_dict(text):
     lines = text.split("\n")
     result = {}
@@ -39,7 +45,7 @@ def parse_text_to_dict(text):
     for line in lines:
         if len(line) > 0 and line[0] == "-" and ":" in line:
             if current_key:
-                result[current_key] = "\n".join(current_content).strip()
+                result[current_key.replace(" ", "")] = "\n".join(current_content).strip()
             current_key = line[1:].split(":")[0]
             current_content = []
             if len(line.split(":")) > 0:
@@ -47,24 +53,25 @@ def parse_text_to_dict(text):
         elif current_key:
             current_content.append(line)
     if current_key:
-        result[current_key] = "\n".join(current_content).strip()
+        result[current_key.replace(" ", "")] = "\n".join(current_content).strip()
     return result
 
-def load_heuristic(heuristic_file:str, problem: str="base", function_name: str=None) -> callable:
-    if not "\n" in heuristic_file:
-        if not heuristic_file.endswith(".py"):
-            # Heuristic name
-            heuristic_file += ".py"
-        heuristic_path = search_file(heuristic_file, problem)
-        assert heuristic_path is not None
-        heuristic_code = open(heuristic_path, "r").read()
+def load_function(file:str, problem: str="base", function_name: str=None) -> callable:
+    if not "\n" in file:
+        if not file.endswith(".py"):
+            # File name
+            file += ".py"
+        file_path = search_file(file, problem)
+        assert file_path is not None
+        code = open(file_path, "r").read()
     else:
-        # Heuristic code
-        heuristic_code = heuristic_file
+        # code only
+        code = file
 
     if function_name is None:
-        function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
-    exec(heuristic_code, globals())
+        function_name = file.split(os.sep)[-1].split(".")[0]
+
+    exec(code, globals())
     assert function_name in globals()
     return eval(function_name)
 
@@ -142,7 +149,7 @@ def extract_function_with_short_docstring(code_str, function_name):
     if match:
         string = match.group(0)
         function_name = string.split("(")[0].strip()
-        parameters = string.split("get_state_data_function: callable")[1].split(", **kwargs")[0].strip()
+        parameters = string.split("algorithm_data: dict")[1].split(", **kwargs")[0].strip()
         if parameters[:2] == ", ":
             parameters = parameters[2:]
         introduction = string.split("\"\"\"")[1].split("Args")[0].strip()

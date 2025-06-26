@@ -1,37 +1,29 @@
-To evaluate the validity of your suggestion, we keep the operations before step {bottleneck_operation_id}, integrate {proposed_operation} in step {bottleneck_operation_id} and applying the {function_name} for remaining steps. Now we got the update result
+Now focus on this operator {bottleneck_operation} in step {bottleneck_operation_id}.
 
-The updated result: {proposed_solution} with {proposed_result}
-{proposed_trajectory}
+The solution before {bottleneck_operation} is:
+{solution_before_bottleneck}
+To aid your analysis, I extracted the following problem states from this state:
+{solution_problem_state_before_bottleneck}
 
-Compared with origin negative result from {function_name}: {negative_solution} with {negative_result}
-{negative_trajectory}
+You believe that {proposed_operation} is better with reason {reason}. So we hope to update {function_name} to output {proposed_operation} in this state.
+Try to provide suggestion to update the code using mathematical analysis.
 
-Your propose works well.
+Please provide suggestion in following one or more aspects:
+1. Set the hyper-parameters or update the hyper-parameters' value for better control.
+2. Add more logic to this function for better control.
+3. Limit the application scope of certain logic with an if-check.
+4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
+5. Also consider learning from other heuristics:
+{all_heuristic_docs}
 
-Now review the {function_name}:
-{function_introduction}.
-We hope to extract this into rule to get the suggestion for improvement of {function_name}:
-Please note:
-1. I believe that in most cases, our rule works in a scope of applicability, that is, it is effective in certain circumstances. Outside of this scope, we still maintain the original algorithm.
-2. The rule must be clear and calculate. For example, choosing operation A brings greater benefits in the form of rebates, but we do not know how to measure future benefits.
-3. Rule must have nothing todo with current data. It should be general experience.
-
-Combined previous calculate process: 
-{calculation_process}
-And application scope: 
-{application_scope}
-By the way, we believe no rule can works for all application scope, sometimes it works and sometimes it may not work. So application scope is important.
-Extract this analysis into rule to improve the {function_name}.
-consider to raise suggestion:
-1. better selection
-2. better parameters
-3. insert more structure
-4. learn from other heuristics
+To make sure the suggestion is useful, please check in following aspects:
+1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.
+2. Will the updated suggestion make the function output {proposed_operation} in this step?
+3. If we run the updated function on this data from beginning to end, will the result be better than {positive_solution} ({positive_result})?
+4. Is this a commonly useful update for all instances or states?
 
 The response format is very important. For better communication, please respond to me in this format:
-***suggestion:
-application_scope: (optional) xxx
-rule: xxx
+***suggestion: xxx
 ***
 Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you have no information to provide, simply respond with ***None***.

@@ -1,17 +1,16 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 import random
 
-def random_6512(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def random_6512(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """This heuristic randomly selects an unfinished job and advances its next operation in the job's processing sequence.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_num" (int): The total number of jobs in the problem.
             - "machine_num" (int): The total number of machines in the problem, also as operation num.
             - "job_operation_sequence" (numpy.ndarray): A list of jobs where each job is a list of operations in target sequence.
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in the target job.
             - "total_processing_times" (list[int]): The total processing time for each machine across all jobs in machine id.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "finished_jobs" (list[int]): List of all finished jobs.
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
@@ -27,7 +26,7 @@ def random_6512(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         dict: Updated algorithm data (empty in this case).
     """
     # Check if there are any unfinished jobs
-    unfinished_jobs = state_data["unfinished_jobs"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
     if not unfinished_jobs:
         return None, {}
 

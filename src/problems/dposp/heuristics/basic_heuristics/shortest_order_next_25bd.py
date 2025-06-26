@@ -1,15 +1,13 @@
 from src.problems.dposp.components import *
 
-def shortest_order_next_25bd(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def shortest_order_next_25bd(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """Shortest Order Next heuristic for DPOSP selects the unfulfilled order with the shortest processing time and inserts it into the best position in the production schedule.
     
     Args:
-        global_data (dict): Contains static information about the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production time for each product on each production line.
             - order_product (numpy.array): 1D array mapping each order to its required product.
             - order_quantity (numpy.array): 1D array of the quantity required for each order.
-            
-        state_data (dict): Contains dynamic state information of the solution.
             - current_solution (Solution): The current solution state.
             - unfulfilled_orders (list[int]): List of unfulfilled orders.
             - feasible_orders_to_fulfill (list): The feasible orders that can be fulfilled based on the current solution.
@@ -23,12 +21,12 @@ def shortest_order_next_25bd(global_data: dict, state_data: dict, algorithm_data
     """
 
     # Extract necessary information
-    production_rate = global_data["production_rate"]
-    order_product = global_data["order_product"]
-    order_quantity = global_data["order_quantity"]
-    feasible_orders = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
-    current_solution = state_data["current_solution"]
+    production_rate = problem_state["production_rate"]
+    order_product = problem_state["order_product"]
+    order_quantity = problem_state["order_quantity"]
+    feasible_orders = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
+    current_solution = problem_state["current_solution"]
     
     # Check if there are any feasible orders to fulfill
     if not feasible_orders:

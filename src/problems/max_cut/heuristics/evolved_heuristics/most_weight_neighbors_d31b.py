@@ -1,21 +1,19 @@
 from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
 import numpy as np
 
-def most_weight_neighbors_d31b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, scaling_factor: float = 0.5, swap_frequency: int = 5, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def most_weight_neighbors_d31b(problem_state: dict, algorithm_data: dict, scaling_factor: float = 0.5, swap_frequency: int = 5, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """The most_weight_neighbors_d31b heuristic selects an unselected node based on both immediate and future impacts 
     on the cut value and periodically considers swaps to further improve the solution.
 
     Args:
-        global_data (dict): The global data dict containing the following items:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): The state dictionary containing the current state information:
             - "current_solution" (Solution): The current partition of the graph into sets A and B.
             - "unselected_nodes" (set[int]): The set of nodes that have not yet been selected.
             - "current_cut_value" (float): The current cut value of the solution.
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
             - "sorted_nodes" (list of tuples): A sorted list of (node, future_impact) in descending order.
             - "operation_count" (int): The number of operations performed so far.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
         scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
         swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.
 
@@ -25,9 +23,9 @@ def most_weight_neighbors_d31b(global_data: dict, state_data: dict, algorithm_da
     """
 
     # Extract necessary data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     set_a, set_b = current_solution.set_a, current_solution.set_b
     operation_count = algorithm_data.get("operation_count", 0)
 

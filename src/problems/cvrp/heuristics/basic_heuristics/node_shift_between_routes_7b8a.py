@@ -1,16 +1,14 @@
 from src.problems.cvrp.components import *
 
-def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[RelocateOperator, dict]:
+def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[RelocateOperator, dict]:
     """Node Shift Between Routes heuristic for CVRP.
     This heuristic attempts to move a node from one route to another route, aiming to reduce the total distance or improve load balance.
     It considers the capacity constraints and ensures that the move is beneficial before applying it.
 
     Args:
-        global_data (dict): Contains the global information about the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): The matrix of distances between nodes.
             - "capacity" (int): The capacity for each vehicle.
-            
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): The current set of routes.
             - "vehicle_loads" (list[int]): The current load of each vehicle.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited.
@@ -20,14 +18,12 @@ def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorith
     Returns:
         (RelocateOperator, dict): The operator to shift a node between routes and an empty dictionary, as the heuristic does not update algorithm_data.
     """
-    # Extract required data from global_data
-    distance_matrix = global_data["distance_matrix"]
-    capacity = global_data["capacity"]
-    depot = global_data["depot"]
-    
-    # Extract required data from state_data
-    current_solution = state_data["current_solution"]
-    vehicle_loads = state_data["vehicle_loads"]
+    # Extract required data from problem_state
+    distance_matrix = problem_state["distance_matrix"]
+    capacity = problem_state["capacity"]
+    depot = problem_state["depot"]
+    current_solution = problem_state["current_solution"]
+    vehicle_loads = problem_state["vehicle_loads"]
     # Find the best position to insert the node in the target route
     best_position = None
     best_cost_reduction = 0
@@ -39,7 +35,7 @@ def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorith
                 continue
             
             # Calculate the load after removing the node
-            new_load_source = vehicle_loads[source_vehicle_id] - global_data["demands"][node]
+            new_load_source = vehicle_loads[source_vehicle_id] - problem_state["demands"][node]
             if new_load_source < 0:
                 continue  # Skip if moving the node violates source vehicle's capacity
             
@@ -50,7 +46,7 @@ def node_shift_between_routes_7b8a(global_data: dict, state_data: dict, algorith
                     continue
                 
                 # Calculate the load after adding the node to the target vehicle
-                new_load_target = vehicle_loads[target_vehicle_id] + global_data["demands"][node]
+                new_load_target = vehicle_loads[target_vehicle_id] + problem_state["demands"][node]
                 if new_load_target > capacity:
                     continue  # Skip if moving the node violates target vehicle's capacity
                 for target_position in range(len(target_route) + 1):

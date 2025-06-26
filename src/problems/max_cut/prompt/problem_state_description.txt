@@ -1,0 +1,19 @@
+- instance_data:
+    - node_num (int): The total number of vertices in the graph.
+    - weight_matrix (numpy.ndarray): A 2D array representing the weight between nodes.
+
+- solution:
+    - current_solution (Solution): Current solution instance.
+
+- key_item:
+    - current_cut_value (int or float): The total weight of edges between set A and set B in the current solution.
+
+- helper_function:
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+
+- instance_problem_state:
+    ...
+
+- solution_problem_state:
+    ...

@@ -1,26 +1,25 @@
 from src.problems.jssp.components import ShiftOperator
 
-def shift_operator_109f(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ShiftOperator, dict]:
+def shift_operator_109f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ShiftOperator, dict]:
     """
     This heuristic attempts to find a better schedule by shifting an operation within the same machine's queue.
     For each machine, it tries shifting each operation to all possible positions and evaluates the makespan.
     The shift that results in the best improvement (reduction in makespan) is selected.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "machine_num" (int): The total number of machines.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current solution state.
             - "current_makespan" (int): The current makespan of the schedule.
-        get_state_data_function (callable): Function to get the new state data given a Solution instance.
+        problem_state["get_problem_state"] (callable): Function to get the new state data given a Solution instance.
 
     Returns:
         ShiftOperator: An operator that shifts a job in the schedule to achieve a local improvement.
         dict: An empty dictionary as this heuristic does not require algorithm data updates.
     """
 
-    current_solution = state_data['current_solution']
-    machine_num = global_data['machine_num']
+    current_solution = problem_state['current_solution']
+    machine_num = problem_state['machine_num']
     best_operator = None
     best_delta = float('inf')
 
@@ -36,11 +35,11 @@ def shift_operator_109f(global_data: dict, state_data: dict, algorithm_data: dic
                 
                 # Create a new solution with the operation shifted to the new position
                 new_solution = ShiftOperator(machine_id, job_id, new_position).run(current_solution)
-                new_state = get_state_data_function(new_solution)
+                new_state = problem_state["get_problem_state"](new_solution)
                 
                 # If the new solution is valid, evaluate its makespan
                 if new_state is not None:
-                    delta = new_state['current_makespan'] - state_data['current_makespan']
+                    delta = new_state['current_makespan'] - problem_state['current_makespan']
                     
                     # If the makespan is improved, store this operator
                     if delta < best_delta:

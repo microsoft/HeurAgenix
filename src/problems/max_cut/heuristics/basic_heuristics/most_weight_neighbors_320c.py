@@ -1,28 +1,27 @@
 from src.problems.max_cut.components import Solution, InsertNodeOperator
 
-def most_weight_neighbors_320c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def most_weight_neighbors_320c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """
     This heuristic selects an unselected node that has the highest sum of weights connected to it and inserts it into one of the sets (A or B) in the Solution, aiming to maximize the cut value.
     It stores the sorted list of unselected nodes based on the sum of weights for future use.
     
     Args:
-        global_data (dict): Contains the global data of the graph. For this algorithm, we require:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): Contains the current state information. For this algorithm, we require:
             - "current_solution" (Solution): The current partition of the graph.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
         algorithm_data (dict): Contains the algorithm-specific data. For this algorithm, we use:
             - "sorted_nodes" (list of tuples): A sorted list of (node, weight_sum) in descending order.
-        get_state_data_function (callable): Function to get state data for a new solution; not used directly in this algorithm.
+        problem_state["get_problem_state"] (callable): Function to get state data for a new solution; not used directly in this algorithm.
         
     Returns:
         (InsertNodeOperator): Operator to insert the selected node into one of the sets.
         (dict): Updated algorithm data with the sorted list of nodes.
     """
     
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     
     # Check if we already have a sorted list of nodes in algorithm_data
     if "sorted_nodes" not in algorithm_data or not algorithm_data["sorted_nodes"]:

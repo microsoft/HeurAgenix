@@ -1,6 +1,6 @@
 from src.problems.dposp.components import *
 
-def nearest_order_scheduling_1a5e(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def nearest_order_scheduling_1a5e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
     Implements the nearest order scheduling heuristic for DPOSP. Starting from an initial order, the heuristic builds
     a production schedule by selecting and appending the next order that minimizes the combined criteria of setup time
@@ -11,21 +11,16 @@ def nearest_order_scheduling_1a5e(global_data: dict, state_data: dict, algorithm
     deadline constraints.
 
     Args:
-        global_data (dict): Contains static information for the DPOSP. Relevant keys:
+        problem_state (dict): Contains static information for the DPOSP. Relevant keys:
             - "transition_time" (numpy.array): 3D array of transition time between products on each production line.
             - "production_rate" (numpy.array): 2D array of production time for each product on each production line.
             - "order_deadline" (numpy.array): 1D array of the deadline for each order.
             - "order_product" (numpy.array): 1D array mapping each order to its required product.
-
-        state_data (dict): Contains dynamic state information for the DPOSP. Relevant keys:
             - "current_solution" (Solution): Current scheduling solution.
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
             - "validation_single_production_schedule" (callable): Function to check whether a production schedule is valid.
 
         algorithm_data (dict): Contains data necessary for the heuristic, which may be updated and returned.
-
-        get_state_data_function (callable): Function to get the state data for a new solution.
-
         **kwargs: Optional hyperparameters for the heuristic, which can be used to tweak its behavior.
 
     Returns:
@@ -33,16 +28,14 @@ def nearest_order_scheduling_1a5e(global_data: dict, state_data: dict, algorithm
         dict: Updated algorithm_data containing any new information for future iterations.
     """
 
-    # Unpack necessary data from global_data
-    transition_time = global_data["transition_time"]
-    production_rate = global_data["production_rate"]
-    order_deadline = global_data["order_deadline"]
-    order_product = global_data["order_product"]
-
-    # Unpack necessary data from state_data
-    current_solution = state_data["current_solution"]
-    feasible_orders = state_data["feasible_orders_to_fulfill"]
-    validation_single_production_schedule = state_data["validation_single_production_schedule"]
+    # Unpack necessary data from problem_state
+    transition_time = problem_state["transition_time"]
+    production_rate = problem_state["production_rate"]
+    order_deadline = problem_state["order_deadline"]
+    order_product = problem_state["order_product"]
+    current_solution = problem_state["current_solution"]
+    feasible_orders = problem_state["feasible_orders_to_fulfill"]
+    validation_single_production_schedule = problem_state["validation_single_production_schedule"]
 
     # Start heuristic logic
     if not feasible_orders:

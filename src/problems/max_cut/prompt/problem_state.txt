@@ -1,0 +1,24 @@
+problem_state (dict): The dictionary contains the problem state with:
+    - node_num (int): The total number of vertices in the graph.
+    - weight_matrix (numpy.ndarray): A 2D array representing the weight between nodes.
+    - current_solution (Solution): Current solution instance.
+    - current_profit (float): The total profit of the items included in the current solution.
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+    - average_operation_time (float): The average processing time for all operations across machines.
+    - max_operation_time (int): The maximum processing time for any operation on any machine.
+    - min_operation_time (int): The minimum non-zero processing time for any operation.
+    - total_operation_time (int): The total sum of all operation times.
+    - machine_utilization_variance (float): The variance in operation times for each machine.
+    - critical_machine (int): The machine with the highest total operation time.
+    - set_a_count (int): The number of nodes in set A of the current partition.
+    - set_b_count (int): The number of nodes in set B of the current partition.
+    - selected_nodes (set[int]): The set of selected nodes.
+    - selected_num (int): The number of nodes have been selected.
+    - unselected_nodes (set[int]): The set of unselected nodes.
+    - unselected_num (int): The number of nodes have not been selected.
+    - current_cut_value (int or float): The total weight of edges between set A and set B in the current solution.
+    - average_completion_time (float): The average time of job completion.
+    - operation_balance (float): The variance in the number of completed operations across jobs.
+    - scheduling_efficiency (float): Ratio of completed operations to total possible operations.
+    - remaining_jobs (int): Number of jobs still in progress or not started.

@@ -1,19 +1,18 @@
 from src.problems.mkp.components import *
 
-def block_flip_d4f4(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, block_size: int = 2) -> tuple[FlipBlockOperator, dict]:
+def block_flip_d4f4(problem_state: dict, algorithm_data: dict, block_size: int = 2) -> tuple[FlipBlockOperator, dict]:
     """
     Block Flip Heuristic for Multidimensional Knapsack Problem.
     Flips the inclusion status of a contiguous block of items to test for an improved solution.
     
     Args:
-        global_data (dict): Contains the global data of the problem.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
-        state_data (dict): Contains the current state information.
             - "current_solution" (Solution): The current solution instance.
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.        algorithm_data (dict): Contains the data necessary for the algorithm. Not used in this function.
             - "validation_solution" (callable): validation solution.
-        get_state_data_function (callable): Function to get the state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get the state data for a new solution.
         block_size (int): The size of the block to consider for flipping. Defaults to 2.
 
     Returns:
@@ -21,11 +20,11 @@ def block_flip_d4f4(global_data: dict, state_data: dict, algorithm_data: dict, g
         dict: Empty dictionary as no algorithm data is updated.
     """
 
-    # Extract necessary data from global_data and state_data
-    weights = global_data['weights']
-    capacities = global_data['capacities']
-    current_solution = state_data['current_solution']
-    validation_solution = state_data['validation_solution']
+    # Extract necessary data from problem_state
+    weights = problem_state['weights']
+    capacities = problem_state['capacities']
+    current_solution = problem_state['current_solution']
+    validation_solution = problem_state['validation_solution']
 
 
     # Determine the range for the start of the block
@@ -35,7 +34,7 @@ def block_flip_d4f4(global_data: dict, state_data: dict, algorithm_data: dict, g
     # Initialize variables to track the best block flip
     best_operator = None
     best_state_data = None
-    best_profit = state_data['current_profit']
+    best_profit = problem_state['current_profit']
     
     # Iterate over all possible starting positions for the block
     for start in start_range:
@@ -46,13 +45,13 @@ def block_flip_d4f4(global_data: dict, state_data: dict, algorithm_data: dict, g
         new_solution = FlipBlockOperator(block).run(current_solution)
         
         # Get the state data for the new solution
-        new_state_data = get_state_data_function(new_solution)
+        new_problem_state = problem_state["get_problem_state"](new_solution)
         
         # If the new solution is valid and improves the profit, update the best_operator
-        if validation_solution(new_solution) and new_state_data['current_profit'] > best_profit:
-            best_profit = new_state_data['current_profit']
+        if validation_solution(new_solution) and new_problem_state['current_profit'] > best_profit:
+            best_profit = new_problem_state['current_profit']
             best_operator = FlipBlockOperator(block)
-            best_state_data = new_state_data
+            best_state_data = new_problem_state
     
     # If no improvement is found, return None
     if not best_operator:

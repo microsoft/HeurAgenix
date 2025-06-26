@@ -1,19 +1,17 @@
 # HeurAgenix
-
-## Introduction
 HeurAgenix is a novel framework based on LLM, designed to generate, evolve, evaluate, and select heuristic algorithms for solving combinatorial optimization problems. It leverages the power of large language models to autonomously handle various optimization tasks with minimal human intervention. This framework ensures high adaptability, flexibility, and performance in solving both classical and novel optimization problems.
 
 ![Framework Overview](doc/framework.png)
 
-## Prepare
+# Prepare
 
-### Set up environment
+## Set up environment
 To set up the environment, run the following command:
 ```bash
 pip install -r requirements.txt
 ```
 
-### Set up LLM
+## Set up LLM
 Currently, the framework supports GPT from Azure using tokens and api based model.
 
 1. Fill in the parameters in json file.
@@ -23,10 +21,10 @@ Azure GPT config:
     "type": "azure_apt",
 
     "api_type": "azure",
-    "api_base": "https://gcraoai9sw1.openai.azure.com/",
-    "api_version": "2024-05-01-preview",
-    "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
-    "model": "gpt-4o_2024-08-06",
+    "api_base": "...",
+    "api_version": "...",
+    "azure_endpoint": "...",
+    "model": "...",
     "temperature": 0.7,
     "top-p": 0.95,
     "max_tokens": 3200,
@@ -40,9 +38,9 @@ API model config:
 {
     "type": "api_model",
 
-    "url": "xxx",
-    "api_key": "xxx",
-    "model": "xxx",
+    "url": "...",
+    "api_key": "...",
+    "model": "...",
     "temperature": 0.7,
     "top-p": 0.95,
     "max_tokens": 3200,
@@ -59,7 +57,7 @@ Local model config:
     "temperature": 0.7,
     "top-p": 0.95,
     "max_tokens": 1600,
-    "model_path": "xxx",
+    "model_path": "...",
 
     "max_attempts": 50,
     "sleep_time": 10
@@ -71,31 +69,30 @@ Modify the `config_file` in chat.py and run
 python chat.py
 ```
 
-### Prepare Data
-#### Data for Classical CO Problem
+## Prepare Data
+### Data for Classical CO Problem
 Data sources and formatting requirements for TSP, CVRP, JSSP, MaxCut, and MKP are detailed in the respective readme files.
 
-| Problem                             | Data Source                                                                                     | Readme Link                                           |
-|-------------------------------------|-------------------------------------------------------------------------------------------------|-------------------------------------------------------|
-| Traveling Salesman Problem (TSP)    | [TSPLIB](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/)                            | [TSP data readme](src/problems/tsp/data/README.md)    |
-| Capacitated Vehicle Routing Problem (CVRP) | [VRPLIB](http://vrp.galgos.inf.puc-rio.br/index.php/en/)                                       | [CVRP data readme](src/problems/cvrp/data/README.md)  |
-| Job Shop Scheduling Problem (JSSP)  | [OR-library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/)                          | [JSSP data readme](src/problems/jssp/data/README.md)  |
-| Maximum Cut Problem (MaxCut)        | [OPTSICOM](https://grafo.etsii.urjc.es/optsicom/maxcut.html#instances)                          | [MaxCut data readme](src/problems/max_cut/data/README.md) |
-| Multidimensional Knapsack Problem (MKP) | [OR-library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/)                            | [MKP data readme](src/problems/mkp/data/README.md)    |
+| Problem                                    | Data Source                                                                                     |
+|--------------------------------------------|-------------------------------------------------------------------------|
+| Traveling Salesman Problem (TSP)           | [TSPLIB](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/)    |
+| Capacitated Vehicle Routing Problem (CVRP) | [VRPLIB](http://vrp.galgos.inf.puc-rio.br/index.php/en/)         |
+| Job Shop Scheduling Problem (JSSP)         | [OR-library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/)     |
+| Maximum Cut Problem (MaxCut)               | [OPTSICOM](https://grafo.etsii.urjc.es/optsicom/maxcut.html#instances)  |
+| Multidimensional Knapsack Problem (MKP)    | [OR-library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/) |
 
-#### Data For DPOSP
+### Data For DPOSP
 To generate the data for the Dynamic Production Order Scheduling Problem (DPOSP, new in paper):
 1. Modify the parameters (production line num, order num, production rate distribution, etc.) in `src/problems/dposp/data/generate_data.py` file.
-2. Run the following command:
-    ```bash
-    python src/problems/dposp/data/generate_data.py
-    ```
-3. Refer to the [DPOSP data readme](src/problems/dposp/data/README.md).
+2. Run the following command to generate data:
+```bash
+python src/problems/dposp/generate_data.py
+```
 
-#### Data Structure
-By default, data is stored in `output/{problem}/data/(train_data, validation_data, test_data, smoke_data)`. If data is stored elsewhere, specify the path when running the framework.  
+### Data Structure
+It is recommended to organize data into this structure `output/{problem}/data/(train_data, validation_data, test_data, smoke_data)`.
   
-- **Train Data**: Used by LLM to analyze problems during heuristic evolution. Typically consists of small instances either manually designed or sampled from the data.  
+- **Evolution Data**: Used by LLM to extract evolution policy during heuristic evolution. Typically consists of small instances either manually designed or sampled from the data.  
 - **Validation Data**: Used for evaluating and filtering heuristics during evolution.  
 - **Test Data**: Used for testing heuristics or heuristic selection.  
 - **Smoke Data**: Used for quick testing of generated or evolved heuristics to check for obvious bugs. Usually consists of small, manually designed instances and includes `previous_operations.txt` (pre-operations for the test) and `smoke_data` (test data).  
@@ -106,166 +103,156 @@ tsp/
 data/
 smoke_data/: previous_operations.txt, smoke_data.tsp
 test_data/: a280.tsp, bier127.tsp, ...
-train_data/: case_1.tsp, case_2.tsp, ...
+evolution_data/: case_1.tsp, case_2.tsp, ...
 validation_data/: kroA100.tsp, kroA150.tsp, ...
 
 Our built-in data reading interface can handle the standard data format above. If your data is in a new format, you need to override the `load_data` function in `env.py`.  
 
-## Run on Current Problems (TSP, CVRP, JSSP, MaxCut, MKP, and DPOSP)
+# Structure and Format
+Each problem is independent and share the similar running steps.
 
-### Generate Heuristic
-#### Prepare
-- **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part. Smoke data should include two types of files:
-    - **Instance Data**: The format should be consistent with other data.
-    - **previous_operations.txt (Optional)**: This file records the pre-operations for the smoke test, with each line representing a pre-operation. If not provided, it means there are no pre-operations.
+## File Structure 
+Each problem contains following files
 
-#### Run the Heuristic Generation
-To generate heuristics, use the following command:
+| File | Description | 
+| --------------------------------------- | ----------- | 
+| heuristics                              | Necessary for [problem solving](#solve-problem). Can be generate by [basic heuristic generation](#generate-basic-heuristic), [heuristic evolution](#evolve-heuristic) or manually written.
+| components.py(*)                        | Necessary for all tasks. Provide solution and operations class to support heuristics.
+| env.py(*)                               | Necessary for all tasks. Provide Env class to load data, run heuristics, record and the result.
+| problem_state.py                        | Necessary for [heuristic evolution](#evolve-heuristic) and [problem solving](#solve-problem). Provide function to extract the problem state. Can be generated by [problem state generation](#generate-problem-state) or manually written.
+| prompt/problem_description.txt          | Necessary for all tasks. Text-based problem description.
+| prompt/problem_state_description.txt(*) | Necessary for [problem state generation](#generate-problem-state) by LLM. Description the problem state's format.
+| prompt/problem_state.txt                | Necessary for [heuristic evolution](#evolve-heuristic) and [problem solving](#solve-problem). Provide text-based detailed problem state introduction. Can be generated by [problem state generation](#generate-problemtate) or manually written.
+| prompt/special_remind.txt               | Optional for [basic heuristic generation](#generate-basic-heuristic), [heuristic evolution](#evolve-heuristic) to avoid some typically error.
 
-```bash
-python generate_heuristic.py -p <problem> -s <source> [-m] [-pp <paper_path>] [-r <related_problems>]
+The file marked by (*) are basic files that must by provide manually. Others are optional or can be [generated automatically](#run-tasks-on-heuragenix).
+
+## Components
+Components contain solution class to record the current(partial) solution and operator to update the solution. Format of components can be found in [components.template.py](doc/components.template.py).
+
+## Env
+Env class works as backend to support all tasks in env.py file. Format of env class can be found in [env.template.py](doc/env.template.py).
+
+## Problem State
+Problem state is an abstract representation capturing the high-level features of both the problem instance and its current (partial) solution. It is stored in dict and can works as medium between heuristic, env and LLM.  In our framework, 2 files are necessary:
+- Problem state extraction function in `problem_state.py` with following 3 functions:
+    - def get_instance_problem_state(instance_data: dict) -> dict: Extract instance problem state from instance data.
+    - def get_solution_problem_state(instance_data: dict) -> dict: Extract solution problem state from instance data and solution.
+    - def get_observation_problem_state(problem_state: dict) -> dict: Extract core problem state as observation.
+
+- Problem state description file in `problem_state.txt`:
+    - instance_data: Loaded instance data from load_data function in env.
+    - current_solution: Current solution instance.
+    - key_item: The key value to evaluate solution and calculated by get_key_value in env. 
+    - helper_function: Helper functions to assist heuristics that provided by env.
+    - instance_problem_state: extracted by get_instance_problem_state.
+    - solution_problem_state: extracted by get_solution_problem_state.
+
+## Heuristic Format
+For unified management, all heuristics shared same format:
+```python
+def heuristic_name(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Operator, dict]:
 ```
+problem_state(necessary) contains the problem state.
+algorithm_dat(optional) contains the some hyper-parameters for some algorithms
+Heuristic returns the target operator that runs on solution to get update with some other information in dict.
 
-- `-p`, `--problem`: Specifies the type of CO problem to solve (required). Choose from available options in the `problem_pool`.
-- `-s`, `--source`: Defines the source for generating heuristics (required), with options:
-  - `llm`: Use LLM’s internal knowledge.
-  - `paper`: Extract heuristics from a specified research paper.
-  - `related_problem`: Transfer heuristics from related CO problems.
-- `-m`, `--smoke_test`: Runs a smoke test (optional).
-- `-pp`, `--paper_path`: Path to the LaTeX paper file or directory, used only when the source is `paper`.
-- `-r`, `--related_problems`: A comma-separated list of related problems to reference, default is `"all"`.
-- `-l`, `--llm_config_file`: Path to LLM config file.
-The generated heuristics are saved in the `output/{problem}/generate_heuristic` folder.
+Notes: The file name and heuristic_name should keep algin, such as nearest_neighbor_991d.py contains function nearest_neighbor_991d.
 
-#### Examples
-To generate heuristics for the Traveling Salesman Problem (TSP) using LLM with a smoke test:
-```bash
-python generate_heuristic.py -p TSP -s llm -m
-```
-
-To generate heuristics from a paper:
-```bash
-python generate_heuristic.py -p TSP -s paper -pp "path_to_paper.tex"
-```
-
-To transfer heuristics from related problems for a new problem:
-```bash
-python generate_heuristic.py -p NewProblem -s related_problem -r "CVRP,TSP,JSSP,..."
-```
-
-### Evolve Heuristic
-#### Prepare
-- **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part, you need to provide smoke data in the `src/problems/{problem}/data/smoke_data` folder.
-- **Train Data**: Training data should be small-scale instances to enhance the results. You can sample smaller data from the data source or create small data instances yourself.
-- **Validation Data (Optional)**: If you enable the validation for the evolution heuristic part, you need to provide validation data. If validation is not enabled, this step is not necessary.
-
-#### Running Heuristic Evolution
-Run the heuristic evolution process using:
+# Run Tasks on HeurAgenix
+## Generate Problem State 
+The problem state can either be written manually or generated automatically by:
 
 ```bash
-python evolution_heuristic.py -p <problem> -be <basic_heuristic> [-t <train_dir>] [-v <validation_dir>] [-pe <perturbation_heuristic>] [-pr <perturbation_ratio>] [-pt <perturbation_time>] [-i <max_refinement_round>] [-f <filter_num>] [-r <evolution_rounds>] [-l <time_limit>] [-m]
-```
-
-Parameters:
-- `-p`, `--problem`: Specifies the CO problem type to solve (required).
-- `-e`, `--basic_heuristic`: Path or name of the basic heuristic to evolve (required).
-- `-t`, `--train_dir`: Directory for training data (default: output/{problem}/data/train_data).
-- `-v`, `--validation_dir`: Directory for validation data (default: output/{problem}/data/validation_data).
-- `-pe`, `--perturbation_heuristic`: Path or name of the heuristic used for perturbations.
-- `-pr`, `--perturbation_ratio`: Ratio for perturbation adjustments (default: 0.1).
-- `-pt`, `--perturbation_time`: Maximum perturbation count (default: 1000).
-- `-r`, `--max_refinement_round`: Number of refinement rounds (default: 5).
-- `-f`, `--filter_num`: Number of heuristics to retain after validation (default: 1).
-- `-r`, `--evolution_rounds`: Number of rounds for heuristic evolution (default: 3).
-- `-l`, `--time_limit`: Time limit for running the evolution (default: 10 seconds).
-- `-m`, `--smoke_test`: Optional flag to run a smoke test.
-
-The evolved heuristics are saved in the `output/{problem}/evolution_result` folder.
-
-####  Example
-To evolve heuristics for a Traveling Salesman Problem (TSP) using a basic heuristic with smoke test:
-```bash
-python evolution_heuristic.py -p TSP -e nearest_neighbor_f91d -m -t train_data -v validation_data
-```
-
-### Generate Feature Extractors
-#### Prepare
-- **Smoke Data (Optional)**: If you enable the smoke test for the generate heuristic part, you need to provide smoke data in the `src/problems/{problem}/data/smoke_data` folder.
-
-#### Running Feature Extractor Generation
-Run the following command to generate feature extractors:
-
-```bash
-python generate_feature_extractor.py -p <problem> [-m]
+python generate_problem_state.py -p <problem> [-m] [-l <llm_config_file>]
 ```
 
 Parameters:
-- `-p`, `--problem`: Specifies the type of problem for which to generate the feature extractor (required).
-- `-m`, `--smoke_test`: Optional flag to perform a smoke test on the generated extractor.
-The process and resulting extractor function will be saved in the `output/{problem}/generate_evaluation_function` folder.
+- `-p`, `--problem`: Specifies the type of problem for which you want to generate the problem state. Choose from the available problem pool.
+- `-m`, `--smoke_test`:  Includes a flag to perform a smoke test, which verifies the validity of the generated problem states through quick checks.
+- `-l`, `--llm_config_file`:  Specifies the path to the LLM configuration file to be used. Default is `azure_gpt_4o.json`.
 
-#### Example
-To generate a feature extractor for a Traveling Salesman Problem (TSP) with a smoke test:
-```bash
-python generate_feature_extractor.py -p TSP -m
-```
+The process will generate the problem state code `problem_state.py` and corresponding description file `problem_state_description.txt` in `output/{problem}/generate_evaluation_function`.
 
-
-### Run Single Heuristic and Heuristic Selector
-
-Execute a specified heuristic or enable dynamic heuristic selection for the chosen problem.
-
-#### Preparation
-- **Test Data**: Place test data.
-- **Feature Extractors and Heuristics**: Ensure feature extractors and heuristics are available. Pre-generated extractors and heuristics are included, or you can generate them following the **Generate Feature Extractors** and **Generate Heuristic** sections.
-
-#### Running Heuristics
-Run the following command with the required parameters to apply a heuristic or heuristic selector:
+## Generate Basic Heuristic
+Basic heuristics serve as seeds for subsequent evolution and can be either manually crafted or automatically generated by:
 
 ```bash
-python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-d <heuristic_dir>] [-c <test_case>] [-t <test_dir>] [-r]
+python generate_basic_heuristic.py -p <problem> [-m] [-s <source>] [-l <llm_config_file>] [-pp <paper_path>] [-r <related_problems>] [-d <reference_data>]
 ```
-
-The execution results and generated trajectories (if `-r` is specified) will be saved in the `output/{problem}/test_result` folder.
 
 Parameters:
-- `-p`, `--problem`: Specifies the type of problem to solve (required).
-- `-e`, `--heuristic`: Specifies the heuristic function. Options include:
-  - `<heuristic_function_name>`: Directly specify the name of a particular heuristic function.
-  - `'llm_hh'`: LLM-based rapid selection from heuristics in the specified directory.
-  - `'llm_deep_hh'`: LLM-based comprehensive selection from heuristics in the specified directory.
+- `-p`, `--problem`: Specifies the type of combinatorial optimization problem.
+- `-s`, `--source`: Determines the source of heuristic generation. Options include 'llm' for using a language model, 'paper' for methods from research literature, and 'related_problem' for adapting from similar problems. Default is 'llm'.
+- `-l`, `--llm_config_file`: Path to the language model configuration file. Default is `azure_gpt_4o.json`.
+- `-m`, `--smoke_test`: Optional flag for performing a quick smoke test to verify the generated heuristics.
+- `-pp`, `--paper_path`: Path to a LaTeX paper file or directory containing heuristic methods.
+- `-r`, `--related_problems`: List of related problem types to inform heuristic development. Default is 'all'.
+- `-d`, `--reference_data`: Optional path to reference datasets, used when generating heuristics tailored to specific data distributions.
+
+The generated heuristics are stored in `output/{problem}/generate_heuristic`. 
+
+## Evolve Heuristic
+
+Heuristic evolution is central to evolve basic heuristic by:
+
+```bash
+python evolve_heuristic.py -p <problem> -e <seed_heuristic> [-m] [-l <llm_config_file>] [-ed <evolution_dir>] [-vd <validation_dir>] [-pe <perturbation_heuristic>] [-pr <perturbation_ratio>] [-pt <perturbation_time>] [-i <max_refinement_round>] [-f <filter_num>] [-r <evolution_rounds>] [-d <reference_data>] 
+```
+
+Parameters:
+- `-p`, `--problem`: Specifies the type of problem for which you want to generate the problem state. Choose from the available problem pool.
+- `-e`, `--seed_heuristic`: The initial seed heuristic to be evolved.
+- `-ed`, `--evolution_dir`: Directory where the evolution dataset is stored. Default is `evolution_data`.
+- `-vd`, `--validation_dir`: Directory where the validation dataset is stored. Default to `validation_data`.
+- `-pe`, `--perturbation_heuristic`: Optional name or path for a perturbation heuristic to introduce diverse strategy variations.
+- `-pr`, `--perturbation_ratio`: Proportion of solution operations to be altered during perturbation. Default is 0.1.
+- `-pt`, `--perturbation_time`: Maximum number of perturbation attempts per evolution cycle. Default is 1000.
+- `-i`, `--max_refinement_round`: Number of rounds used in refining heuristics. Default is 5.
+- `-f`, `--filter_num`: How many top-performing heuristics to retain following validation. Default is 1.
+- `-r`, `--evolution_rounds`: Total number of evolution iterations. Default is 3.
+- `-m`, `--smoke_test`:  Includes a flag to perform a smoke test, which verifies the validity of the generated problem states through quick checks.
+- `-l`, `--llm_config_file`:  Specifies the path to the LLM configuration file to be used. Default is `azure_gpt_4o.json`.
+
+The evolved heuristics are stored in `output/{problem}/evolution_result/{seed_heuristic}`. 
+
+## Solve Problem
+
+To apply a heuristic or heuristic selector by:
+
+```bash
+python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-l <llm_config_file>] [-d <heuristic_dir>] [-t <test_case>] [-n <iterations_scale_factor>] [-m <steps_per_selection>] [-c <num_candidate_heuristics>] [-b <rollout_budget>] [-r <result_dir>]
+```
+
+Parameters:
+- `-p`, `--problem`: Specifies the type of combinatorial optimization problem to solve (required).
+- `-e`, `--heuristic`: Specifies which heuristic function or strategy to apply. Options include:
+  - `<heuristic_function_name>`: Directly specify a heuristic function.
+  - `'llm_hh'`: Utilizes LLM for rapid heuristic selection from the directory.
   - `'random_hh'`: Randomly selects a heuristic from the directory.
-  - `'or_solver'`: Uses an exact OR solver (only applicable for specific problems like DPOSP).
-- `-d`, `--heuristic_dir`: Directory containing heuristic functions (if needed).
-- `-c`, `--test_case`: Path to a single test case.
-- `-t`, `--test_dir`: Directory containing the entire test set (Optional, default: output/{problem}/data/test_data).
+  - `'or_solver'`: Uses an exact OR solver, where applicable.
+- `-d`, `--heuristic_dir`: Directory containing heuristics for llm_hh or random_hh. Default is 'basic_heuristics'.
+- `-t`, `--test_data`: Name or path of test data or directory for test cases. Defaults to the complete set in `test_data`.
+- `-l`, `--llm_config_file`: Path to LLM configuration. Defaults is `azure_gpt_4o.json`.
+- `-n`, `--iterations_scale_factor`: Scale factor determining total heuristic steps relative to problem size. Default is 2.0.
+- `-m`, `--steps_per_selection`: Number of steps executed per heuristic selection in LLM mode. Default is 5.
+- `-c`, `--num_candidate_heuristics`: Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.
+- `-b`, `--rollout_budget`: Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.
+- `-r`, `--result_dir`: Target directory for saving results. Default is 'result'.
 
-#### Example
-To run the nearest neighbor heuristic on a test case:
-```bash
-python launch_hyper_heuristic.py -p TSP -e nearest_neighbor_f91d -c path/to/test_case
-```
-To run the rapid heuristic selection on a test case:
-```bash
-python launch_hyper_heuristic.py -p TSP -e llm_hh -c path/to/test_case
-```
-To run the comprehensive heuristic selection on a test case:
-```bash
-python launch_hyper_heuristic.py -p TSP -e llm_deep_hh -c path/to/test_case
-```
+The solution and evaluation are stored in `output/{problem}/{test_data}/{result}/{seed_heuristic}`. 
 
-## Solving On New Problems
-HeurAgenix excels in addressing new problems. When faced with a new problem, the following steps are required:
-- Implement an `Env` class in `src/problems/{problem}/env.py` based on [BaseEnv](src/problems/base/env.py) to provide basic support for algorithm execution, including `load_data`, `init_solution`, `get_global_data`, `get_state_data`, and `validation_solution` functionalities.
-- Implement a `Solution` class based on [BaseSolution](src/problems/base/component.py) and an `Operation` class based on [BaseOperation](src/problems/base/component.py) in `src/problems/{problem}/component.py` to record solutions and modifications.
-- Create the following prompt files in `src/problems/{problem}/prompt`:
-    - `problem_description.txt` to describe the new problem.
-    - `global_data.txt` to describe the storage format of the instance data for the problem.
-    - `state_data.txt` to describe the format of the solution for the problem.
-    - `special_remind.txt` (optional) for specific reminders related to the problem during algorithm generation.
-- If an OR algorithm is needed as an upper bound, implement the `ORSolver` class in `src/problems/{problem}/or_solver.py`.
+## Run on new problems
 
-## Visualize the Project Workflow  
+To setup new problems, please:
+- Set up new folder in `src/problems/{problem_name}`
+- Implement `env.py` and `components.py` in `src/problems/{problem_name}`
+- Provide `problem_description.txt` and `problem_state_description.txt` in `src/problems/{problem_name}/prompt`
+- [Set up llm](#set-up-llm) and [Prepare data](#prepare-data) if necessary.
+- [Run tasks](#run-tasks-on-heuragenix) as needed.
+
+
+# Visualize the Project Workflow  
   
 To explore the project's workflow visually without executing the actual processes, you can use the Streamlit application. This tool provides an interactive way to understand the framework's components and flow.  
   

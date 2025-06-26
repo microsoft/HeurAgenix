@@ -1,30 +1,29 @@
 from src.problems.max_cut.components import *
 
-def highest_delta_node_b31b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def highest_delta_node_b31b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """
     This heuristic selects the unselected node that, when added to one of the sets (A or B),
     would result in the largest increase in the total cut weight. The node is then inserted into
     that set which maximizes the cut weight.
 
     Args:
-        global_data (dict): Contains information about the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): Contains information about the current state of the solution.
             - "current_solution" (Solution): The current partition of the graph into sets A and B.
             - "unselected_count" (int): The number of nodes not yet selected into either set A or B.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
         algorithm_data (dict): Not used in this heuristic.
-        get_state_data_function (callable): Function to get state data for a new solution.
+        problem_state["get_problem_state"] (callable): Function to get state data for a new solution.
 
     Returns:
         InsertNodeOperator: The operator to insert the node into the appropriate set.
         dict: Empty dictionary as this algorithm doesn't update the algorithm data.
     """
 
-    # Extract necessary information from global_data and state_data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    # Extract necessary information from problem_state
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
 
     # Initialize variables to keep track of the best node and delta
     best_node = None

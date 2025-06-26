@@ -1,17 +1,16 @@
 from src.problems.cvrp.components import AppendOperator
 import random
 
-def random_bfdc(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AppendOperator, dict]:
+def random_bfdc(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """Random heuristic for CVRP.
     This heuristic selects an unvisited node at random and appends it to a vehicle's route where it does not violate the capacity constraint.
     This process is repeated for each vehicle until all nodes have been included in a route.
 
     Args:
-        global_data (dict): The global data dict containing the global data. 
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "demands" (numpy.ndarray): The demand of each node.
             - "vehicle_num" (int): The total number of vehicles.
             - "capacity" (int): The capacity for each vehicle.
-        state_data (dict): The state dictionary containing the current state information.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
             - "vehicle_remaining_capacity" (list[int]): The remaining capacity for each vehicle.
             - "current_solution" (Solution): The current set of routes for all vehicles.
@@ -20,12 +19,12 @@ def random_bfdc(global_data: dict, state_data: dict, algorithm_data: dict, get_s
         AppendOperator: The operator to append a node to a vehicle's route.
         dict: Empty dictionary as no algorithm data needs to be updated.
     """
-    unvisited_nodes = state_data['unvisited_nodes']
-    vehicle_remaining_capacity = state_data['vehicle_remaining_capacity']
-    current_solution = state_data['current_solution']
-    demands = global_data['demands']
-    vehicle_num = global_data['vehicle_num']
-    capacity = global_data['capacity']
+    unvisited_nodes = problem_state['unvisited_nodes']
+    vehicle_remaining_capacity = problem_state['vehicle_remaining_capacity']
+    current_solution = problem_state['current_solution']
+    demands = problem_state['demands']
+    vehicle_num = problem_state['vehicle_num']
+    capacity = problem_state['capacity']
 
     # Check if we have any unvisited nodes left
     if not unvisited_nodes:

@@ -1,21 +1,23 @@
 from src.problems.cvrp.components import *
 
-def three_opt_e8d7(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+def three_opt_e8d7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
 
     Args:
-        global_data (dict): Contains the global data with necessary information like distance_matrix.
-        state_data (dict): Contains the current state information with the current_solution.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
+            - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
+            - "depot" (int): The index for depot node.
+            - "current_solution" (Solution): The current set of routes for all vehicles.
         algorithm_data (dict): Contains the data necessary for this algorithm.
 
     Returns:
         TwoOptOperator: The operator that represents the best 2-opt move found.
         dict: Updated algorithm dictionary.
     """
-    # Retrieve data from global_data and state_data
-    distance_matrix = global_data["distance_matrix"]
-    depot = global_data["depot"]
-    current_solution = state_data["current_solution"]
+    # Retrieve data from problem_state
+    distance_matrix = problem_state["distance_matrix"]
+    depot = problem_state["depot"]
+    current_solution = problem_state["current_solution"]
 
     # Initialize variables for the best move found
     best_delta = 0

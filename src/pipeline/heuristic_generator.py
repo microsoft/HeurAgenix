@@ -4,7 +4,7 @@ import importlib
 import traceback
 from copy import deepcopy
 from src.problems.base.components import BaseOperator
-from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_heuristic, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
+from src.util.util import extract, extract_function_with_short_docstring, filter_dict_to_str, find_key_value, load_function, parse_paper_to_dict, replace_strings_in_dict, sanitize_function_name, load_framework_description, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
@@ -23,7 +23,7 @@ class HeuristicGenerator:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, "background_with_code", reference_data)
 
         # Generate available heuristic description
         self.llm_client.load("generate_from_llm", prompt_dict)
@@ -44,7 +44,7 @@ class HeuristicGenerator:
     def generate_from_paper(self, paper_path: str,  reference_data: str=None, smoke_test: bool=False) -> str:
         heuristic_file = None
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, "background_with_code", reference_data)
 
         # Load whole paper
         if os.path.isdir(paper_path):
@@ -111,13 +111,15 @@ class HeuristicGenerator:
         heuristic_files = []
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, reference_data)
+        prompt_dict = self.llm_client.load_background(self.problem, "background_with_code", reference_data)
 
         # Find similar problem
-        description_dict = {
-            problem: open(os.path.join("src", "problems", problem, "prompt", "problem_description.txt")).read()
-            for problem in related_problems
-        }
+        description_dict = {}
+        for problem in related_problems:
+            related_problem_description_file = search_file("problem_description.txt", problem=problem)
+            if related_problem_description_file:
+                description_dict[problem] = open(related_problem_description_file).read()
+
         studied_problems = "\n\n".join([
             f"problem name: {problem}\ndescription: {description_dict[problem]}"
             for problem in related_problems
@@ -168,8 +170,9 @@ class HeuristicGenerator:
                 reference_heuristic_code = open(reference_heuristic_file).read()
                 prompt_dict["referenced_heuristic"] = reference_heuristic
                 prompt_dict["referenced_heuristic_code"] = reference_heuristic_code
-                prompt_dict["referenced_global_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "global_data.txt")).read()
-                prompt_dict["referenced_state_data_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "state_data.txt")).read()
+                referenced_problem_state_introduction = search_file("problem_state.txt", problem=referenced_problem)
+                if referenced_problem_state_introduction:
+                    prompt_dict["referenced_problem_state_introduction"] = open(os.path.join("src", "problems", referenced_problem, "prompt", "problem_state.txt")).read()
                 self.llm_client.load("mapping_component_in_heuristic", prompt_dict)
                 response = self.llm_client.chat()
                 similarities_in_heuristics = extract(response, "similarities", "\n")
@@ -189,7 +192,7 @@ class HeuristicGenerator:
                 heuristic_files.append(self.generate(heuristic_name, description, env_summarize, smoke_test))
         return heuristic_files
 
-    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None, compress=False) -> str:
+    def generate(self, heuristic_name: str, description: str, env_summarize: str="All data are possible", smoke_test: bool=False, more_prompt_dict=None, reminder=True) -> str:
         # Special remind
         special_remind_file = os.path.join("src", "problems", self.problem, "prompt", "special_remind.txt")
         special_remind = "None"
@@ -207,10 +210,10 @@ class HeuristicGenerator:
             prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
         else:
             prompt_dict["components_file"] = f"src.problems.base.mdp_components"
-        if compress:
-            self.llm_client.load("implement_code_compress", prompt_dict)
+        if reminder:
+            self.llm_client.load("implement_code_with_reminder", prompt_dict)
         else:
-            self.llm_client.load("implement_code", prompt_dict)
+            self.llm_client.load("implement_code_without_reminder", prompt_dict)
         response = self.llm_client.chat()
         code = extract(response, "python_code")
 
@@ -232,6 +235,10 @@ class HeuristicGenerator:
 
     def smoke_test(self, heuristic_code: str, function_name: str, max_try_times: int=5) -> str:
         prompt_dict = {}
+        if os.path.exists(os.path.join("src", "problems", self.problem, "components.py")):
+            prompt_dict["components_file"] = f"src.problems.{self.problem}.components"
+        else:
+            prompt_dict["components_file"] = f"src.problems.base.mdp_components"
         # Load smoke data
         smoke_data_dir = search_file("smoke_data", problem=self.problem)
         previous_operations = open(os.path.join(smoke_data_dir, "previous_operations.txt")).readlines()
@@ -253,14 +260,14 @@ class HeuristicGenerator:
         env = Env(data_name=smoke_data)
         for _ in range(max_try_times):
             env.reset()
-            prompt_dict["smoke_global_data"] = filter_dict_to_str(env.global_data)
+            prompt_dict["smoke_instance_problem_state"] = filter_dict_to_str(env.get_instance_problem_state(env.instance_data))
             for previous_operation in previous_operations:
                 env.run_operator(eval(previous_operation.strip()))
             prompt_dict["smoke_solution"] = env.current_solution
-            prompt_dict["smoke_state_data"] = filter_dict_to_str(env.state_data)
+            prompt_dict["smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution))
             try:
                 # Load heuristic and run once
-                heuristic = load_heuristic(heuristic_code, function_name=function_name)
+                heuristic = load_function(heuristic_code, function_name=function_name)
                 operator = env.run_heuristic(heuristic)
             except Exception as e:
                 operator = traceback.format_exc()
@@ -273,7 +280,7 @@ class HeuristicGenerator:
                 # Actual result
                 prompt_dict["output_result"] = str(operator)
                 prompt_dict["updated_smoke_solution"] = env.current_solution
-                prompt_dict["updated_smoke_state_data"] = filter_dict_to_str(env.state_data)
+                prompt_dict["updated_smoke_solution_problem_state"] = filter_dict_to_str(env.get_solution_problem_state(env.instance_data, env.current_solution))
 
                 # Compare
                 prompt_dict["expected_result"] = expected_result

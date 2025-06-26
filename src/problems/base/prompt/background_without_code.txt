@@ -1,0 +1,13 @@
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+
+Currently, I am working on {problem} problem:
+{problem_description}
+
+
+Please consider is {problem} a combinatorial operation problem and can be solved by heuristics?
+If you think this problem is not a combinatorial operation problem or the solution, operator, data are incorrect, response ***is_cop:no*** to me, or response ***is_cop:yes***.
+
+The response format is very important. For better communication, please respond to me in this format:
+***is_cop:yes/no***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

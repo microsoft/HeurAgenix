@@ -1,15 +1,13 @@
 from src.problems.max_cut.components import *
 
-def highest_weight_edge_eb0c(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertEdgeOperator, dict]:
+def highest_weight_edge_eb0c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertEdgeOperator, dict]:
     """
     Selects an edge with the highest weight where both nodes are unselected and adds each node to opposite sets,
     choosing the set that maximizes the cut value increase for each node.
 
     Args:
-        global_data (dict): Contains the global information about the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): The current solution of the MaxCut problem.
             - "unselected_nodes" (set[int]): The set of unselected nodes.
 
@@ -19,10 +17,10 @@ def highest_weight_edge_eb0c(global_data: dict, state_data: dict, algorithm_data
         dict: Empty dictionary as no algorithm data is updated.
     """
     
-    # Extract necessary information from global_data and state_data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    # Extract necessary information from problem_state
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     
     # Initialize variables to track the highest weight and the corresponding edge
     highest_weight = float('-inf')

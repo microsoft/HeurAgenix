@@ -1,6 +1,6 @@
 from src.problems.dposp.components import Solution, InsertOperator
 
-def farthest_deadline_insertion_7e8a(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def farthest_deadline_insertion_7e8a(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Farthest Deadline Insertion heuristic for DPOSP.
     
@@ -12,13 +12,11 @@ def farthest_deadline_insertion_7e8a(global_data: dict, state_data: dict, algori
     while ensuring that all orders are completed before their respective deadlines.
 
     Args:
-        global_data (dict): Contains the global static information data.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "production_rate" (numpy.array): 2D array of production times for each product on each line.
             - "transition_time" (numpy.array): 3D array of transition times between products on each line.
             - "order_deadline" (numpy.array): 1D array of the deadline for each order.
             - "production_line_num" (int): Total number of production lines.
-
-        state_data (dict): Contains the current dynamic state data.
             - "current_solution" (Solution): Current scheduling solution.
             - "feasible_orders_to_fulfill" (list): List of feasible orders that can be fulfilled.
             - "validation_single_production_schedule" (callable): Function to check if a production schedule is valid.
@@ -27,16 +25,14 @@ def farthest_deadline_insertion_7e8a(global_data: dict, state_data: dict, algori
         InsertOperator: Operator to insert the selected order at the best position found.
         dict: Empty dictionary as no additional algorithm data is updated by this heuristic.
     """
-    # Retrieve necessary data from global_data
-    order_deadline = global_data['order_deadline']
-    production_line_num = global_data['production_line_num']
-    production_rate = global_data['production_rate']
-    transition_time = global_data['transition_time']
-    
-    # Retrieve necessary data from state_data
-    current_solution = state_data['current_solution']
-    feasible_orders_to_fulfill = state_data['feasible_orders_to_fulfill']
-    validation_single_production_schedule = state_data['validation_single_production_schedule']
+    # Retrieve necessary data from problem_state
+    order_deadline = problem_state['order_deadline']
+    production_line_num = problem_state['production_line_num']
+    production_rate = problem_state['production_rate']
+    transition_time = problem_state['transition_time']
+    current_solution = problem_state['current_solution']
+    feasible_orders_to_fulfill = problem_state['feasible_orders_to_fulfill']
+    validation_single_production_schedule = problem_state['validation_single_production_schedule']
     
     # If no feasible orders to fulfill, return None
     if not feasible_orders_to_fulfill:
@@ -44,7 +40,7 @@ def farthest_deadline_insertion_7e8a(global_data: dict, state_data: dict, algori
     
     # Select the unfulfilled order with the farthest deadline
     farthest_deadline_order = max(feasible_orders_to_fulfill, key=lambda x: order_deadline[x])
-    product_required = global_data['order_product'][farthest_deadline_order]
+    product_required = problem_state['order_product'][farthest_deadline_order]
     
     # Initialize variables for the best insertion
     best_cost_increase = float('inf')

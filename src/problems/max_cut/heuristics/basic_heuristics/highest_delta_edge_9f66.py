@@ -1,12 +1,11 @@
 from src.problems.max_cut.components import *
 
-def highest_delta_edge_9f66(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertEdgeOperator, dict]:
+def highest_delta_edge_9f66(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertEdgeOperator, dict]:
     """Selects the unselected edge that maximizes the increase in cut weight when added to the solution.
 
     Args:
-        global_data (dict): Contains global information about the graph.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): Contains the current state of the solution.
             - "current_solution" (Solution): The current partition of the graph into sets A and B.
             - "selected_nodes" (set[int]): The set of selected nodes.
 
@@ -14,10 +13,10 @@ def highest_delta_edge_9f66(global_data: dict, state_data: dict, algorithm_data:
         InsertEdgeOperator: Operator to insert the nodes of the edge into the appropriate sets.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    selected_nodes = state_data["selected_nodes"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    selected_nodes = problem_state["selected_nodes"]
+    unselected_nodes = problem_state["unselected_nodes"]
 
     best_delta = -float('inf')
     best_edge = None

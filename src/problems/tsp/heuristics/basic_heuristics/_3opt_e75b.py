@@ -1,20 +1,19 @@
 from src.problems.tsp.components import *
 
-def _3opt_e75b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
+def _3opt_e75b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """ The 3-opt heuristic operates by breaking the tour into three segments and then attempting to reconnect these segments in a different order that reduces the total travel distance. By considering various reconnection possibilities and implementing the most beneficial rearrangement, the heuristic can significantly reduce the length of the tour. This process is repeated until no further improvements can be found, resulting in a locally optimized solution that is often shorter than the initial tour provided to the function.
  
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
  
     Returns:
         ReverseSegmentOperator: The operator that defines the 3-opt move to be performed on the current solution.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    distance_matrix = global_data["distance_matrix"]  
-    current_solution = state_data["current_solution"]  
+    distance_matrix = problem_state["distance_matrix"]  
+    current_solution = problem_state["current_solution"]  
  
     # Best distance improvement found  
     best_delta = 0

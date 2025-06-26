@@ -1,26 +1,25 @@
 from src.problems.mkp.components import *
 
-def greedy_by_resource_balance_52f0(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AddOperator, dict]:
+def greedy_by_resource_balance_52f0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
     Greedy by Resource Balance heuristic for the Multidimensional Knapsack Problem.
     This heuristic selects items that help to balance the resource usage across all dimensions.
     It prefers items that use less of the more consumed resources and more of the less consumed ones.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
             - "capacities" (numpy.array): The maximum available capacity for each resource dimension.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "remaining_capacity" (numpy.array): The remaining capacity for each resource dimension after considering the items included in the current solution.            - "items_not_in_knapsack" (list[int]): A list of item indices that are currently not included in the knapsack.
 
     Returns:
         AddOperator: The operator to add an item to the knapsack that best balances the resource usage.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    weights = global_data['weights']
-    capacities = global_data['capacities']
-    remaining_capacity = state_data['remaining_capacity']
-    items_not_in_knapsack = state_data['items_not_in_knapsack']
+    weights = problem_state['weights']
+    capacities = problem_state['capacities']
+    remaining_capacity = problem_state['remaining_capacity']
+    items_not_in_knapsack = problem_state['items_not_in_knapsack']
 
     # Calculate the resource utilization ratio for each dimension
     utilization_ratios = [1 - (remaining / capacity) for remaining, capacity in zip(remaining_capacity, capacities)]

@@ -4,7 +4,7 @@ import re
 import base64
 import importlib
 from time import sleep
-from src.util.util import compress_numbers, extract, load_framework_description
+from src.util.util import compress_numbers, extract, load_framework_description, search_file
 
 
 class BaseLLMClient:
@@ -51,7 +51,7 @@ class BaseLLMClient:
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)
 
-    def load_background(self, problem: str, reference_data: str=None) -> dict:
+    def load_background(self, problem: str, background_file="background_with_code", reference_data: str=None) -> dict:
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
         if os.path.exists(os.path.join("src", "problems", problem, "components.py")):
@@ -66,18 +66,20 @@ class BaseLLMClient:
             globals()["Env"] = getattr(module, "Env")
             env = Env(reference_data)
             env_summarize = env.summarize_env()
+        problem_description_file = search_file("problem_description.txt", problem)
+        problem_state_file = search_file("problem_state.txt", problem)
+        assert os.path.exists(problem_dir), f"Problem description file {problem_description_file} does not exist"
 
         prompt_dict = {
             "problem": problem,
-            "problem_description": open(os.path.join(problem_dir, "problem_description.txt"), encoding="utf-8").read(),
-            "global_data_introduction": open(os.path.join(problem_dir, "global_data.txt"), encoding="utf-8").read(),
-            "state_data_introduction": open(os.path.join(problem_dir, "state_data.txt"), encoding="utf-8").read(),
+            "problem_description": open(problem_description_file, encoding="utf-8").read(),
+            "problem_state_introduction": open(problem_state_file, encoding="utf-8").read() if problem_state_file else "",
             "solution_class": solution_class_str,
             "operator_class": operator_class_str,
             "env_summarize": env_summarize
         }
 
-        self.load("background", prompt_dict)
+        self.load(background_file, prompt_dict)
         response = self.chat()
         is_cop = extract(response, "is_cop", "\n")
         self.dump("background")

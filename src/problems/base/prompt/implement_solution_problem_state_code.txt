@@ -1,0 +1,36 @@
+Try to implement the get_solution_problem_state function in python:
+def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
+
+The input is instance_data:
+{instance_data_introduction}
+The format of solution is already defined as:
+{solution_class}
+
+The output is algo a dict, which contains the following problem states as keys: {solution_problem_states}.
+
+Please note:
+1. Never modify the instance_data and solution.
+2. The name of function must be get_solution_problem_state.
+3. No any omissions or placeholders, I'm just going to use the code.
+4. Comments in the code are very important.
+5. The solution is already defined, do not implement it again.
+
+The response format is very important. For better communication, please respond to me in this format:
+***python_code:
+import library (if necessary)
+def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
+    """Extract instance problem state from instance data.
+
+    Args:
+        instance_data (dict): The dictionary contains the instance data.
+        solution (Solution): The target solution instance.
+    Returns:
+        dict: The dictionary contains the instance problem state with:
+            - problem_state_name (type): description
+            - problem_state_name (type): description
+            ...
+    """
+    ...
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

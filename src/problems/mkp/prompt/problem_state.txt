@@ -1,0 +1,23 @@
+problem_state (dict): The dictionary contains the problem state with:
+    - item_num (int): The total number of items available for selection.
+    - resource_num (int): The number of resource dimensions or constraints.
+    - profits (numpy.array): The profit value associated with each item.
+    - weights (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.
+    - capacities (numpy.array): The maximum available capacity for each resource dimension.
+    - current_solution (Solution): Current solution instance.
+    - current_profit (float): The total profit of the items included in the current solution.
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+    - average_profit (float): The average profit of all the items.
+    - profit_variance (float): The variance of the profit values of items.
+    - average_weight_per_resource (list[float]): The average weight of items for each resource dimension.
+    - weight_variance_per_resource (list[float]): The variance of item weights for each resource dimension.
+    - capacity_to_weight_ratio (list[float]): The ratio of total capacity to total weight per resource.
+    - profit_to_weight_ratio (list[float]): The ratio of profit to weight for each item.
+    - current_solution_value (float): The total profit of items currently included in the knapsack.
+    - solution_density (float): The ratio of items included in the knapsack to the total number of items.
+    - average_remaining_capacity (float): The average remaining capacity across all resource dimensions.
+    - remaining_capacity_variance (float): The variance of the remaining capacities across all resource dimensions.
+    - feasibility_ratio (float): The ratio of feasible items to add to the knapsack, calculated against the total remaining items.
+    - utilized_capacity_ratio (array-like): The ratio of used capacity to total capacity for each resource dimension.
+    - item_profitability_in_solution (float): The average profit of items that are included in the current solution.

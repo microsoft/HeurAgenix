@@ -2,7 +2,7 @@ from src.problems.tsp.components import *
 import random
 import math
 
-def simulated_annealing_e625(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[SwapOperator, dict]:
+def simulated_annealing_e625(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Simulated Annealing heuristic for the Traveling Salesman Problem.
     This function applies the simulated annealing technique to find a solution to the TSP.
@@ -10,9 +10,8 @@ def simulated_annealing_e625(global_data: dict, state_data: dict, algorithm_data
     the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): The current solution of the TSP.
             - "current_cost" (int): The total cost of the current solution.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
@@ -29,15 +28,15 @@ def simulated_annealing_e625(global_data: dict, state_data: dict, algorithm_data
     alpha = algorithm_data.get('alpha', 0.995)
     
     # Select two distinct nodes at random
-    node_indices = list(range(len(state_data['current_solution'].tour)))
+    node_indices = list(range(len(problem_state['current_solution'].tour)))
     if len(node_indices) < 2:
         return None, {}
     i, j = random.sample(node_indices, 2)
     
     # Calculate the cost difference if the nodes were swapped
-    current_solution = state_data['current_solution']
-    distance_matrix = global_data['distance_matrix']
-    current_cost = state_data['current_cost']
+    current_solution = problem_state['current_solution']
+    distance_matrix = problem_state['distance_matrix']
+    current_cost = problem_state['current_cost']
     
     node_i = current_solution.tour[i]
     node_j = current_solution.tour[j]

@@ -1,14 +1,13 @@
 from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOperator
 import numpy as np
 
-def balanced_cut_c0e6(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertNodeOperator, dict]:
+def balanced_cut_c0e6(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """Balanced Cut heuristic for the Max Cut problem with improvements to ensure balanced partitions, 
     future impact consideration, and periodic swap operations.
 
     Args:
-        global_data (dict): The global data dict containing the following items:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - weight_matrix (numpy.ndarray): A 2D array representing the weight between nodes.
-        state_data (dict): The state dictionary containing the current state information:
             - current_solution (Solution): The current partition of the graph into sets A and B.
             - unselected_nodes (set[int]): The set of nodes that have not yet been selected.
             - set_a (set[int]): The set of nodes in partition A.
@@ -16,8 +15,7 @@ def balanced_cut_c0e6(global_data: dict, state_data: dict, algorithm_data: dict,
             - current_cut_value (float): The current cut value of the solution.
         algorithm_data (dict): The algorithm dictionary for the current algorithm only. In this algorithm, the following items are necessary:
             - operation_count (int): The number of operations performed so far. Default is 0.
-            - sorted_nodes (list of tuples): A sorted list of (node, future_impact) in descending order. Default is empty.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for the new solution. It does not modify the original solution.
+            - sorted_nodes (list of tuples): A sorted list of (node, future_impact) in descending order. Default is empty.the original solution.
         kwargs (dict): Hyperparameters for the heuristic:
             - scaling_factor (float, optional): A hyperparameter to scale the future impact of nodes. Defaults to 0.5.
             - swap_frequency (int, optional): Frequency (in terms of operations) at which swap operations are considered. Defaults to 5.
@@ -27,9 +25,9 @@ def balanced_cut_c0e6(global_data: dict, state_data: dict, algorithm_data: dict,
         dict: Updated algorithm data with the sorted list of nodes and operation count.
     """
     # Extract necessary data
-    weight_matrix = global_data["weight_matrix"]
-    current_solution = state_data["current_solution"]
-    unselected_nodes = state_data["unselected_nodes"]
+    weight_matrix = problem_state["weight_matrix"]
+    current_solution = problem_state["current_solution"]
+    unselected_nodes = problem_state["unselected_nodes"]
     set_a, set_b = current_solution.set_a, current_solution.set_b
     operation_count = algorithm_data.get("operation_count", 0)
     sorted_nodes = algorithm_data.get("sorted_nodes", [])

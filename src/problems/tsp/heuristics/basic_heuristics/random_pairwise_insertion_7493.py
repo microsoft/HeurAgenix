@@ -1,14 +1,13 @@
 from src.problems.tsp.components import *
 import random
 
-def random_pairwise_insertion_7493(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def random_pairwise_insertion_7493(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Random Pairwise Insertion heuristic for the Traveling Salesman Problem. This heuristic selects two unvisited nodes at random and inserts them into the current tour at positions that result in the least increase in tour length. It returns an InsertOperator with the selected nodes and their positions.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): A 2D array representing the distances between nodes.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - "current_solution" (Solution): An instance of the Solution class representing the current solution.
             - "unvisited_nodes" (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
 
@@ -17,10 +16,10 @@ def random_pairwise_insertion_7493(global_data: dict, state_data: dict, algorith
         dict: Empty dictionary as no algorithm data is updated.
     """
 
-    # Extract necessary data from global_data and state_data
-    distance_matrix = global_data["distance_matrix"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
+    # Extract necessary data from problem_state
+    distance_matrix = problem_state["distance_matrix"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
 
     # Check if there are at least two unvisited nodes to insert
     if len(unvisited_nodes) < 2:

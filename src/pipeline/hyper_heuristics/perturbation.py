@@ -2,7 +2,7 @@ import os
 import random
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
 class PerturbationHyperHeuristic:
     def __init__(
@@ -11,13 +11,15 @@ class PerturbationHyperHeuristic:
         perturbation_heuristic_file: str,
         problem: str,
         perturbation_ratio: float=0.1,
+        iterations_scale_factor: float = 2.0
     ) -> None:
-        self.main_heuristic = load_heuristic(main_heuristic_file, problem=problem)
-        self.perturbation_heuristic = load_heuristic(perturbation_heuristic_file, problem=problem)
+        self.main_heuristic = load_function(main_heuristic_file, problem=problem)
+        self.perturbation_heuristic = load_function(perturbation_heuristic_file, problem=problem)
         self.perturbation_ratio = perturbation_ratio
+        self.iterations_scale_factor = iterations_scale_factor
 
-    def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
-        max_steps = max_steps if max_steps is not None else env.construction_steps * 3
+    def run(self, env:BaseEnv) -> bool:
+        max_steps = int(env.construction_steps * self.iterations_scale_factor)
         current_steps = 0
         heuristic_work = BaseOperator()
         while current_steps <= max_steps and isinstance(heuristic_work, BaseOperator) and env.continue_run:

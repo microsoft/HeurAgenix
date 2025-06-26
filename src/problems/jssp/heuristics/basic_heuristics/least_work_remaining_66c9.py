@@ -1,13 +1,12 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
-def least_work_remaining_66c9(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[AdvanceOperator, dict]:
+def least_work_remaining_66c9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """
     Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
 
     Args:
-        global_data (dict): The global data dict containing the global data. For this algorithm, we need:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "job_operation_time" (numpy.ndarray):  The time cost for each operation in target job.
-        state_data (dict): The state dictionary containing the current state information. For this algorithm, we need:
             - "unfinished_jobs" (list[int]): List of all unfinished jobs.
             - "job_operation_index" (list[int]): The index of the next operation to be scheduled for each job.
 
@@ -15,12 +14,10 @@ def least_work_remaining_66c9(global_data: dict, state_data: dict, algorithm_dat
         AdvanceOperator: Operator to advance the selected job's next operation.
         dict: Empty dictionary as no algorithm data is updated.
     """
-    # Extract necessary information from global_data
-    job_operation_time = global_data["job_operation_time"]
-
-    # Extract necessary state data
-    unfinished_jobs = state_data["unfinished_jobs"]
-    job_operation_index = state_data["job_operation_index"]
+    # Extract necessary information from problem_state
+    job_operation_time = problem_state["job_operation_time"]
+    unfinished_jobs = problem_state["unfinished_jobs"]
+    job_operation_index = problem_state["job_operation_index"]
 
     # Initialize the least work remaining and corresponding job ID
     min_work_remaining = float('inf')

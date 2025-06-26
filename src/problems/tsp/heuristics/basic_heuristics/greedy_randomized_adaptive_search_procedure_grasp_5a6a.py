@@ -2,15 +2,14 @@ import random
 import numpy as np
 from src.problems.tsp.components import *
 
-def greedy_randomized_adaptive_search_procedure_grasp_5a6a(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, alpha: float = 0.3, **kwargs) -> tuple[InsertOperator, dict]:
+def greedy_randomized_adaptive_search_procedure_grasp_5a6a(problem_state: dict, algorithm_data: dict, alpha: float = 0.3, **kwargs) -> tuple[InsertOperator, dict]:
     """
     Greedy Randomized Adaptive Search Procedure (GRASP) function embodies the Greedy Randomized Adaptive Search Procedure (GRASP), a metaheuristic algorithm tailored for solving combinatorial optimization problems like the Traveling Salesman Problem (TSP). GRASP iteratively constructs a solution through a two-phase process: a greedy randomized construction phase and a local search phase. During the construction phase, it builds a partial solution by repeatedly adding the best candidate according to a greedy function, which is randomized within a Restricted Candidate List (RCL) determined by the alpha parameter. This parameter adjusts the level of greediness versus randomness, with lower values favoring greedy choices and higher values allowing for more exploration. Once an initial solution is constructed, the local search phase seeks to improve it by exploring the neighborhood of the current solution. 
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - distance_matrix (numpy.ndarray): A 2D array representing the distances between nodes.
             - node_num (int): The total number of nodes in the problem.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): An instance of the Solution class representing the current solution.
             - unvisited_nodes (list[int]): A list of integers representing the IDs of nodes that have not yet been visited.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. This algorithm does not use algorithm_data.
@@ -21,9 +20,9 @@ def greedy_randomized_adaptive_search_procedure_grasp_5a6a(global_data: dict, st
         dict: Empty dictionary as this algorithm does not update algorithm_data.
     """
 
-    current_solution = state_data['current_solution']
-    unvisited_nodes = state_data['unvisited_nodes']
-    distance_matrix = global_data['distance_matrix']
+    current_solution = problem_state['current_solution']
+    unvisited_nodes = problem_state['unvisited_nodes']
+    distance_matrix = problem_state['distance_matrix']
 
     # If the current solution is empty, start from first unvisited node.
     if not current_solution.tour:

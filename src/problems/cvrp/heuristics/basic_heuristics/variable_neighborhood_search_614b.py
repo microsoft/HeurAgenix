@@ -1,17 +1,16 @@
 from src.problems.cvrp.components import *
 
-def variable_neighborhood_search_614b(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[BaseOperator, dict]:
+def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[BaseOperator, dict]:
     """ Variable Neighborhood Search heuristic algorithm for CVRP.
     This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions.
     It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
 
     Args:
-        global_data (dict): Global data containing problem parameters.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): Distance between nodes.
             - "vehicle_num" (int): Number of vehicles.
             - "capacity" (int): Capacity of each vehicle.
             - "depot" (int): Index of the depot node.
-        state_data (dict): State data containing the current state of the solution.
             - "current_solution" (Solution): The current set of routes for all vehicles.
             - "vehicle_loads" (list[int]): The current load of each vehicle.
             - "unvisited_nodes" (list[int]): Nodes that have not yet been visited by any vehicle.
@@ -23,16 +22,14 @@ def variable_neighborhood_search_614b(global_data: dict, state_data: dict, algor
         dict: Empty dictionary as this function does not update algorithm_data.
     """
 
-    # Retrieve necessary data from state_data
-    current_solution = state_data.get('current_solution')
-    vehicle_loads = state_data.get('vehicle_loads')
-    unvisited_nodes = state_data.get('unvisited_nodes')
-
-    # Retrieve necessary data from global_data
-    depot = global_data.get('depot')
-    capacity = global_data.get('capacity')
-    vehicle_num = global_data.get('vehicle_num')
-    distance_matrix = global_data.get('distance_matrix')
+    # Retrieve necessary data from problem_state
+    current_solution = problem_state.get('current_solution')
+    vehicle_loads = problem_state.get('vehicle_loads')
+    unvisited_nodes = problem_state.get('unvisited_nodes')
+    depot = problem_state.get('depot')
+    capacity = problem_state.get('capacity')
+    vehicle_num = problem_state.get('vehicle_num')
+    distance_matrix = problem_state.get('distance_matrix')
 
     # Define hyperparameters (with default values)
     neighborhood_size = kwargs.get('neighborhood_size', 10)
@@ -46,7 +43,7 @@ def variable_neighborhood_search_614b(global_data: dict, state_data: dict, algor
         for node_index in range(len(unvisited_nodes)):
             node = unvisited_nodes[node_index]
             # Check if adding this node to the route exceeds the vehicle's capacity
-            if vehicle_loads[vehicle_id] + global_data['demands'][node] <= capacity:
+            if vehicle_loads[vehicle_id] + problem_state['demands'][node] <= capacity:
                 for position in range(len(current_solution.routes[vehicle_id]) + 1):
                     # Calculate the cost of inserting the node at the current position
                     if position == 0:

@@ -1,0 +1,20 @@
+We aim to collaboratively create the functions to generate some problem states(statistics data), which captures the high-level features of problem instance for the {problem}. 
+
+These functions will be underpinned by rigorous statistical analysis and domain-specific knowledge, ensuring they are both accurate and relevant.
+
+
+In determining the optimal problem states to represent instance, we must adhere to the following criteria:
+1. The data representation should be succinct to minimize computational load while retaining sufficient granularity to recognize the feature of the problem and solution.
+2. It must incorporate unique attributes that aid in the clear distinction between different instances.
+3. The most important, these data only focus on instance and has nothing to do with solution.
+
+Now, please tell me which statistical data are best serve as instance problem state.
+
+The response format is very important. For better communication, please respond to me in this format:
+***instance_problem_state:
+problem_state_name;how_to_calculate;reason
+problem_state_name;how_to_calculate;reason
+....
+***
+Ensure there is no other content inside the ***, and analysis outside *** is welcome.
+If you have no information to provide, simply respond with ***None***.

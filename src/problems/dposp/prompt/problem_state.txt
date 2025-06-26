@@ -1,0 +1,33 @@
+problem_state (dict): The dictionary contains the problem state with:
+    - product_num (int): Total number of unique products.
+    - production_line_num (int): Total number of production lines.
+    - order_num (int): Total number of orders to be scheduled.
+    - production_rate (numpy.array): 2D array of production time for each product on each production line.
+    - transition_time (numpy.array): 3D array of transition time between products on each production line.
+    - order_product (numpy.array): 1D array mapping each order to its required product.
+    - order_quantity (numpy.array): 1D array of the quantity required for each order.
+    - order_deadline (numpy.array): 1D array of the deadline for each order.
+    - current_solution (Solution): Current solution instance.
+    - fulfilled_order_num (int): Number of fulfilled orders.
+    - validation_single_production_schedule (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
+    - get_time_cost_delta (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
+    - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
+    - validation_solution (callable): def validation_solution(solution: Solution) -> bool: The function to check whether the solution is valid.
+    - average_production_rate (np.ndarray): The average production rate for each product across all production lines.
+    - maximum_transition_time (float): The maximum transition time required between different product changes.
+    - average_order_quantity (float): The average quantity required for all orders.
+    - deadline_variance (float): The variance in deadlines for the orders.
+    - product_to_order_ratio (float): The ratio of the number of products to the number of orders.
+    - average_deadline_per_product (np.ndarray): The average order deadline for each product.
+    - production_line_utilization_potential (np.ndarray): An array representing potential utilization of each production line based on current order requirements and production capabilities.
+    - fulfilled_order_num (int): Number of fulfilled orders.
+    - fulfilled_orders (list[int]): List of fulfilled orders.
+    - unfulfilled_orders (list[int]): List of unfulfilled orders.
+    - total_time_cost_per_production_line (numpy.array): 1D array of the sum of production and transition times for each production line.
+    - feasible_orders_to_fulfill (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
+    - fulfillment_ratio (float): The ratio of fulfilled orders to total orders.
+    - average_time_cost (float): The average time cost incurred per production line.
+    - max_time_cost (float): The maximum time cost incurred by any production line.
+    - unfulfilled_order_quantity_sum (float): The sum of quantities for all unfulfilled orders.
+    - unfulfilled_order_deadline_variance (float): The variance in deadlines for the unfulfilled orders.
+    - feasible_order_count (int): The number of orders that are still feasible to fulfill.

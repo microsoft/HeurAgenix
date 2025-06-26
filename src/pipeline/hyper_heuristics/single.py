@@ -1,18 +1,18 @@
 import os
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
-from src.util.util import load_heuristic
+from src.util.util import load_function
 
 
 class SingleHyperHeuristic:
     def __init__(
         self,
-        heuristic_file: str,
+        heuristic: str,
         problem: str,
     ) -> None:
-        self.heuristic = load_heuristic(heuristic_file, problem=problem)
+        self.heuristic = load_function(heuristic, problem=problem)
 
-    def run(self, env:BaseEnv, max_steps: int=None, **kwargs) -> bool:
+    def run(self, env:BaseEnv, **kwargs) -> bool:
         current_steps = 0
         heuristic_work = BaseOperator()
         while isinstance(heuristic_work, BaseOperator) and env.continue_run:

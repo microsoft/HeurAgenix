@@ -1,21 +1,19 @@
 from src.problems.tsp.components import *
 import numpy as np
 
-def farthest_insertion_54db(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def farthest_insertion_54db(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """ Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost.
     
     This heuristic also periodically applies the 2-opt heuristic to improve the solution.
 
     Args:
-        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - distance_matrix (numpy.ndarray): A 2D array representing the distances between nodes.
             - std_dev_distance (float): The standard deviation of distances.
             - node_num (int): The total number of nodes in the problem.
-        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
             - current_solution (Solution): The current solution of the TSP.
             - unvisited_nodes (list[int]): The list of nodes that have not been visited.
             - last_visited (int or None): The last visited node, or None if no nodes have been visited yet.
-        get_state_data_function (callable): The function receives the new solution as input and returns the state dictionary for new solution, and it will not modify the original solution.
         **kwargs: Hyper-parameters for the heuristic algorithm.
             - apply_2opt_frequency (int, default=5): The frequency (number of insertions) at which to apply the 2-opt heuristic.
             - high_disparity_threshold (float, default=1.0): The threshold for high disparity in distances.
@@ -25,12 +23,12 @@ def farthest_insertion_54db(global_data: dict, state_data: dict, algorithm_data:
         InsertOperator: The operator to insert the chosen node into the current solution.
         dict: Updated algorithm data if any.
     """
-    distance_matrix = global_data["distance_matrix"]
-    std_dev_distance = global_data["std_dev_distance"]
-    node_num = global_data["node_num"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
-    last_visited = state_data.get("last_visited")
+    distance_matrix = problem_state["distance_matrix"]
+    std_dev_distance = problem_state["std_dev_distance"]
+    node_num = problem_state["node_num"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
+    last_visited = problem_state["last_visited"]
 
     apply_2opt_frequency = kwargs.get("apply_2opt_frequency", 5)
     high_disparity_threshold = kwargs.get("high_disparity_threshold", 1.0)

@@ -1,13 +1,11 @@
 from src.problems.tsp.components import *
 
-def farthest_insertion_b6d3(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[InsertOperator, dict]:
+def farthest_insertion_b6d3(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """ This heuristic selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost.
 
     Args:
-        global_data (dict): Contains the global data necessary for the heuristic.
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): The distance matrix between nodes.
-            
-        state_data (dict): Contains the current state information necessary for the heuristic.
             - "current_solution" (Solution): The current solution of the TSP.
             - "unvisited_nodes" (list[int]): The list of nodes that have not been visited.
             
@@ -19,10 +17,10 @@ def farthest_insertion_b6d3(global_data: dict, state_data: dict, algorithm_data:
         dict: Empty dictionary as this heuristic does not update algorithm_data.
     """
     
-    # Extract necessary data from global_data and state_data
-    distance_matrix = global_data["distance_matrix"]
-    current_solution = state_data["current_solution"]
-    unvisited_nodes = state_data["unvisited_nodes"]
+    # Extract necessary data from problem_state
+    distance_matrix = problem_state["distance_matrix"]
+    current_solution = problem_state["current_solution"]
+    unvisited_nodes = problem_state["unvisited_nodes"]
     
     # Initialize variables to track the farthest node and its insertion cost
     farthest_node = None
