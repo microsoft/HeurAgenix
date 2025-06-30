@@ -43,6 +43,7 @@ def main():
     evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
     heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
 
+    llm_client = None
     if heuristic == "llm_hh":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
@@ -80,7 +81,8 @@ def main():
     for test_case in test_cases:
         env = Env(data_name=test_case)
         env.reset(output_dir)
-        llm_client.reset(env.output_dir)
+        if llm_client:
+            llm_client.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result()
