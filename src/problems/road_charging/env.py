@@ -68,9 +68,9 @@ class Env(MDPEnv):
         return filter_dict_to_str(self.get_global_data())
 
     def dump_result(self, dump_trajectory: bool=True, compress_trajectory: bool=False, result_file: str="result.txt") -> str:
-        # output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")
-        # data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.agents_trajectory.items()}  
-        # json.dump(data_converted, output_file)
+        output_file = open(os.path.join(self.output_dir, "trajectory.json"), "w")
+        data_converted = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in self.gym_env.agents_trajectory.items()}  
+        json.dump(data_converted, output_file)
         # self.show_trajectory()
         content = super().dump_result(dump_trajectory=dump_trajectory, compress_trajectory=compress_trajectory, result_file=result_file)
         

@@ -39,18 +39,20 @@ def main():
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
 
-    prompt_dir = os.path.join("src", "problems", "base", "prompt")
-    llm_client = get_llm_client(llm_config_file, prompt_dir, None)
-    llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
-
     heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_type))
     evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
     heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
 
     if heuristic == "llm_hh":
+        prompt_dir = os.path.join("src", "problems", "base", "prompt")
+        llm_client = get_llm_client(llm_config_file, prompt_dir, None)
+        llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
         output_dir = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMSelectionHyperHeuristic(llm_client=llm_client, heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "llm_deep_hh":
+        prompt_dir = os.path.join("src", "problems", "base", "prompt")
+        llm_client = get_llm_client(llm_config_file, prompt_dir, None)
+        llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
         output_dir = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMDeepSelectionHyperHeuristic(
             llm_client=llm_client,
