@@ -16,7 +16,7 @@ def parse_arguments():
     parser.add_argument("-e", "--heuristic", type=str, required=True, help=": Specifies which heuristic function or strategy to apply. 'heuristic_function_name': Directly specify a heuristic function. 'llm_hh': Utilizes LLM for rapid heuristic selection from the directory. 'random_hh': Randomly selects a heuristic from the directory. 'or_solver': Uses an exact OR solver, where applicable.")
     parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="Path to the language model configuration file. Default is azure_gpt_4o.json.")
     parser.add_argument("-d", "--heuristic_dir", type=str, default="basic_heuristics", help="Directory containing heuristics for llm_hh or random_hh. Default is 'basic_heuristics'.")
-    parser.add_argument("-t", "--test_data", type=str, default="test_data", help="test_data", help="Path to a specific test data file. Defaults to testing all files in the `test_data` directory if not specified.")
+    parser.add_argument("-t", "--test_data", type=str, default="test_data", help="Path to a specific test data file. Defaults to testing all files in the `test_data` directory if not specified.")
     parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor determining total heuristic steps relative to problem size. Default is 2.0.")
     parser.add_argument("-m", "--steps_per_selection", type=int, default=5, help="Number of steps executed per heuristic selection in LLM mode. Default is 5.")
     parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.")
