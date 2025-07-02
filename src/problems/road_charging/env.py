@@ -50,6 +50,7 @@ class Env(MDPEnv):
             "return": self.gym_env.ep_returns,
             "current_solution": self.current_solution
         }
+    
 
     def validation_solution(self, solution: Solution=None) -> bool:
         return True

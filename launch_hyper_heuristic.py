@@ -19,7 +19,8 @@ def parse_arguments():
     parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Data name for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
-    parser.add_argument("-l", "--llm_config_file", type=str, default="AzureGPT", help="LLM config file to use.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file to use.")
+    parser.add_argument("-o", "--output_dir", type=str, default=None, help="Output dir.")
 
     return parser.parse_args()
 
@@ -32,6 +33,7 @@ def main():
     search_interval = args.search_interval
     search_time = args.search_time
     llm_config_file = args.llm_config_file
+    output_dir = args.output_dir if args.output_dir else os.path.join("output", problem, "result")
 
     if test_case is None:
         test_dir = os.path.join("output", problem, "data", "test_data") if args.test_dir is None else args.test_dir
@@ -48,13 +50,13 @@ def main():
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
         llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
-        output_dir = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
+        experiment_name = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMSelectionHyperHeuristic(llm_client=llm_client, heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "llm_deep_hh":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
         llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
-        output_dir = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
+        experiment_name = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMDeepSelectionHyperHeuristic(
             llm_client=llm_client,
             heuristic_pool=heuristic_pool,
@@ -63,16 +65,15 @@ def main():
             search_time=search_time,
         )
     elif heuristic == "random_hh":
-        output_dir = f"{heuristic}.{datetime_str}"
-        output_dir = f"{heuristic}.{heuristic_type}.{datetime_str}"
+        experiment_name = f"{heuristic}.{heuristic_type}.{datetime_str}"
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem)
     elif heuristic == "or_solver":
-        output_dir = "or_solver"
+        experiment_name = "or_solver"
         module = importlib.import_module(f"src.problems.{problem}.or_solver")
         globals()["ORSolver"] = getattr(module, "ORSolver")
         hyper_heuristic = ORSolver(problem=problem)
     else:
-        output_dir = heuristic
+        experiment_name = heuristic
         hyper_heuristic = SingleHyperHeuristic(heuristic, problem=problem)
 
     module = importlib.import_module(f"src.problems.{problem}.env")
@@ -80,7 +81,7 @@ def main():
 
     for test_case in test_cases:
         env = Env(data_name=test_case)
-        env.reset(output_dir)
+        env.reset(os.path.join(output_dir))
         if llm_client:
             llm_client.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)

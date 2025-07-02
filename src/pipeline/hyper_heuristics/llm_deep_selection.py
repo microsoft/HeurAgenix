@@ -124,8 +124,7 @@ class LLMDeepSelectionHyperHeuristic:
                         search_interval,
                         search_time,
                         self.problem,
-                        best_result_proxy,
-                        True
+                        best_result_proxy
                     )
 
                     # Find the best heuristic
