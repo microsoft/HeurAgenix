@@ -13,10 +13,10 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Generate heuristic")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Type of problem to solve.")
-    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'llm_hh' / 'llm_deep_hh' /'random_hh' for LLM/random selection from the heuristic directory, and 'or_solver' for OR result.")
+    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Name or path of the heuristic function. Use 'llm_hh' / 'llm_tts' /'random_hh' for LLM/random selection from the heuristic directory, and 'or_solver' for OR result.")
     parser.add_argument("-d", "--heuristic_type", type=str, default="basic_heuristics", help="Directory containing heuristic functions.")
-    parser.add_argument("-si", "--search_interval", type=int, default=None, help="Search interval for deep hh mode.")
-    parser.add_argument("-st", "--search_time", type=int, default=None, help="Search time for deep hh mode.")
+    parser.add_argument("-si", "--search_interval", type=int, default=1, help="Search interval for deep hh mode.")
+    parser.add_argument("-st", "--search_time", type=int, default=100, help="Search time for deep hh mode.")
     parser.add_argument("-c", "--test_case", type=str, default=None, help="Data name for single test case.")
     parser.add_argument("-t", "--test_dir", type=str, default=None, help="Directory for the whole test set.")
     parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("output", "llm_config", "azure_gpt_4o.json"), help="LLM config file to use.")
@@ -52,7 +52,7 @@ def main():
         llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
         experiment_name = f"{heuristic}.{heuristic_type}.{llm_name}.{datetime_str}"
         hyper_heuristic = LLMSelectionHyperHeuristic(llm_client=llm_client, heuristic_pool=heuristic_pool, problem=problem)
-    elif heuristic == "llm_deep_hh":
+    elif heuristic == "llm_tts":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
         llm_name = llm_config_file.split(os.sep)[-1].split(".")[0]
