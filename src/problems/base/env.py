@@ -142,10 +142,10 @@ class BaseEnv:
                 content += f"-trajectory:\noperation_id\toperator(parameter)\n{trajectory_str}\n"
             else:
                 trajectory_str = "\n".join([
-                    str(index) + "\t" + heuristic_name + "\t" + str(operator) + "\t" + solution_str.replace("\n", r"\n")
+                    str(index) + "\t" + heuristic_name + "\t" + str(operator)
                     for index, (heuristic_name, operator, solution_str) in enumerate(self.recording)
                 ])
-                content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\tsolution_after_operation\n{trajectory_str}\n"
+                content += f"-trajectory:\noperation_id\theuristic\toperator(parameter)\n{trajectory_str}\n"
 
         if self.output_dir != None and result_file != None:
             output_file = os.path.join(self.output_dir, result_file)
