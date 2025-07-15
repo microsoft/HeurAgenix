@@ -1,9 +1,8 @@
 from src.problems.base.mdp_components import Solution, ActionOperator
 import numpy as np
-from sklearn.linear_model import LinearRegression
 
-def lowest_soc_priority_6658(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
-    """ Heuristic algorithm using predictive modeling and real-time feedback to prioritize EVs for charging.
+def lowest_soc_priority_d0a2(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[ActionOperator, dict]:
+    """ Heuristic algorithm using a weighted scoring system to prioritize EVs for charging based on multiple factors.
 
     Args:
         global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
@@ -18,8 +17,8 @@ def lowest_soc_priority_6658(global_data: dict, state_data: dict, algorithm_data
             - operational_status (list[int]): A 1D array indicating the operational status of each EV, where 0 represents idle, 1 represents serving a trip, and 2 represents charging.
 
     Returns:
-        ActionOperator to assign charging actions to EVs based on predictive modeling and real-time feedback.
-        Updated algorithm data containing model parameters and performance metrics.
+        ActionOperator to assign charging actions to EVs based on a weighted score of various factors.
+        An empty dictionary as no algorithm data needs to be updated.
     """
     fleet_size = global_data["fleet_size"]
     total_chargers = global_data["total_chargers"]
@@ -32,18 +31,14 @@ def lowest_soc_priority_6658(global_data: dict, state_data: dict, algorithm_data
     # Initialize actions with zeros
     actions = [0] * fleet_size
 
-    # Predict future demand using a simple linear regression model
-    if 'demand_model' not in algorithm_data:
-        X = np.arange(len(customer_arrivals)).reshape(-1, 1)
-        y = np.array(customer_arrivals)
-        model = LinearRegression().fit(X, y)
-        algorithm_data['demand_model'] = model
-    else:
-        model = algorithm_data['demand_model']
-    
-    # Predict demand for next few steps
-    future_steps = np.arange(current_step, current_step + 5).reshape(-1, 1)
-    future_demand_forecast = model.predict(future_steps).sum()
+    # Define weights for scoring factors
+    soc_weight = kwargs.get("soc_weight", 0.4)
+    availability_weight = kwargs.get("availability_weight", 0.3)
+    completion_weight = kwargs.get("completion_weight", 0.2)
+    demand_weight = kwargs.get("demand_weight", 0.1)
+
+    # Calculate future demand forecast for next few steps
+    future_demand_forecast = sum(customer_arrivals[current_step:current_step+5])
 
     # Calculate scores for each EV
     scores = []
@@ -54,7 +49,12 @@ def lowest_soc_priority_6658(global_data: dict, state_data: dict, algorithm_data
         demand_score = future_demand_forecast / sum(customer_arrivals)  # Higher future demand gives higher score
 
         # Total weighted score
-        total_score = soc_score + availability_score + completion_score + demand_score
+        total_score = (
+            soc_weight * soc_score +
+            availability_weight * availability_score +
+            completion_weight * completion_score +
+            demand_weight * demand_score
+        )
         scores.append((i, total_score))
 
     # Sort EVs by their total weighted score in descending order (highest score first)
@@ -64,16 +64,11 @@ def lowest_soc_priority_6658(global_data: dict, state_data: dict, algorithm_data
     for i, _ in scores[:total_chargers]:
         actions[i] = 1
 
-    # Update algorithm data with performance metrics
-    previous_reward = algorithm_data.get("previous_reward", 0)
-    current_reward = state_data["reward"]
-    updated_algorithm_data = {
-        "demand_model": model,
-        "previous_reward": current_reward,
-        "reward_diff": current_reward - previous_reward
-    }
+    # Ensure the sum of actions does not exceed the number of chargers
+    if sum(actions) > total_chargers:
+        actions = [0] * fleet_size
 
     # Create the ActionOperator with the generated actions
     operator = ActionOperator(actions)
 
-    return operator, updated_algorithm_data
+    return operator, {}
