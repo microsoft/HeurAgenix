@@ -42,8 +42,6 @@ def main():
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
 
     heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_type))
-    evolved_names = [heuristic[:-8] for heuristic in heuristic_pool]
-    heuristic_pool += [file for file in os.listdir(os.path.join("src", "problems", problem, "heuristics", "basic_heuristics")) if file[:-8] not in evolved_names]
 
     llm_client = None
     if heuristic == "llm_hh":
