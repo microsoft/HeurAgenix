@@ -1,2 +1,0 @@
-1. Make the result must be valid, such as: no re-inserted nodes, never insert a node in set A, which are already in set B, etc.
-2. The graph is undirected, meaning each edge connecting two nodes is treated as a single, bidirectional edge.

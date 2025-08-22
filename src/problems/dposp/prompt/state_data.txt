@@ -1,9 +1,0 @@
-- "current_solution" (Solution): Current scheduling solution.
-- "fulfilled_order_num" (int): Number of fulfilled orders.
-- "fulfilled_orders" (list[int]): List of fulfilled orders.
-- "unfulfilled_orders" (list[int]): List of unfulfilled orders.
-- "total_time_cost_per_production_line" (numpy.array): 1D array of the sum of production and transition times for each production line.
-- "feasible_orders_to_fulfill" (list): The feasible orders that can be fulfilled based on the current solution without delaying other planned orders.
-- "validation_single_production_schedule" (callable): def validation_single_production_schedule(production_line_id: int, production_schedule: list[int]) -> bool: function to check whether the production schedule is valid.
-- "get_time_cost_delta" (callable): def get_time_cost_delta(production_line_id: int, order_id: int, position: int, solution: Solution=None) -> float: function to get the time cost for following order after insert in this solution. solution can be omitted if using current solution.
-- "validation_solution" (callable): def validation_solution(solution: Solution) -> bool: function to check whether new solution is valid.
