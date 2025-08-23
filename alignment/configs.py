@@ -79,6 +79,15 @@ class ScriptArguments(trl.SFTScriptArguments):
                 seed: 42
                 test_split_size: 0.1
     """
+    dataset_loader: Optional[str] = field(
+        default=None,
+        metadata={"help": "Dotted path to a callable returning a DatasetDict"},
+    )
+
+    dataset_holdout_split: Optional[str] = field(
+        default=None,
+        metadata={"help": "Name of the holdout split in the returned DatasetDict"},
+    )
 
     dataset_mixture: Optional[dict[str, Any]] = field(
         default=None,

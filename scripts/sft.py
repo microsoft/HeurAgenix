@@ -41,6 +41,7 @@ import sys
 
 import datasets
 import transformers
+from importlib import import_module
 from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
 
@@ -84,7 +85,14 @@ def main(script_args, training_args, model_args):
     ################
     # Load datasets
     ################
-    dataset = get_dataset(script_args)
+    if getattr(script_args, "dataset_loader", None):
+        dataloader_path = script_args.dataset_loader
+        logger.info(f"Loading dataset via custom loader: {dataloader_path}")
+        mod, func = dataloader_path.rsplit(".", 1)
+        dataset_loader = getattr(import_module(mod), func)
+        dataset = dataset_loader(script_args)
+    else:
+        dataset = get_dataset(script_args)
     ############
     # Load model
     ############
