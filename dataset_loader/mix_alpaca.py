@@ -41,7 +41,7 @@ def get_dataset(data_config: DataConfig) -> DatasetDict:
 
     holdout_num = min(10000, alpaca_cleaned.num_rows)
     holdout_dataset = alpaca_cleaned.select(range(holdout_num))
-    train_dataset = concatenate_datasets([alpaca, holdout_dataset]).shuffle(seed=42)
+    train_dataset = concatenate_datasets([alpaca, holdout_dataset])
     test_dataset = alpaca_cleaned.select(range(holdout_num, alpaca_cleaned.num_rows)) if alpaca_cleaned.num_rows > holdout_num else alpaca_cleaned.select([])
     return DatasetDict(
         holdout=holdout_dataset,

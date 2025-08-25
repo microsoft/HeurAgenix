@@ -86,9 +86,9 @@ class DataConfig:
         metadata={"help": "Dotted path to a callable returning weight"},
     )
 
-    weight_normalization_function: Optional[str] = field(
+    weight_args: Optional[dict] = field(
         default=None,
-        metadata={"help": "Dotted path to a callable returning normalized weight"},
+        metadata={"help": "Config for weight function"},
     )
 
     cache_weight_file: Optional[str] = field(
