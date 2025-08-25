@@ -52,33 +52,15 @@ class DatasetMixtureConfig:
     seed: int = 0
     test_split_size: Optional[float] = None
 
+@dataclass
+class WeightConfig:
+    """Configuration for a weight calculation."""
+    weight_function: callable
+    weight_normalization_function: callable
+    cache_file: str = None
 
 @dataclass
-class ScriptArguments(trl.SFTScriptArguments):
-    """
-    Extended version of ScriptArguments with support for dataset mixtures.
-
-    Args:
-        dataset_mixture (`dict[str, Any]` or `None`, *optional*, defaults to `None`):
-            Configuration for creating dataset mixtures with advanced options.
-            Format:
-              dataset_mixture:
-                datasets:
-                  - id: dataset_id1
-                    config: config_name
-                    columns:
-                      - col1
-                      - col2
-                    weight: 0.5
-                  - id: dataset_id2
-                    config: config_name
-                    columns:
-                      - col1
-                      - col2
-                    weight: 0.5
-                seed: 42
-                test_split_size: 0.1
-    """
+class DataConfig:
     dataset_loader: Optional[str] = field(
         default=None,
         metadata={"help": "Dotted path to a callable returning a DatasetDict"},
@@ -89,54 +71,30 @@ class ScriptArguments(trl.SFTScriptArguments):
         metadata={"help": "Name of the holdout split in the returned DatasetDict"},
     )
 
-    dataset_mixture: Optional[dict[str, Any]] = field(
+    dataset_train_split: Optional[str] = field(
         default=None,
-        metadata={"help": "Configuration for creating dataset mixtures with advanced options like shuffling."},
+        metadata={"help": "Name of the train split in the returned DatasetDict"},
     )
 
-    def __post_init__(self):
-        if self.dataset_name is None and self.dataset_mixture is None:
-            raise ValueError("Either `dataset_name` or `dataset_mixture` must be provided")
+    dataset_test_split: Optional[str] = field(
+        default=None,
+        metadata={"help": "Name of the test split in the returned DatasetDict"},
+    )
 
-        if self.dataset_mixture is not None:
-            if not isinstance(self.dataset_mixture, dict) or "datasets" not in self.dataset_mixture:
-                raise ValueError(
-                    "dataset_mixture must be a dictionary with a 'datasets' key. "
-                    "Expected format: {'datasets': [...], 'seed': int}"
-                )
+    weight_function: Optional[str] = field(
+        default=None,
+        metadata={"help": "Dotted path to a callable returning weight"},
+    )
 
-            datasets_list = []
-            datasets_data = self.dataset_mixture.get("datasets", [])
+    weight_normalization_function: Optional[str] = field(
+        default=None,
+        metadata={"help": "Dotted path to a callable returning normalized weight"},
+    )
 
-            if isinstance(datasets_data, list):
-                for dataset_config in datasets_data:
-                    datasets_list.append(
-                        DatasetConfig(
-                            id=dataset_config.get("id"),
-                            config=dataset_config.get("config"),
-                            split=dataset_config.get("split", "train"),
-                            columns=dataset_config.get("columns"),
-                            weight=dataset_config.get("weight", 1.0),
-                        )
-                    )
-            else:
-                raise ValueError("'datasets' must be a list of dataset configurations")
-
-            self.dataset_mixture = DatasetMixtureConfig(
-                datasets=datasets_list,
-                seed=self.dataset_mixture.get("seed", 0),
-                test_split_size=self.dataset_mixture.get("test_split_size", None),
-            )
-
-            # Check that column names are consistent across all dataset configs
-            columns_sets = [set(dataset.columns) for dataset in datasets_list if dataset.columns is not None]
-            if columns_sets:
-                first_columns = columns_sets[0]
-                if not all(columns == first_columns for columns in columns_sets):
-                    raise ValueError(
-                        "Column names must be consistent across all dataset configurations in a mixture. "
-                        f"Found different column sets: {[list(cols) for cols in columns_sets]}"
-                    )
+    cache_weight_file: Optional[str] = field(
+        default=None,
+        metadata={"help": "Dotted path to cached weight"},
+    )
 
 
 @dataclass

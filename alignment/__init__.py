@@ -1,16 +1,14 @@
 __version__ = "0.4.0.dev0"
 
-from .configs import DPOConfig, ORPOConfig, ScriptArguments, SFTConfig
-from .data import get_dataset
+from .configs import DPOConfig, ORPOConfig, SFTConfig, DataConfig
 from .model_utils import get_model, get_tokenizer
 
 
 __all__ = [
-    "ScriptArguments",
+    "DataConfig"
     "DPOConfig",
     "SFTConfig",
     "ORPOConfig",
-    "get_dataset",
     "get_tokenizer",
     "get_model",
 ]

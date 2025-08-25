@@ -45,14 +45,14 @@ from importlib import import_module
 from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
 
-from alignment import ScriptArguments, SFTConfig, get_dataset, get_model, get_tokenizer
+from alignment import SFTConfig, DataConfig, get_model, get_tokenizer
 from trl import ModelConfig, SFTTrainer, TrlParser, get_peft_config, setup_chat_format
 
 
 logger = logging.getLogger(__name__)
 
 
-def main(script_args, training_args, model_args):
+def main(model_args, data_args, training_args):
     # Set seed for reproducibility
     set_seed(training_args.seed)
 
@@ -72,7 +72,7 @@ def main(script_args, training_args, model_args):
     transformers.utils.logging.enable_explicit_format()
 
     logger.info(f"Model parameters {model_args}")
-    logger.info(f"Script parameters {script_args}")
+    logger.info(f"Data parameters {data_args}")
     logger.info(f"Training parameters {training_args}")
 
     # Check for last checkpoint
@@ -85,14 +85,12 @@ def main(script_args, training_args, model_args):
     ################
     # Load datasets
     ################
-    if getattr(script_args, "dataset_loader", None):
-        dataloader_path = script_args.dataset_loader
-        logger.info(f"Loading dataset via custom loader: {dataloader_path}")
-        mod, func = dataloader_path.rsplit(".", 1)
-        dataset_loader = getattr(import_module(mod), func)
-        dataset = dataset_loader(script_args)
-    else:
-        dataset = get_dataset(script_args)
+    dataloader_path = data_args.dataset_loader
+    logger.info(f"Loading dataset via custom loader: {dataloader_path}")
+    mod, func = dataloader_path.rsplit(".", 1)
+    dataset_loader = getattr(import_module(mod), func)
+    dataset = dataset_loader(data_args)
+
     ############
     # Load model
     ############
@@ -117,8 +115,8 @@ def main(script_args, training_args, model_args):
     trainer = SFTTrainer(
         model=model,
         args=training_args,
-        train_dataset=dataset[script_args.dataset_train_split],
-        eval_dataset=(dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None),
+        train_dataset=dataset[data_args.dataset_train_split],
+        eval_dataset=(dataset[data_args.dataset_test_split] if training_args.eval_strategy != "no" else None),
         tokenizer=tokenizer,
         peft_config=get_peft_config(model_args),
     )
@@ -134,7 +132,7 @@ def main(script_args, training_args, model_args):
         checkpoint = last_checkpoint
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
     metrics = train_result.metrics
-    metrics["train_samples"] = len(dataset[script_args.dataset_train_split])
+    metrics["train_samples"] = len(dataset[data_args.dataset_train_split])
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
     trainer.save_state()
@@ -153,7 +151,7 @@ def main(script_args, training_args, model_args):
     # Save everything else on main process
     kwargs = {
         "model_name": training_args.hub_model_id if training_args.push_to_hub else None,
-        "dataset_name": script_args.dataset_name,
+        "dataset_loader": data_args.dataset_loader,
         "tags": ["alignment-handbook"],
     }
     if trainer.accelerator.is_main_process:
@@ -168,7 +166,7 @@ def main(script_args, training_args, model_args):
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate()
-        metrics["eval_samples"] = len(dataset[script_args.dataset_test_split])
+        metrics["eval_samples"] = len(dataset[data_args.dataset_test_split])
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
 
@@ -181,6 +179,6 @@ def main(script_args, training_args, model_args):
 
 
 if __name__ == "__main__":
-    parser = TrlParser((ScriptArguments, SFTConfig, ModelConfig))
-    script_args, training_args, model_args = parser.parse_args_and_config()
-    main(script_args, training_args, model_args)
+    parser = TrlParser((ModelConfig, DataConfig, SFTConfig))
+    model_args, data_args, training_args = parser.parse_args_and_config()
+    main(model_args, data_args, training_args)

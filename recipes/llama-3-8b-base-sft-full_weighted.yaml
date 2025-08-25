@@ -1,0 +1,49 @@
+# Model arguments
+model_name_or_path: meta-llama/Meta-Llama-3-8B
+model_revision: main
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+# Data training arguments
+chat_template: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ '<|user|>\n' + message['content'] + eos_token }}\n{% elif message['role'] == 'system' %}\n{{ '<|system|>\n' + message['content'] + eos_token }}\n{% elif message['role'] == 'assistant' %}\n{{ '<|assistant|>\n'  + message['content'] + eos_token }}\n{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ '<|assistant|>' }}\n{% endif %}\n{% endfor %}"
+dataset_num_proc: 12
+dataset_train_split: train
+dataset_test_split: test
+
+# Weight arguments
+dataset_loader: dataset_loader.mix_alpaca.get_dataset
+dataset_holdout_split: holdout
+weight_function: weight_function.weight_by_holdout.get_weight
+weight_normalization_function: weight_function.normalization.softmax
+cache_weight_file: output/weight_cache/mix_alpaca/weight_by_holdout
+
+
+# SFT trainer config
+bf16: true
+do_eval: true
+eval_strategy: epoch
+gradient_accumulation_steps: 1
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: False
+learning_rate: 2.0e-05
+log_level: info
+logging_steps: 5  
+logging_strategy: steps
+lr_scheduler_type: cosine
+max_seq_length: 1024
+max_steps: -1
+num_train_epochs: 1
+output_dir: output/llama-3-8b-base-sft-full
+overwrite_output_dir: true
+per_device_train_batch_size: 2
+per_device_eval_batch_size: 4
+push_to_hub: false
+remove_unused_columns: true
+report_to:
+- wandb
+save_strategy: "steps"
+save_steps: 100
+save_total_limit: 1
+seed: 42
+warmup_ratio: 0.1

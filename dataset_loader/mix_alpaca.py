@@ -1,5 +1,5 @@
 from datasets import load_dataset, DatasetDict, concatenate_datasets
-from alignment.configs import ScriptArguments
+from alignment.configs import DataConfig
 
 def to_messages(example):
     instruction = (example.get("instruction") or "").strip()
@@ -22,10 +22,10 @@ def only_messages(dataset):
         dataset = dataset.remove_columns(columns_to_remove)
     return dataset
 
-def get_dataset(args: ScriptArguments) -> DatasetDict:
+def get_dataset(data_config: DataConfig) -> DatasetDict:
     alpaca = load_dataset("tatsu-lab/alpaca", split="train")
     alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
-    num_proc = getattr(args, "dataset_num_proc", None)
+    num_proc = getattr(data_config, "dataset_num_proc", None)
 
 
     alpaca = only_messages(alpaca.map(
