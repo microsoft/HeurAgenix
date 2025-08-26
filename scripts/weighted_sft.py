@@ -47,11 +47,10 @@ import transformers
 from importlib import import_module
 from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
+from trl import ModelConfig, TrlParser, get_peft_config, setup_chat_format
 
 from alignment import SFTConfig, DataConfig, get_model, get_tokenizer
-from trl import ModelConfig, TrlParser, get_peft_config, setup_chat_format
-from scripts.weighted_trainers import WeightedSFTTrainer
-from jinja2 import Template
+from scripts.weighted_trainers import KeepKeysCollator, WeightedSFTTrainer
 
 
 logger = logging.getLogger(__name__)
@@ -114,29 +113,10 @@ def main(model_args, data_args, training_args):
     logger.info(f"Loading dataset via custom loader: {dataset_loader_path}")
     module, function = dataset_loader_path.rsplit(".", 1)
     dataset_loader = getattr(import_module(module), function)
-    dataset = dataset_loader(data_args)
+    dataset = dataset_loader(data_args, tokenizer)
     holdout_dataset, train_dataset, test_dataset = \
         dataset[data_args.dataset_holdout_split], dataset[data_args.dataset_train_split], dataset[data_args.dataset_test_split]
-
-    weight_cache_path = data_args.cache_weight_file
-    if os.path.exists(weight_cache_path):
-        # Load weight from cache
-        logger.info(f"Loading weight cache from: {weight_cache_path}")
-        weights = np.load(weight_cache_path)
-        weight_len = len(weights)
-        training_len = len(train_dataset)
-        assert weight_len == training_len, f"cache size {weight_len} != training dataset size {training_len}"
-    else:
-        # calculate weight by weight calculation function
-        weight_function_path = data_args.weight_function
-        weight_args = data_args.weight_args
-        logger.info(f"Calculate weight by {weight_function_path} with args: {weight_args}")
-        module, function = weight_function_path.rsplit(".", 1)
-        weight_function = getattr(import_module(module), function)
-        weights = weight_function(model, holdout_dataset, train_dataset, weight_args)
-        # Save to cache
-        Path(weight_cache_path).parent.mkdir(parents=True, exist_ok=True)
-        np.save(weight_cache_path, weights)
+    dataset_num_proc = getattr(data_args, "dataset_process_num", None)
     
     ############################
     # Initialize the SFT Trainer
@@ -148,7 +128,12 @@ def main(model_args, data_args, training_args):
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
         peft_config=get_peft_config(model_args),
+        dataset_text_field="text",
+        packing=False,
+        max_seq_length=training_args.max_seq_length,
+        dataset_num_proc=dataset_num_proc,
     )
+    trainer.data_collator = KeepKeysCollator(trainer.data_collator, keep_key="example_id", drop_keys=("text",))
 
     ###############
     # Training loop

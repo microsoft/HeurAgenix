@@ -66,6 +66,11 @@ class DataConfig:
         metadata={"help": "Dotted path to a callable returning a DatasetDict"},
     )
 
+    dataset_process_num: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of processes to use for dataset processing"},
+    )
+
     dataset_holdout_split: Optional[str] = field(
         default=None,
         metadata={"help": "Name of the holdout split in the returned DatasetDict"},

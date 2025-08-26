@@ -6,6 +6,41 @@ from typing import Any, Optional, Union
 from transformers import default_data_collator
 
 
+class KeepKeysCollator:
+    def __init__(self, base_collator, keep_key="example_id", drop_keys=("text",)):
+        self.base_collator = base_collator
+        self.keep_key = keep_key
+        self.drop_keys = set(drop_keys) | {keep_key}
+
+    def __call__(self, features):
+        # 已经 tokenized 才能到这里
+        if "input_ids" not in features[0]:
+            raise RuntimeError(f"Expected tokenized features, got keys={features[0].keys()}")
+
+        # 拿出 example_id
+        ids = None
+        if self.keep_key in features[0]:
+            ids = torch.tensor([f[self.keep_key] for f in features], dtype=torch.long)
+
+        # 清掉 text 和 example_id，再交给 base_collator
+        cleaned = []
+        for f in features:
+            g = {k: v for k, v in f.items() if k not in self.drop_keys}
+            cleaned.append(g)
+
+        batch = self.base_collator(cleaned)
+
+        # 有的 TRL 版本 collator 不会产 labels，兜底一下（可选）
+        if "labels" not in batch and "input_ids" in batch:
+            batch["labels"] = batch["input_ids"].clone()
+
+        if ids is not None:
+            batch[self.keep_key] = ids
+        return batch
+
+
+
+
 class WeightedLossMixin:
     def compute_loss(
         self,
@@ -15,8 +50,8 @@ class WeightedLossMixin:
         num_items_in_batch: Optional[torch.Tensor] = None,
     ):
         labels  = inputs.pop("labels")
-        # TODO error here.
-        weights  = inputs.pop("weights")
+        example_id = inputs.pop("example_id")
+        # weights  = inputs.pop("weights")
         outputs = model(**inputs)
         logits  = outputs.logits
 
@@ -41,4 +76,12 @@ class WeightedLossMixin:
 
 
 class WeightedSFTTrainer(WeightedLossMixin, SFTTrainer):
-    pass
+    def __init__(self, *args, dataset_text_field="text", **kwargs):
+        self.dataset_text_field = dataset_text_field
+        super().__init__(*args, dataset_text_field=dataset_text_field, **kwargs)
+
+    def tokenize(self, examples):
+        outputs = super().tokenize(examples)
+        if "example_id" in examples:
+            outputs["example_id"] = examples["example_id"]
+        return outputs

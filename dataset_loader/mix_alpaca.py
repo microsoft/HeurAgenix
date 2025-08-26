@@ -1,49 +1,55 @@
-from datasets import load_dataset, DatasetDict, concatenate_datasets
+from typing import Dict, List, Any
+from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
 
-def to_messages(example):
-    instruction = (example.get("instruction") or "").strip()
-    input = (example.get("input") or "").strip()
-    if input:
-        user = f"{instruction}\n\n{input}"
-    else:
-        user = instruction
-    output = (example.get("output") or "").strip()
-    return {
-        "messages": [
+def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=None) -> Dict[str, List[Any]]:
+    texts = []
+    instructions = batch.get("instruction", [])
+    inputs       = batch.get("input", [])
+    outputs      = batch.get("output", [])
+    n = len(instructions)
+    for i in range(n):
+        instruction = (instructions[i] or "").strip()
+        input = (inputs[i] or "").strip()
+        if input:
+            user = f"{instruction}\n\n{input}"
+        else:
+            user = instruction
+        output = (outputs[i] or "").strip()
+        messages = [
             {"role": "user", "content": user},
             {"role": "assistant", "content": output},
         ]
-    }
+        texts.append(tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False))
+    example_ids = list(indices)
+    return {"text": texts, "example_id": example_ids}
 
-def only_messages(dataset):
-    columns_to_remove = [column for column in dataset.column_names if column != "messages"]
-    if columns_to_remove:
-        dataset = dataset.remove_columns(columns_to_remove)
-    return dataset
+def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> Dataset:
+    return dataset.map(
+        process_dataset,
+        batched=True,
+        with_indices=True,
+        fn_kwargs={"tokenizer": tokenizer},
+        remove_columns=dataset.column_names,
+        num_proc=num_proc,
+        desc=f"process_dataset ({split_name}) messages->text, add example_id",
+    )
 
-def get_dataset(data_config: DataConfig) -> DatasetDict:
+def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
     alpaca = load_dataset("tatsu-lab/alpaca", split="train")
     alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
-    num_proc = getattr(data_config, "dataset_num_proc", None)
-
-
-    alpaca = only_messages(alpaca.map(
-        to_messages,
-        remove_columns=alpaca.column_names,
-        num_proc=num_proc,
-    ))
-    alpaca_cleaned = only_messages(alpaca_cleaned.map(
-        to_messages,
-        remove_columns=alpaca_cleaned.column_names,
-        num_proc=num_proc,
-    ))
+    num_proc = getattr(data_config, "dataset_process_num", None)
 
     holdout_num = min(10000, alpaca_cleaned.num_rows)
     holdout_dataset = alpaca_cleaned.select(range(holdout_num))
     train_dataset = concatenate_datasets([alpaca, holdout_dataset])
     test_dataset = alpaca_cleaned.select(range(holdout_num, alpaca_cleaned.num_rows)) if alpaca_cleaned.num_rows > holdout_num else alpaca_cleaned.select([])
+
+    holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)
+    train_dataset   = subset_map(train_dataset, "train", num_proc, tokenizer)
+    test_dataset    = subset_map(test_dataset, "test", num_proc, tokenizer)
     return DatasetDict(
         holdout=holdout_dataset,
         train=train_dataset,
-        test=test_dataset)
+        test=test_dataset
+    )
