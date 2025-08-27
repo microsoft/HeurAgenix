@@ -2,11 +2,11 @@ compute_environment: LOCAL_MACHINE
 debug: false
 deepspeed_config:
   deepspeed_multinode_launcher: standard
-  offload_optimizer_device: none
-  offload_param_device: none
   zero3_init_flag: true
   zero3_save_16bit_model: true
   zero_stage: 3
+  offload_optimizer_device: "none"
+  offload_param_device:    "none"
 distributed_type: DEEPSPEED
 downcast_bf16: 'no'
 machine_rank: 0

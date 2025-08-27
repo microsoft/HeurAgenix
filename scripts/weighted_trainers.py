@@ -36,7 +36,6 @@ class KeepKeysCollator:
 
 
 
-
 class WeightedLossMixin:
     def __init__(self, model, weight_function, holdout_dataset, train_dataset, weight_args, **kwargs):
         self.weight_function = weight_function
@@ -45,7 +44,15 @@ class WeightedLossMixin:
         self.train_dataset = train_dataset
         self.model = model
 
-        self.weights = self.weight_function(self.model, self.holdout_dataset, self.train_dataset, self.weight_args)
+        np_weights = self.weight_function(self.model, self.holdout_dataset, self.train_dataset, self.weight_args)
+        self.weights = torch.as_tensor(np_weights, dtype=torch.float32, device="cpu")
+
+    @torch.no_grad()
+    def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
+        idx = example_id.detach().to("cpu").long()
+        w = self.weights.index_select(0, idx)
+        w = w.to(device=device, dtype=dtype)
+        return w
 
     def compute_loss(
         self,
@@ -56,11 +63,6 @@ class WeightedLossMixin:
     ):
         labels  = inputs.pop("labels")
         example_id = inputs.pop("example_id")
-        print("++++++++++")
-        print(example_id)
-        print(self.weights)
-        print(self.weights[example_id])
-        weights  = self.weights[example_id]
         outputs = model(**inputs)
         logits  = outputs.logits
 
@@ -76,6 +78,12 @@ class WeightedLossMixin:
 
         token_mask = (shift_labels != -100).float()
         per_example_loss = (loss_per_token * token_mask).sum(dim=1) / token_mask.sum(dim=1).clamp(min=1.0)
+
+        weights = self._gather_weights_for_batch(
+            example_id,
+            device=per_example_loss.device,
+            dtype=per_example_loss.dtype,
+        )
 
         weighted = per_example_loss * weights
         loss = weighted.sum() / weights.sum().clamp(min=1e-12)
@@ -97,6 +105,11 @@ class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
         )
         self.label_names = []
         self.data_collator = KeepKeysCollator(self.data_collator, keep_key="example_id", drop_keys=("text",))
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        return WeightedLossMixin.compute_loss(
+            self, model, inputs, return_outputs, num_items_in_batch
+        )
 
     def tokenize(self, examples):
         outputs = super().tokenize(examples)

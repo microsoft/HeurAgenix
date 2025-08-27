@@ -82,7 +82,6 @@ def main(model_args, data_args, training_args):
     logger.info(f"Calculate weight by {weight_function_path} with args: {weight_args}")
     module, function = weight_function_path.rsplit(".", 1)
     weight_function = getattr(import_module(module), function)
-    weights = weight_function(model, holdout_dataset, train_dataset, weight_args)
 
 
     ############################
@@ -103,7 +102,6 @@ def main(model_args, data_args, training_args):
         weight_function=weight_function,
         weight_args=weight_args,
     )
-    trainer.data_collator = KeepKeysCollator(trainer.data_collator, keep_key="example_id", drop_keys=("text",))
 
 
     ###############
