@@ -1,48 +1,8 @@
-# Copyright 2020-2025 The HuggingFace Team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""
-Supervised fine-tuning script for decoder language models.
-
-Usage:
-
-# One 1 node of 8 x H100s
-accelerate launch --config_file recipes/accelerate_configs/zero3.yaml scripts/sft.py \
-    --model_name_or_path Qwen/Qwen2.5-1.5B-Instruct \
-    --dataset_name trl-lib/Capybara \
-    --learning_rate 2.0e-5 \
-    --num_train_epochs 1 \
-    --packing \
-    --max_seq_length 4096 \
-    --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 8 \
-    --gradient_checkpointing \
-    --bf16 true \
-    --logging_steps 5 \
-    --eval_strategy steps \
-    --eval_steps 100 \
-    --output_dir data/Qwen2.5-1.5B-SFT
-"""
-
 import logging
 import os
 import sys
-from pathlib import Path
 
-import torch
 import datasets
-import numpy as np
 import transformers
 from importlib import import_module
 from transformers import set_seed
@@ -117,13 +77,21 @@ def main(model_args, data_args, training_args):
     holdout_dataset, train_dataset, test_dataset = \
         dataset[data_args.dataset_holdout_split], dataset[data_args.dataset_train_split], dataset[data_args.dataset_test_split]
     dataset_num_proc = getattr(data_args, "dataset_process_num", None)
-    
+    weight_function_path = data_args.weight_function
+    weight_args = data_args.weight_args
+    logger.info(f"Calculate weight by {weight_function_path} with args: {weight_args}")
+    module, function = weight_function_path.rsplit(".", 1)
+    weight_function = getattr(import_module(module), function)
+    weights = weight_function(model, holdout_dataset, train_dataset, weight_args)
+
+
     ############################
     # Initialize the SFT Trainer
     ############################
     trainer = WeightedSFTTrainer(
         model=model,
         args=training_args,
+        holdout_dataset=holdout_dataset,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
@@ -132,8 +100,11 @@ def main(model_args, data_args, training_args):
         packing=False,
         max_seq_length=training_args.max_seq_length,
         dataset_num_proc=dataset_num_proc,
+        weight_function=weight_function,
+        weight_args=weight_args,
     )
     trainer.data_collator = KeepKeysCollator(trainer.data_collator, keep_key="example_id", drop_keys=("text",))
+
 
     ###############
     # Training loop

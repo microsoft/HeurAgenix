@@ -13,16 +13,13 @@ class KeepKeysCollator:
         self.drop_keys = set(drop_keys) | {keep_key}
 
     def __call__(self, features):
-        # 已经 tokenized 才能到这里
         if "input_ids" not in features[0]:
             raise RuntimeError(f"Expected tokenized features, got keys={features[0].keys()}")
 
-        # 拿出 example_id
         ids = None
         if self.keep_key in features[0]:
             ids = torch.tensor([f[self.keep_key] for f in features], dtype=torch.long)
 
-        # 清掉 text 和 example_id，再交给 base_collator
         cleaned = []
         for f in features:
             g = {k: v for k, v in f.items() if k not in self.drop_keys}
@@ -30,7 +27,6 @@ class KeepKeysCollator:
 
         batch = self.base_collator(cleaned)
 
-        # 有的 TRL 版本 collator 不会产 labels，兜底一下（可选）
         if "labels" not in batch and "input_ids" in batch:
             batch["labels"] = batch["input_ids"].clone()
 
@@ -42,6 +38,15 @@ class KeepKeysCollator:
 
 
 class WeightedLossMixin:
+    def __init__(self, model, weight_function, holdout_dataset, train_dataset, weight_args, **kwargs):
+        self.weight_function = weight_function
+        self.weight_args = weight_args
+        self.holdout_dataset = holdout_dataset
+        self.train_dataset = train_dataset
+        self.model = model
+
+        self.weights = self.weight_function(self.model, self.holdout_dataset, self.train_dataset, self.weight_args)
+
     def compute_loss(
         self,
         model: nn.Module,
@@ -51,7 +56,11 @@ class WeightedLossMixin:
     ):
         labels  = inputs.pop("labels")
         example_id = inputs.pop("example_id")
-        # weights  = inputs.pop("weights")
+        print("++++++++++")
+        print(example_id)
+        print(self.weights)
+        print(self.weights[example_id])
+        weights  = self.weights[example_id]
         outputs = model(**inputs)
         logits  = outputs.logits
 
@@ -75,10 +84,19 @@ class WeightedLossMixin:
         return loss
 
 
-class WeightedSFTTrainer(WeightedLossMixin, SFTTrainer):
-    def __init__(self, *args, dataset_text_field="text", **kwargs):
-        self.dataset_text_field = dataset_text_field
-        super().__init__(*args, dataset_text_field=dataset_text_field, **kwargs)
+class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
+    def __init__(self, *args, weight_function, holdout_dataset, weight_args, **kwargs):
+        SFTTrainer.__init__(self, *args, **kwargs)
+        WeightedLossMixin.__init__(
+            self,
+            model=self.model,
+            weight_function=weight_function,
+            holdout_dataset=holdout_dataset,
+            train_dataset=self.train_dataset,
+            weight_args=weight_args
+        )
+        self.label_names = []
+        self.data_collator = KeepKeysCollator(self.data_collator, keep_key="example_id", drop_keys=("text",))
 
     def tokenize(self, examples):
         outputs = super().tokenize(examples)

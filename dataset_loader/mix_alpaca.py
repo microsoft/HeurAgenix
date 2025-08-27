@@ -40,10 +40,15 @@ def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
     alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
     num_proc = getattr(data_config, "dataset_process_num", None)
 
-    holdout_num = min(10000, alpaca_cleaned.num_rows)
-    holdout_dataset = alpaca_cleaned.select(range(holdout_num))
-    train_dataset = concatenate_datasets([alpaca, holdout_dataset])
-    test_dataset = alpaca_cleaned.select(range(holdout_num, alpaca_cleaned.num_rows)) if alpaca_cleaned.num_rows > holdout_num else alpaca_cleaned.select([])
+    n_rows = alpaca_cleaned.num_rows
+    holdout_dataset = alpaca_cleaned.select(range(10000))
+    middle_dataset = alpaca_cleaned.select(range(10000, n_rows - 10000))
+    test_dataset = alpaca_cleaned.select(range(n_rows - 10000, n_rows))
+
+    test_instructions = set(ins.strip() for ins in test_dataset["instruction"])
+    filter_batch = lambda batch: [ins.strip() not in test_instructions for ins in batch["instruction"]]
+    filtered_alpaca = alpaca.filter(filter_batch, num_proc=num_proc)
+    train_dataset = concatenate_datasets([holdout_dataset, middle_dataset, filtered_alpaca])
 
     holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)
     train_dataset   = subset_map(train_dataset, "train", num_proc, tokenizer)
