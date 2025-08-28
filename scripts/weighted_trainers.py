@@ -3,11 +3,10 @@ import torch.nn as nn
 import numpy as np
 from trl import SFTTrainer
 from typing import Any, Optional, Union
-from transformers import default_data_collator
 
 
 class KeepKeysCollator:
-    def __init__(self, base_collator, keep_key="example_id", drop_keys=("text",)):
+    def __init__(self, base_collator, keep_key="example_id", drop_keys=("text", "message")):
         self.base_collator = base_collator
         self.keep_key = keep_key
         self.drop_keys = set(drop_keys) | {keep_key}
@@ -35,17 +34,11 @@ class KeepKeysCollator:
         return batch
 
 
-
 class WeightedLossMixin:
-    def __init__(self, model, weight_function, holdout_dataset, train_dataset, weight_args, **kwargs):
-        self.weight_function = weight_function
-        self.weight_args = weight_args
-        self.holdout_dataset = holdout_dataset
-        self.train_dataset = train_dataset
-        self.model = model
-
-        np_weights = self.weight_function(self.model, self.holdout_dataset, self.train_dataset, self.weight_args)
-        self.weights = torch.as_tensor(np_weights, dtype=torch.float32, device="cpu")
+    # TODO: dynamic update
+    # def __init__(self, model, weight_function, holdout_dataset, train_dataset, weight_args, **kwargs):
+    def __init__(self, weights, **kwargs):
+        self.weights = torch.as_tensor(weights, dtype=torch.float32, device="cpu")
 
     @torch.no_grad()
     def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
@@ -93,7 +86,7 @@ class WeightedLossMixin:
 
 
 class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
-    def __init__(self, *args, weight_function, holdout_dataset, weight_args, **kwargs):
+    def __init__(self, *args, weight_function, holdout_dataset, weight_args, weights, **kwargs):
         SFTTrainer.__init__(self, *args, **kwargs)
         WeightedLossMixin.__init__(
             self,
@@ -101,7 +94,8 @@ class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
             weight_function=weight_function,
             holdout_dataset=holdout_dataset,
             train_dataset=self.train_dataset,
-            weight_args=weight_args
+            weight_args=weight_args,
+            weights=weights
         )
         self.label_names = []
         self.data_collator = KeepKeysCollator(self.data_collator, keep_key="example_id", drop_keys=("text",))

@@ -4,6 +4,7 @@ from alignment.configs import DataConfig
 
 def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=None) -> Dict[str, List[Any]]:
     texts = []
+    messages = []
     instructions = batch.get("instruction", [])
     inputs       = batch.get("input", [])
     outputs      = batch.get("output", [])
@@ -16,13 +17,14 @@ def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=N
         else:
             user = instruction
         output = (outputs[i] or "").strip()
-        messages = [
+        message = [
             {"role": "user", "content": user},
             {"role": "assistant", "content": output},
         ]
-        texts.append(tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False))
+        messages.append(message)
+        texts.append(tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=False))
     example_ids = list(indices)
-    return {"text": texts, "example_id": example_ids}
+    return {"message": messages, "text": texts, "example_id": example_ids}
 
 def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> Dataset:
     return dataset.map(
@@ -33,6 +35,7 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
         remove_columns=dataset.column_names,
         num_proc=num_proc,
         desc=f"process_dataset ({split_name}) messages->text, add example_id",
+        load_from_cache_file=False,
     )
 
 def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
@@ -46,8 +49,8 @@ def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
     test_dataset = alpaca_cleaned.select(range(n_rows - 10000, n_rows))
 
     test_instructions = set(ins.strip() for ins in test_dataset["instruction"])
-    filter_batch = lambda batch: [ins.strip() not in test_instructions for ins in batch["instruction"]]
-    filtered_alpaca = alpaca.filter(filter_batch, num_proc=num_proc)
+    filtered_indices = [index for index, instruction in enumerate(alpaca["instruction"]) if instruction.strip() not in test_instructions]
+    filtered_alpaca = alpaca.select(filtered_indices)
     train_dataset = concatenate_datasets([holdout_dataset, middle_dataset, filtered_alpaca])
 
     holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)

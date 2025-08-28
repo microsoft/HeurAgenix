@@ -14,9 +14,9 @@ dataset_test_split: test
 # Weight arguments
 weight_function: weight_function.uniform_weight.get_weight
 weight_args:
-  - normalization: softmax
+  - normalization: min_max
   - top_k: 3
-cache_weight_file: output/weight_cache/mix_alpaca/weight_by_holdout.npy
+  - cache_weight_file: output/weight_cache/mix_alpaca/weight_by_holdout.Meta-Llama-3-8B.top_3
 
 
 # SFT trainer config
