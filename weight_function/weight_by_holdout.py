@@ -1,12 +1,8 @@
 import faiss
 import torch
 import numpy as np
-from datasets import Dataset
+from pathlib import Path
 from sentence_transformers import SentenceTransformer
-from transformers import AutoModelForCausalLM, PreTrainedTokenizerFast
-import torch.distributed as dist
-from torch.distributed import ReduceOp
-import datetime
 
 
 def embedding_question(questions, model):
@@ -21,64 +17,147 @@ def embedding_question(questions, model):
     index.add(question_embeddings)
     return index
 
-def retrieve_topk_faiss(index, query, model, top_k=3):
-    q_emb = model.encode(query, convert_to_tensor=False)
-    q_emb = q_emb / (np.linalg.norm(q_emb) + 1e-12)
-    q_emb = q_emb.reshape(1, -1).astype("float32")
 
+def retrieve_topk_faiss_batch(index, queries, embedding_model, top_k=3, batch_size=64):
+    q_emb = embedding_model.encode(
+        queries,
+        convert_to_numpy=True,
+        show_progress_bar=False,
+        batch_size=batch_size
+    )
+    q_emb = q_emb.astype("float32")
+    faiss.normalize_L2(q_emb)
     scores, indices = index.search(q_emb, top_k)
     return indices
 
-def calculate_logprob(model, tokenizer, prompt: str, response: str, ) -> float:
+def calculate_logprob_batch(
+    model,
+    tokenizer,
+    prompts: list[str],
+    responses: list[str],
+):
+    assert len(prompts) == len(responses)
     device = next(model.parameters()).device
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
-    response_inputs = tokenizer(response, return_tensors="pt").to(device)
-    input_ids = torch.cat([inputs.input_ids, response_inputs.input_ids], dim=1).long()
-    attention_mask = torch.cat([inputs.attention_mask, response_inputs.attention_mask], dim=1)
+    pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
 
-    labels = input_ids.clone()
-    labels[:, : inputs.input_ids.size(1)] = -100
-    labels = labels.long()
+    input_ids_list = []
+    attn_mask_list = []
+    labels_list = []
 
-    with torch.no_grad():
-        out = model(input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels)
-        n_answer_tokens = (labels != -100).sum().item()
-        average_logprob = - out.loss.item()
-        logprob = average_logprob * n_answer_tokens
-    return logprob
+    for p, r in zip(prompts, responses):
+        enc_p = tokenizer(p, add_special_tokens=False)
+        enc_r = tokenizer(r, add_special_tokens=False)
+        p_ids = enc_p["input_ids"]
+        r_ids = enc_r["input_ids"]
 
-def evaluation_data(model, tokenizer, example_messages: list[list], target_message: list):
-    target_question, target_answer = target_message[0]['content'], target_message[1]['content']
+        input_ids = p_ids + r_ids
+        attention_mask = [1] * len(input_ids)
+        labels = [-100] * len(p_ids) + list(r_ids)
+
+        input_ids_list.append(input_ids)
+        attn_mask_list.append(attention_mask)
+        labels_list.append(labels)
+
+    max_len = max(len(x) for x in input_ids_list)
+    for i in range(len(input_ids_list)):
+        cur_len = len(input_ids_list[i])
+        pad_len = max_len - cur_len
+        if pad_len > 0:
+            input_ids_list[i] = input_ids_list[i] + [pad_id] * pad_len
+            attn_mask_list[i] = attn_mask_list[i] + [0] * pad_len
+            labels_list[i]    = labels_list[i]    + [-100] * pad_len
+
+    input_ids = torch.tensor(input_ids_list, dtype=torch.long, device=device)
+    attention_mask = torch.tensor(attn_mask_list, dtype=torch.long, device=device)
+    labels = torch.tensor(labels_list, dtype=torch.long, device=device)
+
+    with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+        logits = outputs.logits
+
+    shift_logits = logits[:, :-1, :]
+    shift_labels = labels[:, 1:]
+    valid = shift_labels != -100
+
+    safe_labels = torch.where(valid, shift_labels, torch.zeros_like(shift_labels))
+    log_probs = torch.nn.functional.log_softmax(shift_logits, dim=-1)
+    token_logp = log_probs.gather(-1, safe_labels.unsqueeze(-1)).squeeze(-1)
+    token_logp = token_logp * valid.float()
+
+    per_sample_logprob = token_logp.sum(dim=1)
+    return per_sample_logprob.detach().cpu().numpy()
+
+def get_score_single(
+    model: torch.nn.Module,
+    tokenizer,
+    holdout_dataset,
+    train_dataset,
+    embedding_model,
+    embedding_index,
+    top_k: int = 3,
+    batch_size: int = 4,
+):
     system_prompt = "You are a helpful assistant."
-    messages_base = [{"role": "system", "content": system_prompt}, {"role": "user", "content": target_question}, {"role": "assistant", "content": ""}]
+    scores = []
 
-    example_prompt = ""
-    for example_question, example_answer in example_messages:
-        example_prompt += "Prefer responses the questions follow examples:\n"
-        example_prompt += f"Question: {example_question['content']}\n"
-        example_prompt += f"Answer: {example_answer['content']}\n"
-    example_prompt += "\n\nPlease answer the following question:"
-    messages_with_example = [{"role": "system", "content": system_prompt}, {"role": "user", "content": example_prompt + target_question + "\nAnswer:"}, {"role": "assistant", "content": ""}]
+    n = len(train_dataset)
+    for start in range(0, n, batch_size):
+        end = min(start + batch_size, n)
+        batch = [train_dataset[i] for i in range(start, end)]
 
-    prompt_base = tokenizer.apply_chat_template(messages_base, add_generation_prompt=True, tokenize=False)
-    prompt_with_example = tokenizer.apply_chat_template(messages_with_example, add_generation_prompt=True, tokenize=False)
+        batch_questions = [ex["message"][0]["content"] for ex in batch]
+        batch_answers   = [ex["message"][1]["content"] for ex in batch]
 
-    logprob_base         = calculate_logprob(model, tokenizer, prompt_base, target_answer)
-    logprob_with_example = calculate_logprob(model, tokenizer, prompt_with_example, target_answer)
-    score = logprob_with_example - logprob_base
-    return score
+        topk_indices = retrieve_topk_faiss_batch(
+            embedding_index,
+            batch_questions,
+            embedding_model,
+            top_k=top_k,
+            batch_size=max(32, batch_size)
+        )
 
-def calculate_score(holdout_dataset, target_message, embedding_index, embedding_model, model, tokenizer):
-    target_question = target_message[0]['content']
-    indices = retrieve_topk_faiss(embedding_index, target_question, embedding_model, 3).flatten().tolist()
-    example_messages = [holdout_dataset[i] for i in indices]
-    score = evaluation_data(model, tokenizer, example_messages, target_message)
+        prompts_base = []
+        prompts_with_example = []
 
-    return score
+        for qi, q in enumerate(batch_questions):
+            messages_base = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": q},
+                {"role": "assistant", "content": ""},
+            ]
+            prompt_base = tokenizer.apply_chat_template(
+                messages_base, add_generation_prompt=True, tokenize=False
+            )
+            prompts_base.append(prompt_base)
 
+            indices = topk_indices[qi].tolist()
+            example_prompt = ""
+            for i in indices:
+                ex_q = holdout_dataset[i]["message"][0]["content"]
+                ex_a = holdout_dataset[i]["message"][1]["content"]
+                example_prompt += "Prefer responses the questions follow examples:\n"
+                example_prompt += f"Question: {ex_q}\n"
+                example_prompt += f"Answer: {ex_a}\n"
+            example_prompt += "\n\nPlease answer the following question:"
+
+            messages_with_example = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": example_prompt + q + "\nAnswer:"},
+                {"role": "assistant", "content": ""},
+            ]
+            prompt_with_example = tokenizer.apply_chat_template(
+                messages_with_example, add_generation_prompt=True, tokenize=False
+            )
+            prompts_with_example.append(prompt_with_example)
+
+        logprob_base         = calculate_logprob_batch(model, tokenizer, prompts_base, batch_answers)
+        logprob_with_example = calculate_logprob_batch(model, tokenizer, prompts_with_example, batch_answers)
+
+        batch_scores = (logprob_with_example - logprob_base).tolist()
+        scores.extend(batch_scores)
+
+    return scores
 
 def get_score(
     model: torch.nn.Module,
@@ -87,77 +166,42 @@ def get_score(
     train_dataset,
     config: dict
 ) -> np.ndarray:
-    print("Calculate begin")
-    print(datetime.datetime.now())
-    if dist.is_available() and dist.is_initialized():
-        # Multi-GPUs
-        rank = dist.get_rank()
-        world_size = dist.get_world_size()
-    else:
-        # Single-GPUs
-        rank = 0
-        world_size = 1
-    
-    cache_weight_file = config.get("cache_weight_file", None)
+
+    top_k = int(config.get("top_k", 3))
     normalization = config.get("normalization", None)
+    cache_weight_file = config.get("cache_weight_file", None)
+    batch_size = int(config.get("batch_size", 4))
+
     embedding_model_name = config.get("embedding_model_name", "all-mpnet-base-v2")
     embedding_model = SentenceTransformer(embedding_model_name)
-    holdout_questions = [message[0]['content'] for message in holdout_dataset['message']]
+
+    holdout_questions = [holdout_data['message'][0]["content"] for holdout_data in holdout_dataset]
     embedding_index = embedding_question(holdout_questions, embedding_model)
 
-    # Split training dataset
-    total = len(train_dataset)
-    per = total // world_size
-    start = rank * per
-    end = total if rank == world_size - 1 else (rank + 1) * per
+    scores = get_score_single(
+        model=model,
+        tokenizer=tokenizer,
+        holdout_dataset=holdout_dataset,
+        train_dataset=train_dataset,
+        embedding_model=embedding_model,
+        embedding_index=embedding_index,
+        top_k=top_k,
+        batch_size=batch_size,
+    )
 
-    
-    local_scores = []
-    for train_index in range(start, end):
-        target_message = train_dataset[train_index]['message']
-        score = calculate_score(
-            holdout_dataset['message'],
-            target_message,
-            embedding_index,
-            embedding_model,
-            model,
-            tokenizer
-        )
-        local_scores.append(score)
-        if train_index % 1000 == 0:
-            print(datetime.datetime.now())
-        print(start, end, train_index, score)
-    
-    print("Calculate done")
-    print(datetime.datetime.now())
+    np_scores = np.array(scores, dtype=np.float32)
 
-    # Merge and convert
-    device = next(model.parameters()).device
-    local_tensor = torch.zeros(end - start, dtype=torch.float32, device=device)
-    local_tensor[:] = torch.tensor(local_scores, dtype=torch.float32, device=device)
-    global_tensor = torch.zeros(total, dtype=torch.float32, device=device)
-    global_tensor[start:end] = local_tensor
-
-    if world_size > 1:
-        dist.all_reduce(global_tensor, op=ReduceOp.SUM)
-
-    # Normalizaion
-    np_scores = global_tensor.cpu().numpy()
-    normalization = config.get("normalization", None)
     if normalization == "min_max":
-        mn = np_scores.min()
-        mx = np_scores.max()
-        normed_scores = (np_scores - mn) / ((mx - mn) + 1e-12)
+        mn = float(np_scores.min())
+        mx = float(np_scores.max())
+        normed_scores = (np_scores - mn) / (mx - mn + 1e-12)
     else:
         normed_scores = np_scores
 
-    # Save to cache
-    cache_path = config.get("cache_weight_file", None)
-    if rank == 0 and cache_path:
-        np.save(cache_path + ".raw.npy", np_scores)
+    if cache_weight_file:
+        Path(cache_weight_file).parent.mkdir(parents=True, exist_ok=True)
+        np.save(cache_weight_file + ".raw.npy", np_scores)
         if normalization is not None:
-            np.save(cache_path + f".{normalization}.npy", normed_scores)
+            np.save(cache_weight_file + f".{normalization}.npy", normed_scores)
 
-    print("Done")
-    print(datetime.datetime.now())
     return normed_scores

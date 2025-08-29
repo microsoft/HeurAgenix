@@ -68,7 +68,6 @@ def main(model_args, data_args, training_args):
     ################
     # Load datasets
     ################
-    # Load data by dataset_loader
     dataset_loader_path = data_args.dataset_loader
     logger.info(f"Loading dataset via custom loader: {dataset_loader_path}")
     module, function = dataset_loader_path.rsplit(".", 1)
