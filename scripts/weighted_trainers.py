@@ -71,14 +71,13 @@ class WeightedLossMixin:
 
         token_mask = (shift_labels != -100).float()
         per_example_loss = (loss_per_token * token_mask).sum(dim=1) / token_mask.sum(dim=1).clamp(min=1.0)
-
         weights = self._gather_weights_for_batch(
             example_id,
             device=per_example_loss.device,
             dtype=per_example_loss.dtype,
         )
 
-        weighted = per_example_loss * weights
+        weighted = per_example_loss # * weights
         loss = weighted.sum() / weights.sum().clamp(min=1e-12)
         if return_outputs:
             return loss, outputs
@@ -90,15 +89,15 @@ class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
         SFTTrainer.__init__(self, *args, **kwargs)
         WeightedLossMixin.__init__(
             self,
-            model=self.model,
-            weight_function=weight_function,
-            holdout_dataset=holdout_dataset,
-            train_dataset=self.train_dataset,
-            weight_args=weight_args,
+            # model=self.model,
+            # weight_function=weight_function,
+            # holdout_dataset=holdout_dataset,
+            # train_dataset=self.train_dataset,
+            # weight_args=weight_args,
             weights=weights
         )
         self.label_names = []
-        self.data_collator = KeepKeysCollator(self.data_collator, keep_key="example_id", drop_keys=("text",))
+        self.data_collator = KeepKeysCollator(self.data_collator, keep_key="example_id", drop_keys=("text", "message"))
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         return WeightedLossMixin.compute_loss(

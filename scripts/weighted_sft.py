@@ -100,6 +100,7 @@ def main(model_args, data_args, training_args):
         dataset_num_proc=dataset_num_proc,
         weight_function=weight_function,
         weight_args=weight_args,
+        weights=None
     )
 
 
