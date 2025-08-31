@@ -160,10 +160,10 @@ def get_score_single(
     return scores
 
 def get_score(
+    train_dataset,
+    holdout_dataset,
     model: torch.nn.Module,
     tokenizer,
-    holdout_dataset,
-    train_dataset,
     config: dict
 ) -> np.ndarray:
 

@@ -118,6 +118,8 @@ class DPOConfig(trl.DPOConfig):
     """
 
     chat_template: Optional[str] = field(default=None, metadata={"help": "The chat template to use."})
+    eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
+    eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
 
 
 @dataclass

@@ -4,6 +4,7 @@ import sys
 
 import datasets
 import transformers
+import numpy as np
 from importlib import import_module
 from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
@@ -81,6 +82,10 @@ def main(model_args, data_args, training_args):
     logger.info(f"Calculate weight by {weight_function_path} with args: {weight_args}")
     module, function = weight_function_path.rsplit(".", 1)
     weight_function = getattr(import_module(module), function)
+    if os.path.exists(weight_args.get("cache_weight_file", None)):
+        weights = np.load(weight_args.get("cache_weight_file", None))
+    else:
+        weights = weight_function(train_dataset=train_dataset, holdout_dataset=holdout_dataset, model=model, tokenizer=tokenizer, config=weight_args)
 
 
     ############################
@@ -100,7 +105,7 @@ def main(model_args, data_args, training_args):
         dataset_num_proc=dataset_num_proc,
         weight_function=weight_function,
         weight_args=weight_args,
-        weights=None
+        weights=weights
     )
 
 
@@ -146,20 +151,14 @@ def main(model_args, data_args, training_args):
     ##########
     # Evaluate
     ##########
-    if training_args.do_eval:
+    if training_args.eval_function:
         logger.info("*** Evaluate ***")
-        metrics = trainer.evaluate()
-        metrics["eval_samples"] = len(test_dataset)
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
-
-    #############
-    # push to hub
-    #############
-    if training_args.push_to_hub:
-        logger.info("Pushing to hub...")
-        trainer.push_to_hub(**kwargs)
-
+        eval_path = data_args.eval_function
+        weight_args = data_args.weight_args
+        logger.info(f"Evaluate by {eval_path}")
+        module, function = eval_path.rsplit(".", 1)
+        eval_function = getattr(import_module(module), function)
+        metrics = eval_function(trainer.model, tokenizer, test_dataset, training_args.output_dir )
 
 if __name__ == "__main__":
     parser = TrlParser((ModelConfig, DataConfig, SFTConfig))

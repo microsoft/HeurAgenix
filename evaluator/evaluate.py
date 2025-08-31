@@ -1,4 +1,5 @@
 import json
+import os
 import torch
 import re
 import json
@@ -7,7 +8,7 @@ from typing import List
 from azure_gpt_client import AzureGPTClient
 
 
-def generate_output(model, tokenizer, questions: List[str], max_new_tokens, batch_size: int = 4, output_file: str = "output.json"):
+def generate_output(model, tokenizer, questions: List[str], max_new_tokens, batch_size: int = 4, output_file: str = "output.json") -> dict:
     model.eval()
     device = next(model.parameters()).device
     system_prompt = "You are a helpful assistant."
@@ -54,8 +55,11 @@ def generate_output(model, tokenizer, questions: List[str], max_new_tokens, batc
             gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
             results.append({"instruction": question, "output": gen_text})
 
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    if output_file:
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+
+    return results
 
 
 def extract_winner(response: str) -> int:
@@ -68,18 +72,16 @@ def extract_winner(response: str) -> int:
     return 0
 
 
-def evaluate(client: AzureGPTClient, prompt_template_file: str, output_file_1: str, output_file_2: str, length_control: str=None, output_file: str=None):
+def evaluate(client: AzureGPTClient, prompt_template_file: str, output_1: dict, output_2: dict, length_control: str=None, output_file: str=None):
     prompt_template = open(prompt_template_file).read()
-    output_json_1   = json.load(open(output_file_1))
-    output_json_2 = json.load(open(output_file_2))
-    assert len(output_json_1) == len(output_json_2)
+    assert len(output_1) == len(output_2)
     winners = [0, 0, 0]
 
-    for index in range(len(output_json_1)):
-        assert output_json_1[index]["instruction"] == output_json_2[index]["instruction"]
-        instruction = output_json_1[index]["instruction"]
-        output_1 = output_json_1[index]["output"]
-        output_2 = output_json_2[index]["output"]
+    for index in range(len(output_1)):
+        assert output_1[index]["instruction"] == output_2[index]["instruction"]
+        instruction = output_1[index]["instruction"]
+        output_1 = output_1[index]["output"]
+        output_2 = output_2[index]["output"]
         if length_control == "min_length":
             length = min(len(output_1), len(output_2))
             output_1 = output_1[:length]
@@ -95,7 +97,13 @@ def evaluate(client: AzureGPTClient, prompt_template_file: str, output_file_1: s
         sleep(0.1)
     return winners
 
-if __name__ == "__main__":
+
+def main(model, tokenizer, test_dataset, output_dir, config: dict) -> float:
+    length_control = config.get("length_control", False)
+    prompt_template_file = config.get("prompt_template_file", "evaluator/eval_prompt.txt")
+    test_output = os.path.join(output_dir, "test_output.json")
+    comparison_output = os.path.join(output_dir, "comparison_output.json")
+
     gpt_setting = {
         "api_type": "azure",
         "api_version": "2025-01-01-preview",
@@ -103,9 +111,12 @@ if __name__ == "__main__":
         "model": "gpt-4o_2024-08-06",
     }
     client = AzureGPTClient(gpt_setting)
-    prompt_template_file = "evaluator/eval_prompt.txt"
-    output_file_1 = "output1.json"
-    output_file_2 = "output2.json"
-    length_control = False
-    output_file = "output.json"
-    winners = evaluate(client, prompt_template_file, output_file_1, output_file_2, length_control, output_file)
+    questions = []
+    baseline_output = []
+    for data in test_dataset:
+        questions.append(data["message"][0]["content"])
+        baseline_output.append([{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset])
+    test_output = generate_output(model, tokenizer, questions, 256, 4, os.path.join(output_dir, "test_output.json"))
+
+    winners = evaluate(client, prompt_template_file, test_output, baseline_output, length_control, comparison_output)
+    return winners / len(questions)

@@ -1,5 +1,5 @@
 # Model arguments
-model_name_or_path: meta-llama/Meta-Llama-3-8B
+model_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
@@ -16,8 +16,10 @@ weight_function: weight_function.uniform_weight.get_weight
 
 # SFT trainer config
 bf16: true
-do_eval: true
-eval_strategy: epoch
+eval_function: evaluator.evaluate.main
+eval_args:
+  - length_control: False
+  - prompt_template_file: evaluator/eval_prompt.txt
 gradient_accumulation_steps: 16
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
@@ -30,7 +32,7 @@ lr_scheduler_type: cosine
 max_seq_length: 1024
 max_steps: -1
 num_train_epochs: 1
-output_dir: output/llama-3-8b-base-sft-full
+output_dir: output/llama-3-8b-instruct-sft-full
 overwrite_output_dir: true
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 4

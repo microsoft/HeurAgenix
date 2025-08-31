@@ -12,7 +12,7 @@ dataset_train_split: train
 dataset_test_split: test
 
 # Weight arguments
-weight_function: weight_function.uniform_weight.get_weight
+weight_function: weight_function.weight_by_holdout.get_weight
 weight_args:
   - normalization: min_max
   - top_k: 3

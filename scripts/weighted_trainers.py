@@ -77,7 +77,7 @@ class WeightedLossMixin:
             dtype=per_example_loss.dtype,
         )
 
-        weighted = per_example_loss # * weights
+        weighted = per_example_loss * weights
         loss = weighted.sum() / weights.sum().clamp(min=1e-12)
         if return_outputs:
             return loss, outputs
