@@ -81,16 +81,16 @@ def extract_winner(response: str) -> int:
     return 0
 
 
-def evaluate(client, prompt_template_file: str, output_1: dict, output_2: dict, length_control: str=None):
+def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict_2: dict, length_control: str=None):
     prompt_template = open(prompt_template_file).read()
-    assert len(output_1) == len(output_2)
+    assert len(output_dict_1) == len(output_dict_2)
     winners = [0, 0, 0]
 
-    for index in range(len(output_1)):
-        assert output_1[index]["instruction"] == output_2[index]["instruction"]
-        instruction = output_1[index]["instruction"]
-        output_1 = output_1[index]["output"]
-        output_2 = output_2[index]["output"]
+    for index in range(len(output_dict_1)):
+        assert output_dict_1[index]["instruction"] == output_dict_2[index]["instruction"]
+        instruction = output_dict_1[index]["instruction"]
+        output_1 = output_dict_1[index]["output"]
+        output_2 = output_dict_2[index]["output"]
         if length_control == "min_length":
             length = min(len(output_1), len(output_2))
             output_1 = output_1[:length]
@@ -134,5 +134,5 @@ def main(
     baseline_output = generate_baseline(test_dataset, output_dir)
     test_output = generate_output(model, tokenizer, questions, 256, 4, output_dir)
 
-    winners = evaluate(client, prompt_template_file, test_output, baseline_output, length_control)
+    winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control)
     return winners / len(questions)

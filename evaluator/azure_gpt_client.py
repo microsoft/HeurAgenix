@@ -34,7 +34,7 @@ class AzureGPTClient:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    seed=gpt_setting.get("seed", None),
+                    seed=self.seed,
                     frequency_penalty=0,
                     presence_penalty=0,
                     stop=None,
