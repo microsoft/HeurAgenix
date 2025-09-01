@@ -1,0 +1,2 @@
+RUN_ID=$(date +%Y%m%d_%H%M%S)
+ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/zero3.yaml scripts/weighted_sft.py --config recipes/llama-3-8b-instruct-sft-full-weighted.yaml --output_dir output/llama-3-8b-instruct-sft-full-weighted/${RUN_ID}

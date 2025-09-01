@@ -1,33 +1,23 @@
 import torch
 import torch.nn as nn
-from trl import SFTTrainer
 from typing import Any, Optional, Union
+from trl import SFTTrainer
 
 
-class KeepKeysCollator:
-    def __init__(self, base_collator, keep_key="example_id", drop_keys=("text", "message")):
+class KeepKeysWrapper:
+    def __init__(self, base_collator, keep_key="example_id"):
         self.base_collator = base_collator
         self.keep_key = keep_key
-        self.drop_keys = set(drop_keys) | {keep_key}
 
     def __call__(self, features):
-        if "input_ids" not in features[0]:
-            raise RuntimeError(f"Expected tokenized features, got keys={features[0].keys()}")
-
         ids = None
         if self.keep_key in features[0]:
-            ids = torch.tensor([f[self.keep_key] for f in features], dtype=torch.long)
-
-        cleaned = []
+            ids = torch.tensor([f.pop(self.keep_key) for f in features], dtype=torch.long)
         for f in features:
-            g = {k: v for k, v in f.items() if k not in self.drop_keys}
-            cleaned.append(g)
+            f.pop("message", None)
+            f.pop("text", None)
 
-        batch = self.base_collator(cleaned)
-
-        if "labels" not in batch and "input_ids" in batch:
-            batch["labels"] = batch["input_ids"].clone()
-
+        batch = self.base_collator(features)
         if ids is not None:
             batch[self.keep_key] = ids
         return batch
@@ -45,6 +35,7 @@ class WeightedLossMixin:
         w = self.weights.index_select(0, idx)
         w = w.to(device=device, dtype=dtype)
         return w
+
 
     def compute_loss(
         self,
@@ -84,22 +75,13 @@ class WeightedLossMixin:
 
 
 class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
-    def __init__(self, *args, weights, **kwargs):
-        SFTTrainer.__init__(self, *args, **kwargs)
+    def __init__(self, weights, **kwargs):
+        SFTTrainer.__init__(self, **kwargs)
         WeightedLossMixin.__init__(
             self,
             weights=weights
         )
         self.label_names = []
-        self.data_collator = KeepKeysCollator(self.data_collator, keep_key="example_id", drop_keys=("text", "message"))
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        return WeightedLossMixin.compute_loss(
-            self, model, inputs, return_outputs, num_items_in_batch
-        )
-
-    def tokenize(self, examples):
-        outputs = super().tokenize(examples)
-        if "example_id" in examples:
-            outputs["example_id"] = examples["example_id"]
-        return outputs
+        return WeightedLossMixin.compute_loss(self, model, inputs, return_outputs, num_items_in_batch)

@@ -38,6 +38,7 @@ def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict
         sleep(0.1)
     return winners
 
+
 def generate_baseline(test_dataset, output_dir: str="output") -> dict:
     baseline_output = []
     baseline_output.append([{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset])

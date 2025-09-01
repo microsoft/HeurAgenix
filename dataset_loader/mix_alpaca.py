@@ -58,6 +58,6 @@ def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
     test_dataset    = subset_map(test_dataset, "test", num_proc, tokenizer)
     return DatasetDict(
         holdout=holdout_dataset,
-        train=train_dataset,
-        test=test_dataset
+        train=train_dataset.select(range(0, 100)),
+        test=test_dataset.select(range(0, 4)),
     )
