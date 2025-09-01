@@ -5,7 +5,6 @@ torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 
 # Data arguments
-chat_template: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ '<|user|>\n' + message['content'] + eos_token }}\n{% elif message['role'] == 'system' %}\n{{ '<|system|>\n' + message['content'] + eos_token }}\n{% elif message['role'] == 'assistant' %}\n{{ '<|assistant|>\n'  + message['content'] + eos_token }}\n{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ '<|assistant|>' }}\n{% endif %}\n{% endfor %}"
 dataset_loader: dataset_loader.mix_alpaca.get_dataset
 dataset_holdout_split: holdout
 dataset_train_split: train

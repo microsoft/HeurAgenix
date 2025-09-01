@@ -89,11 +89,6 @@ class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
         SFTTrainer.__init__(self, *args, **kwargs)
         WeightedLossMixin.__init__(
             self,
-            # model=self.model,
-            # weight_function=weight_function,
-            # holdout_dataset=holdout_dataset,
-            # train_dataset=self.train_dataset,
-            # weight_args=weight_args,
             weights=weights
         )
         self.label_names = []

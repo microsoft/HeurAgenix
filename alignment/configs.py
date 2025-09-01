@@ -108,7 +108,6 @@ class SFTConfig(trl.SFTConfig):
     args for callbacks, benchmarks etc
     """
 
-    chat_template: Optional[str] = field(default=None, metadata={"help": "The chat template to use."})
     eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
     eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
 
@@ -117,8 +116,9 @@ class DPOConfig(trl.DPOConfig):
     """
     args for callbacks, benchmarks etc
     """
+    eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
+    eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
 
-    chat_template: Optional[str] = field(default=None, metadata={"help": "The chat template to use."})
 
 
 @dataclass
@@ -126,5 +126,6 @@ class ORPOConfig(trl.ORPOConfig):
     """
     args for callbacks, benchmarks etc
     """
+    eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
+    eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
 
-    chat_template: Optional[str] = field(default=None, metadata={"help": "The chat template to use."})

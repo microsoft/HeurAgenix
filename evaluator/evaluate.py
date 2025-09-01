@@ -36,7 +36,7 @@ def generate_output(
             ]
             for question in questions_batch
         ]
-        prompts = tokenizer.apply_chat_template(
+        encode_prompts = tokenizer.apply_chat_template(
             messages_list,
             add_generation_prompt=True,
             tokenize=True,
@@ -44,8 +44,8 @@ def generate_output(
             padding=True
         ).to(device)
 
-        input_ids = prompts
-        attention_mask = torch.ne(input_ids, tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id).to(device)
+        input_ids = encode_prompts.input_ids
+        attention_mask = encode_prompts.attention_mask
         input_lengths = attention_mask.sum(dim=1)
 
         with torch.no_grad():
@@ -54,8 +54,8 @@ def generate_output(
                 attention_mask=attention_mask,
                 max_new_tokens=max_new_tokens,
                 do_sample=False,
-                eos_token_id=eos_ids,
-                pad_token_id=tokenizer.eos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.pad_token_id,
             )
 
         for idx, question in enumerate(questions_batch):

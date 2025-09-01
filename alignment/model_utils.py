@@ -28,7 +28,7 @@ def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrain
         trust_remote_code=model_args.trust_remote_code,
     )
 
-    if training_args.chat_template is not None:
+    if tokenizer.chat_template is None:
         tokenizer.chat_template = training_args.chat_template
 
     return tokenizer
