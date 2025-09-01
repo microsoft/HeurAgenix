@@ -55,9 +55,9 @@ def main(model_args, data_args, training_args):
     ############################
     response_template, response_template_id = infer_response_template(tokenizer)
     try:
-        base= DataCollatorForCompletionOnlyLM(response_template=response_template, tokenizer=tokenizer)
-    except TypeError:
         base= DataCollatorForCompletionOnlyLM(response_template_id=response_template_id, tokenizer=tokenizer)
+    except TypeError:
+        base= DataCollatorForCompletionOnlyLM(response_template=response_template, tokenizer=tokenizer)
 
     data_collator = KeepKeysWrapper(base_collator=base, keep_key="example_id")
     trainer = WeightedSFTTrainer(
@@ -93,8 +93,6 @@ def main(model_args, data_args, training_args):
         logger.info("*** Save model ***")
         # Align the model's generation config with the tokenizer's eos token
         # to avoid unbounded generation in the transformers `pipeline()` function
-        trainer.model.generation_config.eos_token_id = tokenizer.eos_token_id
-        trainer.model.config.eos_token_id = tokenizer.eos_token_id
         trainer.save_model(training_args.output_dir)
         logger.info(f"Model saved to {training_args.output_dir}")
 

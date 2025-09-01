@@ -59,6 +59,18 @@ def generate_output(
         **kwargs
 ) -> dict:
     model.eval()
+    
+    model_to_use = getattr(model, "module", model)
+    gen_cfg = getattr(model_to_use, "generation_config", None)
+
+    eos_ids = None
+    if gen_cfg is not None and getattr(gen_cfg, "eos_token_id", None) is not None:
+        eos_ids = gen_cfg.eos_token_id
+    if eos_ids is None:
+        eos_ids = tokenizer.eos_token_id
+    if isinstance(eos_ids, int):
+        eos_ids = [eos_ids]
+
     device = next(model.parameters()).device
     system_prompt = "You are a helpful assistant."
     results = []
@@ -85,7 +97,8 @@ def generate_output(
             prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True
+            truncation=True,
+            max_length=tokenizer.model_max_length,
         )
 
         input_ids = encode_prompts.input_ids.to(device)
@@ -98,7 +111,7 @@ def generate_output(
                 attention_mask=attention_mask,
                 max_new_tokens=max_new_tokens,
                 do_sample=False,
-                eos_token_id=tokenizer.eos_token_id,
+                eos_token_id=eos_ids,
                 pad_token_id=tokenizer.pad_token_id,
             )
 
