@@ -17,7 +17,7 @@ weight_args:
   - normalization: min_max
   - top_k: 3
   - batch_size: 16
-  - cache_weight_file: output/weight_cache/mix_alpaca/weight_by_holdout.Meta-Llama-3-8B.top_3
+  - cache_weight_file: output/weight_cache/mix_alpaca/weight_by_holdout.Meta-Llama-3-8B.top_3.min_max.npy
 
 
 # SFT trainer config

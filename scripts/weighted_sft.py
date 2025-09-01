@@ -85,7 +85,12 @@ def main(model_args, data_args, training_args):
     if os.path.exists(weight_args.get("cache_weight_file", None)):
         weights = np.load(weight_args.get("cache_weight_file", None))
     else:
-        weights = weight_function(train_dataset=train_dataset, holdout_dataset=holdout_dataset, model=model, tokenizer=tokenizer, config=weight_args)
+        weight_args["train_dataset"] = train_dataset
+        weight_args["holdout_dataset"] = holdout_dataset
+        weight_args["model"] = model
+        weight_args["tokenizer"] = tokenizer
+        weights = weight_function(**weight_args)
+
 
 
     ############################
@@ -153,12 +158,17 @@ def main(model_args, data_args, training_args):
     ##########
     if training_args.eval_function:
         logger.info("*** Evaluate ***")
-        eval_path = data_args.eval_function
-        weight_args = data_args.weight_args
+        eval_path = training_args.eval_function
+        eval_args = training_args.eval_args
         logger.info(f"Evaluate by {eval_path}")
         module, function = eval_path.rsplit(".", 1)
         eval_function = getattr(import_module(module), function)
-        metrics = eval_function(trainer.model, tokenizer, test_dataset, training_args.output_dir )
+        eval_args["model"] = trainer.model
+        eval_args["tokenizer"] = tokenizer
+        eval_args["test_dataset"] = test_dataset
+        eval_args["output_dir"] = training_args.output_dir
+        metrics = eval_function(**eval_args)
+
 
 if __name__ == "__main__":
     parser = TrlParser((ModelConfig, DataConfig, SFTConfig))

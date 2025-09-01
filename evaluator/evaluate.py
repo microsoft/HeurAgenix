@@ -1,14 +1,22 @@
 import json
 import os
+from pathlib import Path
 import torch
 import re
 import json
 from time import sleep
 from typing import List
-from azure_gpt_client import AzureGPTClient
 
 
-def generate_output(model, tokenizer, questions: List[str], max_new_tokens, batch_size: int = 4, output_file: str = "output.json") -> dict:
+def generate_output(
+        model,
+        tokenizer,
+        questions: List[str],
+        max_new_tokens: int=256,
+        batch_size: int=4,
+        output_dir: str="output",
+        **kwargs
+) -> dict:
     model.eval()
     device = next(model.parameters()).device
     system_prompt = "You are a helpful assistant."
@@ -55,9 +63,10 @@ def generate_output(model, tokenizer, questions: List[str], max_new_tokens, batc
             gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
             results.append({"instruction": question, "output": gen_text})
 
-    if output_file:
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
+    output_file = os.path.join(output_dir, "response.json")
+    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
 
     return results
 
@@ -72,7 +81,7 @@ def extract_winner(response: str) -> int:
     return 0
 
 
-def evaluate(client: AzureGPTClient, prompt_template_file: str, output_1: dict, output_2: dict, length_control: str=None, output_file: str=None):
+def evaluate(client, prompt_template_file: str, output_1: dict, output_2: dict, length_control: str=None):
     prompt_template = open(prompt_template_file).read()
     assert len(output_1) == len(output_2)
     winners = [0, 0, 0]
@@ -90,20 +99,28 @@ def evaluate(client: AzureGPTClient, prompt_template_file: str, output_1: dict, 
         response = client.chat(prompt)
         winner = extract_winner(response)
         winners[winner] += 1
-        if index % 20 == 0:
-            file = open(output_file, "a")
-            file.write(str(index) + ":" + ",".join([str(i) for i in winners]) + "\n")
-            file.close()
         sleep(0.1)
     return winners
 
+def generate_baseline(test_dataset, output_dir: str="output") -> dict:
+    baseline_output = []
+    baseline_output.append([{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset])
+    output_file = os.path.join(output_dir, "baselines.json")
+    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(baseline_output, f, ensure_ascii=False, indent=2)
+    
 
-def main(model, tokenizer, test_dataset, output_dir, config: dict) -> float:
-    length_control = config.get("length_control", False)
-    prompt_template_file = config.get("prompt_template_file", "evaluator/eval_prompt.txt")
-    test_output = os.path.join(output_dir, "test_output.json")
-    comparison_output = os.path.join(output_dir, "comparison_output.json")
-
+def main(
+        model,
+        tokenizer,
+        test_dataset,
+        output_dir: str="output",
+        prompt_template_file: str="evaluator/eval_prompt.txt",
+        length_control: bool=False,
+        **kwargs,
+) -> float:
+    from evaluator.azure_gpt_client import AzureGPTClient
     gpt_setting = {
         "api_type": "azure",
         "api_version": "2025-01-01-preview",
@@ -111,12 +128,11 @@ def main(model, tokenizer, test_dataset, output_dir, config: dict) -> float:
         "model": "gpt-4o_2024-08-06",
     }
     client = AzureGPTClient(gpt_setting)
-    questions = []
-    baseline_output = []
-    for data in test_dataset:
-        questions.append(data["message"][0]["content"])
-        baseline_output.append([{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset])
-    test_output = generate_output(model, tokenizer, questions, 256, 4, os.path.join(output_dir, "test_output.json"))
 
-    winners = evaluate(client, prompt_template_file, test_output, baseline_output, length_control, comparison_output)
+    questions = [data["message"][0]["content"] for data in test_dataset]
+
+    baseline_output = generate_baseline(test_dataset, output_dir)
+    test_output = generate_output(model, tokenizer, questions, 256, 4, output_dir)
+
+    winners = evaluate(client, prompt_template_file, test_output, baseline_output, length_control)
     return winners / len(questions)

@@ -159,22 +159,20 @@ def get_score_single(
 
     return scores
 
-def get_score(
+def get_weight(
     train_dataset,
     holdout_dataset,
     model: torch.nn.Module,
     tokenizer,
-    config: dict
+    top_k: int=3,
+    normalization: str=None,
+    batch_size: int=4,
+    embedding_model_name: str="all-mpnet-base-v2",
+    cache_weight_file: str=None,
+    **kwargs,
 ) -> np.ndarray:
 
-    top_k = int(config.get("top_k", 3))
-    normalization = config.get("normalization", None)
-    cache_weight_file = config.get("cache_weight_file", None)
-    batch_size = int(config.get("batch_size", 4))
-
-    embedding_model_name = config.get("embedding_model_name", "all-mpnet-base-v2")
     embedding_model = SentenceTransformer(embedding_model_name)
-
     holdout_questions = [holdout_data['message'][0]["content"] for holdout_data in holdout_dataset]
     embedding_index = embedding_question(holdout_questions, embedding_model)
 
@@ -200,8 +198,7 @@ def get_score(
 
     if cache_weight_file:
         Path(cache_weight_file).parent.mkdir(parents=True, exist_ok=True)
-        np.save(cache_weight_file + ".raw.npy", np_scores)
-        if normalization is not None:
-            np.save(cache_weight_file + f".{normalization}.npy", normed_scores)
+        np.save(cache_weight_file, normed_scores)
+        np.save(cache_weight_file.split('.npy')[0] + ".raw.npy", np_scores)
 
     return normed_scores
