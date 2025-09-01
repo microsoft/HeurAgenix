@@ -10,7 +10,7 @@ from alignment.configs import SFTConfig, DataConfig
 from alignment.dataset_utils import load_dataset, load_weight
 from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer, infer_response_template
-from scripts.weighted_trainers import KeepKeysWrapper, WeightedSFTTrainer
+from scripts.weighted_trainers import EoTCompletionCollator, KeepKeysWrapper, WeightedSFTTrainer
 
 accelerator = Accelerator()
 def main(model_args, data_args, training_args):
@@ -59,6 +59,7 @@ def main(model_args, data_args, training_args):
     except TypeError:
         base= DataCollatorForCompletionOnlyLM(response_template=response_template, tokenizer=tokenizer)
 
+    base = EoTCompletionCollator(base, tokenizer)
     data_collator = KeepKeysWrapper(base_collator=base, keep_key="example_id")
     trainer = WeightedSFTTrainer(
         weights=weights,

@@ -97,8 +97,7 @@ def generate_output(
             prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
-            max_length=tokenizer.model_max_length,
+            truncation=True
         )
 
         input_ids = encode_prompts.input_ids.to(device)
@@ -120,7 +119,7 @@ def generate_output(
             gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
             results.append({"instruction": question, "output": gen_text})
 
-    output_file = os.path.join(output_dir, "response.json")
+    output_file = os.path.join(output_dir, "test_results.json")
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)

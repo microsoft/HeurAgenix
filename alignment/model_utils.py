@@ -35,6 +35,7 @@ def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrain
         tokenizer.pad_token = tokenizer.eos_token
 
     tokenizer.padding_side = "right"
+    tokenizer.truncation_side = "left"
 
     return tokenizer
 

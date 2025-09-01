@@ -23,7 +23,7 @@ gradient_accumulation_steps: 16
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: False
-learning_rate: 2.0e-05
+learning_rate: 1.0e-05
 log_level: info
 logging_steps: 5  
 logging_strategy: steps
@@ -40,7 +40,7 @@ remove_unused_columns: false
 report_to:
 - wandb
 save_strategy: "steps"
-save_steps: 100
+save_steps: 20
 save_total_limit: 1
 seed: 42
 warmup_ratio: 0.1
