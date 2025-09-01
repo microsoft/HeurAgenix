@@ -11,14 +11,14 @@ dataset_train_split: train
 dataset_test_split: test
 
 # Weight arguments
-weight_function: weight_function.uniform_weight.get_score
+weight_function: weight_function.uniform_weight.get_weight
 
 # SFT trainer config
 bf16: true
-eval_function: evaluator.evaluate.main
+eval_function: evaluator.evaluate.generate_output
 eval_args:
-  - length_control: False
-  - prompt_template_file: evaluator/eval_prompt.txt
+  length_control: False
+  prompt_template_file: evaluator/eval_prompt.txt
 gradient_accumulation_steps: 16
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:

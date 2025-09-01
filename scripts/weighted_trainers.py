@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from trl import SFTTrainer
 from typing import Any, Optional, Union
 
@@ -85,7 +84,7 @@ class WeightedLossMixin:
 
 
 class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
-    def __init__(self, *args, weight_function, holdout_dataset, weight_args, weights, **kwargs):
+    def __init__(self, *args, weights, **kwargs):
         SFTTrainer.__init__(self, *args, **kwargs)
         WeightedLossMixin.__init__(
             self,

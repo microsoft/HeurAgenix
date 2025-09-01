@@ -5,70 +5,6 @@ import torch
 import re
 import json
 from time import sleep
-from typing import List
-
-
-def generate_output(
-        model,
-        tokenizer,
-        questions: List[str],
-        max_new_tokens: int=256,
-        batch_size: int=4,
-        output_dir: str="output",
-        **kwargs
-) -> dict:
-    model.eval()
-    device = next(model.parameters()).device
-    system_prompt = "You are a helpful assistant."
-    results = []
-
-    eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
-    eos_ids = [tid for tid in [tokenizer.eos_token_id, eot_id] if tid is not None]
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    for i in range(0, len(questions), batch_size):
-        questions_batch = questions[i : i + batch_size]
-        messages_list = [
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": question},
-            ]
-            for question in questions_batch
-        ]
-        encode_prompts = tokenizer.apply_chat_template(
-            messages_list,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_tensors="pt",
-            padding=True
-        ).to(device)
-
-        input_ids = encode_prompts.input_ids
-        attention_mask = encode_prompts.attention_mask
-        input_lengths = attention_mask.sum(dim=1)
-
-        with torch.no_grad():
-            outputs = model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                eos_token_id=tokenizer.eos_token_id,
-                pad_token_id=tokenizer.pad_token_id,
-            )
-
-        for idx, question in enumerate(questions_batch):
-            gen_tokens = outputs[idx, input_lengths[idx]:]
-            gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
-            results.append({"instruction": question, "output": gen_text})
-
-    output_file = os.path.join(output_dir, "response.json")
-    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-
-    return results
 
 
 def extract_winner(response: str) -> int:
@@ -109,9 +45,79 @@ def generate_baseline(test_dataset, output_dir: str="output") -> dict:
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(baseline_output, f, ensure_ascii=False, indent=2)
-    
 
-def main(
+
+def generate_output(
+        model,
+        tokenizer,
+        test_dataset,
+        max_new_tokens: int=256,
+        batch_size: int=4,
+        output_dir: str="output",
+        return_type: str="output_file",
+        **kwargs
+) -> dict:
+    model.eval()
+    device = next(model.parameters()).device
+    system_prompt = "You are a helpful assistant."
+    results = []
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    questions = [data["message"][0]["content"] for data in test_dataset]
+    for i in range(0, len(questions), batch_size):
+        questions_batch = questions[i : i + batch_size]
+        messages_list = [
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": question},
+            ]
+            for question in questions_batch
+        ]
+        prompts = tokenizer.apply_chat_template(
+            messages_list,
+            add_generation_prompt=True,
+            tokenize=False
+        )
+        encode_prompts = tokenizer(
+            prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True
+        )
+
+        input_ids = encode_prompts.input_ids.to(device)
+        attention_mask = encode_prompts.attention_mask.to(device)
+        input_lengths = attention_mask.sum(dim=1)
+
+        with torch.no_grad():
+            outputs = model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+
+        for idx, question in enumerate(questions_batch):
+            gen_tokens = outputs[idx, input_lengths[idx]:]
+            gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+            results.append({"instruction": question, "output": gen_text})
+
+    output_file = os.path.join(output_dir, "response.json")
+    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+
+    if return_type == "output_file":
+        return output_file
+    elif return_type == "output_result":
+        return results
+
+
+def compare(
         model,
         tokenizer,
         test_dataset,
@@ -119,7 +125,7 @@ def main(
         prompt_template_file: str="evaluator/eval_prompt.txt",
         length_control: bool=False,
         **kwargs,
-) -> float:
+):
     from evaluator.azure_gpt_client import AzureGPTClient
     gpt_setting = {
         "api_type": "azure",
@@ -129,10 +135,8 @@ def main(
     }
     client = AzureGPTClient(gpt_setting)
 
-    questions = [data["message"][0]["content"] for data in test_dataset]
-
     baseline_output = generate_baseline(test_dataset, output_dir)
-    test_output = generate_output(model, tokenizer, questions, 256, 4, output_dir)
+    test_output = generate_output(model, tokenizer, test_dataset, 256, 4, output_dir, "output_result")
 
     winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control)
-    return winners / len(questions)
+    return winners

@@ -18,7 +18,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenize
 from trl import ModelConfig, get_kbit_device_map, get_quantization_config
 
 from .configs import SFTConfig
-
+from trl import ModelConfig, setup_chat_format
 
 def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrainedTokenizer:
     """Get the tokenizer for the model."""
@@ -31,10 +31,15 @@ def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrain
     if tokenizer.chat_template is None:
         tokenizer.chat_template = training_args.chat_template
 
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    tokenizer.padding_side = "right"
+
     return tokenizer
 
 
-def get_model(model_args: ModelConfig, training_args: SFTConfig) -> AutoModelForCausalLM:
+def get_model(tokenizer, model_args: ModelConfig, training_args: SFTConfig) -> AutoModelForCausalLM:
     """Get the model"""
     torch_dtype = (
         model_args.torch_dtype if model_args.torch_dtype in ["auto", None] else getattr(torch, model_args.torch_dtype)
@@ -53,5 +58,8 @@ def get_model(model_args: ModelConfig, training_args: SFTConfig) -> AutoModelFor
         model_args.model_name_or_path,
         **model_kwargs,
     )
+    
+    if getattr(model.config, "pad_token_id", None) is None or model.config.pad_token_id == -1:
+        model.config.pad_token_id = tokenizer.eos_token_id
 
     return model

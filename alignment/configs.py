@@ -28,7 +28,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Optional
 
 import trl
 
@@ -52,6 +52,7 @@ class DatasetMixtureConfig:
     seed: int = 0
     test_split_size: Optional[float] = None
 
+
 @dataclass
 class WeightConfig:
     """Configuration for a weight calculation."""
@@ -59,47 +60,16 @@ class WeightConfig:
     weight_normalization_function: callable
     cache_file: str = None
 
+
 @dataclass
 class DataConfig:
-    dataset_loader: Optional[str] = field(
-        default=None,
-        metadata={"help": "Dotted path to a callable returning a DatasetDict"},
-    )
-
-    dataset_process_num: Optional[int] = field(
-        default=None,
-        metadata={"help": "Number of processes to use for dataset processing"},
-    )
-
-    dataset_holdout_split: Optional[str] = field(
-        default=None,
-        metadata={"help": "Name of the holdout split in the returned DatasetDict"},
-    )
-
-    dataset_train_split: Optional[str] = field(
-        default=None,
-        metadata={"help": "Name of the train split in the returned DatasetDict"},
-    )
-
-    dataset_test_split: Optional[str] = field(
-        default=None,
-        metadata={"help": "Name of the test split in the returned DatasetDict"},
-    )
-
-    weight_function: Optional[str] = field(
-        default=None,
-        metadata={"help": "Dotted path to a callable returning weight"},
-    )
-
-    weight_args: Optional[dict] = field(
-        default=None,
-        metadata={"help": "Config for weight function"},
-    )
-
-    cache_weight_file: Optional[str] = field(
-        default=None,
-        metadata={"help": "Dotted path to cached weight"},
-    )
+    dataset_loader: Optional[str] = field(default=None, metadata={"help": "Dotted path to a callable returning a DatasetDict"})
+    dataset_process_num: Optional[int] = field(default=None, metadata={"help": "Number of processes to use for dataset processing"})
+    dataset_holdout_split: Optional[str] = field(default=None, metadata={"help": "Name of the holdout split in the returned DatasetDict"})
+    dataset_train_split: Optional[str] = field(default=None, metadata={"help": "Name of the train split in the returned DatasetDict"})
+    dataset_test_split: Optional[str] = field(default=None, metadata={"help": "Name of the test split in the returned DatasetDict"})
+    weight_function: Optional[str] = field(default=None, metadata={"help": "Dotted path to a callable returning weight"})
+    weight_args: Optional[dict] = field(default_factory=dict, metadata={"help": "Config for weight function"}, )
 
 
 @dataclass
@@ -109,7 +79,8 @@ class SFTConfig(trl.SFTConfig):
     """
 
     eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
-    eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
+    eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
+
 
 @dataclass
 class DPOConfig(trl.DPOConfig):
@@ -117,8 +88,7 @@ class DPOConfig(trl.DPOConfig):
     args for callbacks, benchmarks etc
     """
     eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
-    eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
-
+    eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
 
 
 @dataclass
@@ -127,5 +97,4 @@ class ORPOConfig(trl.ORPOConfig):
     args for callbacks, benchmarks etc
     """
     eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
-    eval_args: Optional[dict] = field(default=None, metadata={"help": "The evaluation arguments to use."})
-
+    eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
