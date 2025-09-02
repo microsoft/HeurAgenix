@@ -4,13 +4,13 @@ import transformers
 from accelerate import Accelerator
 from importlib import import_module
 from transformers import set_seed
-from trl import ModelConfig, TrlParser, DataCollatorForCompletionOnlyLM, get_peft_config
+from trl import ModelConfig, TrlParser,  get_peft_config
 
 from alignment.configs import SFTConfig, DataConfig
-from alignment.dataset_utils import load_dataset, load_weight
+from alignment.dataset_utils import get_data_collator, load_dataset, load_weight
 from alignment.log import get_log
-from alignment.model_utils import get_model, get_tokenizer, infer_response_template
-from scripts.weighted_trainers import EoTCompletionCollator, KeepKeysWrapper, WeightedSFTTrainer
+from alignment.model_utils import get_model, get_tokenizer
+from scripts.weighted_trainers import WeightedSFTTrainer
 
 accelerator = Accelerator()
 def main(model_args, data_args, training_args):
@@ -53,14 +53,7 @@ def main(model_args, data_args, training_args):
     ############################
     # Initialize the SFT Trainer
     ############################
-    response_template, response_template_id = infer_response_template(tokenizer)
-    try:
-        base= DataCollatorForCompletionOnlyLM(response_template_id=response_template_id, tokenizer=tokenizer)
-    except TypeError:
-        base= DataCollatorForCompletionOnlyLM(response_template=response_template, tokenizer=tokenizer)
-
-    base = EoTCompletionCollator(base, tokenizer)
-    data_collator = KeepKeysWrapper(base_collator=base, keep_key="example_id")
+    data_collator = get_data_collator(tokenizer)
     trainer = WeightedSFTTrainer(
         weights=weights,
         model=model,

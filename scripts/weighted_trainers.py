@@ -3,47 +3,6 @@ import torch.nn as nn
 from typing import Any, Optional, Union
 from trl import SFTTrainer
 
-from alignment.model_utils import infer_response_template
-
-
-class EoTCompletionCollator:
-    def __init__(self, base_collator, tokenizer):
-        self.base = base_collator
-        self.eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
-
-    def __call__(self, features):
-        batch = self.base(features)
-        input_ids = batch["input_ids"]
-        labels = batch["labels"]
-        B, S = labels.shape
-        for i in range(B):
-            sup = (labels[i] != -100).nonzero(as_tuple=True)[0]
-            if sup.numel() == 0:
-                continue
-            last = sup[-1].item()
-            if last + 1 < S and input_ids[i, last + 1].item() == self.eot_id:
-                labels[i, last + 1] = self.eot_id
-        batch["labels"] = labels
-        return batch
-
-class KeepKeysWrapper:
-    def __init__(self, base_collator, keep_key="example_id"):
-        self.base_collator = base_collator
-        self.keep_key = keep_key
-
-    def __call__(self, features):
-        ids = None
-        if self.keep_key in features[0]:
-            ids = torch.tensor([f.pop(self.keep_key) for f in features], dtype=torch.long)
-        for f in features:
-            f.pop("message", None)
-            f.pop("text", None)
-
-        batch = self.base_collator(features)
-        if ids is not None:
-            batch[self.keep_key] = ids
-        return batch
-
 
 class WeightedLossMixin:
     # TODO: dynamic update
