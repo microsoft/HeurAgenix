@@ -23,6 +23,27 @@ class KeepKeysWrapper:
         return batch
 
 
+class EoTCompletionCollator:
+    def __init__(self, base_collator, tokenizer):
+        self.base = base_collator
+        self.eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
+
+    def __call__(self, features):
+        batch = self.base(features)
+        input_ids = batch["input_ids"]
+        labels = batch["labels"]
+        B, S = labels.shape
+        for i in range(B):
+            sup = (labels[i] != -100).nonzero(as_tuple=True)[0]
+            if sup.numel() == 0:
+                continue
+            last = sup[-1].item()
+            if last + 1 < S and input_ids[i, last + 1].item() == self.eot_id:
+                labels[i, last + 1] = self.eot_id
+        batch["labels"] = labels
+        return batch
+
+
 def load_dataset(tokenizer, data_args):
     dataset_loader_path = data_args.dataset_loader
     module, function = dataset_loader_path.rsplit(".", 1)
@@ -84,6 +105,6 @@ def get_data_collator(tokenizer):
         base= DataCollatorForCompletionOnlyLM(response_template_id=response_template_id, tokenizer=tokenizer)
     except TypeError:
         base= DataCollatorForCompletionOnlyLM(response_template=response_template, tokenizer=tokenizer)
-
+    base = EoTCompletionCollator(base, tokenizer)
     data_collator = KeepKeysWrapper(base_collator=base, keep_key="example_id")
     return data_collator
