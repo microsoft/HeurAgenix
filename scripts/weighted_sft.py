@@ -80,16 +80,17 @@ def main(model_args, data_args, training_args):
     trainer.save_metrics("train", metrics)
     trainer.save_state()
 
-    if trainer.accelerator.is_main_process:
-        ##################################
-        # Save model and create model card
-        ##################################
-        logger.info("*** Save model ***")
-        # Align the model's generation config with the tokenizer's eos token
-        # to avoid unbounded generation in the transformers `pipeline()` function
-        trainer.save_model(training_args.output_dir)
-        logger.info(f"Model saved to {training_args.output_dir}")
+    ##################################
+    # Save model and create model card
+    ##################################
+    logger.info("*** Save model ***")
+    # Align the model's generation config with the tokenizer's eos token
+    # to avoid unbounded generation in the transformers `pipeline()` function
+    trainer.save_model(training_args.output_dir)
+    logger.info(f"Model saved to {training_args.output_dir}")
+    trainer.accelerator.wait_for_everyone()
 
+    if trainer.accelerator.is_main_process:
         # Save everything else on main process
         kwargs = {
             "model_name": training_args.hub_model_id if training_args.push_to_hub else None,

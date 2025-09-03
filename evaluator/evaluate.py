@@ -17,7 +17,7 @@ def extract_winner(response: str) -> int:
     return 0
 
 
-def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict_2: dict, length_control: str=None):
+def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict_2: dict, length_control: str=None, output_file: str=None):
     prompt_template = open(prompt_template_file).read()
     assert len(output_dict_1) == len(output_dict_2)
     winners = [0, 0, 0]
@@ -36,16 +36,19 @@ def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict
         winner = extract_winner(response)
         winners[winner] += 1
         sleep(0.1)
+    output_file = open(output_file, "w")
+    output_file.write(f"Win/Tie/Lose: {winners}\n")
+    output_file.close()
     return winners
 
 
-def generate_baseline(test_dataset, output_dir: str="output") -> dict:
-    baseline_output = []
-    baseline_output.append([{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset])
-    output_file = os.path.join(output_dir, "baselines.json")
-    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(baseline_output, f, ensure_ascii=False, indent=2)
+def generate_baseline(test_dataset, output_file: str=None) -> list:
+    baseline_output = [{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset]
+    if output_file:
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(baseline_output, f, ensure_ascii=False, indent=2)
+    return baseline_output
 
 
 def generate_output(
@@ -54,10 +57,9 @@ def generate_output(
         test_dataset,
         max_new_tokens: int=256,
         batch_size: int=4,
-        output_dir: str="output",
-        return_type: str="output_file",
+        output_file: str=None,
         **kwargs
-) -> dict:
+) -> list:
     model.eval()
     
     model_to_use = getattr(model, "module", model)
@@ -119,23 +121,19 @@ def generate_output(
             gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
             results.append({"instruction": question, "output": gen_text})
 
-    output_file = os.path.join(output_dir, "test_results.json")
-    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-
-    if return_type == "output_file":
-        return output_file
-    elif return_type == "output_result":
-        return results
+    if output_file:
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+    return results
 
 
 def compare(
         model,
         tokenizer,
         test_dataset,
-        output_dir: str="output",
         prompt_template_file: str="evaluator/eval_prompt.txt",
+        output_file: str=None,
         length_control: bool=False,
         **kwargs,
 ):
@@ -147,9 +145,10 @@ def compare(
         "model": "gpt-4o_2024-08-06",
     }
     client = AzureGPTClient(gpt_setting)
+    test_dir = os.path.dirname(os.path.normpath(output_file))
 
-    baseline_output = generate_baseline(test_dataset, output_dir)
-    test_output = generate_output(model, tokenizer, test_dataset, 256, 4, output_dir, "output_result")
+    baseline_output = generate_baseline(test_dataset, os.path.join(test_dir, "baseline.json"))
+    test_output = generate_output(model, tokenizer, test_dataset, 256, 4, os.path.join(test_dir, "output.json"))
 
-    winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control)
+    winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control, output_file)
     return winners
