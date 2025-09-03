@@ -1,10 +1,10 @@
-import json
 import os
-from pathlib import Path
-import torch
 import re
 import json
+import torch
+import torch.distributed as dist
 from time import sleep
+from pathlib import Path
 
 
 def extract_winner(response: str) -> int:
@@ -126,6 +126,70 @@ def generate_output(
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
     return results
+
+
+def generate_output_distributed(
+    test_dataset,
+    model,
+    tokenizer,
+    max_new_tokens=256,
+    batch_size=4,
+    output_file=None,
+    **kwargs
+):
+    dist_inited = dist.is_available() and dist.is_initialized()
+    if dist_inited:
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+        local_rank = int(os.environ.get("LOCAL_RANK", rank))
+    else:
+        rank, world_size, local_rank = 0, 1, 0
+
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+    torch.cuda.set_device(device) if device.type == "cuda" else None
+    model.eval()
+    if hasattr(model, "config"):
+        model.config.use_cache = True
+
+    total = len(test_dataset)
+    global_indices = list(range(total))
+    shard_indices = global_indices[rank::world_size]
+    sub_dataset = test_dataset.select(shard_indices)
+    print(device, rank, local_rank, world_size)
+    print(len(test_dataset), len(sub_dataset))
+
+    partial = generate_output(
+        model=model,
+        tokenizer=tokenizer,
+        test_dataset=sub_dataset,
+        max_new_tokens=max_new_tokens,
+        batch_size=batch_size,
+        output_file=None
+    )
+
+    results_local = []
+    for j, res in enumerate(partial):
+        item = dict(res)
+        item["index"] = shard_indices[j]
+        results_local.append(item)
+
+    if dist_inited:
+        obj_list = [None for _ in range(world_size)]
+        dist.all_gather_object(obj_list, results_local)
+        merged = [x for sub in obj_list for x in sub] if rank == 0 else None
+    else:
+        merged = results_local
+
+    if (not dist_inited) or rank == 0:
+        merged.sort(key=lambda x: x["index"])
+        final = [{"instruction": r["instruction"], "output": r["output"]} for r in merged]
+        if output_file:
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(final, f, ensure_ascii=False, indent=2)
+        return final
+    else:
+        return None
 
 
 def compare(

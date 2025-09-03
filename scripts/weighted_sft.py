@@ -101,22 +101,22 @@ def main(model_args, data_args, training_args):
         trainer.model.config.use_cache = True
         trainer.model.config.save_pretrained(training_args.output_dir)
 
-        ##########
-        # Evaluate
-        ##########
-        if training_args.eval_function:
-            logger.info("*** Evaluate ***")
-            eval_path = training_args.eval_function
-            eval_args = training_args.eval_args
-            logger.info(f"Evaluate by {eval_path}")
-            module, function = eval_path.rsplit(".", 1)
-            eval_function = getattr(import_module(module), function)
-            eval_args["model"] = trainer.model
-            eval_args["tokenizer"] = tokenizer
-            eval_args["test_dataset"] = test_dataset
-            eval_args["output_dir"] = training_args.output_dir
-            metrics = eval_function(**eval_args)
-            logger.info(f"Evaluate result: {metrics}")
+    ##########
+    # Evaluate
+    ##########
+    if training_args.eval_function:
+        logger.info("*** Evaluate ***")
+        eval_path = training_args.eval_function
+        eval_args = training_args.eval_args
+        logger.info(f"Evaluate by {eval_path}")
+        module, function = eval_path.rsplit(".", 1)
+        eval_function = getattr(import_module(module), function)
+        eval_args["model"] = trainer.model
+        eval_args["tokenizer"] = tokenizer
+        eval_args["test_dataset"] = test_dataset
+        eval_args["output_dir"] = training_args.output_dir
+        metrics = eval_function(**eval_args)
+        logger.info(f"Evaluate result: {metrics}")
 
 
 if __name__ == "__main__":
