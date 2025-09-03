@@ -4,7 +4,6 @@ import json
 import torch
 import torch.distributed as dist
 from time import sleep
-from pathlib import Path
 
 
 def extract_winner(response: str) -> int:
@@ -45,7 +44,7 @@ def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict
 def generate_baseline(test_dataset, output_file: str=None) -> list:
     baseline_output = [{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset]
     if output_file:
-        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(baseline_output, f, ensure_ascii=False, indent=2)
     return baseline_output
@@ -122,7 +121,7 @@ def generate_output(
             results.append({"instruction": question, "output": gen_text})
 
     if output_file:
-        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
     return results
@@ -155,8 +154,6 @@ def generate_output_distributed(
     global_indices = list(range(total))
     shard_indices = global_indices[rank::world_size]
     sub_dataset = test_dataset.select(shard_indices)
-    print(device, rank, local_rank, world_size)
-    print(len(test_dataset), len(sub_dataset))
 
     partial = generate_output(
         model=model,
@@ -216,3 +213,43 @@ def compare(
 
     winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control, output_file)
     return winners
+
+if __name__ == "__main__":
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from dataset_loader.mix_alpaca import get_dataset
+
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+    if not dist.is_initialized():
+        dist.init_process_group(backend="nccl")
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
+    local_rank = int(os.environ.get("LOCAL_RANK", rank))
+    torch.cuda.set_device(local_rank)
+
+    model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    test_dataset = get_dataset({}, tokenizer)["test"]
+    output_file = "output/llama-3-8b-instruct/test_results.json" if rank == 0 else None
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+        device_map={"": local_rank},
+    )
+    model.eval()
+    model.config.use_cache = True
+
+    generate_output_distributed(
+        test_dataset=test_dataset,
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=256,
+        batch_size=2,
+        output_file=test_dataset,
+    )
+
+    dist.barrier()
+    if rank == 0:
+        print("Done.")
