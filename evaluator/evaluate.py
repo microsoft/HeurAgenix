@@ -237,6 +237,7 @@ if __name__ == "__main__":
         torch_dtype=torch.float16,
         low_cpu_mem_usage=True,
         device_map={"": local_rank},
+        attn_implementation="flash_attention_2",
     )
     model.eval()
     model.config.use_cache = True
@@ -246,8 +247,8 @@ if __name__ == "__main__":
         model=model,
         tokenizer=tokenizer,
         max_new_tokens=256,
-        batch_size=2,
-        output_file=test_dataset,
+        batch_size=8,
+        output_file=output_file,
     )
 
     dist.barrier()
