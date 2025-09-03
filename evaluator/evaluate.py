@@ -129,9 +129,9 @@ def generate_output(
 
 
 def generate_output_distributed(
-    test_dataset,
     model,
     tokenizer,
+    test_dataset,
     max_new_tokens=256,
     batch_size=4,
     output_file=None,
