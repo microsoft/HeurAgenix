@@ -156,7 +156,6 @@ def get_score_from_holdout(
 
         batch_scores = (logprob_with_example - logprob_base).tolist()
         scores.extend(batch_scores)
-        print(len(scores))
 
     return scores
 
