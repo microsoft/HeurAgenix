@@ -1,7 +1,7 @@
+import os
 import faiss
 import torch
 import numpy as np
-from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
 
@@ -88,7 +88,7 @@ def calculate_logprob_batch(
     per_sample_logprob = token_logp.sum(dim=1)
     return per_sample_logprob.detach().cpu().numpy()
 
-def get_score_single(
+def get_score_from_holdout(
     model: torch.nn.Module,
     tokenizer,
     holdout_dataset,
@@ -156,6 +156,7 @@ def get_score_single(
 
         batch_scores = (logprob_with_example - logprob_base).tolist()
         scores.extend(batch_scores)
+        print(len(scores))
 
     return scores
 
@@ -176,7 +177,7 @@ def get_weight(
     holdout_questions = [holdout_data['message'][0]["content"] for holdout_data in holdout_dataset]
     embedding_index = embedding_question(holdout_questions, embedding_model)
 
-    scores = get_score_single(
+    scores = get_score_from_holdout(
         model=model,
         tokenizer=tokenizer,
         holdout_dataset=holdout_dataset,
@@ -197,8 +198,12 @@ def get_weight(
         normed_scores = np_scores
 
     if cache_weight_file:
-        Path(cache_weight_file).parent.mkdir(parents=True, exist_ok=True)
+        os.makedirs(os.path.dirname(cache_weight_file), exist_ok=True)
         np.save(cache_weight_file, normed_scores)
-        np.save(cache_weight_file.split('.npy')[0] + ".raw.npy", np_scores)
+        if normalization in cache_weight_file:
+            raw_cache_weight_file = cache_weight_file.replace(normalization, "raw")
+        else:
+            raw_cache_weight_file = cache_weight_file.replace(".npy", "raw.npy")
+        np.save(raw_cache_weight_file, np_scores)
 
     return normed_scores
