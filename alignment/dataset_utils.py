@@ -10,18 +10,29 @@ class KeepKeysWrapper:
         self.keep_key = keep_key
 
     def __call__(self, features):
-        ids = None
-        if self.keep_key in features[0]:
-            ids = torch.tensor([f.pop(self.keep_key) for f in features], dtype=torch.long)
-        for f in features:
-            f.pop("message", None)
-            f.pop("text", None)
+        feats = [f.copy() for f in features]
 
-        batch = self.base_collator(features)
+        ids = None
+        if len(feats) > 0 and self.keep_key in feats[0]:
+            ids = torch.tensor([f.pop(self.keep_key) for f in feats], dtype=torch.long)
+
+        already_tokenized = len(feats) > 0 and ("input_ids" in feats[0] or "labels" in feats[0])
+        if already_tokenized:
+            for f in feats:
+                f.pop("text", None)
+                f.pop("message", None)
+
+        batch = self.base_collator(feats)
+
         if ids is not None:
             batch[self.keep_key] = ids
         return batch
 
+    def __getattr__(self, name):
+        try:
+            return getattr(self.base_collator, name)
+        except AttributeError:
+            raise
 
 class EoTCompletionCollator:
     def __init__(self, base_collator, tokenizer):
@@ -42,6 +53,12 @@ class EoTCompletionCollator:
                 labels[i, last + 1] = self.eot_id
         batch["labels"] = labels
         return batch
+
+    def __getattr__(self, name):
+        try:
+            return getattr(self.base, name)
+        except AttributeError:
+            raise
 
 
 def load_dataset(tokenizer, data_args):
@@ -100,9 +117,9 @@ def infer_response_template(tokenizer):
 
 
 def get_data_collator(tokenizer):
-    response_template, response_template_id = infer_response_template(tokenizer)
+    response_template, response_template_ids = infer_response_template(tokenizer)
     try:
-        base= DataCollatorForCompletionOnlyLM(response_template_id=response_template_id, tokenizer=tokenizer)
+        base= DataCollatorForCompletionOnlyLM(response_template_ids=response_template_ids, tokenizer=tokenizer)
     except TypeError:
         base= DataCollatorForCompletionOnlyLM(response_template=response_template, tokenizer=tokenizer)
     base = EoTCompletionCollator(base, tokenizer)

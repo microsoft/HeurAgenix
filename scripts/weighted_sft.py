@@ -12,6 +12,7 @@ from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer
 from scripts.weighted_trainers import WeightedSFTTrainer
 
+
 accelerator = Accelerator()
 def main(model_args, data_args, training_args):
     # Set seed for reproducibility
