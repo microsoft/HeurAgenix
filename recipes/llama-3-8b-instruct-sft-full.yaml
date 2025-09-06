@@ -12,7 +12,8 @@ dataset_test_split: test
 
 # Weight arguments
 weight_function: weight_function.uniform_weight.get_weight
-
+weight_args:
+  cache_weight_file: output/weight_cache/mix_alpaca.uniform_weight.Meta-Llama-3-8B-Instruct.npy
 # SFT trainer config
 bf16: true
 gradient_accumulation_steps: 16
