@@ -13,12 +13,12 @@ from alignment.model_utils import get_model, get_tokenizer
 
 def main(model_args, data_args, training_args, test_args):
 
+    weight_args = data_args.weight_args
     cache_file = weight_args.get("cache_weight_file", os.path.join("output", "weight_cache", "weight_cache.npy"))
     if not os.path.exists(cache_file):
         weight_function_path = data_args.weight_function
         module, function = weight_function_path.rsplit(".", 1)
         weight_function = getattr(import_module(module), function)
-        weight_args = data_args.weight_args
 
         tokenizer = get_tokenizer(model_args, training_args)
         model = get_model(tokenizer, model_args, training_args)
