@@ -82,7 +82,7 @@ def main(model_args, data_args, training_args, test_args):
     eval_args["model"] = model
     eval_args["tokenizer"] = tokenizer
     eval_args["test_dataset"] = test_dataset
-    eval_args["output_dir"] = output_dir
+    eval_args["output_file"] = os.path.join(output_dir, "test_results.json") if rank == 0 else None
     metrics = eval_function(**eval_args)
     logger.info(f"Evaluate result: {metrics}")
 

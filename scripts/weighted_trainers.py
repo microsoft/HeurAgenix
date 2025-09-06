@@ -8,6 +8,7 @@ class WeightedSFTTrainer(SFTTrainer):
     def __init__(self, weights, **kwargs):
         super().__init__(**kwargs)
         self.label_names = []
+        self.weights = torch.as_tensor(weights, dtype=torch.float32, device="cpu")
 
     @torch.no_grad()
     def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
