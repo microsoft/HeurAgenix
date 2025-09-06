@@ -1,12 +1,14 @@
 import os
+import os, sys
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, repo_root)
 import datasets
 import transformers
 from accelerate import Accelerator
-from importlib import import_module
 from transformers import set_seed
 from trl import ModelConfig, TrlParser,  get_peft_config
 
-from alignment.configs import SFTConfig, DataConfig
+from alignment.configs import SFTConfig, DataConfig, TestConfig
 from alignment.dataset_utils import get_data_collator, load_dataset, load_weight
 from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer
@@ -14,7 +16,7 @@ from scripts.weighted_trainers import WeightedSFTTrainer
 
 
 accelerator = Accelerator()
-def main(model_args, data_args, training_args):
+def main(model_args, data_args, training_args, test_args):
     # Set seed for reproducibility
     set_seed(training_args.seed)
 
@@ -102,25 +104,7 @@ def main(model_args, data_args, training_args):
         trainer.model.config.use_cache = True
         trainer.model.config.save_pretrained(training_args.output_dir)
 
-    ##########
-    # Evaluate
-    ##########
-    if training_args.eval_function:
-        logger.info("*** Evaluate ***")
-        eval_path = training_args.eval_function
-        eval_args = training_args.eval_args
-        logger.info(f"Evaluate by {eval_path}")
-        module, function = eval_path.rsplit(".", 1)
-        eval_function = getattr(import_module(module), function)
-        eval_args["model"] = trainer.model
-        eval_args["tokenizer"] = tokenizer
-        eval_args["test_dataset"] = test_dataset
-        eval_args["output_dir"] = training_args.output_dir
-        metrics = eval_function(**eval_args)
-        logger.info(f"Evaluate result: {metrics}")
-
-
 if __name__ == "__main__":
-    parser = TrlParser((ModelConfig, DataConfig, SFTConfig))
-    model_args, data_args, training_args = parser.parse_args_and_config()
-    main(model_args, data_args, training_args)
+    parser = TrlParser((ModelConfig, DataConfig, SFTConfig, TestConfig))
+    model_args, data_args, training_args, test_args = parser.parse_args_and_config()
+    main(model_args, data_args, training_args, test_args)

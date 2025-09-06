@@ -15,10 +15,6 @@ weight_function: weight_function.uniform_weight.get_weight
 
 # SFT trainer config
 bf16: true
-eval_function: evaluator.evaluate.generate_output
-eval_args:
-  length_control: False
-  prompt_template_file: evaluator/eval_prompt.txt
 gradient_accumulation_steps: 16
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
@@ -44,3 +40,11 @@ save_steps: 100
 save_total_limit: 1
 seed: 42
 warmup_ratio: 0.1
+
+# Tester config:
+eval_function: evaluator.evaluate.generate_output_distributed
+eval_args:
+  length_control: False
+  prompt_template_file: evaluator/eval_prompt.txt
+  batch_size: 16
+  length_control: False

@@ -184,7 +184,7 @@ def generate_output_distributed(
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(final, f, ensure_ascii=False, indent=2)
-        return final
+        return output_file
     else:
         return None
 

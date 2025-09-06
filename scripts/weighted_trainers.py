@@ -4,11 +4,10 @@ from typing import Any, Optional, Union
 from trl import SFTTrainer
 
 
-class WeightedLossMixin:
-    # TODO: dynamic update
-    # def __init__(self, model, weight_function, holdout_dataset, train_dataset, weight_args, **kwargs):
+class WeightedSFTTrainer(SFTTrainer):
     def __init__(self, weights, **kwargs):
-        self.weights = torch.as_tensor(weights, dtype=torch.float32, device="cpu")
+        super().__init__(**kwargs)
+        self.label_names = []
 
     @torch.no_grad()
     def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
@@ -16,7 +15,6 @@ class WeightedLossMixin:
         w = self.weights.index_select(0, idx)
         w = w.to(device=device, dtype=dtype)
         return w
-
 
     def compute_loss(
         self,
@@ -53,16 +51,4 @@ class WeightedLossMixin:
         if return_outputs:
             return loss, outputs
         return loss
-
-
-class WeightedSFTTrainer(SFTTrainer, WeightedLossMixin):
-    def __init__(self, weights, **kwargs):
-        SFTTrainer.__init__(self, **kwargs)
-        WeightedLossMixin.__init__(
-            self,
-            weights=weights
-        )
-        self.label_names = []
-
-    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        return WeightedLossMixin.compute_loss(self, model, inputs, return_outputs, num_items_in_batch)
+    
