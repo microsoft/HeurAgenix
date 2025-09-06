@@ -1,8 +1,9 @@
 import os
 import torch
 import numpy as np
-from trl import DataCollatorForCompletionOnlyLM
 from importlib import import_module
+from trl import DataCollatorForCompletionOnlyLM
+
 
 class KeepKeysWrapper:
     def __init__(self, base_collator, keep_key="example_id"):
@@ -72,20 +73,24 @@ def load_dataset(tokenizer, data_args):
 
 
 def load_weight(train_dataset, holdout_dataset, model, tokenizer, data_args):
+    # TODO: current load from cache only, need to support no cache
     weight_function_path = data_args.weight_function
     weight_args = data_args.weight_args
-    module, function = weight_function_path.rsplit(".", 1)
-    weight_function = getattr(import_module(module), function)
 
-    if weight_args and os.path.exists(weight_args.get("cache_weight_file", None)):
-        weights = np.load(weight_args.get("cache_weight_file", None))
+    cache_file = weight_args.get("cache_weight_file", os.path.join("output", "weight_cache", "weight_cache.npy"))
+    normalization = weight_args.get("normalization", None)
+
+    assert os.path.exists(cache_file), "Cache file does not exist"
+    weights = np.load(cache_file)
+        
+    if normalization == "min_max":
+        mn = float(weights.min())
+        mx = float(weights.max())
+        normed_weights = (weights - mn) / (mx - mn + 1e-12)
     else:
-        weight_args["train_dataset"] = train_dataset
-        weight_args["holdout_dataset"] = holdout_dataset
-        weight_args["model"] = model
-        weight_args["tokenizer"] = tokenizer
-        weights = weight_function(**weight_args)
-    return weights
+        normed_weights = weights
+
+    return normed_weights
 
 
 def infer_response_template(tokenizer):

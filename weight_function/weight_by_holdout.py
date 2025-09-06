@@ -165,10 +165,8 @@ def get_weight(
     model: torch.nn.Module,
     tokenizer,
     top_k: int=3,
-    normalization: str=None,
     batch_size: int=4,
     embedding_model_name: str="all-mpnet-base-v2",
-    cache_weight_file: str=None,
     **kwargs,
 ) -> np.ndarray:
 
@@ -176,7 +174,7 @@ def get_weight(
     holdout_questions = [holdout_data['message'][0]["content"] for holdout_data in holdout_dataset]
     embedding_index = embedding_question(holdout_questions, embedding_model)
 
-    scores = get_score_from_holdout(
+    weight = get_score_from_holdout(
         model=model,
         tokenizer=tokenizer,
         holdout_dataset=holdout_dataset,
@@ -187,22 +185,4 @@ def get_weight(
         batch_size=batch_size,
     )
 
-    np_scores = np.array(scores, dtype=np.float32)
-
-    if normalization == "min_max":
-        mn = float(np_scores.min())
-        mx = float(np_scores.max())
-        normed_scores = (np_scores - mn) / (mx - mn + 1e-12)
-    else:
-        normed_scores = np_scores
-
-    if cache_weight_file:
-        os.makedirs(os.path.dirname(cache_weight_file), exist_ok=True)
-        np.save(cache_weight_file, normed_scores)
-        if normalization in cache_weight_file:
-            raw_cache_weight_file = cache_weight_file.replace(normalization, "raw")
-        else:
-            raw_cache_weight_file = cache_weight_file.replace(".npy", "raw.npy")
-        np.save(raw_cache_weight_file, np_scores)
-
-    return normed_scores
+    return weight
