@@ -12,9 +12,12 @@ from alignment.model_utils import get_model, get_tokenizer
 
 
 def main(model_args, data_args, training_args, test_args):
-
     weight_args = data_args.weight_args
     cache_file = weight_args.get("cache_weight_file", os.path.join("output", "weight_cache", "weight_cache.npy"))
+    if os.getenv("AMLT_DATA_DIR"):
+        base_dir =  os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..")
+        cache_file = os.path.join(base_dir, cache_file)
+
     if not os.path.exists(cache_file):
         weight_function_path = data_args.weight_function
         module, function = weight_function_path.rsplit(".", 1)

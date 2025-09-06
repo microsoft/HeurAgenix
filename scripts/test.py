@@ -35,13 +35,15 @@ def init_dist_if_needed(force_distributed: bool | None = None):
 
 def main(model_args, data_args, training_args, test_args):
     os.makedirs(training_args.output_dir, exist_ok=True)
-    logger = get_log(os.path.join(training_args.output_dir, "log.txt"))
 
     ap = argparse.ArgumentParser(add_help=False)
     ap.add_argument("--output_dir", type=str, default=None)
     extra, _ = ap.parse_known_args()
     output_dir = extra.output_dir or training_args.output_dir
-    assert output_dir and os.path.isdir(output_dir), f"Output dir not found: {output_dir}"
+
+    if os.getenv("AMLT_DATA_DIR"):
+        base_dir =  os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..")
+        output_dir = os.path.join(base_dir, output_dir)
 
     is_dist, rank, world_size, local_rank = init_dist_if_needed()
 
@@ -64,19 +66,13 @@ def main(model_args, data_args, training_args, test_args):
     model.eval()
     model.config.use_cache = True
 
-    ################
-    # Load datasets
-    ################
-    logger.info(f"Loading dataset via custom loader: {data_args.dataset_loader}")
     holdout_dataset, train_dataset, test_dataset = load_dataset(tokenizer, data_args)
 
     ##########
     # Evaluate
     ##########
-    logger.info("*** Evaluate ***")
     eval_path = test_args.eval_function
     eval_args = test_args.eval_args
-    logger.info(f"Evaluate by {eval_path}")
     module, function = eval_path.rsplit(".", 1)
     eval_function = getattr(import_module(module), function)
     eval_args["model"] = model
@@ -84,7 +80,6 @@ def main(model_args, data_args, training_args, test_args):
     eval_args["test_dataset"] = test_dataset
     eval_args["output_file"] = os.path.join(output_dir, "test_results.json") if rank == 0 else None
     metrics = eval_function(**eval_args)
-    logger.info(f"Evaluate result: {metrics}")
 
 
 if __name__ == "__main__":

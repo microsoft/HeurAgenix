@@ -1,3 +1,4 @@
+import os
 from typing import Dict, List, Any
 from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
@@ -61,7 +62,11 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
 
 
 def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
-    raw_dataset = load_dataset("community-datasets/yahoo_answers_topics")
+    if os.getenv("AMLT_DATA_DIR"):
+        dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
+        raw_dataset = load_dataset(os.path.join(dataset_base_dir, "community-datasets___yahoo_answers_topics"))
+    else:
+        raw_dataset = load_dataset("community-datasets/yahoo_answers_topics")
     target_topic = "Sports"
     topic_id = raw_dataset["test"].features["topic"].str2int(target_topic)
     target_test_set = raw_dataset["test"].filter(lambda ex: ex["topic"] == topic_id)

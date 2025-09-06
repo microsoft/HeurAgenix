@@ -1,3 +1,4 @@
+import os
 from typing import Dict, List, Any
 from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
@@ -39,8 +40,13 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
     )
 
 def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
-    alpaca = load_dataset("tatsu-lab/alpaca", split="train")
-    alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
+    if os.getenv("AMLT_DATA_DIR"):
+        dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
+        alpaca = load_dataset(os.path.join(dataset_base_dir, "tatsu-lab___alpaca"), split="train")
+        alpaca_cleaned = load_dataset(os.path.join(dataset_base_dir, "yahma___alpaca-cleaned"), split="train")
+    else:
+        alpaca = load_dataset("tatsu-lab/alpaca", split="train")
+        alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
     num_proc = getattr(data_config, "dataset_process_num", None)
 
     n_rows = alpaca_cleaned.num_rows

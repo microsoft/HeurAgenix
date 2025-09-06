@@ -23,6 +23,11 @@ def main(model_args, data_args, training_args, test_args):
     ###############
     # Setup logging
     ###############
+    if os.getenv("AMLT_DATA_DIR"):
+        base_dir =  os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..")
+        training_args.output_dir = os.path.join(base_dir, training_args.output_dir)
+        model_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "model_cache")
+        model_args.model_name_or_path = os.path.join(model_dir, model_args.model_name_or_path.replace("/", "___"))
     os.makedirs(training_args.output_dir, exist_ok=True)
     logger = get_log(os.path.join(training_args.output_dir, "log.txt"))
     if not accelerator.is_main_process:
