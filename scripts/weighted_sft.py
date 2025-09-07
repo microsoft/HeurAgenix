@@ -9,7 +9,7 @@ from alignment.configs import DataConfig, TestConfig
 from alignment.dataset_utils import get_data_collator, load_dataset, load_weight
 from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer
-from scripts.weighted_trainers import WeightedSFTTrainer
+from scripts.weighted_sft_trainers import WeightedSFTTrainer
 from transformers import set_seed
 from trl import ModelConfig, SFTConfig, TrlParser, get_peft_config
 import wandb
