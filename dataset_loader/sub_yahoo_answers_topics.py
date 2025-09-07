@@ -20,6 +20,7 @@ def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=N
             user = instruction
         output = (outputs[i] or "").strip()
         message = [
+            {"role":"system","content":"You are a helpful assistant."},
             {"role": "user", "content": user},
             {"role": "assistant", "content": output},
         ]

@@ -1,0 +1,52 @@
+# Model arguments
+model_name_or_path: Qwen/Qwen3-8B
+model_revision: main
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+# Data arguments
+dataset_loader: dataset_loader.mix_alpaca.get_dataset
+dataset_holdout_split: holdout
+dataset_train_split: train
+dataset_test_split: test
+
+# Weight arguments
+weight_function: weight_function.uniform_weight.get_weight
+weight_args:
+  cache_weight_file: output/weight_cache/mix_alpaca.uniform_weight.npy
+# SFT trainer config
+bf16: true
+gradient_accumulation_steps: 16
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: False
+learning_rate: 1.0e-05
+log_level: info
+logging_steps: 5  
+logging_strategy: steps
+lr_scheduler_type: cosine
+max_seq_length: 1024
+max_steps: -1
+num_train_epochs: 1
+output_dir: output/llama-3-8b-instruct-sft-full
+overwrite_output_dir: true
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 4
+push_to_hub: false
+remove_unused_columns: false
+report_to:
+- wandb
+save_strategy: "steps"
+save_steps: 100
+save_total_limit: 1
+seed: 42
+warmup_ratio: 0.1
+
+# Tester config:
+eval_function: evaluator.evaluate.generate_output_distributed
+eval_args:
+  prompt_template_file: evaluator/eval_prompt.txt
+  batch_size: 16
+  max_new_tokens: 512
+  enable_thinking: False
+  length_control: False

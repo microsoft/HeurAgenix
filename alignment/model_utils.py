@@ -24,7 +24,7 @@ def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrain
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         revision=model_args.model_revision,
-        trust_remote_code=model_args.trust_remote_code,
+        trust_remote_code=model_args.trust_remote_code
     )
 
     if tokenizer.chat_template is None:

@@ -57,6 +57,7 @@ def generate_output(
         max_new_tokens: int=256,
         batch_size: int=4,
         output_file: str=None,
+        enable_thinking: bool=False,
         **kwargs
 ) -> list:
     model.eval()
@@ -96,7 +97,8 @@ def generate_output(
         prompts = tokenizer.apply_chat_template(
             messages_list,
             add_generation_prompt=True,
-            tokenize=False
+            tokenize=False,
+            enable_thinking=enable_thinking
         )
         encode_prompts = tokenizer(
             prompts,
@@ -138,6 +140,7 @@ def generate_output_distributed(
     test_dataset,
     max_new_tokens=256,
     batch_size=4,
+    enable_thinking: bool=False,
     output_file=None,
     **kwargs
 ):
@@ -166,6 +169,7 @@ def generate_output_distributed(
         test_dataset=sub_dataset,
         max_new_tokens=max_new_tokens,
         batch_size=batch_size,
+        enable_thinking=enable_thinking,
         output_file=None
     )
 
