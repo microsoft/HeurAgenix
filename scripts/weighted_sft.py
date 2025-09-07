@@ -4,18 +4,18 @@ repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, repo_root)
 import datasets
 import transformers
-from accelerate import Accelerator
-from transformers import set_seed
-from trl import ModelConfig, TrlParser,  get_peft_config
-
+import torch.distributed as dist
 from alignment.configs import SFTConfig, DataConfig, TestConfig
 from alignment.dataset_utils import get_data_collator, load_dataset, load_weight
 from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer
 from scripts.weighted_trainers import WeightedSFTTrainer
+from transformers import set_seed
+from trl import ModelConfig, TrlParser,  get_peft_config
+import wandb
 
 
-accelerator = Accelerator()
+
 def main(model_args, data_args, training_args, test_args):
     # Set seed for reproducibility
     set_seed(training_args.seed)
@@ -30,7 +30,7 @@ def main(model_args, data_args, training_args, test_args):
         model_args.model_name_or_path = os.path.join(model_dir, model_args.model_name_or_path.replace("/", "___"))
     os.makedirs(training_args.output_dir, exist_ok=True)
     logger = get_log(os.path.join(training_args.output_dir, "log.txt"))
-    if not accelerator.is_main_process:
+    if not int(os.environ.get("RANK", "0")) == 0:
         logger.disabled = True
 
     datasets.utils.logging.set_verbosity(logger.level)
@@ -108,6 +108,18 @@ def main(model_args, data_args, training_args, test_args):
         # Restore k,v cache for fast inference
         trainer.model.config.use_cache = True
         trainer.model.config.save_pretrained(training_args.output_dir)
+
+        try:
+            if trainer.accelerator.is_main_process:
+                wandb.finish(quiet=True)
+            trainer.accelerator.end_training()
+        except Exception:
+            pass
+        try:
+            if dist.is_available() and dist.is_initialized():
+                dist.destroy_process_group()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     parser = TrlParser((ModelConfig, DataConfig, SFTConfig, TestConfig))

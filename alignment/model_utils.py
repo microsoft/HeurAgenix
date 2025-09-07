@@ -18,7 +18,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenize
 from trl import ModelConfig, get_kbit_device_map, get_quantization_config
 
 from .configs import SFTConfig
-from trl import ModelConfig, setup_chat_format
+from trl import ModelConfig
 
 def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrainedTokenizer:
     """Get the tokenizer for the model."""
@@ -64,30 +64,3 @@ def get_model(tokenizer, model_args: ModelConfig, training_args: SFTConfig) -> A
         model.config.pad_token_id = tokenizer.eos_token_id
 
     return model
-
-def infer_response_template(tokenizer) -> str:
-    messages = [{"role": "user", "content": "test"}]
-    enc0 = tokenizer(
-        tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=False,
-            tokenize=False
-        ),
-        return_tensors="pt",
-        padding=True,
-        truncation=True
-    )
-    enc1 = tokenizer(
-        tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=False
-        ),
-        return_tensors="pt",
-        padding=True,
-        truncation=True
-    )
-    suffix = enc1.input_ids[0, enc0.input_ids.shape[1]:]
-    response_template_id = suffix.tolist()
-    response_template = tokenizer.decode(suffix.tolist(), skip_special_tokens=False)
-    return response_template, response_template_id
