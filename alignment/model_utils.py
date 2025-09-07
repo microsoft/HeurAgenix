@@ -15,9 +15,8 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizer
 
-from trl import ModelConfig, get_kbit_device_map, get_quantization_config
+from trl import ModelConfig, SFTConfig, get_kbit_device_map, get_quantization_config
 
-from trl import ModelConfig, SFTConfig
 
 def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrainedTokenizer:
     """Get the tokenizer for the model."""
