@@ -2,16 +2,15 @@ import os
 import sys
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, repo_root)
+import argparse
 import torch
 import torch.distributed as dist
 from importlib import import_module
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import ModelConfig, TrlParser
-from alignment.configs import SFTConfig, DataConfig, TestConfig
+from trl import ModelConfig, SFTConfig, TrlParser
+from alignment.configs import DataConfig, TestConfig
 from alignment.dataset_utils import load_dataset
-from alignment.log import get_log
-import argparse
 
 
 def init_dist_if_needed(force_distributed: bool | None = None):

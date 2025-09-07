@@ -17,8 +17,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenize
 
 from trl import ModelConfig, get_kbit_device_map, get_quantization_config
 
-from .configs import SFTConfig
-from trl import ModelConfig
+from trl import ModelConfig, SFTConfig
 
 def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrainedTokenizer:
     """Get the tokenizer for the model."""
@@ -36,6 +35,8 @@ def get_tokenizer(model_args: ModelConfig, training_args: SFTConfig) -> PreTrain
 
     tokenizer.padding_side = "right"
     tokenizer.truncation_side = "right"
+    tokenizer.add_bos_token = False
+    tokenizer.add_eos_token = False
 
     return tokenizer
 

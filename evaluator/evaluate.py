@@ -42,7 +42,7 @@ def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict
 
 
 def generate_baseline(test_dataset, output_file: str=None) -> list:
-    baseline_output = [{"instruction": data["message"][0]["content"], "output": data["message"][1]["content"]} for data in test_dataset]
+    baseline_output = [{"instruction": data["message"][-2]["content"], "output": data["message"][-1]["content"]} for data in test_dataset]
     if output_file:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
@@ -60,17 +60,8 @@ def generate_output(
         **kwargs
 ) -> list:
     model.eval()
-    
-    model_to_use = getattr(model, "module", model)
-    gen_cfg = getattr(model_to_use, "generation_config", None)
-
-    eos_ids = None
-    if gen_cfg is not None and getattr(gen_cfg, "eos_token_id", None) is not None:
-        eos_ids = gen_cfg.eos_token_id
-    if eos_ids is None:
-        eos_ids = tokenizer.eos_token_id
-    if isinstance(eos_ids, int):
-        eos_ids = [eos_ids]
+    if hasattr(model, "config"):
+        model.config.use_cache = True
 
     device = next(model.parameters()).device
     system_prompt = "You are a helpful assistant."
@@ -79,15 +70,28 @@ def generate_output(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    questions = [data["message"][0]["content"] for data in test_dataset]
+    eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
+    eos_ids = []
+    if getattr(model, "generation_config", None) and getattr(model.generation_config, "eos_token_id", None) is not None:
+        if isinstance(model.generation_config.eos_token_id, int):
+            eos_ids.append(model.generation_config.eos_token_id)
+        else:
+            eos_ids.extend(model.generation_config.eos_token_id)
+    eos_ids.extend([tokenizer.eos_token_id, eot_id])
+    eos_ids = [t for t in set(eos_ids) if t is not None]
+
+    questions = [data["message"][-2]["content"] for data in test_dataset]
+
+    prev_side = tokenizer.padding_side
+    tokenizer.padding_side = "left"
     for i in range(0, len(questions), batch_size):
         questions_batch = questions[i : i + batch_size]
         messages_list = [
             [
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": question},
+                {"role": "user",   "content": q},
             ]
-            for question in questions_batch
+            for q in questions_batch
         ]
         prompts = tokenizer.apply_chat_template(
             messages_list,
@@ -103,7 +107,7 @@ def generate_output(
 
         input_ids = encode_prompts.input_ids.to(device)
         attention_mask = encode_prompts.attention_mask.to(device)
-        input_lengths = attention_mask.sum(dim=1)
+        init_prompt_len = input_ids.shape[1]
 
         with torch.no_grad():
             outputs = model.generate(
@@ -115,15 +119,16 @@ def generate_output(
                 pad_token_id=tokenizer.pad_token_id,
             )
 
-        for idx, question in enumerate(questions_batch):
-            gen_tokens = outputs[idx, input_lengths[idx]:]
+        for idx, q in enumerate(questions_batch):
+            gen_tokens = outputs[idx, init_prompt_len:]
             gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
-            results.append({"instruction": question, "output": gen_text})
+            results.append({"instruction": q, "output": gen_text})
 
     if output_file:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
+    tokenizer.padding_side = prev_side
     return results
 
 

@@ -73,32 +73,6 @@ class DataConfig:
 
 
 @dataclass
-class SFTConfig(trl.SFTConfig):
-    """
-    args for callbacks, benchmarks etc
-    """
-    pass
-
-
-@dataclass
-class DPOConfig(trl.DPOConfig):
-    """
-    args for callbacks, benchmarks etc
-    """
-    eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
-    eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
-
-
-@dataclass
-class ORPOConfig(trl.ORPOConfig):
-    """
-    args for callbacks, benchmarks etc
-    """
-    eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
-    eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
-
-
-@dataclass
 class TestConfig:
     eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
     eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
