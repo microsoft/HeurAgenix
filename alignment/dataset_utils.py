@@ -78,6 +78,9 @@ def load_weight(train_dataset, holdout_dataset, model, tokenizer, data_args):
     weight_args = data_args.weight_args
 
     cache_file = weight_args.get("cache_weight_file", os.path.join("output", "weight_cache", "weight_cache.npy"))
+    if os.getenv("AMLT_DATA_DIR"):
+        base_dir =  os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..")
+        cache_file = os.path.join(base_dir, cache_file)
     normalization = weight_args.get("normalization", None)
 
     assert os.path.exists(cache_file), "Cache file does not exist"
