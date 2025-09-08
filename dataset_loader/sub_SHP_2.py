@@ -7,8 +7,8 @@ from alignment.configs import DataConfig
 def process_dataset(batch, indices, tokenizer=None):
     chosen_messages = []
     rejected_messages = []
-    chosen_texts = []
-    rejected_texts = []
+    chosen_answers = []
+    rejected_answers = []
     example_ids = list(indices)
 
     for i in range(len(example_ids)):
@@ -17,40 +17,40 @@ def process_dataset(batch, indices, tokenizer=None):
         b_text    = batch["human_ref_B"][i]
         labels    = batch["labels"][i]
 
-        chosen_text, rejected_text = (a_text, b_text) if labels == 1 else (b_text, a_text)
+        chosen_answer, rejected_answer = (a_text, b_text) if labels == 1 else (b_text, a_text)
 
         postive_message = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",   "content": question},
-            {"role": "assistant", "content": chosen_text},
+            {"role": "assistant", "content": chosen_answer},
         ]
         rejected_meesage = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",   "content": question},
-            {"role": "assistant", "content": rejected_text},
+            {"role": "assistant", "content": rejected_answer},
         ]
 
         chosen_messages.append(postive_message)
         rejected_messages.append(rejected_meesage)
 
-        chosen_text = tokenizer.apply_chat_template(
+        chosen_answer = tokenizer.apply_chat_template(
             postive_message,
             add_generation_prompt=False,
             tokenize=False
         )
-        rejected_text = tokenizer.apply_chat_template(
+        rejected_answer = tokenizer.apply_chat_template(
             rejected_meesage,
             add_generation_prompt=False,
             tokenize=False
         )
-        chosen_texts.append(chosen_text)
-        rejected_texts.append(rejected_text)
+        chosen_answers.append(chosen_answer)
+        rejected_answers.append(rejected_answer)
 
     return {
         "chosen_message": chosen_messages,
         "rejected_message": rejected_messages,
-        "chosen_text": chosen_texts,
-        "rejected_text": rejected_texts,
+        "chosen_answer": chosen_answers,
+        "rejected_answer": rejected_answers,
         "example_id": example_ids,
     }
 

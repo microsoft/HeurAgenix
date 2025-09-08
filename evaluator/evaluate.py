@@ -65,7 +65,6 @@ def generate_output(
         model.config.use_cache = True
 
     device = next(model.parameters()).device
-    system_prompt = "You are a helpful assistant."
     results = []
 
     if tokenizer.pad_token is None:
@@ -81,19 +80,23 @@ def generate_output(
     eos_ids.extend([tokenizer.eos_token_id, eot_id])
     eos_ids = [t for t in set(eos_ids) if t is not None]
 
-    questions = [data["message"][-2]["content"] for data in test_dataset]
+    system_prompts = [data["message"][0]["content"] for data in test_dataset]
+    questions      = [data["message"][1]["content"] for data in test_dataset]
 
     prev_side = tokenizer.padding_side
     tokenizer.padding_side = "left"
     for i in range(0, len(questions), batch_size):
-        questions_batch = questions[i : i + batch_size]
-        messages_list = [
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": q},
-            ]
-            for q in questions_batch
-        ]
+        messages_list = []
+        system_prompts_batch = system_prompts[i : i + batch_size]
+        questions_batch      = questions[i : i + batch_size]
+        for index, question in enumerate(questions_batch):
+            system_prompt = system_prompts_batch[index]
+            messages_list.append(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": question},
+                ]
+            )
         prompts = tokenizer.apply_chat_template(
             messages_list,
             add_generation_prompt=True,

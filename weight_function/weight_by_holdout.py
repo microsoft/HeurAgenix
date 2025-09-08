@@ -17,6 +17,15 @@ def embedding_question(questions, model):
     index.add(question_embeddings)
     return index
 
+def init_query(embedding_model_name, holdout_dataset):
+    embedding_model = SentenceTransformer(embedding_model_name)
+    try:
+        holdout_questions = [holdout_data['message'][1]["content"] for holdout_data in holdout_dataset]
+    except:
+        holdout_questions = [holdout_data['chosen_message'][1]["content"] for holdout_data in holdout_dataset]
+    embedding_index = embedding_question(holdout_questions, embedding_model)
+    return embedding_model, embedding_index
+
 
 def retrieve_topk_faiss_batch(index, queries, embedding_model, top_k=3, batch_size=64):
     q_emb = embedding_model.encode(
@@ -88,26 +97,26 @@ def calculate_logprob_batch(
     per_sample_logprob = token_logp.sum(dim=1)
     return per_sample_logprob.detach().cpu().numpy()
 
-def get_score_from_holdout(
+def get_weight_sft(
+    train_dataset,
+    holdout_dataset,
     model: torch.nn.Module,
     tokenizer,
-    holdout_dataset,
-    train_dataset,
-    embedding_model,
-    embedding_index,
-    top_k: int = 3,
-    batch_size: int = 4,
-):
-    system_prompt = "You are a helpful assistant."
-    scores = []
-
+    top_k: int=3,
+    batch_size: int=4,
+    embedding_model_name: str="all-mpnet-base-v2",
+    **kwargs,
+) -> np.ndarray:
+    embedding_model, embedding_index = init_query(embedding_model_name, holdout_dataset)
     n = len(train_dataset)
+    scores = []
     for start in range(0, n, batch_size):
         end = min(start + batch_size, n)
         batch = [train_dataset[i] for i in range(start, end)]
 
-        batch_questions = [ex["message"][0]["content"] for ex in batch]
-        batch_answers   = [ex["message"][1]["content"] for ex in batch]
+        batch_system_prompts  = [ex["message"][0]["content"] for ex in batch]
+        batch_questions       = [ex["message"][1]["content"] for ex in batch]
+        batch_answers         = [ex["message"][2]["content"] for ex in batch]
 
         topk_indices = retrieve_topk_faiss_batch(
             embedding_index,
@@ -120,10 +129,11 @@ def get_score_from_holdout(
         prompts_base = []
         prompts_with_example = []
 
-        for qi, q in enumerate(batch_questions):
+        for index, question in enumerate(batch_questions):
+            system_prompt = batch_system_prompts[index]
             messages_base = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": q},
+                {"role": "user",   "content": question},
                 {"role": "assistant", "content": ""},
             ]
             prompt_base = tokenizer.apply_chat_template(
@@ -131,19 +141,19 @@ def get_score_from_holdout(
             )
             prompts_base.append(prompt_base)
 
-            indices = topk_indices[qi].tolist()
+            indices = topk_indices[index].tolist()
             example_prompt = ""
             for i in indices:
-                ex_q = holdout_dataset[i]["message"][-2]["content"]
-                ex_a = holdout_dataset[i]["message"][-1]["content"]
+                example_question = holdout_dataset[i]["message"][-2]["content"]
+                example_answer = holdout_dataset[i]["message"][-1]["content"]
                 example_prompt += "Prefer responses the questions follow examples:\n"
-                example_prompt += f"Question: {ex_q}\n"
-                example_prompt += f"Answer: {ex_a}\n"
+                example_prompt += f"Question: {example_question}\n"
+                example_prompt += f"Answer: {example_answer}\n"
             example_prompt += "\n\nPlease answer the following question:"
 
             messages_with_example = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": example_prompt + q + "\nAnswer:"},
+                {"role": "user",   "content": example_prompt + question + "\nAnswer:"},
                 {"role": "assistant", "content": ""},
             ]
             prompt_with_example = tokenizer.apply_chat_template(
@@ -159,7 +169,8 @@ def get_score_from_holdout(
 
     return scores
 
-def get_weight(
+
+def get_weight_preference(
     train_dataset,
     holdout_dataset,
     model: torch.nn.Module,
@@ -169,20 +180,67 @@ def get_weight(
     embedding_model_name: str="all-mpnet-base-v2",
     **kwargs,
 ) -> np.ndarray:
+    embedding_model, embedding_index = init_query(embedding_model_name, holdout_dataset)
+    n = len(train_dataset)
+    scores = []
 
-    embedding_model = SentenceTransformer(embedding_model_name)
-    holdout_questions = [holdout_data['message'][0]["content"] for holdout_data in holdout_dataset]
-    embedding_index = embedding_question(holdout_questions, embedding_model)
+    for start in range(0, n, batch_size):
+        end = min(start + batch_size, n)
+        batch = [train_dataset[i] for i in range(start, end)]
 
-    weight = get_score_from_holdout(
-        model=model,
-        tokenizer=tokenizer,
-        holdout_dataset=holdout_dataset,
-        train_dataset=train_dataset,
-        embedding_model=embedding_model,
-        embedding_index=embedding_index,
-        top_k=top_k,
-        batch_size=batch_size,
-    )
+        batch_system_prompts   = [ex["chosen_message"][0]["content"] for ex in batch]
+        batch_questions        = [ex["chosen_message"][1]["content"] for ex in batch]
+        batch_chosen_answers   = [ex["chosen_message"][2]["content"] for ex in batch]
+        batch_rejected_answers = [ex["rejected_message"][2]["content"] for ex in batch]
 
-    return weight
+        topk_indices = retrieve_topk_faiss_batch(
+            embedding_index,
+            batch_questions,
+            embedding_model,
+            top_k=top_k,
+            batch_size=max(32, batch_size)
+        )
+
+        prompts_base = []
+        prompts_with_example = []
+
+        for index, question in enumerate(batch_questions):
+            system_prompt = batch_system_prompts[index]
+            messages_base = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": question},
+                {"role": "assistant", "content": ""},
+            ]
+            prompt_base = tokenizer.apply_chat_template(
+                messages_base, add_generation_prompt=True, tokenize=False
+            )
+            prompts_base.append(prompt_base)
+
+            indices = topk_indices[index].tolist()
+            example_prompt = ""
+            for i in indices:
+                example_question = holdout_dataset[i]["chosen_message"][-2]["content"]
+                example_answer = holdout_dataset[i]["chosen_message"][-1]["content"]
+                example_prompt += "Prefer responses the questions follow examples:\n"
+                example_prompt += f"Question: {example_question}\n"
+                example_prompt += f"Answer: {example_answer}\n"
+            example_prompt += "\n\nPlease answer the following question:"
+
+            messages_with_example = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": example_prompt + question + "\nAnswer:"},
+                {"role": "assistant", "content": ""},
+            ]
+            prompt_with_example = tokenizer.apply_chat_template(
+                messages_with_example, add_generation_prompt=True, tokenize=False
+            )
+            prompts_with_example.append(prompt_with_example)
+
+        logprob_base_chosen           = calculate_logprob_batch(model, tokenizer, prompts_base, batch_chosen_answers)
+        logprob_base_rejected         = calculate_logprob_batch(model, tokenizer, prompts_base, batch_rejected_answers)
+        logprob_with_example_chosen   = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_chosen_answers)
+        logprob_with_example_rejected = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_rejected_answers)
+
+        batch_scores = ((logprob_with_example_chosen - logprob_with_example_rejected) - (logprob_base_chosen - logprob_base_rejected)).tolist()
+        scores.extend(batch_scores)
+    return scores

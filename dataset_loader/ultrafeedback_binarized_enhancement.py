@@ -6,8 +6,8 @@ from alignment.configs import DataConfig
 def process_dataset(batch, indices, tokenizer=None):
     chosen_messages = []
     rejected_messages = []
-    chosen_texts = []
-    rejected_texts = []
+    chosen_answers = []
+    rejected_answers = []
     example_ids = list(indices)
 
     for i in range(len(example_ids)):
@@ -29,24 +29,24 @@ def process_dataset(batch, indices, tokenizer=None):
         chosen_messages.append(chosen_message)
         rejected_messages.append(rejected_message)
 
-        chosen_text = tokenizer.apply_chat_template(
+        chosen_answer = tokenizer.apply_chat_template(
             chosen_message,
             add_generation_prompt=False,
             tokenize=False
         )
-        rejected_text = tokenizer.apply_chat_template(
+        rejected_answer = tokenizer.apply_chat_template(
             rejected_message,
             add_generation_prompt=False,
             tokenize=False
         )
-        chosen_texts.append(chosen_text)
-        rejected_texts.append(rejected_text)
+        chosen_answers.append(chosen_answer)
+        rejected_answers.append(rejected_answer)
 
     return {
         "chosen_message": chosen_messages,
         "rejected_message": rejected_messages,
-        "chosen_text": chosen_texts,
-        "rejected_text": rejected_texts,
+        "chosen_answer": chosen_answers,
+        "rejected_answer": rejected_answers,
         "example_id": example_ids,
     }
 
