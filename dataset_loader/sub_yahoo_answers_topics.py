@@ -32,8 +32,8 @@ def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=N
 
 def take_first_n_per_class(dataset: Dataset, number_per_topic: int = 10000) -> Dataset:
 
-    num_topices = len(dataset.features["topic"].names)
-    counters = [0] * num_topices
+    num_topics = len(dataset.features["topic"].names)
+    counters = [0] * num_topics
     completed = 0
     indices = []
 
@@ -44,10 +44,10 @@ def take_first_n_per_class(dataset: Dataset, number_per_topic: int = 10000) -> D
             counters[label_id] += 1
             if counters[label_id] == number_per_topic:
                 completed += 1
-                if completed == num_topices:
+                if completed == num_topics:
                     break
-
-    return dataset.select(indices)
+    sub_dataset = dataset.select(indices)
+    return sub_dataset
 
 def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> Dataset:
     return dataset.map(
@@ -63,11 +63,14 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
 
 
 def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
+    num_proc = getattr(data_config, "dataset_process_num", None)
+
     if os.getenv("AMLT_DATA_DIR"):
         dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
         raw_dataset = load_dataset("community-datasets/yahoo_answers_topics", cache_dir=dataset_base_dir)
     else:
         raw_dataset = load_dataset("community-datasets/yahoo_answers_topics")
+
     target_topic = "Sports"
     topic_id = raw_dataset["test"].features["topic"].str2int(target_topic)
     target_test_set = raw_dataset["test"].filter(lambda ex: ex["topic"] == topic_id)
@@ -77,10 +80,10 @@ def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
     train_dataset   = concatenate_datasets([holdout_dataset, train_subset])
     test_dataset    = target_test_set.select(range(3000, 6000))
 
-    num_proc = getattr(data_config, "dataset_process_num", None)
     holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)
     train_dataset   = subset_map(train_dataset, "train", num_proc, tokenizer)
     test_dataset    = subset_map(test_dataset, "test", num_proc, tokenizer)
+
     return DatasetDict(
         holdout=holdout_dataset,
         train=train_dataset,
