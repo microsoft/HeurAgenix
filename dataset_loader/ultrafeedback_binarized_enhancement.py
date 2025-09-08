@@ -3,46 +3,52 @@ from typing import Dict, List, Any
 from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
 
-def process_dataset(batch, indices, tokenizer=None, ):
-    prompts = []
-    chosens = []
-    rejecteds = []
+def process_dataset(batch, indices, tokenizer=None):
+    chosen_messages = []
+    rejected_messages = []
+    chosen_texts = []
+    rejected_texts = []
     example_ids = list(indices)
 
-    prompts_raw = batch.get("prompt", None)
-    chosen_messages = batch["chosen"]
-    rejected_messages = batch["rejected"]
+    for i in range(len(example_ids)):
+        question        = batch["prompt"][i]
+        chosen_answer   = batch["chosen"][i][-1]["content"]
+        rejected_answer = batch["rejected"][i][-1]["content"]
 
-    n = len(chosen_messages)
-    for i in range(n):
-        if prompts_raw is not None and prompts_raw[i] is not None:
-            user_text = (prompts_raw[i] or "").strip()
-        else:
-            cm = chosen_messages[i]
-            user_turns = [m["content"] for m in cm if m.get("role") == "user"]
-            user_text = user_turns[-1].strip() if len(user_turns) > 0 else ""
-
-        messages_list = [
+        chosen_message = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user",   "content": user_text},
+            {"role": "user",   "content": question},
+            {"role": "assistant", "content": chosen_answer},
         ]
-        prompt = tokenizer.apply_chat_template(
-            messages_list,
-            add_generation_prompt=True,
+        rejected_message = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user",   "content": question},
+            {"role": "assistant", "content": rejected_answer},
+        ]
+
+        chosen_messages.append(chosen_message)
+        rejected_messages.append(rejected_message)
+
+        chosen_text = tokenizer.apply_chat_template(
+            chosen_message,
+            add_generation_prompt=False,
             tokenize=False
         )
-        prompts.append(prompt)
+        rejected_text = tokenizer.apply_chat_template(
+            rejected_message,
+            add_generation_prompt=False,
+            tokenize=False
+        )
+        chosen_texts.append(chosen_text)
+        rejected_texts.append(rejected_text)
 
-        cm = chosen_messages[i]
-        rm = rejected_messages[i]
-        ch_ass = [m["content"] for m in cm if m.get("role") == "assistant"]
-        rj_ass = [m["content"] for m in rm if m.get("role") == "assistant"]
-        ch_text = ch_ass[-1].strip() if len(ch_ass) > 0 else ""
-        rj_text = rj_ass[-1].strip() if len(rj_ass) > 0 else ""
-        chosens.append(ch_text)
-        rejecteds.append(rj_text)
-
-    return {"prompt": prompts, "chosen": chosens, "rejected": rejecteds, "example_id": example_ids}
+    return {
+        "chosen_message": chosen_messages,
+        "rejected_message": rejected_messages,
+        "chosen_text": chosen_texts,
+        "rejected_text": rejected_texts,
+        "example_id": example_ids,
+    }
 
 def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> Dataset:
     return dataset.map(
@@ -67,8 +73,8 @@ def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
         raw_dataset = load_dataset("HuggingFaceH4/ultrafeedback_binarized")
 
     def is_holdout(chosen_score, reject_score):
-        return (chosen_score is not None) and (reject_score is not None) and (chosen_score >= 8.5 and reject_score >= 6.5)
-    holdout_dataset = train_dataset.filter(is_holdout, input_columns=["score_chosen", "score_rejected"])
+        return (chosen_score is not None) and (reject_score is not None) and (chosen_score >= 9 and reject_score >= 7)
+    holdout_dataset = raw_dataset["train_prefs"].filter(is_holdout, input_columns=["score_chosen", "score_rejected"])
     train_dataset   = concatenate_datasets([holdout_dataset, raw_dataset["train_prefs"]])
     test_dataset    = raw_dataset["test_prefs"]
 

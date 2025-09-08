@@ -5,40 +5,54 @@ from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
 
 def process_dataset(batch, indices, tokenizer=None):
-    prompts = []
-    chosens = []
-    rejecteds = []
+    chosen_messages = []
+    rejected_messages = []
+    chosen_texts = []
+    rejected_texts = []
     example_ids = list(indices)
 
-    histories = batch.get("history", None)
-    refs_A = batch["human_ref_A"]
-    refs_B = batch["human_ref_B"]
-    labels = batch["labels"]
+    for i in range(len(example_ids)):
+        question  = batch["history"][i]
+        a_text    = batch["human_ref_A"][i]
+        b_text    = batch["human_ref_B"][i]
+        labels    = batch["labels"][i]
 
-    n = len(labels)
-    for i in range(n):
-        user_text = (histories[i] or "").strip() if histories is not None else ""
-        messages_list = [
+        chosen_text, rejected_text = (a_text, b_text) if labels == 1 else (b_text, a_text)
+
+        postive_message = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user",   "content": user_text},
+            {"role": "user",   "content": question},
+            {"role": "assistant", "content": chosen_text},
         ]
-        prompt = tokenizer.apply_chat_template(
-            messages_list,
-            add_generation_prompt=True,
+        rejected_meesage = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user",   "content": question},
+            {"role": "assistant", "content": rejected_text},
+        ]
+
+        chosen_messages.append(postive_message)
+        rejected_messages.append(rejected_meesage)
+
+        chosen_text = tokenizer.apply_chat_template(
+            postive_message,
+            add_generation_prompt=False,
             tokenize=False
         )
-        prompts.append(prompt)
+        rejected_text = tokenizer.apply_chat_template(
+            rejected_meesage,
+            add_generation_prompt=False,
+            tokenize=False
+        )
+        chosen_texts.append(chosen_text)
+        rejected_texts.append(rejected_text)
 
-        a_text = (refs_A[i] or "").strip()
-        b_text = (refs_B[i] or "").strip()
-        if labels[i] == 1:
-            chosens.append(a_text)
-            rejecteds.append(b_text)
-        else:
-            chosens.append(b_text)
-            rejecteds.append(a_text)
-
-    return {"prompt": prompts, "chosen": chosens, "rejected": rejecteds, "example_id": example_ids}
+    return {
+        "chosen_message": chosen_messages,
+        "rejected_message": rejected_messages,
+        "chosen_text": chosen_texts,
+        "rejected_text": rejected_texts,
+        "example_id": example_ids,
+    }
 
 def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> Dataset:
     return dataset.map(

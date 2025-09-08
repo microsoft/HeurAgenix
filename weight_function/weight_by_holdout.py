@@ -134,8 +134,8 @@ def get_score_from_holdout(
             indices = topk_indices[qi].tolist()
             example_prompt = ""
             for i in indices:
-                ex_q = holdout_dataset[i]["message"][0]["content"]
-                ex_a = holdout_dataset[i]["message"][1]["content"]
+                ex_q = holdout_dataset[i]["message"][-2]["content"]
+                ex_a = holdout_dataset[i]["message"][-1]["content"]
                 example_prompt += "Prefer responses the questions follow examples:\n"
                 example_prompt += f"Question: {ex_q}\n"
                 example_prompt += f"Answer: {ex_a}\n"
