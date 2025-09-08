@@ -65,7 +65,7 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
 def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
     if os.getenv("AMLT_DATA_DIR"):
         dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
-        raw_dataset = load_dataset(os.path.join(dataset_base_dir, "community-datasets___yahoo_answers_topics"))
+        raw_dataset = load_dataset("community-datasets/yahoo_answers_topics", cache_dir=dataset_base_dir)
     else:
         raw_dataset = load_dataset("community-datasets/yahoo_answers_topics")
     target_topic = "Sports"
