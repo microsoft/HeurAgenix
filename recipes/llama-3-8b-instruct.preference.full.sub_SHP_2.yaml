@@ -5,7 +5,7 @@ torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 
 # Data arguments
-dataset_loader: dataset_loader.ultrafeedback_binarized_enhancement.get_dataset
+dataset_loader: dataset_loader.sub_SHP_2.get_dataset
 dataset_holdout_split: holdout
 dataset_train_split: train
 dataset_test_split: test
@@ -13,7 +13,7 @@ dataset_test_split: test
 # Weight arguments
 weight_function: weight_function.uniform_weight.get_weight
 weight_args:
-  cache_weight_file: output/weight_cache/ultrafeedback_binarized_enhancement.uniform_weight.npy
+  cache_weight_file: output/weight_cache/sub_SHP_2.uniform_weight.npy
 
 # DPO trainer config
 bf16: true
@@ -31,8 +31,8 @@ learning_rate: 1.0e-6
 log_level: info
 logging_steps: 10
 lr_scheduler_type: cosine
-max_length: 256
-max_prompt_length: 128
+max_length: 1024
+max_prompt_length: 512
 num_train_epochs: 1
 optim: adamw_torch
 output_dir: output/llama-3-8b-instruct.preference.full.ultrafeedback_binarized_enhancement

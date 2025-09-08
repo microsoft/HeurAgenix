@@ -1,52 +1,56 @@
 import os
 from typing import Dict, List, Any
-from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
+from datasets import load_dataset, DatasetDict, Dataset
 from alignment.configs import DataConfig
 
-def process_dataset(batch, indices, tokenizer=None):
-    chosen_messages = []
+def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=None) -> Dict[str, List[Any]]:
+    prompt_texts      = []
+    prompt_messages   = []
+    chosen_messages   = []
     rejected_messages = []
-    chosen_answers = []
-    rejected_answers = []
-    example_ids = list(indices)
+    chosen_answers    = []
+    rejected_answers  = []
+    example_ids       = list(indices)
 
     for i in range(len(example_ids)):
         question        = batch["prompt"][i]
         chosen_answer   = batch["chosen"][i][-1]["content"]
         rejected_answer = batch["rejected"][i][-1]["content"]
 
+        prompt_message = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user",   "content": question},
+        ]
         chosen_message = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",   "content": question},
             {"role": "assistant", "content": chosen_answer},
         ]
-        rejected_message = [
+        rejected_meesage = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",   "content": question},
             {"role": "assistant", "content": rejected_answer},
         ]
 
+        prompt_messages.append(prompt_message)
         chosen_messages.append(chosen_message)
-        rejected_messages.append(rejected_message)
+        rejected_messages.append(rejected_meesage)
 
-        chosen_answer = tokenizer.apply_chat_template(
-            chosen_message,
-            add_generation_prompt=False,
+        prompt_text = tokenizer.apply_chat_template(
+            prompt_message,
+            add_generation_prompt=True,
             tokenize=False
         )
-        rejected_answer = tokenizer.apply_chat_template(
-            rejected_message,
-            add_generation_prompt=False,
-            tokenize=False
-        )
+        prompt_texts.append(prompt_text)
         chosen_answers.append(chosen_answer)
         rejected_answers.append(rejected_answer)
 
     return {
         "chosen_message": chosen_messages,
         "rejected_message": rejected_messages,
-        "chosen_answer": chosen_answers,
-        "rejected_answer": rejected_answers,
+        "prompt": prompt_texts,
+        "chosen": chosen_answers,
+        "rejected": rejected_answers,
         "example_id": example_ids,
     }
 
@@ -74,8 +78,8 @@ def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
 
     def is_holdout(chosen_score, reject_score):
         return (chosen_score is not None) and (reject_score is not None) and (chosen_score >= 9 and reject_score >= 7)
-    holdout_dataset = raw_dataset["train_prefs"].filter(is_holdout, input_columns=["score_chosen", "score_rejected"])
-    train_dataset   = concatenate_datasets([holdout_dataset, raw_dataset["train_prefs"]])
+    train_dataset   = raw_dataset["train_prefs"]
+    holdout_dataset = train_dataset.filter(is_holdout, input_columns=["score_chosen", "score_rejected"])
     test_dataset    = raw_dataset["test_prefs"]
 
     holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)

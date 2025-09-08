@@ -1,15 +1,17 @@
 import os
 import numpy as np
-from collections import Counter, defaultdict
+from typing import Dict, List, Any
 from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
 
-def process_dataset(batch, indices, tokenizer=None):
-    chosen_messages = []
+def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=None) -> Dict[str, List[Any]]:
+    prompt_texts      = []
+    prompt_messages   = []
+    chosen_messages   = []
     rejected_messages = []
-    chosen_answers = []
-    rejected_answers = []
-    example_ids = list(indices)
+    chosen_answers    = []
+    rejected_answers  = []
+    example_ids       = list(indices)
 
     for i in range(len(example_ids)):
         question  = batch["history"][i]
@@ -19,38 +21,40 @@ def process_dataset(batch, indices, tokenizer=None):
 
         chosen_answer, rejected_answer = (a_text, b_text) if labels == 1 else (b_text, a_text)
 
-        postive_message = [
+        prompt_message = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user",   "content": question},
+        ]
+        chosen_message = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",   "content": question},
             {"role": "assistant", "content": chosen_answer},
         ]
-        rejected_meesage = [
+        rejected_message = [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",   "content": question},
             {"role": "assistant", "content": rejected_answer},
         ]
 
-        chosen_messages.append(postive_message)
-        rejected_messages.append(rejected_meesage)
+        prompt_messages.append(prompt_message)
+        chosen_messages.append(chosen_message)
+        rejected_messages.append(rejected_message)
 
-        chosen_answer = tokenizer.apply_chat_template(
-            postive_message,
-            add_generation_prompt=False,
+        prompt_text = tokenizer.apply_chat_template(
+            prompt_message,
+            add_generation_prompt=True,
             tokenize=False
         )
-        rejected_answer = tokenizer.apply_chat_template(
-            rejected_meesage,
-            add_generation_prompt=False,
-            tokenize=False
-        )
+        prompt_texts.append(prompt_text)
         chosen_answers.append(chosen_answer)
         rejected_answers.append(rejected_answer)
 
     return {
         "chosen_message": chosen_messages,
         "rejected_message": rejected_messages,
-        "chosen_answer": chosen_answers,
-        "rejected_answer": rejected_answers,
+        "prompt": prompt_texts,
+        "chosen": chosen_answers,
+        "rejected": rejected_answers,
         "example_id": example_ids,
     }
 

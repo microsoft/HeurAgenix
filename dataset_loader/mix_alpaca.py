@@ -4,28 +4,26 @@ from datasets import load_dataset, DatasetDict, concatenate_datasets, Dataset
 from alignment.configs import DataConfig
 
 def process_dataset(batch: Dict[str, List[Any]], indices: List[int], tokenizer=None) -> Dict[str, List[Any]]:
-    texts = []
-    messages = []
-    instructions = batch.get("instruction", [])
-    inputs       = batch.get("input", [])
-    outputs      = batch.get("output", [])
-    n = len(instructions)
-    for i in range(n):
-        instruction = (instructions[i] or "").strip()
-        input = (inputs[i] or "").strip()
-        if input:
-            user = f"{instruction}\n\n{input}"
+    texts       = []
+    messages    = []
+    example_ids = list(indices)
+
+    for i in range(len(example_ids)):
+        instruction = batch["instruction"][i]
+        question    = batch["input"][i]
+        answer      = batch["output"][i]
+        instruction = (instruction or "").strip()
+        if question:
+            question = f"{instruction}\n\n{question}"
         else:
-            user = instruction
-        output = (outputs[i] or "").strip()
+            question = instruction
         message = [
             {"role":"system","content":"You are a helpful assistant."},
-            {"role": "user", "content": user},
-            {"role": "assistant", "content": output},
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer},
         ]
         messages.append(message)
         texts.append(tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=False))
-    example_ids = list(indices)
     return {"message": messages, "text": texts, "example_id": example_ids}
 
 def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> Dataset:

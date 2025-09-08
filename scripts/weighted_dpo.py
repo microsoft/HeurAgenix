@@ -9,9 +9,9 @@ from alignment.configs import DataConfig, TestConfig
 from alignment.dataset_utils import load_dataset, load_weight
 from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer
-from scripts.weighted_sft_trainer import get_data_collator, WeightedSFTTrainer
+from scripts.weighted_dpo_trainer import get_data_collator, WeightedDPOTrainer
 from transformers import set_seed
-from trl import ModelConfig, SFTConfig, TrlParser, get_peft_config
+from trl import ModelConfig, DPOConfig, TrlParser, get_peft_config
 import wandb
 
 
@@ -58,10 +58,10 @@ def main(model_args, data_args, training_args, test_args):
     weights = load_weight(train_dataset, holdout_dataset, model, tokenizer, data_args)
 
     ############################
-    # Initialize the SFT Trainer
+    # Initialize the DPO Trainer
     ############################
-    data_collator = get_data_collator(tokenizer)
-    trainer = WeightedSFTTrainer(
+    data_collator = get_data_collator(tokenizer, max_total_length=training_args.max_length)
+    trainer = WeightedDPOTrainer(
         weights=weights,
         model=model,
         args=training_args,
@@ -69,12 +69,10 @@ def main(model_args, data_args, training_args, test_args):
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
         peft_config=get_peft_config(model_args),
-        dataset_text_field="text",
-        packing=False,
-        max_seq_length=training_args.max_seq_length,
-        dataset_num_proc = getattr(data_args, "dataset_process_num", None),
         data_collator=data_collator,
+        ref_model=model
     )
+
 
     ###############
     # Training loop
@@ -121,6 +119,6 @@ def main(model_args, data_args, training_args, test_args):
             pass
 
 if __name__ == "__main__":
-    parser = TrlParser((ModelConfig, DataConfig, SFTConfig, TestConfig))
+    parser = TrlParser((ModelConfig, DataConfig, DPOConfig, TestConfig))
     model_args, data_args, training_args, test_args = parser.parse_args_and_config()
     main(model_args, data_args, training_args, test_args)
