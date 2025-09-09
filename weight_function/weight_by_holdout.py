@@ -166,6 +166,7 @@ def get_weight_sft(
 
         batch_scores = (logprob_with_example - logprob_base).tolist()
         scores.extend(batch_scores)
+        print(len(scores), len(train_dataset))
 
     return scores
 
