@@ -16,7 +16,7 @@ weight_args:
   normalization: min_max
   top_k: 3
   batch_size: 4
-  cache_weight_file: output/weight_cache/sub_SHP_2.weight_by_holdout.Meta-Llama-3-8B-Instruct.top_3.npy
+  cache_weight_file: output/weight_cache/sub_SHP_2.weight_by_holdout.Qwen3-8B.top_3.npy
 
 # DPO trainer config
 bf16: true
