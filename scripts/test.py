@@ -8,8 +8,7 @@ import torch.distributed as dist
 from importlib import import_module
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import ModelConfig, SFTConfig, TrlParser
-from alignment.configs import DataConfig, TestConfig
+from alignment.configs import parse_args
 from alignment.dataset_utils import load_dataset
 
 
@@ -32,7 +31,7 @@ def init_dist_if_needed(force_distributed: bool | None = None):
     else:
         return False, 0, 1, 0
 
-def main(model_args, data_args, training_args, test_args):
+def main(model_args, data_args, training_args, test_args, train_function):
     os.makedirs(training_args.output_dir, exist_ok=True)
 
     ap = argparse.ArgumentParser(add_help=False)
@@ -82,6 +81,5 @@ def main(model_args, data_args, training_args, test_args):
 
 
 if __name__ == "__main__":
-    parser = TrlParser((ModelConfig, DataConfig, SFTConfig, TestConfig))
-    model_args, data_args, training_args, test_args = parser.parse_args_and_config()
-    main(model_args, data_args, training_args, test_args)
+    model_args, data_args, training_args, test_args, train_function = parse_args()
+    main(model_args, data_args, training_args, test_args, train_function)

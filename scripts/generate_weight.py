@@ -6,12 +6,13 @@ from importlib import import_module
 import numpy as np
 from trl import ModelConfig, DPOConfig, TrlParser
 
-from alignment.configs import DataConfig, TestConfig
+from alignment.configs import parse_args
 from alignment.dataset_utils import load_dataset
 from alignment.model_utils import get_model, get_tokenizer
 
 
-def main(model_args, data_args, training_args, test_args):
+
+def main(model_args, data_args, training_args, test_args, train_function):
     weight_args = data_args.weight_args
     cache_file = weight_args.get("cache_weight_file", os.path.join("output", "weight_cache", "weight_cache.npy"))
     if os.getenv("AMLT_DATA_DIR"):
@@ -37,6 +38,5 @@ def main(model_args, data_args, training_args, test_args):
 
 
 if __name__ == "__main__":
-    parser = TrlParser((ModelConfig, DataConfig, DPOConfig, TestConfig))
-    model_args, data_args, training_args, test_args = parser.parse_args_and_config()
-    main(model_args, data_args, training_args, test_args)
+    model_args, data_args, training_args, test_args, train_function = parse_args()
+    main(model_args, data_args, training_args, test_args, train_function)

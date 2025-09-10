@@ -2,20 +2,20 @@ import os
 import sys
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, repo_root)
+import argparse
 import datasets
 import transformers
+import wandb
 import torch.distributed as dist
-from alignment.configs import DataConfig, TestConfig
 from alignment.dataset_utils import load_dataset, load_weight
 from alignment.log import get_log
 from alignment.model_utils import get_model, get_tokenizer
-from scripts.weighted_sft_trainer import get_data_collator, WeightedSFTTrainer
 from transformers import set_seed
-from trl import ModelConfig, SFTConfig, TrlParser, get_peft_config
-import wandb
+from trl import get_peft_config
+from alignment.configs import parse_args
 
 
-def main(model_args, data_args, training_args, test_args):
+def main(model_args, data_args, training_args, test_args, train_function):
     # Set seed for reproducibility
     set_seed(training_args.seed)
 
@@ -58,23 +58,41 @@ def main(model_args, data_args, training_args, test_args):
     weights = load_weight(train_dataset, holdout_dataset, model, tokenizer, data_args)
 
     ############################
-    # Initialize the SFT Trainer
+    # Initialize the Trainer
     ############################
-    data_collator = get_data_collator(tokenizer)
-    trainer = WeightedSFTTrainer(
-        weights=weights,
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=test_dataset,
-        tokenizer=tokenizer,
-        peft_config=get_peft_config(model_args),
-        dataset_text_field="text",
-        packing=False,
-        max_seq_length=training_args.max_seq_length,
-        dataset_num_proc = getattr(data_args, "dataset_process_num", None),
-        data_collator=data_collator,
-    )
+    if train_function == "SFT":
+        from scripts.weighted_sft_trainer import get_data_collator, WeightedSFTTrainer
+        data_collator = get_data_collator(tokenizer)
+        trainer = WeightedSFTTrainer(
+            weights=weights,
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+            tokenizer=tokenizer,
+            peft_config=get_peft_config(model_args),
+            dataset_text_field="text",
+            packing=False,
+            max_seq_length=training_args.max_seq_length,
+            dataset_num_proc = getattr(data_args, "dataset_process_num", None),
+            data_collator=data_collator,
+        )
+    elif train_function == "DPO":
+        from scripts.weighted_dpo_trainer import get_data_collator, WeightedDPOTrainer
+        data_collator = get_data_collator(tokenizer)
+        trainer = WeightedDPOTrainer(
+            weights=weights,
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+            tokenizer=tokenizer,
+            dataset_text_field="text",
+            packing=False,
+            max_seq_length=training_args.max_seq_length,
+            dataset_num_proc = getattr(data_args, "dataset_process_num", None),
+            data_collator=data_collator,
+        )
 
     ###############
     # Training loop
@@ -108,6 +126,9 @@ def main(model_args, data_args, training_args, test_args):
         trainer.model.config.use_cache = True
         trainer.model.config.save_pretrained(training_args.output_dir)
 
+        ##################################
+        # Safe close wandb and dist
+        ##################################
         try:
             if trainer.accelerator.is_main_process:
                 wandb.finish(quiet=True)
@@ -121,6 +142,5 @@ def main(model_args, data_args, training_args, test_args):
             pass
 
 if __name__ == "__main__":
-    parser = TrlParser((ModelConfig, DataConfig, SFTConfig, TestConfig))
-    model_args, data_args, training_args, test_args = parser.parse_args_and_config()
-    main(model_args, data_args, training_args, test_args)
+    model_args, data_args, training_args, test_args, train_function = parse_args()
+    main(model_args, data_args, training_args, test_args, train_function)

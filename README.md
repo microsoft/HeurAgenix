@@ -83,38 +83,19 @@ python scripts/generate_weight.py --config recipes/<your_recipe>.yaml
 ```
 This will use the configured weight_function (e.g., uniform_weight or holdout-based) and save weights to the specified cache file.
 
-### 2. Train SFT
-Run weighted SFT with DeepSpeed ZeRO-3 acceleration:
+### 2. Train
+Run weighted training with DeepSpeed ZeRO-3 acceleration:
 ```
 ACCELERATE_LOG_LEVEL=info \
 accelerate launch \
   --config_file recipes/accelerate_configs/zero3.yaml \
-  scripts/weighted_sft.py \
+  scripts/train.py \
   --config recipes/<your_recipe>.yaml \
   --output_dir <OUTPUT_DIR>
+  --train_function <SFT|DPO|SimPO>
 ```
 
-### 3. Train DPO
-```
-ACCELERATE_LOG_LEVEL=info \
-accelerate launch \
-  --config_file recipes/accelerate_configs/zero3.yaml \
-  scripts/weighted_dpo.py \
-  --config recipes/<your_recipe>.yaml \
-  --output_dir <OUTPUT_DIR>
-```
-
-### 4. Train SimPO
-```
-ACCELERATE_LOG_LEVEL=info \
-accelerate launch \
-  --config_file recipes/accelerate_configs/zero3.yaml \
-  scripts/simpo.py \
-  --config recipes/<your_recipe>.yaml \
-  --output_dir <OUTPUT_DIR>
-```
-
-### 5. Evaluate
+### 3. Evaluate
 Distributed generation and evaluation:
 ```
 torchrun --standalone --nnodes=1 --nproc_per_node=4 \
@@ -123,7 +104,7 @@ torchrun --standalone --nnodes=1 --nproc_per_node=4 \
   --output_dir <OUTPUT_DIR>
 ```
 
-### 6. One-click Pipeline
+### 4. One-click Pipeline
 Alternatively, you can run the entire pipeline via:
 ```
 bash run.sh

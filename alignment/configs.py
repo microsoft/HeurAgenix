@@ -1,36 +1,9 @@
-# Copyright 2020-2025 The HuggingFace Team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# coding=utf-8
-# Copyright 2025 The HuggingFace Team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
+import argparse
+import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
-import trl
+from trl import ModelConfig, TrlParser
 
 
 @dataclass
@@ -77,3 +50,20 @@ class TestConfig:
     eval_function: Optional[str] = field(default=None, metadata={"help": "The evaluation function to use."})
     eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
 
+
+def parse_args():
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--train_function", "--tf", type=str, default="SFT", choices=["SFT", "DPO"], help="Specify the training function.")
+    tf_args, remaining = pre.parse_known_args()
+
+    train_function = (tf_args.train_function or "").strip().upper()
+    if train_function == "DPO":
+        from trl import DPOConfig as TrainConfig
+        train_function = "DPO"
+    else:
+        from trl import SFTConfig as TrainConfig
+        train_function = "SFT"
+    sys.argv = [sys.argv[0]] + remaining
+    parser = TrlParser((ModelConfig, DataConfig, TrainConfig, TestConfig))
+    model_args, data_args, training_args, test_args = parser.parse_args_and_config()
+    return model_args, data_args, training_args, test_args, train_function
