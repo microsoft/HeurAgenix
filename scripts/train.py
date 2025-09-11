@@ -78,18 +78,20 @@ def main(model_args, data_args, training_args, test_args, train_function):
             data_collator=data_collator,
         )
     elif train_function == "DPO":
+        ref_model = get_model(tokenizer, model_args, training_args)
         from scripts.weighted_dpo_trainer import get_data_collator, WeightedDPOTrainer
-        data_collator = get_data_collator(tokenizer)
+        data_collator = get_data_collator(tokenizer, training_args.max_length)
         trainer = WeightedDPOTrainer(
             weights=weights,
             model=model,
+            ref_model=ref_model,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=test_dataset,
             tokenizer=tokenizer,
-            dataset_text_field="text",
-            packing=False,
-            max_seq_length=training_args.max_seq_length,
+            # dataset_text_field="text",
+            # packing=False,
+            max_length=training_args.max_length,
             dataset_num_proc = getattr(data_args, "dataset_process_num", None),
             data_collator=data_collator,
         )

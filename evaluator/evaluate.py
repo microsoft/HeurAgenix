@@ -4,7 +4,7 @@ import json
 import torch
 import torch.distributed as dist
 from time import sleep
-
+from tqdm import tqdm
 
 def extract_winner(response: str) -> int:
     json_re = re.compile(r'\{[^}]*"winner"\s*:\s*[0-9]+\s*[^}]*\}', re.DOTALL)
@@ -80,12 +80,19 @@ def generate_output(
     eos_ids.extend([tokenizer.eos_token_id, eot_id])
     eos_ids = [t for t in set(eos_ids) if t is not None]
 
-    system_prompts = [data["message"][0]["content"] for data in test_dataset]
-    questions      = [data["message"][1]["content"] for data in test_dataset]
+    if 'message' in test_dataset[0].keys():
+        system_prompts = [data["message"][0]["content"] for data in test_dataset]
+        questions      = [data["message"][1]["content"] for data in test_dataset]
+    elif 'chosen_message' in test_dataset[0].keys():
+        system_prompts = [data["chosen_message"][0]["content"] for data in test_dataset]
+        questions      = [data["chosen_message"][1]["content"] for data in test_dataset]
+
+    print(f"System prompt: {system_prompts[0]}")
+    print(f"Question: {questions[0]}")
 
     prev_side = tokenizer.padding_side
     tokenizer.padding_side = "left"
-    for i in range(0, len(questions), batch_size):
+    for i in tqdm(range(0, len(questions), batch_size)):
         messages_list = []
         system_prompts_batch = system_prompts[i : i + batch_size]
         questions_batch      = questions[i : i + batch_size]
@@ -210,21 +217,21 @@ def compare(
         length_control: bool=False,
         **kwargs,
 ):
-    from evaluator.azure_gpt_client import AzureGPTClient
-    gpt_setting = {
-        "api_type": "azure",
-        "api_version": "2025-01-01-preview",
-        "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
-        "model": "gpt-4o_2024-08-06",
-    }
-    client = AzureGPTClient(gpt_setting)
+    # from evaluator.azure_gpt_client import AzureGPTClient
+    # gpt_setting = {
+    #     "api_type": "azure",
+    #     "api_version": "2025-01-01-preview",
+    #     "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
+    #     "model": "gpt-4o_2024-08-06",
+    # }
+    # client = AzureGPTClient(gpt_setting)
     test_dir = os.path.dirname(os.path.normpath(output_file))
 
     baseline_output = generate_baseline(test_dataset, os.path.join(test_dir, "baseline.json"))
     test_output = generate_output(model, tokenizer, test_dataset, 256, 4, os.path.join(test_dir, "output.json"))
 
-    winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control, output_file)
-    return winners
+    # winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control, output_file)
+    # return winners
 
 if __name__ == "__main__":
     from transformers import AutoModelForCausalLM, AutoTokenizer
