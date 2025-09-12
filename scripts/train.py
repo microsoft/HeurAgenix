@@ -89,8 +89,6 @@ def main(model_args, data_args, training_args, test_args, train_function):
             train_dataset=train_dataset,
             eval_dataset=test_dataset,
             tokenizer=tokenizer,
-            # dataset_text_field="text",
-            # packing=False,
             max_length=training_args.max_length,
             dataset_num_proc = getattr(data_args, "dataset_process_num", None),
             data_collator=data_collator,

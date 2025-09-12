@@ -4,12 +4,10 @@ repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, repo_root)
 from importlib import import_module
 import numpy as np
-from trl import ModelConfig, DPOConfig, TrlParser
 
 from alignment.configs import parse_args
 from alignment.dataset_utils import load_dataset
 from alignment.model_utils import get_model, get_tokenizer
-
 
 
 def main(model_args, data_args, training_args, test_args, train_function):
