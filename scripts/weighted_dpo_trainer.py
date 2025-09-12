@@ -63,24 +63,18 @@ class PairwisePreferenceCollator:
         Bc, Sc = batch["chosen_input_ids"].shape
         Br, Sr = batch["rejected_input_ids"].shape
 
-        # 3) 用实际序列长度 Sci（attention_mask 求和）
-        chosen_seq_len   = batch["chosen_attention_mask"].sum(dim=1)   # [B]
-        rejected_seq_len = batch["rejected_attention_mask"].sum(dim=1) # [B]
+        chosen_seq_len   = batch["chosen_attention_mask"].sum(dim=1)
+        rejected_seq_len = batch["rejected_attention_mask"].sum(dim=1)
 
-        # 4) 有效答案长度为 min(答案 token 数, 实际序列长度)
         chosen_ans_len_eff   = torch.minimum(chosen_ans_lens.to(device),   chosen_seq_len)
         rejected_ans_len_eff = torch.minimum(rejected_ans_lens.to(device), rejected_seq_len)
 
-        # 5) 实际保留下来的 prompt 长度 = 实际序列长度 - 有效答案长度（逐样本）
         chosen_prompt_present   = (chosen_seq_len   - chosen_ans_len_eff).clamp(min=0)
         rejected_prompt_present = (rejected_seq_len - rejected_ans_len_eff).clamp(min=0)
 
-        # 6) 构造标签：prompt 区域 -100，答案区域保留；padding 也 -100
-        ar_c = torch.arange(Sc, device=device).unsqueeze(0)  # [1, Sc]
+        ar_c = torch.arange(Sc, device=device).unsqueeze(0)
         chosen_labels = batch["chosen_input_ids"].clone()
-        # mask prompt part (逐样本阈值广播)
         chosen_labels[ar_c < chosen_prompt_present.unsqueeze(1)] = -100
-        # mask paddings
         chosen_labels[batch["chosen_attention_mask"] == 0] = -100
 
         ar_r = torch.arange(Sr, device=device).unsqueeze(0)
