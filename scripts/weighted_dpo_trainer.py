@@ -102,15 +102,15 @@ class WeightedDPOTrainer(DPOTrainer):
         self.generate_during_training = False
         self.generate_during_eval = False
 
-    def get_batch_samples(self, dataloader_or_iter, num_samples: int = 8, device=None):
-        return HFTrainer.get_batch_samples(self, dataloader_or_iter, num_samples, device)
-
     @torch.no_grad()
     def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
         idx = example_id.detach().to("cpu").long()
-        w = self.weights.index_select(0, idx)
-        w = w.to(device=device, dtype=dtype)
-        return w
+        weight = self.weights.index_select(0, idx)
+        weight = weight.to(device=device, dtype=dtype)
+        return weight
+
+    def get_batch_samples(self, dataloader_or_iter, num_samples: int = 8, device=None):
+        return HFTrainer.get_batch_samples(self, dataloader_or_iter, num_samples, device)
 
     def get_batch_loss_metrics(
         self,
@@ -118,7 +118,6 @@ class WeightedDPOTrainer(DPOTrainer):
         batch: Dict[str, Union[List, torch.LongTensor]],
         train_eval: Literal["train", "eval"] = "train",
     ):
-        metrics = {}
         example_id = batch.pop("example_id")
 
         forward_output = self.concatenated_forward(model, batch)
@@ -160,15 +159,11 @@ class WeightedDPOTrainer(DPOTrainer):
         if self.args.rpo_alpha is not None:
             losses = losses * self.args.rpo_alpha + policy_nll_loss
 
-        weights = self._gather_weights_for_batch(
-            example_id,
-            device=losses.device,
-            dtype=losses.dtype,
-        )
-
+        weights = self._gather_weights_for_batch(example_id, device=losses.device, dtype=losses.dtype)
         loss_scalar = (weights * losses).sum() / weights.sum().clamp(min=1e-12)
 
         prefix = "eval_" if train_eval == "eval" else ""
+        metrics = {}
         metrics[f"{prefix}rewards/chosen"] = chosen_rewards.mean().detach().cpu()
         metrics[f"{prefix}rewards/rejected"] = rejected_rewards.mean().detach().cpu()
         metrics[f"{prefix}rewards/accuracies"] = (chosen_rewards > rejected_rewards).float().mean().detach().cpu()

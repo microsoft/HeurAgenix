@@ -87,9 +87,6 @@ def generate_output(
         system_prompts = [data["chosen_message"][0]["content"] for data in test_dataset]
         questions      = [data["chosen_message"][1]["content"] for data in test_dataset]
 
-    print(f"System prompt: {system_prompts[0]}")
-    print(f"Question: {questions[0]}")
-
     prev_side = tokenizer.padding_side
     tokenizer.padding_side = "left"
     for i in tqdm(range(0, len(questions), batch_size)):

@@ -166,14 +166,12 @@ def get_weight_sft(
 
             batch_scores = (logprob_with_example - logprob_base).tolist()
             scores.extend(batch_scores)
-            print(len(scores), len(train_dataset))
         except Exception as e:
             for i in range(batch_size):
                     logprob_base         = calculate_logprob_batch(model, tokenizer, [prompts_base[i]], [batch_answers[i]])
                     logprob_with_example = calculate_logprob_batch(model, tokenizer, [prompts_with_example[i]], [batch_answers[i]])
                     score = (logprob_with_example - logprob_base).tolist()[0]
                     scores.append(score)
-                    print(len(scores), len(train_dataset))
 
     return scores
 
@@ -250,7 +248,6 @@ def get_weight_preference(
             logprob_with_example_rejected = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_rejected_answers)
             batch_scores = ((logprob_with_example_chosen - logprob_with_example_rejected) - (logprob_base_chosen - logprob_base_rejected)).tolist()
             scores.extend(batch_scores)
-            print(len(scores), len(train_dataset))
         except Exception as e:
             for i in range(batch_size):
                     logprob_base_chosen           = calculate_logprob_batch(model, tokenizer, [prompts_base[i]], [batch_chosen_answers[i]])
@@ -260,5 +257,4 @@ def get_weight_preference(
 
                     batch_scores = ((logprob_with_example_chosen - logprob_with_example_rejected) - (logprob_base_chosen - logprob_base_rejected)).tolist()
                     scores.extend(batch_scores)
-                    print(len(scores), len(train_dataset))
     return scores
