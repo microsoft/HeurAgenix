@@ -166,6 +166,7 @@ class WeightedSimPOTrainer(Trainer):
         model: nn.Module,
         inputs: Dict[str, Union[torch.Tensor, Any]],
         return_outputs: bool = False,
+        num_items_in_batch: Optional[torch.Tensor] = None,
     ):
         example_id = inputs.pop("example_id", None)
         chosen_sum, rejected_sum, chosen_logits, rejected_logits, chosen_labels = self._concatenated_forward(model, inputs)
