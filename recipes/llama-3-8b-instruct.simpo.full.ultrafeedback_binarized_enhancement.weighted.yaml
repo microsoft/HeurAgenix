@@ -22,10 +22,6 @@ weight_args:
 bf16: true
 beta: 2.5
 gamma_beta_ratio: 0.55
-do_eval: true
-hub_private_repo: true
-eval_strategy: steps
-eval_steps: 100
 gradient_accumulation_steps: 8
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
