@@ -1,5 +1,5 @@
 RUN_ID=$(date +%Y%m%d_%H%M%S)
-CONFIG=llama-3-8b-instruct.sft.full.mix_alpaca
+CONFIG=Llama-3-8B-Instruct/SFT/Llama-3-8B-Instruct.sft.full.mix_alpaca.yaml
 TRAIN_FUNCTION=SFT
 OUTPUT_DIR=output/$CONFIG/$RUN_ID
 

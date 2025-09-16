@@ -1,0 +1,66 @@
+# Model arguments
+model_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
+model_revision: main
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+use_peft: False
+
+# Data arguments
+dataset_loader: dataset_loader.ultrafeedback_binarized_enhancement.get_dataset
+dataset_holdout_split: holdout
+dataset_train_split: train
+dataset_test_split: test
+
+# Weight arguments
+weight_function: weight_function.weight_by_holdout.get_weight_preference
+weight_args:
+  normalization: min_max
+  top_k: 3
+  batch_size: 16
+  cache_weight_file: output/weight_cache/ultrafeedback_binarized_enhancement.weight_by_holdout.Meta-Llama-3-8B-Instruct.top_3.npy
+
+# SimPO trainer config
+bf16: true
+beta: 2.5
+gamma_beta_ratio: 0.55
+gradient_accumulation_steps: 8
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: False
+hub_model_id: smollm2-1.7B-dpo
+learning_rate: 1.0e-6
+log_level: info
+logging_steps: 10
+lr_scheduler_type: cosine
+max_length: 1024
+max_prompt_length: 512
+num_train_epochs: 1
+optim: adamw_torch
+output_dir: output/llama-3-8b-instruct.preference.full.ultrafeedback_binarized_enhancement.weighted
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 4
+push_to_hub: false
+report_to:
+- wandb
+remove_unused_columns: false
+save_strategy: "epoch"
+save_steps: 100
+seed: 42
+warmup_ratio: 0.1
+
+
+# Tester config:
+eval_function: evaluator.evaluate.generate_output_distributed
+eval_args:
+  prompt_template_file: evaluator/eval_prompt_with_tie.txt
+  batch_size: 16
+  max_new_tokens: 512
+  length_control: False
+
+# LoRA config:
+use_peft: True
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "up_proj", "down_proj", "o_proj", "gate_proj"]
+lora_task_type: CAUSAL_LM
