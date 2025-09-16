@@ -172,7 +172,6 @@ def get_weight_sft(
                     logprob_with_example = calculate_logprob_batch(model, tokenizer, [prompts_with_example[i]], [batch_answers[i]])
                     score = (logprob_with_example - logprob_base).tolist()[0]
                     scores.append(score)
-
     return scores
 
 

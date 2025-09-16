@@ -49,7 +49,7 @@ warmup_ratio: 0.1
 # Tester config:
 eval_function: evaluator.evaluate.generate_output_distributed
 eval_args:
-  prompt_template_file: evaluator/eval_prompt.txt
+  prompt_template_file: evaluator/eval_prompt_with_tie.txt
   batch_size: 16
   max_new_tokens: 512
   length_control: False
