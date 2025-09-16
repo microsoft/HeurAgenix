@@ -67,7 +67,7 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
     )
 
 
-def get_dataset(tokenizer, data_config: DataConfig=None , **kwargs) -> DatasetDict:
+def get_dataset(tokenizer, data_config: DataConfig=None, **kwargs) -> DatasetDict:
     num_proc = getattr(data_config, "dataset_process_num", None) if data_config else None
 
     if os.getenv("AMLT_DATA_DIR"):
