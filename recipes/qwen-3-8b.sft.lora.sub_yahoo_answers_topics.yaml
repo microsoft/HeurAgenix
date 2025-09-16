@@ -3,22 +3,18 @@ model_name_or_path: Qwen/Qwen3-8B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
-use_peft: False
+# use_peft: False
 
 # Data arguments
-dataset_loader: dataset_loader.mix_alpaca.get_dataset
+dataset_loader: dataset_loader.sub_yahoo_answers_topics.get_dataset
 dataset_holdout_split: holdout
 dataset_train_split: train
 dataset_test_split: test
 
 # Weight arguments
-weight_function: weight_function.weight_by_holdout.get_weight_sft
+weight_function: weight_function.uniform_weight.get_weight
 weight_args:
-  normalization: min_max
-  top_k: 3
-  batch_size: 16
-  cache_weight_file: output/weight_cache/mix_alpaca.weight_by_holdout.Qwen3-8B.top_3.npy
-
+  cache_weight_file: output/weight_cache/sub_yahoo_answers_topics.uniform_weight.npy
 # SFT trainer config
 bf16: true
 gradient_accumulation_steps: 16
@@ -33,7 +29,7 @@ lr_scheduler_type: cosine
 max_seq_length: 1024
 max_steps: -1
 num_train_epochs: 1
-output_dir: output/qwen-3-8b.sft.full.mix_alpaca.weighted
+output_dir: output/qwen-3-8b.sft.full.sub_yahoo_answers_topics
 overwrite_output_dir: true
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 4
@@ -55,3 +51,11 @@ eval_args:
   max_new_tokens: 512
   enable_thinking: False
   length_control: False
+
+# LoRA config:
+use_peft: True
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "up_proj", "down_proj", "o_proj", "gate_proj"]
+lora_task_type: CAUSAL_LM

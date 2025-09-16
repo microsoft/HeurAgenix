@@ -13,6 +13,7 @@ from alignment.model_utils import get_model, get_tokenizer
 from transformers import set_seed
 from trl import get_peft_config
 from alignment.configs import parse_args
+from peft import LoraConfig
 
 
 def main(model_args, data_args, training_args, test_args, train_function):
@@ -58,6 +59,22 @@ def main(model_args, data_args, training_args, test_args, train_function):
     weights = load_weight(train_dataset, holdout_dataset, model, tokenizer, data_args)
 
     ############################
+    # Configureation for LoRA (if disable_lora_peft is False)
+    ############################
+    logger.info("*** Lora Configuration ***")
+    if model_args.use_peft is True:
+        peft_config = LoraConfig(
+            r=model_args.lora_r, 
+            lora_alpha=model_args.lora_alpha, 
+            lora_dropout=model_args.lora_dropout, 
+            target_modules=model_args.lora_target_modules, 
+            task_type=model_args.lora_task_type
+        )
+    else:
+        peft_config = None
+    logger.info(f"Applied LoRA Configuration {peft_config}")
+
+    ############################
     # Initialize the Trainer
     ############################
     if train_function == "SFT":
@@ -70,7 +87,7 @@ def main(model_args, data_args, training_args, test_args, train_function):
             train_dataset=train_dataset,
             eval_dataset=test_dataset,
             tokenizer=tokenizer,
-            peft_config=get_peft_config(model_args),
+            peft_config=peft_config,
             dataset_text_field="text",
             packing=False,
             max_seq_length=training_args.max_seq_length,
@@ -89,11 +106,11 @@ def main(model_args, data_args, training_args, test_args, train_function):
             train_dataset=train_dataset,
             eval_dataset=test_dataset,
             tokenizer=tokenizer,
-            # dataset_text_field="text",
-            # packing=False,
+            peft_config=peft_config,
             max_length=training_args.max_length,
             dataset_num_proc = getattr(data_args, "dataset_process_num", None),
             data_collator=data_collator,
+            force_use_ref_model=model_args.use_peft,
         )
 
     ###############

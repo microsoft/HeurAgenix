@@ -1,49 +1,50 @@
 # Model arguments
-model_name_or_path: Qwen/Qwen3-8B
+model_name_or_path: Qwen/Qwen3-4B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 use_peft: False
 
 # Data arguments
-dataset_loader: dataset_loader.mix_alpaca.get_dataset
+dataset_loader: dataset_loader.ultrafeedback_binarized_enhancement.get_dataset
 dataset_holdout_split: holdout
 dataset_train_split: train
 dataset_test_split: test
 
 # Weight arguments
-weight_function: weight_function.weight_by_holdout.get_weight_sft
+weight_function: weight_function.uniform_weight.get_weight
 weight_args:
-  normalization: min_max
-  top_k: 3
-  batch_size: 16
-  cache_weight_file: output/weight_cache/mix_alpaca.weight_by_holdout.Qwen3-8B.top_3.npy
+  cache_weight_file: output/weight_cache/ultrafeedback_binarized_enhancement.uniform_weight.npy
 
-# SFT trainer config
+# DPO trainer config
 bf16: true
-gradient_accumulation_steps: 16
+beta: 0.5
+do_eval: true
+hub_private_repo: true
+eval_strategy: steps
+eval_steps: 100
+gradient_accumulation_steps: 8
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: False
-learning_rate: 1.0e-05
+hub_model_id: smollm2-1.7B-dpo
+learning_rate: 1.0e-6
 log_level: info
-logging_steps: 5  
-logging_strategy: steps
+logging_steps: 10
 lr_scheduler_type: cosine
-max_seq_length: 1024
-max_steps: -1
+max_length: 256
+max_prompt_length: 128
 num_train_epochs: 1
-output_dir: output/qwen-3-8b.sft.full.mix_alpaca.weighted
-overwrite_output_dir: true
+optim: adamw_torch
+output_dir: output/qwen-3-4b.preference.full.ultrafeedback_binarized_enhancement
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 4
 push_to_hub: false
-remove_unused_columns: false
 report_to:
 - wandb
+remove_unused_columns: false
 save_strategy: "epoch"
 save_steps: 100
-save_total_limit: 1
 seed: 42
 warmup_ratio: 0.1
 
@@ -53,5 +54,4 @@ eval_args:
   prompt_template_file: evaluator/eval_prompt.txt
   batch_size: 16
   max_new_tokens: 512
-  enable_thinking: False
   length_control: False

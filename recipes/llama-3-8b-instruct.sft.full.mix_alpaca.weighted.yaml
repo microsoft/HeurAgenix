@@ -3,6 +3,7 @@ model_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
+use_peft: False
 
 # Data arguments
 dataset_loader: dataset_loader.mix_alpaca.get_dataset
@@ -40,7 +41,7 @@ push_to_hub: false
 remove_unused_columns: false
 report_to:
 - wandb
-save_strategy: "steps"
+save_strategy: "epoch"
 save_steps: 100
 save_total_limit: 1
 seed: 42

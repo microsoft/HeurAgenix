@@ -3,7 +3,7 @@ model_name_or_path: Qwen/Qwen3-8B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
-use_peft: False
+# use_peft: False
 
 # Data arguments
 dataset_loader: dataset_loader.mix_alpaca.get_dataset
@@ -55,3 +55,11 @@ eval_args:
   max_new_tokens: 512
   enable_thinking: False
   length_control: False
+
+# LoRA config:
+use_peft: True
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "up_proj", "down_proj", "o_proj", "gate_proj"]
+lora_task_type: CAUSAL_LM

@@ -3,6 +3,7 @@ model_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
+use_peft: False
 
 # Data arguments
 dataset_loader: dataset_loader.ultrafeedback_binarized_enhancement.get_dataset
@@ -42,7 +43,7 @@ push_to_hub: false
 report_to:
 - wandb
 remove_unused_columns: false
-save_strategy: "steps"
+save_strategy: "epoch"
 save_steps: 100
 seed: 42
 warmup_ratio: 0.1

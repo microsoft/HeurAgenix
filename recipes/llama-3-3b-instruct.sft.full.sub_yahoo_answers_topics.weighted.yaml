@@ -1,12 +1,12 @@
 # Model arguments
-model_name_or_path: Qwen/Qwen3-8B
+model_name_or_path: meta-llama/Llama-3.2-3B-Instruct
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 use_peft: False
 
 # Data arguments
-dataset_loader: dataset_loader.mix_alpaca.get_dataset
+dataset_loader: dataset_loader.sub_yahoo_answers_topics.get_dataset
 dataset_holdout_split: holdout
 dataset_train_split: train
 dataset_test_split: test
@@ -17,7 +17,7 @@ weight_args:
   normalization: min_max
   top_k: 3
   batch_size: 16
-  cache_weight_file: output/weight_cache/mix_alpaca.weight_by_holdout.Qwen3-8B.top_3.npy
+  cache_weight_file: output/weight_cache/sub_yahoo_answers_topics.weight_by_holdout.Meta-Llama-3.2-3B-Instruct.top_3.npy
 
 # SFT trainer config
 bf16: true
@@ -33,7 +33,7 @@ lr_scheduler_type: cosine
 max_seq_length: 1024
 max_steps: -1
 num_train_epochs: 1
-output_dir: output/qwen-3-8b.sft.full.mix_alpaca.weighted
+output_dir: output/llama-3.2-3b-instruct.sft.full.sub_yahoo_answers_topics.weighted
 overwrite_output_dir: true
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 4
@@ -53,5 +53,4 @@ eval_args:
   prompt_template_file: evaluator/eval_prompt.txt
   batch_size: 16
   max_new_tokens: 512
-  enable_thinking: False
   length_control: False
