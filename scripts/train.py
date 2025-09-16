@@ -2,7 +2,7 @@ import os
 import sys
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, repo_root)
-import argparse
+import warnings
 import datasets
 import transformers
 import wandb
@@ -111,6 +111,23 @@ def main(model_args, data_args, training_args, test_args, train_function):
             dataset_num_proc = getattr(data_args, "dataset_process_num", None),
             data_collator=data_collator,
             force_use_ref_model=model_args.use_peft,
+        )
+    elif train_function == "SimPO":
+        from scripts.weighted_dpo_trainer import get_data_collator
+        from scripts.weighted_simpo_trainer import WeightedSimPOTrainer
+        data_collator = get_data_collator(tokenizer, training_args.max_length)
+        trainer = WeightedSimPOTrainer(
+            weights=weights,
+            beta=training_args.beta,
+            gamma_beta_ratio=training_args.gamma_beta_ratio,
+            loss_type=training_args.loss_type,
+            sft_weight=training_args.sft_weight,
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
         )
 
     ###############

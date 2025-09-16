@@ -83,9 +83,9 @@ class WeightedSFTTrainer(SFTTrainer):
     @torch.no_grad()
     def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
         idx = example_id.detach().to("cpu").long()
-        w = self.weights.index_select(0, idx)
-        w = w.to(device=device, dtype=dtype)
-        return w
+        weight = self.weights.index_select(0, idx)
+        weight = weight.to(device=device, dtype=dtype)
+        return weight
 
     def compute_loss(
         self,

@@ -21,47 +21,63 @@ class PairwisePreferenceCollator:
         chosens   = [f["chosen"]   for f in feats]
         rejecteds = [f["rejected"] for f in feats]
 
-        prompt_batch = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True)
-
-        chosen_ans_tok = self.tokenizer(chosens, add_special_tokens=False, padding=False, truncation=False)
+        chosen_ans_tok   = self.tokenizer(chosens,   add_special_tokens=False, padding=False, truncation=False)
         rejected_ans_tok = self.tokenizer(rejecteds, add_special_tokens=False, padding=False, truncation=False)
-        chosen_ans_lens = [len(x) for x in chosen_ans_tok.input_ids]
-        rejected_ans_lens = [len(x) for x in rejected_ans_tok.input_ids]
+        chosen_ans_lens   = torch.tensor([len(x) for x in chosen_ans_tok["input_ids"]], dtype=torch.long)
+        rejected_ans_lens = torch.tensor([len(x) for x in rejected_ans_tok["input_ids"]], dtype=torch.long)
 
         prev_trunc_side = self.tokenizer.truncation_side
         self.tokenizer.truncation_side = "left"
-        chosen_full  = [p + c for p, c in zip(prompts, chosens)]
-        reject_full  = [p + r for p, r in zip(prompts, rejecteds)]
+
+        chosen_full_texts   = [p + c for p, c in zip(prompts, chosens)]
+        rejected_full_texts = [p + r for p, r in zip(prompts, rejecteds)]
+
         chosen_batch = self.tokenizer(
-            chosen_full, return_tensors="pt", padding=True, truncation=True, max_length=self.max_total_length
+            chosen_full_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.max_total_length,
+            add_special_tokens=False,
+            pad_to_multiple_of=self.pad_to_multiple_of
         )
         rejected_batch = self.tokenizer(
-            reject_full, return_tensors="pt", padding=True, truncation=True, max_length=self.max_total_length
+            rejected_full_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.max_total_length,
+            add_special_tokens=False,
+            pad_to_multiple_of=self.pad_to_multiple_of
         )
         self.tokenizer.truncation_side = prev_trunc_side
 
         batch = {
-            "prompt_input_ids": prompt_batch["input_ids"],
-            "prompt_attention_mask": prompt_batch["attention_mask"],
             "chosen_input_ids": chosen_batch["input_ids"],
             "chosen_attention_mask": chosen_batch["attention_mask"],
             "rejected_input_ids": rejected_batch["input_ids"],
             "rejected_attention_mask": rejected_batch["attention_mask"],
         }
 
+        device = batch["chosen_input_ids"].device
         Bc, Sc = batch["chosen_input_ids"].shape
         Br, Sr = batch["rejected_input_ids"].shape
-        chosen_ans_len_eff = torch.tensor([min(chosen_ans_lens[i], Sc) for i in range(Bc)], dtype=torch.long)
-        rejected_ans_len_eff = torch.tensor([min(rejected_ans_lens[i], Sr) for i in range(Br)], dtype=torch.long)
-        chosen_prompt_present = torch.clamp(Sc - chosen_ans_len_eff, min=0, max=Sc)
-        rejected_prompt_present = torch.clamp(Sr - rejected_ans_len_eff, min=0, max=Sr)
 
-        ar_c = torch.arange(Sc).unsqueeze(0)
+        chosen_seq_len   = batch["chosen_attention_mask"].sum(dim=1)
+        rejected_seq_len = batch["rejected_attention_mask"].sum(dim=1)
+
+        chosen_ans_len_eff   = torch.minimum(chosen_ans_lens.to(device),   chosen_seq_len)
+        rejected_ans_len_eff = torch.minimum(rejected_ans_lens.to(device), rejected_seq_len)
+
+        chosen_prompt_present   = (chosen_seq_len   - chosen_ans_len_eff).clamp(min=0)
+        rejected_prompt_present = (rejected_seq_len - rejected_ans_len_eff).clamp(min=0)
+
+        ar_c = torch.arange(Sc, device=device).unsqueeze(0)
         chosen_labels = batch["chosen_input_ids"].clone()
         chosen_labels[ar_c < chosen_prompt_present.unsqueeze(1)] = -100
         chosen_labels[batch["chosen_attention_mask"] == 0] = -100
 
-        ar_r = torch.arange(Sr).unsqueeze(0)
+        ar_r = torch.arange(Sr, device=device).unsqueeze(0)
         rejected_labels = batch["rejected_input_ids"].clone()
         rejected_labels[ar_r < rejected_prompt_present.unsqueeze(1)] = -100
         rejected_labels[batch["rejected_attention_mask"] == 0] = -100
@@ -86,15 +102,15 @@ class WeightedDPOTrainer(DPOTrainer):
         self.generate_during_training = False
         self.generate_during_eval = False
 
-    def get_batch_samples(self, dataloader_or_iter, num_samples: int = 8, device=None):
-        return HFTrainer.get_batch_samples(self, dataloader_or_iter, num_samples, device)
-
     @torch.no_grad()
     def _gather_weights_for_batch(self, example_id: torch.Tensor, device, dtype):
         idx = example_id.detach().to("cpu").long()
-        w = self.weights.index_select(0, idx)
-        w = w.to(device=device, dtype=dtype)
-        return w
+        weight = self.weights.index_select(0, idx)
+        weight = weight.to(device=device, dtype=dtype)
+        return weight
+
+    def get_batch_samples(self, dataloader_or_iter, num_samples: int = 8, device=None):
+        return HFTrainer.get_batch_samples(self, dataloader_or_iter, num_samples, device)
 
     def get_batch_loss_metrics(
         self,
@@ -102,7 +118,6 @@ class WeightedDPOTrainer(DPOTrainer):
         batch: Dict[str, Union[List, torch.LongTensor]],
         train_eval: Literal["train", "eval"] = "train",
     ):
-        metrics = {}
         example_id = batch.pop("example_id")
 
         forward_output = self.concatenated_forward(model, batch)
@@ -144,15 +159,11 @@ class WeightedDPOTrainer(DPOTrainer):
         if self.args.rpo_alpha is not None:
             losses = losses * self.args.rpo_alpha + policy_nll_loss
 
-        weights = self._gather_weights_for_batch(
-            example_id,
-            device=losses.device,
-            dtype=losses.dtype,
-        )
-
+        weights = self._gather_weights_for_batch(example_id, device=losses.device, dtype=losses.dtype)
         loss_scalar = (weights * losses).sum() / weights.sum().clamp(min=1e-12)
 
         prefix = "eval_" if train_eval == "eval" else ""
+        metrics = {}
         metrics[f"{prefix}rewards/chosen"] = chosen_rewards.mean().detach().cpu()
         metrics[f"{prefix}rewards/rejected"] = rejected_rewards.mean().detach().cpu()
         metrics[f"{prefix}rewards/accuracies"] = (chosen_rewards > rejected_rewards).float().mean().detach().cpu()

@@ -1,9 +1,8 @@
 import argparse
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
-
-from trl import ModelConfig, TrlParser
+from typing import Dict, Literal, Optional
+from trl import ModelConfig, TrlParser, DPOConfig
 
 
 @dataclass
@@ -51,18 +50,30 @@ class TestConfig:
     eval_args: Optional[dict] = field(default_factory=dict, metadata={"help": "The evaluation arguments to use."})
 
 
+@dataclass
+class SimPOConfig(DPOConfig):
+    beta: float = 2.0
+    gamma_beta_ratio: float = 0.25
+    sft_weight: float = 0.0
+    label_smoothing: float = 0
+    loss_type: Literal["sigmoid", "hinge"] = "sigmoid"
+    disable_dropout: bool = True
+
 def parse_args():
     pre = argparse.ArgumentParser(add_help=False)
-    pre.add_argument("--train_function", "--tf", type=str, default="SFT", choices=["SFT", "DPO"], help="Specify the training function.")
+    pre.add_argument("--train_function", "--tf", type=str, default="SFT", choices=["SFT", "DPO", "SimPO"], help="Specify the training function.")
     tf_args, remaining = pre.parse_known_args()
 
     train_function = (tf_args.train_function or "").strip().upper()
-    if train_function == "DPO":
-        from trl import DPOConfig as TrainConfig
-        train_function = "DPO"
-    else:
+    if train_function == "SFT":
         from trl import SFTConfig as TrainConfig
         train_function = "SFT"
+    elif train_function == "DPO":
+        from trl import DPOConfig as TrainConfig
+        train_function = "DPO"
+    elif train_function == "SIMPO":
+        from alignment.configs import SimPOConfig as TrainConfig
+        train_function = "SimPO"
     sys.argv = [sys.argv[0]] + remaining
     parser = TrlParser((ModelConfig, DataConfig, TrainConfig, TestConfig))
     model_args, data_args, training_args, test_args = parser.parse_args_and_config()

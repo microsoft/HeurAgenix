@@ -160,14 +160,18 @@ def get_weight_sft(
                 messages_with_example, add_generation_prompt=True, tokenize=False
             )
             prompts_with_example.append(prompt_with_example)
+        try:
+            logprob_base         = calculate_logprob_batch(model, tokenizer, prompts_base, batch_answers)
+            logprob_with_example = calculate_logprob_batch(model, tokenizer, prompts_with_example, batch_answers)
 
-        logprob_base         = calculate_logprob_batch(model, tokenizer, prompts_base, batch_answers)
-        logprob_with_example = calculate_logprob_batch(model, tokenizer, prompts_with_example, batch_answers)
-
-        batch_scores = (logprob_with_example - logprob_base).tolist()
-        scores.extend(batch_scores)
-        print(len(scores), len(train_dataset))
-
+            batch_scores = (logprob_with_example - logprob_base).tolist()
+            scores.extend(batch_scores)
+        except Exception as e:
+            for i in range(batch_size):
+                    logprob_base         = calculate_logprob_batch(model, tokenizer, [prompts_base[i]], [batch_answers[i]])
+                    logprob_with_example = calculate_logprob_batch(model, tokenizer, [prompts_with_example[i]], [batch_answers[i]])
+                    score = (logprob_with_example - logprob_base).tolist()[0]
+                    scores.append(score)
     return scores
 
 
@@ -236,12 +240,20 @@ def get_weight_preference(
                 messages_with_example, add_generation_prompt=True, tokenize=False
             )
             prompts_with_example.append(prompt_with_example)
+        try:
+            logprob_base_chosen           = calculate_logprob_batch(model, tokenizer, prompts_base, batch_chosen_answers)
+            logprob_base_rejected         = calculate_logprob_batch(model, tokenizer, prompts_base, batch_rejected_answers)
+            logprob_with_example_chosen   = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_chosen_answers)
+            logprob_with_example_rejected = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_rejected_answers)
+            batch_scores = ((logprob_with_example_chosen - logprob_with_example_rejected) - (logprob_base_chosen - logprob_base_rejected)).tolist()
+            scores.extend(batch_scores)
+        except Exception as e:
+            for i in range(batch_size):
+                    logprob_base_chosen           = calculate_logprob_batch(model, tokenizer, [prompts_base[i]], [batch_chosen_answers[i]])
+                    logprob_base_rejected         = calculate_logprob_batch(model, tokenizer, [prompts_base[i]], [batch_rejected_answers[i]])
+                    logprob_with_example_chosen   = calculate_logprob_batch(model, tokenizer, [prompts_with_example[i]], [batch_chosen_answers[i]])
+                    logprob_with_example_rejected = calculate_logprob_batch(model, tokenizer, [prompts_with_example[i]], [batch_rejected_answers[i]])
 
-        logprob_base_chosen           = calculate_logprob_batch(model, tokenizer, prompts_base, batch_chosen_answers)
-        logprob_base_rejected         = calculate_logprob_batch(model, tokenizer, prompts_base, batch_rejected_answers)
-        logprob_with_example_chosen   = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_chosen_answers)
-        logprob_with_example_rejected = calculate_logprob_batch(model, tokenizer, prompts_with_example,  batch_rejected_answers)
-
-        batch_scores = ((logprob_with_example_chosen - logprob_with_example_rejected) - (logprob_base_chosen - logprob_base_rejected)).tolist()
-        scores.extend(batch_scores)
+                    batch_scores = ((logprob_with_example_chosen - logprob_with_example_rejected) - (logprob_base_chosen - logprob_base_rejected)).tolist()
+                    scores.extend(batch_scores)
     return scores
