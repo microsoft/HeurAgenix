@@ -83,7 +83,7 @@ def take_first_n_per_class(dataset: Dataset, number_per_topic: int = 1000) -> Da
     return sub_dataset
 
 def get_dataset(data_config: DataConfig, tokenizer, **kwargs) -> DatasetDict:
-    num_proc = getattr(data_config, "dataset_process_num", None)
+    num_proc = getattr(data_config, "dataset_process_num", None) if data_config else None
 
     if os.getenv("AMLT_DATA_DIR"):
         dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")

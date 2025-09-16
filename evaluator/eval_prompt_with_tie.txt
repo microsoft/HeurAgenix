@@ -23,4 +23,6 @@ If Answer 1 is better, output:
 If Answer 2 is better, output:
 {"winner": 2}
 
+If they are equally good, output:
+{"winner": 0}
 <|im_end|>

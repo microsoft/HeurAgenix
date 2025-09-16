@@ -16,16 +16,16 @@ def extract_winner(response: str) -> int:
     return 0
 
 
-def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict_2: dict, length_control: str=None, output_file: str=None):
+def evaluate(client, prompt_template_file: str, baseline_dict: dict, test_dict: dict, length_control: str=None, output_file: str=None):
     prompt_template = open(prompt_template_file).read()
-    assert len(output_dict_1) == len(output_dict_2)
+    assert len(baseline_dict) == len(test_dict)
     winners = [0, 0, 0]
 
-    for index in range(len(output_dict_1)):
-        assert output_dict_1[index]["instruction"] == output_dict_2[index]["instruction"]
-        instruction = output_dict_1[index]["instruction"]
-        output_1 = output_dict_1[index]["output"]
-        output_2 = output_dict_2[index]["output"]
+    for index in range(len(baseline_dict)):
+        assert baseline_dict[index]["instruction"] == test_dict[index]["instruction"]
+        instruction = baseline_dict[index]["instruction"]
+        output_1 = baseline_dict[index]["output"]
+        output_2 = test_dict[index]["output"]
         if length_control == "min_length":
             length = min(len(output_1), len(output_2))
             output_1 = output_1[:length]
@@ -34,9 +34,13 @@ def evaluate(client, prompt_template_file: str, output_dict_1: dict, output_dict
         response = client.chat(prompt)
         winner = extract_winner(response)
         winners[winner] += 1
+        tie, loss, win = winners
+        win_rate = (win + 0.5 * tie) / (win + tie + loss)
+        print(f"Win/Tie/Lose: {win}, {tie}, {loss}, win rate: {win_rate}\n")
         sleep(0.1)
     output_file = open(output_file, "w")
-    output_file.write(f"Win/Tie/Lose: {winners}\n")
+    tie, loss, win = winners
+    output_file.write(f"Win/Tie/Lose: {win}, {tie}, {loss}, win rate: {win_rate}\n")
     output_file.close()
     return winners
 
@@ -214,21 +218,21 @@ def compare(
         length_control: bool=False,
         **kwargs,
 ):
-    # from evaluator.azure_gpt_client import AzureGPTClient
-    # gpt_setting = {
-    #     "api_type": "azure",
-    #     "api_version": "2025-01-01-preview",
-    #     "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
-    #     "model": "gpt-4o_2024-08-06",
-    # }
-    # client = AzureGPTClient(gpt_setting)
+    from evaluator.azure_gpt_client import AzureGPTClient
+    gpt_setting = {
+        "api_type": "azure",
+        "api_version": "2025-01-01-preview",
+        "azure_endpoint": "https://gcraoai9sw1.openai.azure.com/",
+        "model": "gpt-4o_2024-08-06",
+    }
+    client = AzureGPTClient(gpt_setting)
     test_dir = os.path.dirname(os.path.normpath(output_file))
 
     baseline_output = generate_baseline(test_dataset, os.path.join(test_dir, "baseline.json"))
     test_output = generate_output(model, tokenizer, test_dataset, 256, 4, os.path.join(test_dir, "output.json"))
 
-    # winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control, output_file)
-    # return winners
+    winners = evaluate(client, prompt_template_file, baseline_output, test_output, length_control, output_file)
+    return winners
 
 if __name__ == "__main__":
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -245,7 +249,7 @@ if __name__ == "__main__":
 
     model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-    test_dataset = get_dataset({}, tokenizer)["test"]
+    test_dataset = get_dataset(tokenizer)["test"]
     output_file = "output/llama-3-8b-instruct/test_results.json" if rank == 0 else None
 
     model = AutoModelForCausalLM.from_pretrained(

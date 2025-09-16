@@ -7,7 +7,7 @@ def load_dataset(tokenizer, data_args):
     dataset_loader_path = data_args.dataset_loader
     module, function = dataset_loader_path.rsplit(".", 1)
     dataset_loader = getattr(import_module(module), function)
-    dataset = dataset_loader(data_args, tokenizer)
+    dataset = dataset_loader(tokenizer, data_args)
     holdout_dataset, train_dataset, test_dataset = \
         dataset[data_args.dataset_holdout_split], dataset[data_args.dataset_train_split], dataset[data_args.dataset_test_split]
     return holdout_dataset, train_dataset, test_dataset
