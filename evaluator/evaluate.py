@@ -34,7 +34,7 @@ def evaluate(client, prompt_template_file: str, baseline_dict: dict, test_dict: 
         response = client.chat(prompt)
         winner = extract_winner(response)
         winners[winner] += 1
-        if index % 0 == 100:
+        if index % 100 == 0:
             tie, loss, win = winners
             win_rate = (win + 0.5 * tie) / (win + tie + loss)
             print(f"Win/Tie/Lose: {win}, {tie}, {loss}, win rate: {win_rate}\n")
