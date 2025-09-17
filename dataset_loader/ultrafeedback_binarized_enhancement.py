@@ -69,12 +69,7 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
 
 def get_dataset(tokenizer, data_config: DataConfig=None, **kwargs) -> DatasetDict:
     num_proc = getattr(data_config, "dataset_process_num", None) if data_config else None
-
-    if os.getenv("AMLT_DATA_DIR"):
-        dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
-        raw_dataset = load_dataset("HuggingFaceH4/ultrafeedback_binarized", cache_dir=dataset_base_dir)
-    else:
-        raw_dataset = load_dataset("HuggingFaceH4/ultrafeedback_binarized")
+    raw_dataset = load_dataset("HuggingFaceH4/ultrafeedback_binarized")
 
     def is_holdout(chosen_score, reject_score):
         return (chosen_score is not None) and (reject_score is not None) and (chosen_score >= 9 and reject_score >= 7)

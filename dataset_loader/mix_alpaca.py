@@ -39,13 +39,8 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
     )
 
 def get_dataset(tokenizer, data_config: DataConfig=None, **kwargs) -> DatasetDict:
-    if os.getenv("AMLT_DATA_DIR"):
-        dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
-        alpaca = load_dataset("tatsu-lab/alpaca", split="train", cache_dir=dataset_base_dir)
-        alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train", cache_dir=dataset_base_dir)
-    else:
-        alpaca = load_dataset("tatsu-lab/alpaca", split="train")
-        alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
+    alpaca = load_dataset("tatsu-lab/alpaca", split="train")
+    alpaca_cleaned = load_dataset("yahma/alpaca-cleaned", split="train")
     num_proc = getattr(data_config, "dataset_process_num", None) if data_config else None
 
     n_rows = alpaca_cleaned.num_rows

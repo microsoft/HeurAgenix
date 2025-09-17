@@ -85,11 +85,7 @@ def take_first_n_per_class(dataset: Dataset, number_per_topic: int = 1000) -> Da
 def get_dataset(tokenizer, data_config: DataConfig=None, **kwargs) -> DatasetDict:
     num_proc = getattr(data_config, "dataset_process_num", None) if data_config else None
 
-    if os.getenv("AMLT_DATA_DIR"):
-        dataset_base_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "dataset")
-        raw_dataset = load_dataset("stanfordnlp/SHP-2", cache_dir=dataset_base_dir)
-    else:
-        raw_dataset = load_dataset("stanfordnlp/SHP-2")
+    raw_dataset = load_dataset("stanfordnlp/SHP-2")
 
     train_subset = take_first_n_per_class(raw_dataset["train"], 1000)
     target_topic = "askbaking_test"
