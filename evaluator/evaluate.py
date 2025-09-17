@@ -47,7 +47,10 @@ def evaluate(client, prompt_template_file: str, baseline_dict: dict, test_dict: 
 
 
 def generate_baseline(test_dataset, output_file: str=None) -> list:
-    baseline_output = [{"instruction": data["message"][-2]["content"], "output": data["message"][-1]["content"]} for data in test_dataset]
+    try:
+        baseline_output = [{"instruction": data["message"][-2]["content"], "output": data["message"][-1]["content"]} for data in test_dataset]
+    except:
+        baseline_output = [{"instruction": data["chosen_message"][-2]["content"], "output": data["chosen_message"][-1]["content"]} for data in test_dataset]
     if output_file:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
