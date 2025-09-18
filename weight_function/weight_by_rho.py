@@ -133,5 +133,4 @@ def get_weight_dpo_gap(
                 logprob_chosen = calculate_logprob_batch(model, tokenizer, [prompts[j]], [chosens[j]])
                 logprob_rejected = calculate_logprob_batch(model, tokenizer, [prompts[j]], [rejecteds[j]])
                 scores.append(float(logprob_chosen[0] - logprob_rejected[0]))
-
     return np.asarray(scores, dtype=np.float64)
