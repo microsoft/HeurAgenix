@@ -18,7 +18,7 @@ def embedding_question(questions, model):
     return index
 
 def init_query(embedding_model_name, holdout_dataset):
-    embedding_model = SentenceTransformer(embedding_model_name)
+    embedding_model = SentenceTransformer(embedding_model_name, device="cuda:3")
     try:
         holdout_questions = [holdout_data['message'][1]["content"] for holdout_data in holdout_dataset]
     except:
@@ -166,6 +166,7 @@ def get_weight_sft(
 
             batch_scores = (logprob_with_example - logprob_base).tolist()
             scores.extend(batch_scores)
+            print(len(scores), len(train_dataset))
         except Exception as e:
             for i in range(batch_size):
                     logprob_base         = calculate_logprob_batch(model, tokenizer, [prompts_base[i]], [batch_answers[i]])
