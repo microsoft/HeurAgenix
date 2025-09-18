@@ -104,7 +104,7 @@ def get_weight_sft(
     return scores
 
 
-def get_weight_dpo_gap(
+def get_weight_preference(
     train_dataset,
     model: torch.nn.Module,
     tokenizer,
