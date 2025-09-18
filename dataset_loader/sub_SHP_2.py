@@ -88,12 +88,16 @@ def get_dataset(tokenizer, data_config: DataConfig=None, **kwargs) -> DatasetDic
     raw_dataset = load_dataset("stanfordnlp/SHP-2")
 
     train_subset = take_first_n_per_class(raw_dataset["train"], 1000)
-    target_topic = "askbaking_test"
+    target_topic = "askscience_test"
     target_test_set = raw_dataset["test"].filter(lambda ex: ex["domain"] == target_topic)
+    target_test_set = target_test_set.map( 
+        lambda batch: {"sum_score": [a + b for a, b in zip(batch["score_A"], batch["score_B"])]},  
+        batched=True  
+    ).sort("sum_score", reverse=True)
 
     holdout_dataset = target_test_set.select(range(0, 1000))
     train_dataset   = concatenate_datasets([holdout_dataset, train_subset])
-    test_dataset    = target_test_set.select(range(1000, 2429))
+    test_dataset    = target_test_set.select(range(1000, 2000))
 
     holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)
     train_dataset   = subset_map(train_dataset, "train", num_proc, tokenizer)
