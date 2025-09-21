@@ -1,27 +1,25 @@
-system:
+<|im_start|>system
+
 You are an expert assistant.
 I will give you a question, a standard answer, and two candidate answers. Please analyze which isis **closer** to the standard answer.
 Notes: 
 1. Chose the one closer to standard answer, not high quality.
 2. Consider not only "content", but also **length**, **quality**, **style** compared to standard answer.
 3. Be very concise and output nothing but the final result as a JSON object.
+<|im_end|>
 
-------------------------------
+<|im_start|>user
 Question:
 {instruction}
-
 ------------------------------
 Standard answer:
 {standard_answer}
-
 ------------------------------
 Candidate answer 1:
 {output_1}
-
 ------------------------------
 Candidate answer 2:
 {output_2}
-
 ------------------------------
 Please indicate which answer the majority of humans would prefer by outputting exactly one JSON object. No extra text or explanation only the JSON.
 
