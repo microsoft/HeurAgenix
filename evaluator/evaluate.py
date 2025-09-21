@@ -46,6 +46,34 @@ def evaluate(client, prompt_template_file: str, baseline_dict: dict, test_dict: 
     return winners
 
 
+def evaluate_closer(client, prompt_template_file: str, standard_dict: dict, answer_dict_1: dict, answer_dict_2: dict, output_file: str=None):
+    prompt_template = open(prompt_template_file).read()
+    assert len(answer_dict_1) == len(answer_dict_2)
+    winners = [0, 0]
+
+    for index in range(len(standard_dict)):
+        assert standard_dict[index]["instruction"] == answer_dict_1[index]["instruction"]
+        assert answer_dict_1[index]["instruction"] == answer_dict_2[index]["instruction"]
+        instruction = standard_dict[index]["instruction"]
+        standard_output = standard_dict[index]["output"]
+        output_1 = answer_dict_1[index]["output"]
+        output_2 = answer_dict_2[index]["output"]
+        prompt = prompt_template
+        prompt = prompt.replace("{instruction}", instruction)
+        prompt = prompt.replace("{standard_answer}", standard_output)
+        prompt = prompt.replace("{output_1}", output_1)
+        prompt = prompt.replace("{output_2}", output_2)
+
+        response = client.chat(prompt)
+        winner = extract_winner(response) - 1
+        winners[winner] += 1
+        sleep(0.1)
+    output_file = open(output_file, "w")
+    output_file.write(f"[Answer 1, Answer 2]: {winners}\n")
+    output_file.close()
+    return winners
+
+
 def generate_baseline(test_dataset, output_file: str=None) -> list:
     try:
         baseline_output = [{"instruction": data["message"][-2]["content"], "output": data["message"][-1]["content"]} for data in test_dataset]
