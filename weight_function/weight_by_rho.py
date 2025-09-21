@@ -61,14 +61,11 @@ def calculate_logprob_batch(
     return per_sample_logprob.detach().cpu().numpy()
 
 
-def get_weight_sft(
+def get_weight_sft_once(
     train_dataset,
-    holdout_dataset,
     model: torch.nn.Module,
     tokenizer,
-    top_k: int=3,
     batch_size: int=4,
-    embedding_model_name: str="all-mpnet-base-v2",
     **kwargs,
 ) -> np.ndarray:
     model.eval()
@@ -103,8 +100,7 @@ def get_weight_sft(
                 scores.append(logprob)
     return scores
 
-
-def get_weight_preference(
+def get_weight_preference_once(
     train_dataset,
     model: torch.nn.Module,
     tokenizer,
@@ -134,3 +130,30 @@ def get_weight_preference(
                 logprob_rejected = calculate_logprob_batch(model, tokenizer, [prompts[j]], [rejecteds[j]])
                 scores.append(float(logprob_chosen[0] - logprob_rejected[0]))
     return np.asarray(scores, dtype=np.float64)
+
+
+
+def get_weight_sft(
+    train_dataset,
+    source_model: torch.nn.Module,
+    finetuned_model: torch.nn.Module,
+    tokenizer,
+    batch_size: int=4,
+    **kwargs,
+) -> np.ndarray:
+    source_scores = get_weight_sft_once(train_dataset, source_model, tokenizer, batch_size)
+    finetuned_scores = get_weight_sft_once(train_dataset, finetuned_model, tokenizer, batch_size)
+    return finetuned_scores - source_scores
+
+
+def get_weight_preference(
+    train_dataset,
+    source_model: torch.nn.Module,
+    finetuned_model: torch.nn.Module,
+    tokenizer,
+    batch_size: int=4,
+    **kwargs,
+) -> np.ndarray:
+    source_scores = get_weight_preference_once(train_dataset, source_model, tokenizer, batch_size)
+    finetuned_scores = get_weight_preference_once(train_dataset, finetuned_model, tokenizer, batch_size)
+    return finetuned_scores - source_scores
