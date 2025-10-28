@@ -1,0 +1,42 @@
+In fact we run the {function_name} once, and now we got the output operation from {function_name}:
+{output_result}
+
+The updated solution are
+{update_smoke_solution}
+with detailed data
+{update_smoke_state_data}
+
+Please compare with your expected result: {expected_result}
+1. If the result is aligned with your target output, respond to me ***python_code:correct*** and we will save the code and finish this generation.
+2. If the result is not aligned with your target output and you can not generate correct one, respond to me ***python_code:None*** and we will stop this generation.
+3. If the result is not aligned with your target output and you can fix up this issues, please respond to me in this format:
+***python_code:
+from src.problems.tsp.components import *
+import other_library (if necessary)
+def {function_name}(global_data: dict, state_data: dict, algorithm_data: dict, get_state_data_function: callable, **kwargs) -> tuple[TargetOperatorType, dict]:
+    """ Description for this heuristic algorithm.
+
+    Args:
+        global_data (dict): The global data dict containing the global data. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        state_data (dict): The state dictionary containing the current state information. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        (Optional and can be omitted if no algorithm data) algorithm_data (dict): The algorithm dictionary for current algorithm only. In this algorithm, the following items are necessary:
+            - necessary_key (value type): description
+            - necessary_key (value type): description
+            ...
+        (Optional and can be omitted if no used) get_state_data_function (callable): The function receives the new solution as input and return the state dictionary for new solution, and it will not modify the origin solution.
+        (Optional and can be omitted if no hyper parameters data) introduction for hyper parameters in kwargs if used.
+
+    Returns:
+        Description of this operator.
+        Description of updated algorithm data.
+    """
+    xxx
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.

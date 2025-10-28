@@ -1,0 +1,114 @@
+Current Task: Solve the Capacitated Vehicle Routing Problem (CVRP). The objective of CVRP is to determining the most efficient routes for a fleet of vehicles to deliver goods to various locations, considering vehicle capacity constraints.
+
+We have implemented the following heuristic algorithms. Always use the provided heuristic_name (e.g., "variable_neighborhood_search_614b") when invoking an algorithm. And we classify these algorithms into two categories:  
+   - Exploration algorithms perform node exploration and expansion.  
+   - Refinement algorithms optimize existing routes.
+
+Refinement Algorithms List:
+
+1.  def node_shift_between_routes_7b8a():
+    - Description: Attempts to move a node from its current position in one route to a different position in another route if the move reduces the total distance and respects capacity constraints.
+    - Advantages: Can improve existing solutions by exploring inter-route moves; helps escape some local optima.
+    - Disadvantages: Higher computational cost due to checking many potential moves; it's a local search operator and may not find the global optimum.
+
+2.  def three_opt_e8d7():
+    - Description: Operates *within* a single route by removing three edges and reconnecting the resulting six endpoints in one of several possible ways to decrease the route's length.
+    - Advantages: More powerful than 2-opt, capable of untangling more complex route crossings.
+    - Disadvantages: Significantly higher computational complexity than 2-opt; operates only intra-route, cannot exchange nodes between routes.
+
+3. def two_opt_0554():
+    - Description: Operates *within* a single route by selecting two non-adjacent edges, removing them, and reconnecting the endpoints to reverse the segment between them, if this reduces the route length.
+    - Advantages: Simple and effective local search for improving individual route quality; reduces tour length by eliminating edge crossings.
+    - Disadvantages: Prone to local optima; only performs intra-route improvements.
+
+Exploration Algorithms List:
+
+1.  def farthest_insertion_4e1d():
+    - Description: Starts with the unvisited node farthest from the depot and inserts it into the position in an existing route that causes the minimum cost increase, respecting capacity constraints.
+    - Advantages: Often produces better initial solutions than nearest neighbor or random insertion; considers global positioning to some extent.
+    - Disadvantages: Slightly higher computational cost than simpler insertions; the farthest node isn't always the best starting point.
+
+2.  def greedy_f4c4():
+    - Description: Iteratively adds the closest unvisited node (that fits capacity constraints) to the end of the current vehicle's route.
+    - Advantages: Simple to implement; fast for generating an initial solution.
+    - Disadvantages: Prone to local optima due to myopic choices; often results in poor solution quality.
+
+3.  def min_cost_insertion_7bfa():
+    - Description: Iteratively selects an unvisited node and inserts it into the position (across all routes) that minimizes the increase in total route cost, respecting capacity.
+    - Advantages: Balances construction speed and solution quality; generally better than simple greedy or random methods.
+    - Disadvantages: Computationally more intensive as it evaluates many insertion points per node.
+
+4.  def nearest_neighbor_99ba():
+    - Description: For each vehicle, starting from the depot or the last visited node, adds the nearest unvisited node that satisfies capacity constraints, until no more nodes can be added or all nodes are visited.
+    - Advantages: Simple, intuitive, and fast.
+    - Disadvantages: Very susceptible to local optima; solution quality highly dependent on the starting point and node distribution.
+
+5.  def petal_algorithm_b384():
+    - Description: Sorts nodes based on their polar angle relative to the depot, attempts to form feasible single-node "petal" routes, and assigns these petals to vehicles if capacity allows.
+    - Advantages: Considers geographic clustering; can sometimes produce intuitive route structures.
+    - Disadvantages: Relatively complex; angle-based sorting isn't always optimal; effectiveness depends on node distribution.
+
+6.  def random_bfdc():
+    - Description: Randomly selects an unvisited node and appends it to the end of a randomly chosen vehicle's route, provided capacity constraints are met.
+    - Advantages: Extremely simple and fast; useful for generating diverse starting points for other algorithms.
+    - Disadvantages: Solution quality is highly variable and generally poor; doesn't perform any cost optimization.
+
+7.  def saving_algorithm_710e():
+    - Description: Calculates the cost savings achieved by merging pairs of routes (each initially serving one customer from the depot). It iteratively merges the pair with the highest savings, subject to capacity constraints.
+    - Advantages: Classic and often effective construction heuristic; usually fast and provides good quality initial solutions.
+    - Disadvantages: Greedy nature can lead to suboptimal final solutions; sensitive to distance matrix accuracy.
+
+8. def variable_neighborhood_search_614b():
+    - Description: *Intended* as a Variable Neighborhood Search (VNS) metaheuristic, which systematically explores different neighborhood structures to escape local optima. *However, the provided code implements a simple best-insertion heuristic:* It finds the best position to insert any unvisited node into any existing route based on minimizing insertion cost.
+    - Advantages: Identifies the single most cost-effective node insertion available.
+    - Disadvantages: Very limited scope, essentially a single step of a Min-Cost Insertion heuristic; does not implement the VNS strategy of changing neighborhoods.
+
+First, qualitatively identify the current problem and output three cards, each comprising three parts:
+
+1. **Problem card**: to qualitatively determine the problem type, options are `[tsp, cvrp]`  
+2. **State card**: to assess the current state, options are `['partially visited', 'fully visited', 'unvisited']`  
+3. **Algorithm type card**: to qualitatively determine which type of algorithm to use, candidates are `['exploration', 'refinement']`
+4. **Cost card**: to qualitatively evaluate the current path cost, options are ['None', 'low cost', 'normal cost', 'high cost']
+[Warning] fewer than a minimum number of visited nodes (e.g. fewer than 5), so cost assessment is not meaningful. You can use 'None'.
+Next, expand your reasoning in the `<reasoning> … </reasoning>` section, and present your answers (no more than three) in the order of your ranking. Please put the answers in an answer block; I will focus on your first answer.
+
+Please strictly follow the format:
+
+```
+[problem card]: xx
+[state card]: xx
+[algorithm type card]: xx
+[cost card]: xx
+<reasoning>
+(Your analysis and reasoning)
+</reasoning>
+<answer>
+***Run heuristic:
+selected heuristic: heuristic_name1
+hyper parameter (optional): a=xx; b=xx
+***
+***Run heuristic:
+selected heuristic: heuristic_name2
+hyper parameter (optional): a=xx; b=xx
+***
+***Run heuristic:
+selected heuristic: heuristic_name3
+hyper parameter (optional): a=xx; b=xx
+***
+</answer>
+```
+
+If the problem has already been constructed and no further optimization is possible based on existing methods, please use:
+
+```
+[problem card]: xx
+[state card]: xx
+[algorithm type card]: xx
+[cost card]: xx
+<reasoning>
+(Explain why no further improvement is possible)
+</reasoning>
+<answer>
+***Stop***
+</answer>
+```

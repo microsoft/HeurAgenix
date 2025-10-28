@@ -1,0 +1,37 @@
+To evaluate the validity of your suggestion, we keep the operations before step {bottleneck_operation_id}, integrate {proposed_operation} in step {bottleneck_operation_id} and applying the {function_name} for remaining steps. Now we got the update result
+
+The updated result: {proposed_solution} with {proposed_result}
+{proposed_trajectory}
+
+Compared with origin negative result from {function_name}: {negative_solution} with {negative_result}
+{negative_trajectory}
+
+Your propose works well.
+
+Now review the {function_name}:
+{function_introduction}.
+We hope to extract this into rule to get the suggestion for improvement of {function_name}:
+Please note:
+1. I believe that in most cases, our rule works in a scope of applicability, that is, it is effective in certain circumstances. Outside of this scope, we still maintain the original algorithm.
+2. The rule must be clear and calculate. For example, choosing operation A brings greater benefits in the form of rebates, but we do not know how to measure future benefits.
+3. Rule must have nothing todo with current data. It should be general experience.
+
+Combined previous calculate process: 
+{calculation_process}
+And application scope: 
+{application_scope}
+By the way, we believe no rule can works for all application scope, sometimes it works and sometimes it may not work. So application scope is important.
+Extract this analysis into rule to improve the {function_name}.
+consider to raise suggestion:
+1. better selection
+2. better parameters
+3. insert more structure
+4. learn from other heuristics
+
+The response format is very important. For better communication, please respond to me in this format:
+***suggestion:
+application_scope: (optional) xxx
+rule: xxx
+***
+Ensure there is no other content inside the ***, and analysis outside *** are welcome.
+If you have no information to provide, simply respond with ***None***.
