@@ -1,3 +1,0 @@
-1. Make the result must be valid, such as: no re-visited nodes, no overload on capacity, etc.
-2. We insert the depot in each route before start construct the solution.
-3. The position of depot in route may change, but finial after solution is built, we will make it to first.
