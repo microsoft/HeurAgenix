@@ -55,7 +55,7 @@ def main():
             perturbation_heuristic_file += ".py"
         perturbation_heuristic_file = search_file(perturbation_heuristic_file, problem)
 
-    prompt_dir=os.path.join("src", "problems", "base", "prompt")
+    prompt_dir = os.path.join("src", "problems", "base", "prompt")
     llm_client = get_llm_client(llm_config_file, prompt_dir, None)
 
     heuristic_evolver = HeuristicEvolver(llm_client, problem, evolution_dir, validation_dir)
