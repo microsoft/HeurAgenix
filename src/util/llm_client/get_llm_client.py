@@ -1,10 +1,11 @@
 import json
+import os
 from src.util.llm_client.base_llm_client import BaseLLMClient
 
 
 def get_llm_client(
         config_file: str,
-        prompt_dir: str=None,
+        prompt_dir: str=os.path.join("src", "problems", "base", "prompt"),
         output_dir: str=None,
         ) -> BaseLLMClient:
     config = json.load(open(config_file))

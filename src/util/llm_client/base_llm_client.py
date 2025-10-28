@@ -4,6 +4,7 @@ import re
 import base64
 import importlib
 from time import sleep
+from typing import Dict, List, Tuple
 from src.util.util import compress_numbers, extract, load_framework_description, search_file
 
 
@@ -40,6 +41,21 @@ class BaseLLMClient:
                 sleep(sleep_time)
         self.messages.append({"role": "assistant", "content": "Exceeded the maximum number of attempts"})
         self.dump("error")
+        return None
+
+    def chat_with_tools(self, tools) -> Tuple[str, Dict]:
+        for index in range(self.max_attempts):
+            try:
+                function_name, parameters = self.chat_once_with_tools(tools)
+                self.messages.append({"role": "assistant", "content": [{"type": "text", "text": f"function: {function_name}, parameters: {parameters}"}]})
+                return function_name, parameters
+            except Exception as e:
+                print(f"Try to chat {index + 1} time: {e}")
+                sleep_time = self.sleep_time
+                sleep(sleep_time)
+        self.messages.append({"role": "assistant", "content": "Exceeded the maximum number of attempts"})
+        self.dump("error")
+        return None, None
 
     def load_chat(self, chat_file: str) -> None:
         if chat_file.split(".")[-1] != "json":
@@ -52,6 +68,11 @@ class BaseLLMClient:
             self.messages = json.load(fp)
 
     def load_background(self, problem: str, background_file="background_with_code", reference_data: str=None) -> dict:
+        # Load system prompt 
+        system_prompt_file = os.path.join("src", "problems", "base", "prompt", "system_prompt.txt")
+        system_prompt = open(system_prompt_file, encoding="UTF-8").read()
+        self.messages.append({"role": "system", "content": [{"type": "text", "text": system_prompt}]})
+
         # Load background
         problem_dir = os.path.join("src", "problems", problem, "prompt")
         if os.path.exists(os.path.join("src", "problems", problem, "components.py")):
@@ -140,3 +161,9 @@ class BaseLLMClient:
                             contents += content["text"]
                     file.write(contents + "\n------------------------------------------------------------------------------------\n\n")
         return self.messages[-1]["content"][0]["text"]
+
+    def chat_once(self) -> str:
+        raise NotImplemented
+
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, Dict]:
+        raise NotImplemented

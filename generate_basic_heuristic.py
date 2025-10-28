@@ -26,8 +26,8 @@ def main():
     smoke_test = args.smoke_test
     llm_config_file = args.llm_config_file
 
-    prompt_dir=os.path.join("src", "problems", "base", "prompt")
-    output_dir=os.path.join("output", problem, "generate_heuristic")
+    prompt_dir = os.path.join("src", "problems", "base", "prompt")
+    output_dir = os.path.join("output", problem, "generate_heuristic")
     llm_client = get_llm_client(llm_config_file, prompt_dir, output_dir)
 
     heuristic_generator = HeuristicGenerator(llm_client=llm_client, problem=problem)

@@ -1,4 +1,6 @@
 import os
+import json
+from typing import Dict, List, Tuple
 from openai import AzureOpenAI
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from src.util.llm_client.base_llm_client import BaseLLMClient
@@ -51,3 +53,21 @@ class AzureGPTClient(BaseLLMClient):
         )
         response_content = response.choices[-1].message.content
         return response_content
+
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, Dict]:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=self.messages,
+            tools=tools,
+            tool_choice="auto",
+            seed=self.seed,
+            frequency_penalty=0,
+            presence_penalty=0,
+            stop=None,
+            stream=False,
+        )
+
+        function = response.choices[-1].message.tool_calls[0].function
+        name = function.name
+        parameters = json.loads(function.arguments)
+        return name, parameters
