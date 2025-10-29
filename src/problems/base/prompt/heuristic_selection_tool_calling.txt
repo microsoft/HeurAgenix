@@ -1,8 +1,3 @@
-We have already implement the following heuristics.
-These are the heuristics in format: heuristic_name(parameter=default_value, ..): introduction
-{heuristic_pool_introduction}
-
-
 The instance problem state:
 {instance_problem_state}
 Note: Some data are omitted due to space constraints.
@@ -18,7 +13,4 @@ Before this discuss, we have already {discuss_round} rounds discuss and the most
 
 Now we hope to select heuristic for next {selection_frequency} steps.
 
-Please select {num_candidate_heuristics} heuristics as candidate heuristic for current state and put the one you think is most reasonable first.
-
-
-RESPOND IN THIS FORMAT: ***Selected heuristic: {demo_heuristic_str}***
+MAKE {num_candidate_heuristics} CHOICES: To take any action, you must call exactly {num_candidate_heuristics} of the provided tools.

@@ -3,7 +3,7 @@
   - You must respond in that exact format.
   - Ensure there is no other content inside the triple asterisks (***); any analysis may be placed outside the asterisks.
   - If no content can be provided, respond with ***None***.
-- When asked to make a choice with the phrase "MAKE ONE CHOICE":
-  - You must invoke exactly one of the provided tools using the function-calling interface.
+- When asked to make choice(s) with the phrase "MAKE n CHOICE":
+  - You must invoke exactly n of the provided tools using the function-calling interface.
   - Do not write any prose or JSON. Return a single structured tool call only (exactly one tool_calls entry).
   - Use only tools provided in this chat session; do not invent tools.
