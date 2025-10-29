@@ -43,19 +43,20 @@ class BaseLLMClient:
         self.dump("error")
         return None
 
-    def chat_with_tools(self, tools) -> Tuple[str, Dict]:
+    def chat_with_tools(self, tools) -> List[Tuple[str, Dict]]:
         for index in range(self.max_attempts):
             try:
-                function_name, parameters = self.chat_once_with_tools(tools)
-                self.messages.append({"role": "assistant", "content": [{"type": "text", "text": f"function: {function_name}, parameters: {parameters}"}]})
-                return function_name, parameters
+                function_name_parameters = self.chat_once_with_tools(tools)
+                current_message = "\n".join([f"function: {function_name}, parameters: {parameters}" for function_name, parameters in function_name_parameters])
+                self.messages.append({"role": "assistant", "content": [{"type": "text", "text": current_message}]})
+                return function_name_parameters
             except Exception as e:
                 print(f"Try to chat {index + 1} time: {e}")
                 sleep_time = self.sleep_time
                 sleep(sleep_time)
         self.messages.append({"role": "assistant", "content": "Exceeded the maximum number of attempts"})
         self.dump("error")
-        return None, None
+        return None
 
     def load_chat(self, chat_file: str) -> None:
         if chat_file.split(".")[-1] != "json":
@@ -165,5 +166,5 @@ class BaseLLMClient:
     def chat_once(self) -> str:
         raise NotImplemented
 
-    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, Dict]:
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> List[Tuple[str, Dict]]:
         raise NotImplemented

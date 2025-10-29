@@ -54,7 +54,7 @@ class AzureGPTClient(BaseLLMClient):
         response_content = response.choices[-1].message.content
         return response_content
 
-    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, Dict]:
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> List[Tuple[str, Dict]]:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=self.messages,
@@ -67,7 +67,9 @@ class AzureGPTClient(BaseLLMClient):
             stream=False,
         )
 
-        function = response.choices[-1].message.tool_calls[0].function
-        name = function.name
-        parameters = json.loads(function.arguments)
-        return name, parameters
+        function_name_parameters = []
+        for tool_call in response.choices[-1].message.tool_calls:
+            function_name = tool_call.function.name
+            parameters = json.loads(tool_call.function.arguments)
+            function_name_parameters.append((function_name, parameters))
+        return function_name_parameters
