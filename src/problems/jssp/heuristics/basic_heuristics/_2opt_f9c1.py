@@ -1,9 +1,8 @@
 from src.problems.jssp.components import Solution, SwapOperator
 
 def _2opt_f9c1(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
-    """Implements a 2-opt heuristic for the Job Shop Scheduling Problem (JSSP).
-    This heuristic attempts to reduce the makespan by swapping two non-adjacent operations in the schedule.
-    It iteratively checks all possible pairs of operations to determine if a shorter sequence can be found.
+    """
+    Intra-machine 2-opt-like best-improvement for makespan. Enumerates all non-adjacent pairs (i, j with j ≥ i+2) within each machine’s queue and evaluates the swap by recomputing the schedule via get_problem_state; infeasible candidates (None) are discarded. The objective change is Δ = new_makespan − current_makespan, and only strictly improving moves (Δ < 0) are considered. Selection is global best-improvement: among all feasible candidates, the move with the most negative Δ is chosen; ties are not updated due to strict inequality, so equal-Δ candidates keep the first encountered. Scope is limited to reordering within a single machine (no cross-machine moves, no changes to job operation indices), with precedence feasibility delegated to the external state evaluator. Time complexity: O(∑_m |queue_m|^2) schedule evaluations; constant extra memory. Returns the single best SwapOperator or None if no improvement is found.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

@@ -2,10 +2,7 @@ from src.problems.max_cut.components import Solution, SwapOperator
 
 def greedy_swap_5bb5(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    Greedy Swap Heuristic for the Max Cut problem.
-    Iteratively evaluates the delta in cut value for all possible single-node swaps between set A and set B,
-    and performs the swap that leads to the highest increase in the cut value.
-    If no swap improves the cut value, no operator is returned.
+    Single-step best-improvement node flip. Precomputes per-node sums to each side (weight_to_a, weight_to_b) and scans all nodes to select the single node with strictly positive maximal gain delta, where delta for a node in A is sum_to_A − sum_to_B (flip to B), and for a node in B is sum_to_B − sum_to_A (flip to A). Returns a SwapOperator that flips exactly one node; no pairwise swaps or iterative updates are performed. Ties are broken by scan order due to strict “>” comparison (earliest index retained; equal gains ignored). Does not use current_cut_value. Works for weighted graphs; if weights are asymmetric, gains are computed from row sums (outgoing weights). Time complexity: O(n|A| + n|B|) to aggregate plus O(n) to select (O(n^2) worst-case); O(n) extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

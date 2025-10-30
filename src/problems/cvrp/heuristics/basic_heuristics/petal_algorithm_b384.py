@@ -3,8 +3,7 @@ import math
 
 def petal_algorithm_b384(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Petal construction heuristic algorithm for the CVRP. This heuristic attempts to build feasible routes (petals) around the depot and combine them into a set of vehicle routes.
-    Each petal starts and ends at the depot, creating a loop that can serve as an individual route for a vehicle.
+    Sweep-style single-customer petal seeding. Unvisited customers are ordered by a depot-centric “polar angle” computed directly from the distance matrix (no coordinates): atan2(dist[depot][node]−dist[depot][0], dist[node][depot]−dist[0][depot]) with depot fixed to index 0. Each customer is treated as a singleton petal. The heuristic scans customers in this angular order and vehicles in identifier order, returning the first feasible append-to-end insertion (position = current route length) that does not violate the vehicle’s remaining capacity. Selection is strictly first-fit: no evaluation of marginal travel cost, no best-position search within a route, and no clustering/merging of petals. Stops at the first feasible assignment; otherwise yields no action. Complexity dominated by sorting unvisited nodes: O(|U| log |U|); per-call memory overhead is minimal. Deterministic behavior given the inputs.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

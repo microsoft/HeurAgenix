@@ -2,9 +2,10 @@ from src.problems.dposp.components import *
 
 def maximum_remaining_work_order_ec9c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
-    Heuristic that selects the order with the most remaining work that can be feasibly scheduled on any production line
-    without violating existing order deadlines. The chosen order is then appended or inserted into the most appropriate
-    production line's schedule, aiming to maximize the number of orders fulfilled before their respective deadlines.
+    Largest-remaining-work first with first-feasible append. For each feasible order k, compute a remaining-work surrogate Q_k / v_i,P_k for each production line i with positive rate; the per-order score stored uses the last feasible line encountered in iteration, so the ranking can depend on line iteration order. Select the order with the maximal stored remaining-work value.
+    Placement policy: scan production lines in index order and validate appending the selected order to the end of the line’s schedule via validation_single_production_schedule; accept the first line that passes. No position search (no insertion), no evaluation of time-cost delta/slack; transitions and deadlines are enforced only through the validator.
+    Selection policy: best-improvement in the order space according to the remaining-work score; placement is first-improvement over lines. Acceptance is strict; returns a single AppendOperator for the chosen (line, order).
+    Complexity: O(|feasible_orders| · production_line_num) to build scores plus O(production_line_num) for placement; linear extra memory in |feasible_orders|.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

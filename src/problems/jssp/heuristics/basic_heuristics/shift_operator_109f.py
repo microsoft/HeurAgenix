@@ -2,10 +2,7 @@ from src.problems.jssp.components import ShiftOperator
 
 def shift_operator_109f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ShiftOperator, dict]:
     """
-    This heuristic attempts to find a better schedule by shifting an operation within the same machine's queue.
-    For each machine, it tries shifting each operation to all possible positions and evaluates the makespan.
-    The shift that results in the best improvement (reduction in makespan) is selected.
-
+    Best-improvement intra-machine shift neighborhood for JSSP makespan minimization. For each machine m, for each job j at position p, it evaluates all relocations of j to positions q≠p within m’s queue. Each candidate schedule is materialized via ShiftOperator and passed to get_problem_state; invalid candidates (None) are discarded, so feasibility (including precedence) is enforced externally, not by the operator. The objective is the makespan delta (new − current); the move with the most negative delta over the entire neighborhood is selected. No first-improvement acceptance: the search is exhaustive and returns a move only if it strictly reduces the makespan, otherwise no action. Scope is limited to intra-machine reordering; machine assignments are not altered. Deterministic traversal (implicit tie-handling retains the earliest found with the same delta). Computational cost scales with ∑_m L_m(L_m−1) full schedule evaluations; constant extra memory.
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "machine_num" (int): The total number of machines.

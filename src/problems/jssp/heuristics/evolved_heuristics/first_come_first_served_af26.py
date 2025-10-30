@@ -1,9 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
 def first_come_first_served_af26(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Enhanced First Come First Served (FCFS) heuristic to dynamically prioritize jobs based on immediate impact and adapt to diverse datasets.
-    This heuristic introduces a dynamic scoring mechanism to balance alignment with the positive solution trajectory, machine availability, 
-    and dataset-specific characteristics.
+    """
+    FCFS-style earliest-start selection with a readiness score. For each unfinished job, compute next_machine_id = job_operation_sequence[j][job_operation_index[j]] and score = max(machine_last_operation_end_times[next_machine_id], job_last_operation_end_times[j]). Select the single best job (minimum score)—best-improvement over all unfinished jobs, not first-feasible. The bias term bias_weight/(job_diversity+1) is a uniform offset across jobs and does not affect ranking; job_diversity only triggers a fallback: if diversity ≤ threshold and there is exactly one unfinished job, advance it directly. The operator advances the chosen job’s next operation to its machine queue. No per-job trajectory features or processing-time weights beyond readiness times are used. Time complexity O(|unfinished_jobs|); constant extra memory; no algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

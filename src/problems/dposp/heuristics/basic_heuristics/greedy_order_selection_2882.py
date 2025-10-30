@@ -2,9 +2,7 @@ from src.problems.dposp.components import Solution, AppendOperator, InsertOperat
 
 def greedy_order_selection_2882(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Greedy heuristic algorithm for the DPOSP.
-    This algorithm attempts to construct a solution by iteratively adding the most suitable order to a production line's schedule based on a specific criterion such as closest deadline or shortest processing time.
-
+    Greedy earliest-deadline-first with limited neighborhood and first-feasible acceptance. Unfulfilled orders are sorted by ascending deadline; for each order, only the three least-loaded production lines (by total_time_cost_per_production_line) are considered. Feasibility is screened by production capability (production_rate[line][product] > 0) and then validated via validation_single_production_schedule on the single-line schedule (transition constraints and deadlines enforced implicitly by the validator). Candidate insertion positions per chosen line are restricted to {start, middle, end}; no explicit time-delta computation (get_time_cost_delta not used) and no global revalidation. Selection policy: first-feasible; the algorithm returns the first valid InsertOperator encountered in the order → line (least-loaded first) → position (start, then middle, then end) iteration, without best-improvement scanning. 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - production_rate (numpy.array): 2D array of production time for each product on each production line.

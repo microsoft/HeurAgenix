@@ -2,8 +2,12 @@ from src.problems.mkp.components import *
 
 def block_flip_d4f4(problem_state: dict, algorithm_data: dict, block_size: int = 2) -> tuple[FlipBlockOperator, dict]:
     """
-    Block Flip Heuristic for Multidimensional Knapsack Problem.
-    Flips the inclusion status of a contiguous block of items to test for an improved solution.
+    Contiguous-k flip neighborhood search for MKP. Scans all blocks of length k = block_size over the item index space and evaluates toggling the inclusion of the entire block at once, enabling simultaneous add/remove of multiple items to escape single-bit local minima and capture grouped-item synergies. Feasibility is enforced via validation_solution; profit is read from get_problem_state. Selection policy: best-improvement—among all contiguous blocks, choose the flip with the largest positive profit gain.
+
+    Required problem_state items: "current_solution", "current_profit", "get_problem_state", "validation_solution". No algorithm_data updates.
+
+    Neighborhood: all contiguous blocks of size k; returns a single FlipBlockOperator for the best improving block. Complexity: O(n_items − k + 1) evaluations; per-evaluation cost dominated by state recomputation; constant extra memory. Agnostic to the number of resource dimensions (feasibility delegated to the validator).
+
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

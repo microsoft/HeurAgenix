@@ -1,7 +1,8 @@
 from src.problems.dposp.components import *
 
 def shortest_order_next_25bd(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """Shortest Order Next heuristic for DPOSP selects the unfulfilled order with the shortest processing time and inserts it into the best position in the production schedule.
+    """
+    Greedy single-order insertion based on pure processing time. Considers only feasible_orders_to_fulfill[0] and ignores the rest. For that order, computes per-line processing time as quantity / production_rate[line][product] (interpreting production_rate as throughput; lines with zero rate are discarded). Scans all positions 0..L on each line and relies solely on validation_single_production_schedule to enforce deadlines and product-transition constraints; no explicit evaluation of transition-time deltas or downstream impacts. Selection rule: choose the line with the smallest processing time among those that admit at least one valid insertion; within that line, take the earliest valid position encountered. Deterministic with tie-breaking by line and position iteration order. Time complexity: O(sum_lines (|schedule_line| + 1)) validation calls; constant extra memory.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

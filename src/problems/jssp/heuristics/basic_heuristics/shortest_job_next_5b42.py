@@ -1,8 +1,15 @@
 from src.problems.jssp.components import AdvanceOperator
 
 def shortest_job_next_5b42(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Implements the Shortest Job Next heuristic for the Job Shop Scheduling Problem.
-    This heuristic chooses the unfinished job with the shortest remaining processing time and advances its next operation.
+    """
+    Dispatching rule based on job-level shortest remaining processing time (SRPT). At each decision, compute per unfinished job the tail sum of operation times from its current operation index onward, then select the global minimum and advance exactly its next operation. Selection scope is all unfinished jobs (not only ready operations), making it job-centric rather than machine-centric.
+    Unique aspects:
+    - Progress-aware tail summation via job_operation_index, ensuring remaining time reflects already scheduled operations.
+    - Global-best choice among all unfinished jobs, not first-improvement; ties are resolved deterministically by the enumeration order (smallest job index).
+    - Advances the next operation by enqueuing the job to its required machine derived from job_operation_sequence and the current index, without considering machine readiness or blocking; suitable for constructive queue building.
+    Intent: biases the schedule toward short-tail jobs to reduce flowtime/WIP; not directly optimizing makespan.
+    Complexity: O(sum of remaining operations across unfinished jobs) time per call; O(|unfinished_jobs|) auxiliary memory.
+    Required fields in problem_state: job_operation_time, unfinished_jobs, current_solution (providing job_operation_index and job_operation_sequence).
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

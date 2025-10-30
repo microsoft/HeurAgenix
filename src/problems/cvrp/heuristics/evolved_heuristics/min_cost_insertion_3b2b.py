@@ -2,9 +2,8 @@ from src.problems.cvrp.components import *
 import numpy as np
 
 def min_cost_insertion_3b2b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """ Optimized Min-Cost Insertion Heuristic for CVRP.
-
-    This heuristic algorithm is optimized for performance by restructuring the order of operations, adjusting hyper-parameters, and implementing efficient logic to enhance the solution.
+    """ 
+    Constructive min-cost insertion with depot-radius control and periodic best-improvement local search. Three mechanisms: (1) Capacity-feasible global insertion scan across all vehicles and positions; marginal cost uses depot at endpoints (prev=depot when position=0, next=depot when at tail) and adds a spread penalty proportional to the farthest customer’s depot distance in the route, biasing compact, radially bounded routes. (2) Intra-route 2-opt applied periodically as a best-improvement over all vehicles and valid pairs; it reverses the contiguous segment [i, j−1], evaluates delta using predecessors of i and j, and skips wrap-around pairs to preserve depot anchoring; executed only if the best delta is negative. (3) Inter-vehicle relocate (not swap) triggered periodically as a best-improvement: scans all source nodes (excluding depot) and all target positions across other vehicles, enforces capacity via remaining-capacity gating, and evaluates a circular-arc insertion model (replace edge (prev,next) by (prev,node)+(node,next) in target and repair source’s severed edge); executed only if the best cost reduction is strictly positive. Scheduling is tied to the unvisited count modulo frequencies, interleaving construction with intermittent local optimization. Works with asymmetric distance matrices. Complexity: insertion O(|unvisited| · Σv(|route_v|+1)); 2-opt O(Σv |route_v|^2) when triggered; relocate O(Σv |route_v| · Σw(|route_w|+1)). Constant extra memory; algorithm_data not updated.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

@@ -63,7 +63,7 @@ def load_function(file:str, problem: str="base", function_name: str=None) -> cal
             file += ".py"
         file_path = search_file(file, problem)
         assert file_path is not None
-        code = open(file_path, "r").read()
+        code = open(file_path, "r", encoding="utf-8").read()
     else:
         # code only
         code = file

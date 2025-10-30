@@ -2,9 +2,7 @@ from src.problems.cvrp.components import *
 
 def nearest_neighbor_99ba(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Nearest Neighbor heuristic for CVRP.
-    This algorithm iterates over each vehicle, starting from the depot. For each vehicle, it finds the nearest unvisited node and appends it to the route, respecting the vehicle's capacity constraints.
-    This process repeats until no further nodes can be visited without exceeding the vehicle's capacity or all nodes have been visited.
+    Greedy nearest-neighbor with capacity filter for open CVRP routes. Vehicles are processed in ID order. For the current vehicle, the “last” node is the depot if the route is empty; otherwise it is the route’s final customer. Among all unvisited customers with demand ≤ the vehicle’s remaining capacity, select the one with minimal distance from this last node and append it to the end of that vehicle’s route (InsertOperator at position len(route)). Early exit after the first feasible append: no global competition across vehicles. Consequently, within a vehicle it chooses the best (nearest) candidate, but across vehicles it is “first feasible” rather than globally optimal. Tie-breaking favors the first node encountered at the minimal distance. Does not consider closing to the depot, multi-position insertions, or any local route improvements; pure constructive, adding at most one node per call. Stateless (does not update algorithm_data). Works with asymmetric distance matrices. Time complexity per call: worst-case O(V·U), typically O(U) until a feasible vehicle is found. Capacity is enforced via vehicle_remaining_capacity only.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

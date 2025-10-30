@@ -2,7 +2,8 @@ from src.problems.dposp.components import *
 import numpy as np
 
 def greedy_by_order_density_de77(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
-    """Heuristic to prioritize orders based on a weighted combination of deadline tightness, production feasibility, and potential flexibility for future scheduling.
+    """
+    greedy_by_order_density_de77.py Constructive append-only greedy that evaluates all (order, line) pairs from the feasible set and selects the single best append to the end of a line by a composite score; not first-fit. Score = 1/(deadline+1) · 1/quantity · (1/(other-feasible-on-line+1))^flexibility_weight − Δtime, where: - 1/(deadline+1) prioritizes urgent orders. - 1/quantity prefers small, fast-to-complete orders. - 1/(other-feasible-on-line+1) penalizes assigning to highly versatile lines to preserve future flexibility; flexibility_weight tunes this pressure. - Δtime is the marginal time increase from get_time_cost_delta (captures production and transitions), directly discouraging costly appends. Feasibility is strictly gated: only lines with nonzero production rate for the product are considered, and each candidate append is validated via validation_single_production_schedule to respect deadlines and disallowed transitions. Inserts are not considered; all actions are end-appends. Time complexity is O(L · F^2) due to per-candidate flexibility counting over the feasible set (F = number of feasible orders, L = number of lines); constant extra memory. Tailored to maximize completed orders by favoring urgent, small jobs on less-flexible lines with minimal marginal time growth.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

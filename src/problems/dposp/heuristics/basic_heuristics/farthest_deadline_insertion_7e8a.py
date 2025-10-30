@@ -2,14 +2,8 @@ from src.problems.dposp.components import Solution, InsertOperator
 
 def farthest_deadline_insertion_7e8a(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Farthest Deadline Insertion heuristic for DPOSP.
-    
-    This heuristic selects the unfulfilled order with the farthest deadline and attempts to insert it into a 
-    production schedule where it causes the least increase in overall production and transition times, without 
-    violating any existing deadlines. The heuristic iterates over each production line, evaluating the insertion 
-    of the farthest deadline order at various positions, considering both the production speed of the line for 
-    the product and the transition times between orders. The goal is to minimize the impact on the current schedule 
-    while ensuring that all orders are completed before their respective deadlines.
+    Farthest-deadline prioritized insertion with best-position selection under per-line feasibility. Among currently feasible orders, select the single order with the latest deadline (max D_k). Filter candidate lines by producibility (production_rate[line_id][product_required] > 0). For the chosen order, scan all insertion positions 0..L on each eligible line; feasibility is enforced by validation_single_production_schedule on the full line schedule (transition allowances, timing, and deadlines are validated externally).
+    Cost model: position-based proxy cost_increase = position (earlier insertion is preferred); transition_time and detailed timing deltas are not used inside the heuristic. Selection policy: best-improvement for the chosen order across all lines and positions, minimizing the proxy cost. Tie-handling: first-found minimal-cost insertion is retained.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

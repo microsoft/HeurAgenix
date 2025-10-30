@@ -2,10 +2,7 @@ from src.problems.mkp.components import *
 
 def greedy_improvement_ccbf(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    Greedy Improvement heuristic for the Multidimensional Knapsack Problem.
-    This heuristic tries to improve the current solution by swapping an included item with an excluded item
-    if it results in a higher profit without violating the resource constraints.
-
+    One-for-one exchange local search for MKP using a single SwapOperator. Scans all pairs (included_item, excluded_item) and evaluates the raw profit gain profits[excluded] − profits[included], enforcing feasibility via a differential capacity check: for each resource r, current_weights[r] − weights[r][included] + weights[r][excluded] ≤ capacities[r]. Selection policy: best-improvement; among all feasible exchanges, choose the pair with maximal profit increase. Neighborhood restricted to 1–1 swaps only; no multi-item exchanges or ratio-based criteria. 
     Args:
         problem_state (dict): The dictionary contains the problem state.
         algorithm_data (dict): Contains data specific to the algorithm's execution.

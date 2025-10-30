@@ -2,8 +2,7 @@ from src.problems.max_cut.components import *
 
 def highest_weight_edge_eb0c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertEdgeOperator, dict]:
     """
-    Selects an edge with the highest weight where both nodes are unselected and adds each node to opposite sets,
-    choosing the set that maximizes the cut value increase for each node.
+    Greedy constructive seeding by globally heaviest unselected edge. Selects the edge (i,j) with maximum weight among unselected node pairs, independent of current partition gains. Orientation is decided solely from node_1’s marginal gain against the current sets (sum to set_B vs set_A); node_2 is forced to the opposite set to ensure the chosen edge contributes to the cut. This yields a best-by-edge-weight choice, not a best-improvement-by-cut-gain choice, and may accept non-improving steps relative to the current cut. Single-node remainder is handled by inserting that node into set A without evaluation, introducing a deterministic bias in the terminal step. Ties are resolved by matrix scan order (no secondary criterion). Supports asymmetric weight matrices since all gains are computed from the provided directed weights. Time complexity: O(|U|^2) to find the edge plus O(|A|+|B|) to compute the orientation; O(1) additional memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

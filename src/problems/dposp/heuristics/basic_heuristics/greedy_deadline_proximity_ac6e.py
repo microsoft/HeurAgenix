@@ -2,11 +2,11 @@ from src.problems.dposp.components import AppendOperator, InsertOperator, Soluti
 import numpy as np
 
 def greedy_deadline_proximity_ac6e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """Greedy Deadline Proximity heuristic for DPOSP.
-    This heuristic attempts to construct a production schedule by iteratively appending orders to production lines based on their proximity to their deadline and the transition times between orders. 
-    It begins with an empty schedule for each production line and selects orders based on the closest deadline from the current time in the schedule. 
-    The heuristic also accounts for the transition time from the last scheduled order to the potential new order and production speeds, ensuring that the added order can be completed before its deadline without violating transition constraints. 
-    Orders are chosen to maximize the number of orders fulfilled, considering the remaining processing time and capacity constraints of each production line.
+    """
+    Earliest-deadline-first constructive insertion with first-feasible acceptance. The neighborhood enumerates all (order, production_line, position) triples for orders in feasible_orders_to_fulfill on lines that can produce the order’s product (production_rate[line][product] > 0), across all insertion positions 0..|line_schedule|. Candidates are globally sorted by order_deadline ascending; transition times, production speeds, and deadline feasibility are not scored explicitly—feasibility is delegated entirely to validation_single_production_schedule for the affected line.
+    Selection policy: first-improvement. The algorithm returns the first candidate in deadline order whose single-line schedule becomes valid after insertion; no best-improvement search over the full neighborhood, no tie-breaking beyond sort order.
+    Neighborhood size and complexity: N = sum_l (|schedule_l| + 1) · |feasible_orders_to_fulfill| candidates; sorting O(N log N), validation up to O(N) calls in the worst case; O(N) extra memory. Tailored to DPOSP through validator-based enforcement of start/end times and forbidden transitions.
+
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

@@ -1,10 +1,10 @@
 from src.problems.dposp.components import *
 
 def least_order_remaining_9c3c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
-    """
-    Heuristic for selecting the next order to append to the production schedule based on least cumulative remaining work.
-    The heuristic identifies the order with the shortest processing time left from the unfulfilled orders list and appends it to a production line.
-
+    """    
+    Two-stage balanced-SPT append. Stage 1: select the production line with the smallest accumulated processing load, computed as the sum over its scheduled orders of quantity[line_order] / production_rate[line, product_of_order], excluding incompatible products (rate = 0). Stage 2: on the chosen line, scan feasible_orders_to_fulfill and pick the order with the minimum processing time quantity[order] / production_rate[line, product_of_order], accepting only candidates that pass validation_single_production_schedule when appended at the end.
+    Feasibility is enforced solely via the single-line validator; transition times and deadline checks are not computed explicitly. No use of get_time_cost_delta; time estimation relies on the simple rate-based processing time. Operator scope is append-only (no insertions or relocations).
+    Selection policy: best-improvement on the chosen line (strict minimum processing time; first tie encountered is kept). 
     Args:
         problem_state (dict): The dictionary contains the problem state.
 

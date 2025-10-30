@@ -2,9 +2,8 @@ from src.problems.tsp.components import *
 import numpy as np
 
 def cheapest_insertion_7a30(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """ An enhanced heuristic algorithm for cheapest insertion in the Traveling Salesman Problem (TSP).
-
-    This heuristic incorporates specific rules based on the current state of the tour and certain global data metrics to optimize the solution.
+    """ 
+    Constructive cheapest-insertion with adaptive, variance-aware rules for an open path. Seed selection uses the node with the lowest average outgoing distance (centroid-like), respecting asymmetry. Periodic local search applies a single best-improvement 2-opt move on interior segments, preserving endpoints to keep the path open; it evaluates all valid (i, j) pairs and executes only if the best delta is negative. Early-stage gating: when global distance variance is high and the path length is < N/2, prefer nearest-neighbor appends if the nearest edge is significantly below the mean (threshold_factor). Tie clusters: nodes within percentage_range of the nearest are evaluated more deeply—at path length 3, pick the one minimizing total future connectivity to remaining nodes; otherwise, run a restricted cheapest insertion over this cluster (best node-position pair by marginal cost across all positions 0..L). Fallback is a full cheapest insertion over all unvisited nodes (best-improvement, scanning all node-position pairs). Final-stage compactness: if ≤3 nodes remain, append the current nearest. Cost model distinguishes endpoints (single edge add) and middle positions (replace (prev,next) with (prev,node)+(node,next)), consistent with asymmetric matrices and an open partial tour. Complexity: 2-opt O(L^2) when triggered; insertion scans O(|candidate_nodes| (L+1)). Constant extra memory; no algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
