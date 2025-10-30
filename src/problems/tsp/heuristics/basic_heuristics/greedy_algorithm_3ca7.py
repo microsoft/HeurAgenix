@@ -2,8 +2,7 @@ from src.problems.tsp.components import *
 
 def greedy_algorithm_3ca7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Greedy algorithm heuristic for TSP. Constructs a tour by repeatedly selecting the shortest edge and adding it to the tour.
-    This implementation assumes that the Solution class represents a tour and that the InsertOperator is used to add new nodes to the Solution.
+    Hybrid constructive heuristic: at each step it selects the unvisited node nearest to the current tour’s last node (nearest-neighbor anchor), then inserts that node at the position that yields the smallest marginal increase under a circular tour model. Marginal cost is computed by replacing edge (prev,next) with (prev,node)+(node,next); for positions i=0 and i=|tour| it treats the tour as closed, using prev = tour[-1] and next = tour[0]. This combines greedy candidate selection with global cheapest insertion over a cyclic representation, and is compatible with asymmetric distance matrices. Time per step: O(|unvisited| + |tour|); constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

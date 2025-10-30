@@ -2,7 +2,7 @@ from src.problems.tsp.components import *
 
 def _2opt_89aa(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """
-    The 2-opt heuristic seeks to untangle crossings and smooth the path by swapping two non-adjacent edges and reconnecting the resulting segments. Through repeated application of these edge swaps, the 2-opt algorithm converges towards a more efficient route, often leading to a substantial improvement over the initial solution. It is a simple yet powerful method for local optimization in the context of the TSP.
+    Single-move 2-opt with best-improvement on a closed, symmetric tour. Enumerates all non-adjacent edge pairs (i, i+1) and (j, j+1), skipping the wrap pair (0, n−1), and uses modular indexing to treat the tour as a cycle. Evaluates the exact 2-edge exchange delta: Δ = d(a,c) + d(b,d) − [d(a,b) + d(c,d)], tracking the most negative Δ over the full scan (best, not first improvement). If an improving pair is found, applies a single segment reversal on [i+1 .. j], which realizes the exchange. Assumes a symmetric (undirected) cost matrix so that reversing a subpath changes only the two boundary edges; not suitable for asymmetric costs as written. Produces at most one improving move per invocation; repeat until no improving pair exists to reach a 2-opt local optimum. Time complexity per invocation: O(n^2); O(1) extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

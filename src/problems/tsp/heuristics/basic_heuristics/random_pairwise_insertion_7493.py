@@ -3,7 +3,10 @@ import random
 
 def random_pairwise_insertion_7493(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Random Pairwise Insertion heuristic for the Traveling Salesman Problem. This heuristic selects two unvisited nodes at random and inserts them into the current tour at positions that result in the least increase in tour length. It returns an InsertOperator with the selected nodes and their positions.
+    Randomized two-node pairwise insertion. Samples two distinct unvisited nodes uniformly and evaluates their simultaneous placement by scanning all position pairs (i, j) in 0..L subject to i ≠ j and |i − j| ≠ 1 to avoid adjacent placements and immediate mutual interference. The joint objective is the sum of independent single-node marginal costs computed on the same base tour (no re-evaluation after the first insertion, no interaction terms, no tie policy). Marginal cost model:
+    - For position p > 0: replace edge (tour[p−1], tour[p%L]) with (tour[p−1], node) + (node, tour[p%L]) using circular wrap-around.
+    - For position p = 0: add only d[node, tour[0]] (head-biased, open-path-like treatment).
+    This mix yields a circular model except at the head, and is compatible with asymmetric distances. Assumes a non-empty current tour and at least two unvisited nodes. Time complexity per sampled pair: O((L+1)^2); negligible extra memory; no algorithm_data dependence.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

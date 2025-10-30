@@ -2,7 +2,7 @@ from src.problems.tsp.components import *
 
 def cheapest_insertion_605f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    This heuristic selects the non-tour city that, when inserted into the current tour, results in the smallest possible increase in the total tour cost. It then returns an operator that performs this insertion.
+    Constructive global cheapest-insertion on an open path. For each unvisited node and each position i in [0, L], evaluates marginal cost: middle positions replace edge (prev,next) by (prev,node)+(node,next); endpoints add a single directed edge to/from the path without closing the tour. Explicitly defers tour closure, making it suitable for asymmetric distances. If the path is empty, seeds with the first unvisited node (order-dependent start). Deterministic tie-breaking via iteration order (unvisited list, then positions). Time complexity: O(|unvisited|·(|tour|+1)); extra memory O(1).
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
