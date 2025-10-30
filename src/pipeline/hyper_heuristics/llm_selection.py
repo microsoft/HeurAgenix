@@ -34,7 +34,7 @@ class LLMSelectionHyperHeuristic:
         self.tools = []
         for heuristic in self.heuristic_pool:
             heuristic_name = heuristic.split(".")[0]
-            heuristic_code = open(search_file(heuristic_name + ".py", problem)).read()
+            heuristic_code = open(search_file(heuristic_name + ".py", problem), "r", encoding="utf-8").read()
             self.heuristic_docs[heuristic_name] = extract_function_with_short_docstring(heuristic_code, heuristic) 
             self.heuristic_functions[heuristic_name] = load_function(heuristic, problem=self.problem)
             self.tools.append(convert_function_to_tool(heuristic_name, code=heuristic_code))

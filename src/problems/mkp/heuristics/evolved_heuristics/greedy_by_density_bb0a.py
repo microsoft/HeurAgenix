@@ -2,11 +2,9 @@ from src.problems.mkp.components import AddOperator, SwapOperator
 import numpy as np
 
 def greedy_by_density_bb0a(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
-    """Greedy by Density with Swapping heuristic for the Multidimensional Knapsack Problem.
+    """
 
-    This heuristic first selects items based on their density (profit divided by total weight across all dimensions).
-    After attempting to add high-density items, it considers swapping existing items in the knapsack with those outside
-    to further improve the solution profitably.
+    Density-first constructive with best single-swap fallback for MKP. Excluded items are ranked by density = profit / Σ_d weight_d; zero total weight yields density 0. Addition stage scans the sorted list and returns the first item that fits remaining_capacity across all resources—this is first-feasible greediness, not best-improvement over all adds. If no add is feasible, a swap stage evaluates all one-out/one-in exchanges: feasibility is computed per resource via current_weights − weight(included) + weight(excluded) ≤ capacities, and selection is best-improvement by profit gain (maximum positive difference). Priority is add-first, swap-second; swap is checked unconditionally (swap_frequency is not applied). Complexity: add stage O(|excluded| log |excluded| + |excluded|·R) due to sorting and feasibility checks; swap stage O(|included|·|excluded|·R). Constant extra memory; no algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

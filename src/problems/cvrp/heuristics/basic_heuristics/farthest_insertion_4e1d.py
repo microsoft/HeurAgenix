@@ -2,7 +2,8 @@ from src.problems.cvrp.components import Solution, AppendOperator, InsertOperato
 import numpy as np
 
 def farthest_insertion_4e1d(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
-    """ Farthest Insertion heuristic for the CVRP.
+    """
+    Constructive farthest-insertion for CVRP with depot-anchored routes. At each step, select the single unvisited node with maximum distance from the depot, then insert it into the route-position across all vehicles that yields the smallest marginal cost while respecting remaining capacity. Marginal cost model: replace edge (prev,next) by (prev,node) + (node,next) − (prev,next); at route boundaries the depot acts as prev or next, implicitly modeling routes that start and end at the depot. Capacity feasibility is enforced per vehicle prior to evaluating positions. This variant prioritizes remote (peripheral) customers early to reduce late-stage detours, and uses directed distances, making it compatible with asymmetric matrices. Per step complexity: O(|unvisited|) to pick the seed + O(sum over vehicles of route length) to evaluate insertions; constant extra memory. Deterministic behavior under standard Python max/min tie rules.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

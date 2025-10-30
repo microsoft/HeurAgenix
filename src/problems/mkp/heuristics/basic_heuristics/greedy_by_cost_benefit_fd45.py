@@ -2,10 +2,9 @@ from src.problems.mkp.components import *
 
 def greedy_by_cost_benefit_fd45(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Greedy by Cost-Benefit heuristic for the Multidimensional Knapsack Problem.
-    This heuristic selects the item that provides the best trade-off between added profit
-    and the opportunity cost of reduced remaining capacity for future items.
-
+    Adaptive scarcity-penalized greedy add for MKP. Scores each candidate item with S(i) = profit(i) − total_weight(i) × Σ_r [weight_r(i) / remaining_capacity_r]; if any remaining_capacity_r = 0 and weight_r(i) > 0, the item is discarded via infinite penalty. The Σ_r term quantifies scarcity per resource, penalizing weight in tight dimensions; multiplication by total_weight(i) magnifies the penalty for globally heavy items.
+    Selection policy: best-improvement. Evaluate all items not in the knapsack, filter out infeasible ones (any demand exceeding remaining capacity), and choose the feasible item with the highest score S(i). Items with zero weight on exhausted resources remain eligible.
+    
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "profits" (numpy.array): The profit value associated with each item.

@@ -2,13 +2,7 @@ from src.problems.dposp.components import *
 
 def nearest_order_scheduling_1a5e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
-    Implements the nearest order scheduling heuristic for DPOSP. Starting from an initial order, the heuristic builds
-    a production schedule by selecting and appending the next order that minimizes the combined criteria of setup time
-    (transition time between orders) and proximity to the delivery deadline. The heuristic begins with either a randomly
-    selected order or the one with the earliest deadline and iteratively adds to the schedule the order that is closest
-    in terms of transition time from the previously scheduled order while also taking into account the urgency of order
-    deadlines. This process continues until no further orders can be feasibly added to the schedule without violating
-    deadline constraints.
+    Single-step constructive extension via first-feasible append. Select initial_order = feasible_orders_to_fulfill[0] and attempt to append it to the end of each production line in order. Capability filter: production_rate[line_id][order_product[initial_order]] > 0. Feasibility is enforced exclusively through validation_single_production_schedule on the tentative line schedule (transition constraints and deadlines are handled implicitly by the validator). Acceptance policy: first-improvement/first-feasible; the first line passing validation is chosen, no scoring or tie-breaking beyond iteration order.
 
     Args:
         problem_state (dict): Contains static information for the DPOSP. Relevant keys:

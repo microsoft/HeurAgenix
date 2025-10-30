@@ -1,10 +1,17 @@
 from src.problems.cvrp.components import *
 
 def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[RelocateOperator, dict]:
-    """Node Shift Between Routes heuristic for CVRP.
-    This heuristic attempts to move a node from one route to another route, aiming to reduce the total distance or improve load balance.
-    It considers the capacity constraints and ensures that the move is beneficial before applying it.
+    """
+    Inter-route relocate with best-improvement under capacity constraints. Scans all non-depot nodes in all source routes and all insertion cuts of all different target routes, selecting the single shift with the largest strictly positive cost reduction. Routes are treated as circular sequences (depot included), so removal and insertion are evaluated by cutting and reconnecting edges:
+    - Removal at source (prev, node, next): Δsrc = -d[prev,node] - d[node,next] + d[prev,next].
+    - Insertion at target between (prev, next): Δtgt = +d[prev,node] + d[node,next] - d[prev,next].
+    Total Δ = Δsrc + Δtgt; asymmetric distances supported.
+    Feasibility: target load + demand[node] ≤ capacity; depot nodes never moved. Intra-route relocations are excluded by design (source_vehicle_id ≠ target_vehicle_id).
+    Search space: for each source node, all target routes and all circular cuts (0..|route|) are considered; for routes containing only the depot, insertion evaluates the depot–depot break implicitly.
+    Selection policy: best-improving (global minimum Δ) among all feasible moves; no move if no strict improvement exists.
+    Time complexity ~ O(M^2), where M is the total number of visited nodes across all routes; constant extra memory.
 
+    
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "distance_matrix" (numpy.ndarray): The matrix of distances between nodes.

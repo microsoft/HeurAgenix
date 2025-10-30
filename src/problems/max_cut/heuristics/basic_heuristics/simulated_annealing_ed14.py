@@ -4,9 +4,7 @@ import math
 
 def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    Simulated Annealing heuristic for the Max Cut problem. It probabilistically chooses to swap a node from one set to another,
-    potentially accepting worse solutions early on to escape local optima, with the probability of accepting worse solutions
-    decreasing over time.
+    Single-vertex-flip simulated annealing with uniform random neighbor selection. Each iteration proposes flipping exactly one randomly chosen node to the opposite partition (SwapOperator), without scanning or ranking neighbors—neither first-improvement nor best-improvement is attempted. Move quality (delta) is computed via the external get_problem_state for the proposed solution; the weight matrix is not accessed directly. Acceptance uses the Metropolis criterion: accept if delta ≥ 0, else with probability exp(delta/T). Temperature follows multiplicative cooling T ← T·alpha every iteration regardless of acceptance; the search halts when T ≤ final_temperature. Invalid neighbors (as flagged by get_problem_state) are discarded. If a node is in neither set, the flip is effectively a no-op. One neighbor evaluated per call; runtime dominated by the state evaluation.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

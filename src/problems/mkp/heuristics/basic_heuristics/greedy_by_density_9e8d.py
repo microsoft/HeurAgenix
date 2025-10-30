@@ -2,9 +2,9 @@ from src.problems.mkp.components import *
 
 def greedy_by_density_9e8d(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Greedy by Density heuristic for the Multidimensional Knapsack Problem.
-    This heuristic selects items based on their density, defined as profit divided by the sum of weights across all dimensions.
-    It selects the item with the highest density and adds it to the knapsack, repeating the process until no further items can be added without exceeding resource capacities.
+    Greedy density-based constructive with first-feasible selection. Computes item density for items not in the knapsack as profit divided by the sum of weights across all resource dimensions (resource-major indexing: weights[resource_index][item_index]). Candidates are globally sorted by density in descending order.
+    Selection policy: iterate sorted candidates and return the first item whose weight vector fits within the current remaining_capacity across all dimensions (no best-improvement search beyond first feasible, no lookahead). Zero total weight items receive density 0 to avoid division-by-zero, explicitly deprioritizing them.
+        Complexity: O(|C|·R) to compute densities, O(|C| log |C|) to sort, and up to O(|C|·R) for feasibility checks; constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

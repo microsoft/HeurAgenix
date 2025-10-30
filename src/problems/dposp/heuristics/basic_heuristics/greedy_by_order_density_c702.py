@@ -2,7 +2,8 @@ from src.problems.dposp.components import *
 
 def greedy_by_order_density_c702(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
     """
-    This heuristic for DPOSP selects the next order to schedule based on an 'order density' metric, defined as the ratio of the order's value to the combined time taken for production and transition. For each unscheduled order, compute the order density as 1 divided by the sum of the production time on the assigned production line and the transition time from the last scheduled product. Select the order with the highest density value that can be completed before its deadline and append it to the corresponding production line schedule.
+    Greedy append by order-density across production lines. The neighborhood is limited to appending a single order at the end of any line; no insertion or reordering is attempted. The density metric is the inverse of the local time increment: 1 / (production_time + transition_time_from_last), where production_time is computed as 1 / production_rate for the target line-product pair, and transition_time_from_last uses the last scheduled product on the line (a sentinel product 0 is used when the line is empty).
+    Selection policy: best-improvement. Evaluate all (order, line) candidates drawn from feasible_orders_to_fulfill and select the one with the highest density that passes validation_single_production_schedule after appending. Feasibility (deadlines, disallowed transitions, zero-rate cases) is enforced exclusively via the validator; equal-density ties are broken by first encounter due to a strict > update.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

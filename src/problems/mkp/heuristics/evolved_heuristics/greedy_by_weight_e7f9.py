@@ -2,7 +2,8 @@ from src.problems.mkp.components import *
 from itertools import combinations
 
 def greedy_by_weight_e7f9(problem_state: dict, algorithm_data: dict, k_flip_range=(2, 3), **kwargs) -> tuple[AddOperator, dict]:
-    """Greedy heuristic with profit-to-weight ratio, k-flip, and swap refinement for MKP.
+    """
+    Greedy ratio-first construction with fallback multi-add (k-flip) and best-improvement exchange for MKP. Primary step is first-improvement: sort capacity-feasible candidates by profit divided by the L1 sum of weights across all resource dimensions and add the first item that fits remaining capacities; no exhaustive scan for the globally best single addition. If no single-item addition is possible, activate improvement moves validated via get_problem_state (feasibility and profit computed externally): (1) k-flip multi-add over candidates drawn from the feasible-add set, enumerating k in a small range and selecting the best-improvement FlipBlockOperator (only accept if profit strictly increases); (2) one-out/one-in swap refinement between a currently included item and a feasible-add candidate, selecting the best-improvement SwapOperator. The k-flip explores multi-dimensional capacity interactions implicitly via the external oracle rather than pre-checking resource constraints. Move selection policy: greedy add returns immediately; otherwise, both k-flip and swap perform best-improvement searches. Complexity: sorting O(m log m) and first-fit scan O(m) for m=|feasible_items_to_add|; k-flip O(∑_k C(m, k)) oracle evaluations; swap O(|items_in_knapsack| · m) oracle evaluations. Constant extra memory; no algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

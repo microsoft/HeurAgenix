@@ -1,8 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
 def first_come_first_served_6c4f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Implement the First Come First Served (FCFS) heuristic for the JSSP.
-    This heuristic schedules the jobs in the order they arrive, without considering their processing times or other characteristics.
+    """
+    Deterministic FCFS job-level scheduler. Each call selects the earliest-arrived unfinished job (the head of unfinished_jobs) and advances exactly its next operation via AdvanceOperator, which appends the job to its required machine’s queue according to job_operation_sequence and increments job_operation_index. No evaluation of processing times, machine states, or alternative jobs; no scanning or tie-breaking beyond the given arrival order. This is a purely constructive, one-step progression policy that enforces arrival-order fairness and leverages the one-to-one machine–operation mapping implicitly through AdvanceOperator. Time complexity per decision: O(1); constant memory. Deterministic and reproducible given a fixed unfinished_jobs order; feasibility and resource checks are delegated to the validation layer. Best suited for baseline/initialization or online arrival settings where arrival order is the governing priority.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

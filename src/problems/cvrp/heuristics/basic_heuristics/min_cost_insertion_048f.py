@@ -2,7 +2,8 @@ from src.problems.cvrp.components import Solution, AppendOperator, InsertOperato
 import numpy as np
 
 def min_cost_insertion_048f(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """ Min-Cost Insertion heuristic for the CVRP.
+    """
+    Global best-improvement min-cost insertion for depot-anchored CVRP routes. Scans all unvisited nodes and all vehicles; for each feasible vehicle (remaining capacity ≥ node demand), evaluates positions 1..L where 0 is reserved for the depot sentinel. Marginal cost at position i is computed by replacing edge (prev,next) with (prev,node)+(node,next), with prev=depot when i=1 and next=depot when i=L (thus preserving route closure and keeping the depot fixed at index 0). Selects the single node–vehicle–position triple with the smallest cost increase across the entire fleet (not first-improvement), then returns an InsertOperator for that triple. Supports asymmetric distance matrices; handles empty routes (depot-only) via insertion at position 1. Time complexity: O(|unvisited| · Σ_v |route_v|); minimal extra memory. Capacity is enforced solely via remaining capacity; vehicle_loads are not used.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

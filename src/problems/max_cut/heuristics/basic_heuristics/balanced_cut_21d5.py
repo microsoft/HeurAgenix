@@ -2,9 +2,7 @@ from src.problems.max_cut.components import *
 
 def balanced_cut_21d5(problem_state: dict, algorithm_data: dict, max_iterations: int = 100) -> tuple[InsertNodeOperator, dict]:
     """
-    Balanced Cut heuristic for the Max Cut problem. This heuristic tries to balance the number of nodes in sets A and B
-    while maximizing the cut value. It iteratively adds nodes to the smaller set until a balanced state is reached or
-    the maximum number of iterations is exceeded.
+    Balance-driven single-node insertion. Selects the first available unselected node (order-dependent via set-to-list conversion) and inserts it into the smaller partition; ties are resolved in favor of set A, inducing a slight bias. Ignores edge weights and cut gain entirely, focusing solely on cardinality balance; thus it is constructive/feasibility-oriented and may not improve the cut value. Operates one node per call, enabling gradual balancing across repeated invocations. Inputs effectively used: current_solution and unselected_nodes; total_nodes and max_iterations are unused. Applicable to weighted or unweighted graphs without structural assumptions. Time complexity O(1); constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

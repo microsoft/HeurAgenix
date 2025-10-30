@@ -1,7 +1,8 @@
 from src.problems.max_cut.components import *
 
 def highest_delta_edge_9f66(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertEdgeOperator, dict]:
-    """Selects the unselected edge that maximizes the increase in cut weight when added to the solution.
+    """
+    Greedy pairwise best-improvement constructive step. At each call, considers all unordered pairs of unselected nodes and both orientations (i→A,j→B vs i→B,j→A), selecting the orientation that maximizes the immediate cut gain. Incremental gain model uses precomputed affiliation sums to the current partition: delta(i→A,j→B)=sum_w(i,B)+sum_w(j,A)+w(i,j); delta(i→B,j→A)=sum_w(i,A)+sum_w(j,B)+w(i,j). The global argmax over all unselected pairs is returned as an InsertEdgeOperator with nodes ordered to match the chosen orientation. If exactly one node remains unselected, it is inserted into A without optimization. Ties are implicitly broken by first encounter (strict > update). Works on weighted graphs without assuming symmetry (interprets the weight matrix as given). Time: O(n(|A|+|B|)) to precompute affiliation sums plus O(|U|^2) to scan pairs; memory: O(n). Suitable for constructive/repair phases; emphasizes joint (two-node) gain over single-node myopic insertions.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

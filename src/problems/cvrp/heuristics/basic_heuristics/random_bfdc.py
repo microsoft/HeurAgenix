@@ -2,9 +2,8 @@ from src.problems.cvrp.components import AppendOperator
 import random
 
 def random_bfdc(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
-    """Random heuristic for CVRP.
-    This heuristic selects an unvisited node at random and appends it to a vehicle's route where it does not violate the capacity constraint.
-    This process is repeated for each vehicle until all nodes have been included in a route.
+    """
+    Stochastic constructive assignment with capacity-only feasibility. At each call: (1) uniformly sample one unvisited customer, (2) sample up to V vehicles uniformly at random with replacement, accepting the first whose remaining capacity can cover the customer’s demand, and (3) append the customer to the end of that vehicle’s route. No distance or insertion-cost evaluation; the distance matrix is unused. This is a first-feasible randomized policy (not “best” by any measure such as nearest, cheapest, or best-fit), and because vehicles are sampled with replacement, earlier-sampled feasible vehicles are favored; there is no deterministic tie-breaking. Stateless aside from RNG; does not update algorithm_data. Per-invocation complexity O(V) time, O(1) memory. Best used for diversification or quick feasible construction; expected route cost quality relies on subsequent improvement operators.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

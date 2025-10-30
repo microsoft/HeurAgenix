@@ -2,9 +2,8 @@ from src.problems.tsp.components import *
 import numpy as np
 
 def farthest_insertion_54db(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """ Heuristic algorithm that selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost.
-    
-    This heuristic also periodically applies the 2-opt heuristic to improve the solution.
+    """ 
+    Hybrid constructive–improvement insertion heuristic with regime switching. Start phase: compute the node with the second-lowest mean distance to all nodes as an anchor, but append its nearest unvisited neighbor as the first city; this biases the tour toward a near-central region without selecting the absolute centroid. Main phase switches policy by tour fill ratio (≥ or < 60% of nodes) and distance dispersion (std_dev_distance vs thresholds): - High dispersion, late stage (≥60%): cheapest insertion over all unvisited nodes and cyclic edges; choose the node-position that minimizes local cost increase. - High dispersion, early stage (<60%): select the node whose maximum distance to any current tour node is largest (max-of-any, not max-of-min); insert it at the position of minimal marginal cost. - Low dispersion, early stage (<60%): nearest-neighbor selection by minimum distance to any tour node; insert at minimal marginal cost. - Low dispersion, late stage (≥60%): “balanced” insertion equals cheapest insertion. Insertion cost uses a cyclic edge replacement model: for edge (i,next_i), replace by (i,node)+(node,next_i) and subtract the removed edge; indices wrap modulo tour length to respect a cycle. Periodic improvement: at tour sizes divisible by apply_2opt_frequency, perform a single best-improving 2-opt move by scanning all valid pairs (i,j) with j≥i+2, excluding the (0,last) wrap, and apply the segment reversal with the most negative delta; no first-improvement shortcut is used. Metric-agnostic (works with asymmetric matrices). Complexity: insertion scan O(|unvisited|·|tour|); scheduled 2-opt scan O(|tour|^2); constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

@@ -3,7 +3,11 @@ from itertools import combinations
 import random
 
 def k_flip_2f3e(problem_state: dict, algorithm_data: dict, k: int = 2) -> tuple[FlipBlockOperator, dict]:
-    """ K-flip heuristic that flips the inclusion status of k items.
+    """
+    Exhaustive k-flip neighborhood search with feasibility gating and best-improvement selection. The move toggles exactly k distinct item inclusions simultaneously, enabling simultaneous adds/removes and exploration beyond 1-flip local optima. All k-subsets of items are enumerated; the order is randomized to mitigate deterministic bias, but because the search evaluates the full neighborhood, the final choice is independent of shuffle.
+    Selection policy: best-improvement by profit among feasible candidates. Each candidate is validated via validation_solution; profit is recomputed through get_problem_state to ensure consistency under multiple resource constraints.
+    Complexity: O(C(item_num, k)) evaluations; memory is O(1) beyond the current candidate. Larger k increases intensification and escape potential at the cost of combinatorial growth in runtime, suitable when stronger local search is desired under multi-constraint feasibility.
+
 
     Args:
         problem_state (dict): The dictionary contains the problem state.

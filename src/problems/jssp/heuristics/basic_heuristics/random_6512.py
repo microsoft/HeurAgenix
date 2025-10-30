@@ -2,7 +2,8 @@ from src.problems.jssp.components import Solution, AdvanceOperator
 import random
 
 def random_6512(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """This heuristic randomly selects an unfinished job and advances its next operation in the job's processing sequence.
+    """
+    Stochastic constructive advance for JSSP. Uniformly samples one unfinished job and schedules its next operation by appending the job to the end of the designated machine queue, as dictated by Solution.job_operation_sequence and Solution.job_operation_index. No scoring or “best” selection is performed; this is purely exploratory (not greedy), intended for diversification or initial sampling.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

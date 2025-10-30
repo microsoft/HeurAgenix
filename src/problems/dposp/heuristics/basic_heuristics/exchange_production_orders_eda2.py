@@ -2,10 +2,8 @@ from src.problems.dposp.components import *
 
 def exchange_production_orders_eda2(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    The exchange production orders heuristic tries to improve the current production schedule by swapping two non-adjacent orders
-    from the same or different production lines and assessing the impact on the total production and transition times. The heuristic
-    is based on the 2-opt approach from TSP and is adapted to consider DPOSP-specific constraints such as varying production speeds,
-    transition times, order deadlines, and production line capabilities.
+    Machine-local pairwise swap for DPOSP with validator-driven feasibility and local time-cost minimization. For each production line, evaluate all position pairs i < j (adjacent and non-adjacent) and swap their orders, validating the modified single-line schedule via validation_single_production_schedule to enforce product-transition constraints and deadlines. Cross-line swaps are not explored despite SwapOperator supporting them; the neighborhood is strictly intra-line.
+Cost model: compare the line’s total_time_cost_per_production_line before and after the swap using get_problem_state. Selection policy: best-improvement on the targeted line’s time cost; the algorithm keeps the swap with the largest reduction (most negative delta). Acceptance is strict; equal-improvement moves are discarded, and ties retain the first encountered best move.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

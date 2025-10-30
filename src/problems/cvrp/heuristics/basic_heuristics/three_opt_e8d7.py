@@ -1,7 +1,8 @@
 from src.problems.cvrp.components import *
 
 def three_opt_e8d7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
-    """Implements a 3-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+    """
+Intra-route 3-opt with best-improvement over all routes. Treats each route as a closed cycle and evaluates triplets of breakpoints (i, j, k) with wrap-around indexing (k allowed to cross the route end to the start). For each triplet, removes edges (A,B), (C,D), (E,F) and considers exactly three reconnection patterns (a subset of the seven 3-opt variants), each implementable as reversing two segments; the move is emitted as a ReverseSegmentOperator with up to two (possibly wrap-around) segment reversals. The depot node is not used in the delta evaluation; reconnection costs are computed solely from internal route edges, making the method suitable for cyclic representations and asymmetric distance matrices but not enforcing depot adjacency. Selection policy is best-improvement (most negative delta) across all routes; at most one move is returned per call. Time complexity per route: O(n^3); constant extra memory. Constraints remain satisfied as changes are intra-route (vehicle load unchanged).
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

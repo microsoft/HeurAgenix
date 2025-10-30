@@ -2,7 +2,14 @@ from src.problems.jssp.components import Solution, AdvanceOperator
 
 def least_work_remaining_66c9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
     """
-    Selects the job with the least total processing time remaining from the unfinished jobs and returns an AdvanceOperator to schedule its next operation.
+    Dispatch rule selecting the job with the smallest remaining workload (sum of operation times from its current operation index to completion). At each decision point it scans all unfinished jobs, computes tail workload, and chooses the argmin, returning an AdvanceOperator to append that job’s next operation to its designated machine queue. This is a best-improvement choice over the candidate set of unfinished jobs; tie-breaking follows first minimum encountered.
+    Unique aspects:
+    - Operates on the cumulative “tail” time rather than the next-operation time, prioritizing jobs close to completion and aggressively reducing WIP/flow time when remaining times are heterogeneous.
+    - Strictly constructive dispatch: only appends the next operation; no reordering of existing machine queues and no consideration of machine availability or queue congestion.
+    - Compatible with the one-to-one machine–operation mapping; AdvanceOperator uses job_operation_sequence and job_operation_index to place the next operation.
+    Inputs used: job_operation_time, unfinished_jobs, job_operation_index. Others are ignored.
+    Time complexity per call: O(sum over unfinished jobs of remaining operations length). Memory: O(1). Myopic behavior may starve long-tail jobs until their remaining time diminishes.
+
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

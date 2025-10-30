@@ -2,9 +2,9 @@ from src.problems.max_cut.components import *
 
 def multi_swap_2_dbfe(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    This heuristic evaluates all possible pairs of nodes for swapping between set A and set B.
-    It performs the swap that leads to the highest increase in the cut value, considering the combined effect
-    of swapping two nodes simultaneously rather than one at a time. It utilizes numpy operations for efficient computation.
+    Best-improvement 2-swap (pairwise exchange) local search. Evaluates every (i ∈ A, j ∈ B) and applies the single best pair with strictly positive gain. Gain is computed from precomputed side-sum vectors:
+Δ(i,j) = (ΣA w(i,·) − ΣB w(i,·)) + (ΣB w(j,·) − ΣA w(j,·)) + 2·w(i,j).
+The +2·w(i,j) term corrects the double subtraction of the edge (i,j) when summing single-node flip gains, ensuring the edge’s contribution remains unchanged after a simultaneous swap. Side sums are vectorized via W[:,A]·1 and W[:,B]·1, yielding O(1) evaluation per pair after O(n|A| + n|B|) preprocessing. Selection is global best (not first-improvement) and strictly improving (no worsening acceptance). Assumes an undirected/symmetric weight matrix; otherwise the interaction term should use w(i,j)+w(j,i). Time complexity: O(n|A| + n|B| + |A|·|B|); O(n) extra memory. Suitable for escaping 1-flip local optima in a KL-style refinement step.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

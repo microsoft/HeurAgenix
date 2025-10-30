@@ -2,7 +2,7 @@ from src.problems.dposp.components import *
 
 def order_shift_between_lines_bd0c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[RelocateOperator, dict]:
     """
-    This heuristic attempts to shift an unfulfilled order from one production line to another while adhering to machine capabilities, transition rules, and order deadlines.
+    Single-order cross-line relocation with best-improvement on local two-line time cost. The neighborhood examines every scheduled order on its source line, every other line capable of producing its product (production_rate[target][product] > 0), and every insertion position 0..|target|; the order is removed from the source and inserted into the target at the tested position. Feasibility is enforced before scoring via validation_single_production_schedule on both modified line schedules, covering transition constraints and deadlines. Evaluation uses get_problem_state to compute the delta: (new time cost of source + target) − (current time cost of source + target); selection is strict best-improvement (ties are not accepted). Returns a RelocateOperator moving the order from its current index to the chosen target position.
     
     Args:
         problem_state (dict): The dictionary contains the problem state.

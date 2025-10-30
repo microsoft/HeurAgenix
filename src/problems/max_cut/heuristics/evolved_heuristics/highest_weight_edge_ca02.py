@@ -2,7 +2,8 @@ from src.problems.max_cut.components import *
 import numpy as np
 
 def highest_weight_edge_ca02(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
-    """ Heuristic algorithm to maximize cut value by evaluating the impact of placing each unselected node into set A or B.
+    """
+    Best-improvement constructive insertion with occasional best pair swap. For each unselected node, compute its marginal cut gain for placing in A or in B: ΔA = Σ_{b∈B} w(node,b) − Σ_{a∈A} w(node,a), ΔB = Σ_{a∈A} w(node,a) − Σ_{b∈B} w(node,b). Select the single node and target set with the maximum Δ (ties favor A via ≥ in the comparison). This is a global best-improvement over all node–set choices.  Periodically (trigger: len(A) + (len(B) % k) == 0), evaluate a single inter-set swap (i∈A, j∈B) by precomputing per-node totals to each set: weight_to_a[x] = Σ_{a∈A} w(x,a), weight_to_b[x] = Σ_{b∈B} w(x,b). The exact swap delta is Δswap = (weight_to_a[i] − weight_to_b[i]) + (weight_to_b[j] − weight_to_a[j]) + 2·w(i,j), where the +2·w(i,j) term corrects the mutual edge that remains crossing after the swap. Execute only the best pair with Δswap > 0.  Complexity: insertion O(|U|·(|A|+|B|)); swap precompute O(n·(|A|+|B|)) and pair scan O(|A|·|B|). No algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

@@ -2,9 +2,7 @@ from src.problems.max_cut.components import *
 
 def highest_delta_node_b31b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """
-    This heuristic selects the unselected node that, when added to one of the sets (A or B),
-    would result in the largest increase in the total cut weight. The node is then inserted into
-    that set which maximizes the cut weight.
+    Greedy global best-improvement insertion for partial MaxCut partitions. For each unassigned node, evaluates both placements: ΔA = sum of weights from the node to current set B; ΔB = sum of weights from the node to current set A. Selects the node and target set with the largest Δ, performing an argmax over all (node, target_set) pairs. Strict-improvement updating: a candidate replaces the incumbent only if its Δ exceeds the current best; equal-Δ ties do not update (first-best retention). When ΔA == ΔB and the pair triggers an update (both strictly > current best), the tie breaks to set B. With an empty partition, the first inserted node goes to set B. Not restricted to positive gains; if all Δ are negative, it inserts the least-worsening node, making it suitable for constructive/repair phases rather than strict local improvement. Uses directed outgoing weights weight_matrix[node, other]; for asymmetric matrices it optimizes the node’s outgoing contribution to the cut. Time complexity: O(|unselected| × (|A| + |B|)); O(1) extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

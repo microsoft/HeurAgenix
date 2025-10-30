@@ -1,9 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
 def shortest_processing_time_first_c374(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Implements the Shortest Processing Time first heuristic for the JSSP.
-    
-    This heuristic selects the unfinished job with the shortest next operation processing time and uses an AdvanceOperator to schedule it on the corresponding machine.
+    """
+    Shortest-processing-time (SPT) dispatch for partial JSSP schedules. Each call selects the unfinished job whose immediate next operation has the smallest processing time, then issues an AdvanceOperator to append that operation at the tail of its designated machine’s queue. The rule is job-centric: machine resolution is implicit via the job’s operation sequence; it advances exactly one next operation, preserving job precedence. Tie-breaking follows the first minimum encountered. This is a purely local time-based priority: it ignores machine idleness, queue congestion, and global makespan effects, and performs no reordering on any machine (append-only). Time complexity: O(|unfinished_jobs|); constant memory; algorithm_data unused.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

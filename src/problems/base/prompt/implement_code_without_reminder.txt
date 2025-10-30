@@ -3,6 +3,7 @@ Based on previous discuss, we get the heuristic {heuristic_name}:
 
 Now please implement it in python function {function_name}.
 
+The comments are crucial for the selection and updating of future algorithms. There's no need to repeat points that are obvious and widely known, such as input and output details, or redundant safety code like returning None; instead, it's important to emphasize aspects that are unique to the algorithm.
 
 The response format is very important. For better communication, please respond to me in this format:
 ***python_code:

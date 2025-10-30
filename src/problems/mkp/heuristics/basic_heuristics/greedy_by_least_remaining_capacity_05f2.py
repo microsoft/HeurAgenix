@@ -2,8 +2,9 @@ from src.problems.mkp.components import *
 
 def greedy_by_least_remaining_capacity_05f2(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Greedy by Least Remaining Capacity heuristic for the Multidimensional Knapsack Problem.
-    This heuristic selects the item that, when added, leaves the least remaining capacity in the knapsack.
+    Capacity-tight additive greedy for MKP. Among currently feasible items, evaluate inclusion and compute the post-addition remaining capacity vector; select the item that minimizes the sum of remaining capacities across all resource dimensions. Validity is enforced by requiring all post-addition remaining capacities to be nonnegative.
+    Selection policy: best-improvement on total slack; ties break by first-found due to strict “<” update.
+    Unique focus: ignores profits entirely; purely capacity-driven packing that tends to favor items with high multi-dimensional consumption, potentially saturating tight dimensions early. Suitable when maximizing capacity utilization is prioritized over profit.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

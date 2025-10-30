@@ -1,10 +1,9 @@
 from src.problems.dposp.components import *
 
 def shortest_operation_ff40(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """Shortest Operation Heuristic for DPOSP.
-    
-    This heuristic iterates over each production line and attempts to insert the shortest unfulfilled order
-    that can be appended to the end of the production line's schedule without violating any constraints.
+    """
+    Greedy shortest-quantity tail insertion for DPOSP. The candidate set is feasible_orders_to_fulfill, sorted ascending by order_quantity. For each production line, scan the sorted orders and attempt to append the first order whose product is producible on that line (production_rate[line][product] > 0) and whose appended schedule passes validation_single_production_schedule. Selection policy: first-improvement; the procedure returns immediately upon the first valid append across lines and orders.
+    Constraints and timing (deadlines, transitions, production durations) are enforced exclusively through the per-line validator; no explicit time delta computation (get_time_cost_delta) is performed. Transition_time is not used directly. Neighborhood: tail-only insertion; existing sequence is preserved, no mid-schedule insertion, swap, or relocate.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

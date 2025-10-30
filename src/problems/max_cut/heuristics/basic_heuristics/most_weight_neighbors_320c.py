@@ -2,8 +2,7 @@ from src.problems.max_cut.components import Solution, InsertNodeOperator
 
 def most_weight_neighbors_320c(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
     """
-    This heuristic selects an unselected node that has the highest sum of weights connected to it and inserts it into one of the sets (A or B) in the Solution, aiming to maximize the cut value.
-    It stores the sorted list of unselected nodes based on the sum of weights for future use.
+    Weighted-degree ordered constructive insertion with per-node best side placement. Ranks all unselected nodes once by total incident weight (row-sum/strength) and caches this static ordering in algorithm_data (sorted_nodes). At each step, pops the current top-strength node and places it on the side that maximizes immediate cut gain: gain(A)=sum of weights to current set B, gain(B)=sum of weights to current set A; ties go to A. This is not global best-improvement over all nodes w.r.t. the current partition (the ranking ignores evolving marginal gains), but a low-overhead greedy guided by node strength, suitable for fast construction. Incremental state reuse via filtered sorted_nodes avoids re-sorting across calls. Per call: O(|A|+|B|) to evaluate side gains; initial ranking: O(|U|·n). Constant extra memory beyond the cached node list.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

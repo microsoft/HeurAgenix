@@ -2,8 +2,8 @@ from src.problems.mkp.components import *
 
 def two_opt_8049(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    Two-Opt heuristic that iteratively evaluates potential swaps of two items' inclusion statuses in the knapsack. 
-    It retains the swap if it leads to a solution with a higher profit without violating any resource constraints.
+    Pairwise exchange (1-in/1-out) local search for MKP. The neighborhood consists of swapping inclusion states between one item currently in the knapsack and one currently out, preserving the number of selected items. Feasibility is enforced via validation_solution on the constructed candidate (capacities checked indirectly by the validator); no explicit recomputation of resource usage is performed inside the heuristic.
+    Selection policy: best-improvement over the full neighborhood. All (in, out) pairs are evaluated; among feasible candidates, the swap with the highest resulting profit is retained. Acceptance is strict (new_profit > current best), equal-profit moves are discarded; if multiple swaps reach the same maximal profit, the first encountered is kept.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
