@@ -3,7 +3,7 @@ import random
 
 def random_successive_insertion_57b4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Constructive heuristic that builds a tour by successively inserting random unvisited nodes into the current tour at a position that minimizes the increase in tour length.
+    Randomized node selection with greedy best-position insertion on a cyclic tour. Each call uniformly samples one unvisited node, then scans all edges (prev,next) of the current visited_nodes cycle (with wrap-around) to choose the insertion after prev that minimizes the marginal cost d(prev,node)+d(node,next)-d(prev,next). This evaluates the partial tour as a closed cycle; for tour length < 2, insert at position 0. Assumes visited_nodes encodes the current circular order and is consistent with current_solution.tour, since the InsertOperator position refers to that order. Compared to cheapest-insertion, it reduces per-step complexity by not scanning all unvisited nodes, providing diversification at O(|tour|) time and O(1) memory per call; works for asymmetric matrices. Stochasticity is governed by the external RNG seed.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

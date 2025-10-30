@@ -2,8 +2,8 @@ from src.problems.tsp.components import Solution, AppendOperator
 import random
 
 def random_80a0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AppendOperator, dict]:
-    """ Implements the random append heuristic for the TSP problem. 
-    At each step, randomly select an unvisited node and append it to the current solution.
+    """ 
+    Uniform-random constructive append for an open TSP path. At each iteration it uniformly samples one node from the unvisited set and appends it to the end of the current path, with no distance or marginal-cost evaluation. This distance-agnostic, memoryless move maximizes diversification and provides a high-entropy baseline for multi-start/portfolio hyper-heuristics. By appending only unvisited nodes it preserves a simple path and cannot create subtours; tour closure is deferred to subsequent operators. Invariant to symmetry, scaling, and sparsity of the distance matrix, and requires no algorithm_data. Computational cost per step is O(1) with constant memory; reproducibility is determined solely by the RNG state used by random.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

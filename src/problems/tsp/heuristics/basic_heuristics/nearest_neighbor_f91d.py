@@ -2,7 +2,7 @@ from src.problems.tsp.components import *
 
 def nearest_neighbor_f91d(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Implements the nearest neighbor heuristic for the TSP problem. Starting from an arbitrary city, at each step extend the tour by moving from the current city to its nearest unvisited neighbor until all cities are visited.
+    Greedy nearest-neighbor extension for an open (partial) path. If the path is empty, it deterministically seeds with unvisited_nodes[0]. Otherwise, from last_visited it scans all unvisited nodes and selects the argmin of distance_matrix[last_visited][node]; the chosen node is appended at position L (= len(current_solution.tour)), never inserted in the middle and never closes the tour. Correctness assumes last_visited equals the last node of current_solution.tour. Tie-breaking follows the iteration order of unvisited_nodes. Directional cost queries make it compatible with asymmetric distance matrices. Stateless: algorithm_data is unused; no lookahead, no backtracking, and no intra-tour rearrangements. Per step complexity O(|unvisited|) with constant extra memory; a separate procedure is required to close the tour after construction.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

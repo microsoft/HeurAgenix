@@ -1,7 +1,8 @@
 from src.problems.tsp.components import *
 
 def farthest_insertion_b6d3(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """ This heuristic selects the non-tour city that is farthest from any city in the current tour and inserts it where it causes the least increase in the tour cost.
+    """ 
+    Farthest-insertion with max–max selection on directed distances. At each step, among unvisited nodes, it selects the node whose maximum distance to any node in the current tour is largest (contrast with the classical max–min rule that uses distance to the nearest tour node). The selected node is inserted into the existing cycle at the position minimizing the marginal cost d[i,node] + d[node,j] − d[i,j] over consecutive tour edges (i,j), treating the current tour as a closed cycle throughout construction. Directed costs are used in both selection and insertion, making it suitable for asymmetric TSP. Deterministic seeding with the first unvisited node. Time per step: O(|unvisited|·|tour| + |tour|); constant extra memory. Bias: aggressively favors nodes that are extreme relative to any tour node, promoting rapid expansion toward outliers.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

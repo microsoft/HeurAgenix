@@ -4,10 +4,8 @@ import math
 
 def simulated_annealing_e625(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    Simulated Annealing heuristic for the Traveling Salesman Problem.
-    This function applies the simulated annealing technique to find a solution to the TSP.
-    It randomly selects two nodes and proposes to swap them. The swap is accepted based on
-    the Metropolis criterion, which depends on the temperature and the change in cost of the solution.
+    Stochastic node-interchange simulated annealing on a closed cyclic tour. Each call samples a uniformly random pair of distinct positions and proposes swapping the corresponding node IDs (not a 2-opt edge reversal). The marginal cost is computed by re-evaluating only the four incident edges around each selected position, with cyclic predecessors/successors via modulo indexing; adjacent and wrap-around cases are implicitly included. Distances are queried directionally, making it applicable to asymmetric matrices.
+    Acceptance follows the Metropolis criterion: accept improved moves unconditionally and worsenings with probability exp(-Δ/T). Temperature T and cooling factor α are taken from algorithm_data and updated as T ← α·T on every call, independent of acceptance. If accepted, returns a SwapOperator with the chosen node pair; otherwise returns no operator. Per-step complexity is O(1) with constant memory. Requires: distance_matrix, current_solution, current_cost; algorithm_data keys: temperature, alpha (defaults supported).
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
