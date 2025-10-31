@@ -70,6 +70,16 @@ python chat.py
 ```
 
 ## Prepare Data
+### Quick download (recommended)
+We host the public dataset on Hugging Face. To download everything into ./data, simply run:
+```bash
+python download_data.py
+```
+Notes:
+- This will create and populate the local data/ directory with the dataset files.
+- Make sure huggingface_hub is installed (it is included in requirements.txt; if not, run pip install -U huggingface_hub).
+- For reproducibility, the script can pin a specific revision/tag.
+
 ### Data for Classical CO Problem
 Data sources and formatting requirements for TSP, CVRP, JSSP, MaxCut, and MKP are detailed in the respective readme files.
 
@@ -90,7 +100,7 @@ python src/problems/dposp/generate_data.py
 ```
 
 ### Data Structure
-It is recommended to organize data into this structure `output/{problem}/data/(train_data, validation_data, test_data, smoke_data)`.
+It is recommended to organize data into this structure `/data/{problem}/(train_data, validation_data, test_data, smoke_data)`.
   
 - **Evolution Data**: Used by LLM to extract evolution policy during heuristic evolution. Typically consists of small instances either manually designed or sampled from the data.  
 - **Validation Data**: Used for evaluating and filtering heuristics during evolution.  
