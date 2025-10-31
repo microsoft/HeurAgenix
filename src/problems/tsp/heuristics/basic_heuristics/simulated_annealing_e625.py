@@ -2,7 +2,7 @@ from src.problems.tsp.components import *
 import random
 import math
 
-def simulated_annealing_e625(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator | None, dict]:
+def simulated_annealing_e625(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Stochastic node-interchange simulated annealing on a closed cyclic tour. Each call samples a uniformly random pair of distinct positions and proposes swapping the corresponding nodes (position swap, not 2-opt). The marginal cost Δ is computed by re-evaluating only the incident tour edges around the two positions with modulo indexing; adjacent cases are handled as 3-edge changes to avoid double counting. Distances are queried directionally (prev→node, node→next), making it applicable to asymmetric matrices.
 
