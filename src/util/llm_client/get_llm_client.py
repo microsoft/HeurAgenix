@@ -19,4 +19,7 @@ def get_llm_client(
     elif llm_type == "local_model":
         from src.util.llm_client.local_model_client import LocalModelClient
         llm_client = LocalModelClient(config=config, prompt_dir=prompt_dir, output_dir=output_dir)
-    return llm_client
+    elif llm_type == "vllm":
+        from src.util.llm_client.vllm_client import VLLMClient
+        llm_client = VLLMClient(config=config, prompt_dir=prompt_dir, output_dir=output_dir)
+    return llm_client, config
