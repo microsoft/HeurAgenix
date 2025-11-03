@@ -19,6 +19,7 @@ Azure GPT config:
 ```json
 {
     "type": "azure_apt",
+    "name": "...", 
 
     "api_type": "azure",
     "api_base": "...",
@@ -37,6 +38,7 @@ API model config:
 ```json
 {
     "type": "api_model",
+    "name": "...",
 
     "url": "...",
     "api_key": "...",
@@ -53,6 +55,7 @@ Local model config:
 ```json
 {
     "type": "local_model",
+    "name": "...",
 
     "temperature": 0.7,
     "top-p": 0.95,
@@ -63,7 +66,34 @@ Local model config:
     "sleep_time": 10
 }
 ```
-2. Test the LLM activation by:
+vLLM (OpenAI-compatible server) config:
+```json
+{
+    "type": "vllm",
+    "name": "...",
+
+    "temperature": 0.7,
+    "top-p": 0.95,
+    "max_tokens": 1600,
+    "model_path": "...",
+    "base_url": "http://localhost:8000/v1",
+
+    "max_attempts": 50,
+    "sleep_time": 10
+}
+```
+2. For vLLM server (use either local path or model name):
+```bash
+# Using local path
+vllm serve /path/to/model --port 8000 --max-model-len 8192 --dtype auto
+
+# Using model name (from Hugging Face)
+vllm serve meta-llama/Meta-Llama-3-8B-Instruct --port 8000 --max-model-len 8192 --dtype auto
+```
+- Note: If you plan to use automatic tool calling (tool_choice="auto"), vLLM ≥ 0.5.4 requires enabling:
+  --enable-auto-tool-choice and a suitable --tool-call-parser (e.g., llama3 for Llama-3-Instruct, qwen2 for Qwen2/2.5-Instruct).
+
+3. Test the LLM activation by:
 Modify the `config_file` in chat.py and run
 ```bash
 python chat.py
