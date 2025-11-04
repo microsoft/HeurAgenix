@@ -1,4 +1,5 @@
 import traceback
+import math
 from src.problems.base.env import BaseEnv
 from src.util.function_to_tool import convert_function_to_tool
 from src.util.llm_client.base_llm_client import BaseLLMClient
@@ -14,7 +15,7 @@ class LLMSelectionHyperHeuristic:
         problem: str,
         tool_calling: bool=False,
         iterations_scale_factor: float=2.0,
-        steps_per_selection: int=5,
+        selection_frequency: int=5,
         num_candidate_heuristics: int=3,
         rollout_budget: int=10,
         problem_state_content_threshold: int=1000,
@@ -24,7 +25,7 @@ class LLMSelectionHyperHeuristic:
         self.heuristic_pool = [heuristic.split(".")[0] for heuristic in heuristic_pool]
         self.tool_calling = tool_calling
         self.iterations_scale_factor = iterations_scale_factor
-        self.steps_per_selection = steps_per_selection
+        self.selection_frequency = selection_frequency
         self.num_candidate_heuristics = num_candidate_heuristics
         self.rollout_budget = rollout_budget
         self.problem_state_content_threshold = problem_state_content_threshold
@@ -45,6 +46,7 @@ class LLMSelectionHyperHeuristic:
 
     def run(self, env:BaseEnv) -> bool:
         max_steps = int(env.construction_steps * self.iterations_scale_factor)
+        max_rounds = math.ceil(max_steps / self.selection_frequency)
         selection_round = 0
         hidden_heuristics = []
         heuristic_traject = []
@@ -58,7 +60,7 @@ class LLMSelectionHyperHeuristic:
         prompt_dict["instance_problem_state"] = filter_dict_to_str([instance_data, instance_problem_state], self.problem_state_content_threshold)
 
         next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution)
-        while selection_round * self.steps_per_selection <= max_steps and env.continue_run:
+        while selection_round <= max_rounds and env.continue_run:
             try:
                 if env.is_complete_solution:
                     env.dump_result()
@@ -83,7 +85,9 @@ class LLMSelectionHyperHeuristic:
                     heuristic_trajectory_str = "\n".join([f"-----\n" + "\n".join(f"{key}: {value}" for key, value in items.items()) for items in heuristic_traject[-5:]])
                 prompt_dict["discuss_round"] = str(selection_round)
                 prompt_dict["heuristic_traject"] = heuristic_trajectory_str
-                prompt_dict["selection_frequency"] = self.steps_per_selection
+                prompt_dict["max_steps"] = max_steps
+                prompt_dict["selection_frequency"] = self.selection_frequency
+                prompt_dict["max_rounds"] = max_rounds
                 prompt_dict["num_candidate_heuristics"] = self.num_candidate_heuristics
                 prompt_dict["demo_heuristic_str"] = ",".join([f"heuristic_name_{i + 1}"for i in range(self.num_candidate_heuristics)])
                 
@@ -112,13 +116,13 @@ class LLMSelectionHyperHeuristic:
                     self.heuristic_pool,
                     self.problem,
                     self.iterations_scale_factor,
-                    self.steps_per_selection,
+                    self.selection_frequency,
                     self.rollout_budget,
                 )
                 # Record selection and observation
                 pre_observation = self.get_observation_problem_state(solution_problem_state)
                 pre_observation[env.key_item] = env.key_value
-                for _ in range(self.steps_per_selection):
+                for _ in range(self.selection_frequency):
                     env.run_heuristic(self.heuristic_functions[selected_heuristic_name], add_record_item={"step": selection_round})
                 next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution)
                 next_observation = self.get_observation_problem_state(next_solution_problem_state)

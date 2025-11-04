@@ -6,7 +6,9 @@ The solution problem state:
 {solution_problem_state}
 Note: Some data are omitted due to space constraints.
 
-We want to switch heuristics in real time to solve the problem. Each selected heuristic will be executed {selection_frequency} steps.
+We want to switch heuristics in real time to solve the problem.
+We will run a total of {max_steps} heuristic executions. Each selected heuristic will be executed for {selection_frequency} consecutive steps. Therefore, we have {max_rounds} selection rounds, where {max_rounds} = ceil({max_steps}/{selection_frequency}).
+Now we hope to select a heuristic for the next {selection_frequency} steps.
 
 Before this discuss, we have already {discuss_round} rounds discuss and the most recent discussion is as follows:
 {heuristic_traject}

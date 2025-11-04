@@ -19,7 +19,7 @@ def parse_arguments():
     parser.add_argument("-t", "--test_data", type=str, default="test_data", help="Path to a specific test data file. Defaults to testing all files in the `test_data` directory if not specified.")
     parser.add_argument("-tc", "--tool_calling", action="store_true", help="Using LLM's tool calling function.")
     parser.add_argument("-n", "--iterations_scale_factor", type=float, default=2.0, help="Scale factor determining total heuristic steps relative to problem size. Default is 2.0.")
-    parser.add_argument("-m", "--steps_per_selection", type=int, default=5, help="Number of steps executed per heuristic selection in LLM mode. Default is 5.")
+    parser.add_argument("-m", "--selection_frequency", type=int, default=5, help="Number of steps executed per heuristic selection in LLM mode. Default is 5.")
     parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.")
     parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.")
     parser.add_argument("-o", "--experiment_name", type=str, default=None, help="Target directory for saving results.")
@@ -35,7 +35,7 @@ def main():
     llm_config_file = args.llm_config_file
     tool_calling = args.tool_calling
     iterations_scale_factor = args.iterations_scale_factor
-    steps_per_selection = args.steps_per_selection
+    selection_frequency = args.selection_frequency
     num_candidate_heuristics = args.num_candidate_heuristics
     rollout_budget = args.rollout_budget
     experiment_name = args.experiment_name
@@ -57,7 +57,7 @@ def main():
             problem=problem,
             tool_calling=tool_calling,
             iterations_scale_factor=iterations_scale_factor,
-            steps_per_selection=steps_per_selection,
+            selection_frequency=selection_frequency,
             num_candidate_heuristics=num_candidate_heuristics,
             rollout_budget=rollout_budget,
         )

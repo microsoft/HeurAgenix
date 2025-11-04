@@ -5,5 +5,5 @@
   - If no content can be provided, respond with ***None***.
 - When asked to make choice(s) with the phrase "MAKE n CHOICE":
   - You must invoke exactly n of the provided tools using the function-calling interface.
-  - Do not write any prose or JSON. Return a single structured tool call only (exactly one tool_calls entry).
+  - Analysis are welcome, while n of the provided tools in function-calling interface are necessary.
   - Use only tools provided in this chat session; do not invent tools.
