@@ -8,7 +8,8 @@ HeurAgenix is a novel framework based on LLM, designed to generate, evolve, eval
 ## Set up environment
 To set up the environment, run the following command:
 ```bash
-pip install -r requirements.txt
+conda env create -f environment.yml
+conda activate orllm
 ```
 
 ## Set up LLM
@@ -18,7 +19,7 @@ Currently, the framework supports GPT from Azure using tokens and api based mode
 Azure GPT config:
 ```json
 {
-    "type": "azure_apt",
+    "type": "azure_gpt",
     "name": "...", 
 
     "api_type": "azure",
