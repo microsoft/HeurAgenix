@@ -84,10 +84,10 @@ vLLM (OpenAI-compatible server) config:
 ```
 2. For vLLM server (use either local path or model name):
 ```bash
-# Using local path
+# Using local path or model name
 vllm serve /path/to/model --port 8000 --max-model-len 8192 --dtype auto
 
-# Using model name (from Hugging Face)
+# For example
 vllm serve meta-llama/Meta-Llama-3-8B-Instruct --port 8000 --max-model-len 8192 --dtype auto
 ```
 - Note: If you plan to use automatic tool calling (tool_choice="auto"), vLLM ≥ 0.5.4 requires enabling:
