@@ -18,6 +18,14 @@ class BaseLLMClient:
         self.prompt_dir = prompt_dir
         self.output_dir = output_dir
         self.config = config
+        
+        self.top_p = config.get("top-p", 0.7)
+        self.temperature = config.get("temperature", 0.95)
+        self.max_tokens = config.get("max_tokens", 3200)
+        self.seed = config.get("seed", None)
+        self.think = config.get("think", False)
+        self.max_attempts = config.get("max_attempts", 50)
+        self.sleep_time = config.get("sleep_time", 60)
         self.reset(output_dir)
 
     def reset(self, output_dir:str=None) -> None:

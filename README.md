@@ -62,6 +62,7 @@ Local model config:
     "top-p": 0.95,
     "max_tokens": 1600,
     "model_path": "...",
+    "think": false,
 
     "max_attempts": 50,
     "sleep_time": 10
@@ -78,6 +79,7 @@ vLLM (OpenAI-compatible server) config:
     "max_tokens": 1600,
     "model_path": "...",
     "base_url": "http://localhost:8000/v1",
+    "think": false,
 
     "max_attempts": 50,
     "sleep_time": 10
@@ -85,8 +87,8 @@ vLLM (OpenAI-compatible server) config:
 ```
 2. For vLLM server (use either local path or model name):
 ```bash
-# Using local path or model name
-vllm serve /path/to/model --port 8000 --max-model-len 8192 --dtype auto
+# Using local path or model name (with reasoning mode)
+vllm serve /path/to/model --port 8000 --max-model-len 8192 --dtype auto (--reasoning-parser ...)
 
 # For example
 vllm serve meta-llama/Meta-Llama-3-8B-Instruct --port 8000 --max-model-len 8192 --dtype auto
@@ -262,7 +264,7 @@ The evolved heuristics are stored in `output/{problem}/evolution_result/{seed_he
 To apply a heuristic or heuristic selector by:
 
 ```bash
-python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-l <llm_config_file>] [-d <heuristic_dir>] [-t <test_case>] [-n <iterations_scale_factor>] [-m <steps_per_selection>] [-c <num_candidate_heuristics>] [-b <rollout_budget>] [-r <result_dir>]
+python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-l <llm_config_file>] [-d <heuristic_dir>] [-t <test_case>] [-n <iterations_scale_factor>] [-m <selection_frequency>] [-c <num_candidate_heuristics>] [-b <rollout_budget>] [-r <result_dir>]
 ```
 
 Parameters:
@@ -276,7 +278,7 @@ Parameters:
 - `-t`, `--test_data`: Path to a specific test data file. Defaults to testing all files in the `test_data` directory if not specified.
 - `-l`, `--llm_config_file`: Path to LLM configuration. Defaults is `azure_gpt_4o.json`.
 - `-n`, `--iterations_scale_factor`: Scale factor determining total heuristic steps relative to problem size. Default is 2.0.
-- `-m`, `--steps_per_selection`: Number of steps executed per heuristic selection in LLM mode. Default is 5.
+- `-m`, `--selection_frequency`: Number of steps executed per heuristic selection in LLM mode. Default is 5.
 - `-c`, `--num_candidate_heuristics`: Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.
 - `-b`, `--rollout_budget`: Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.
 - `-r`, `--result_dir`: Target directory for saving results. Default is 'result'.

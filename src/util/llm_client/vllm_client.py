@@ -22,13 +22,6 @@ class VLLMClient(BaseLLMClient):
         else:
             raise Exception("No model or model_path in config")
 
-        self.top_p = config.get("top-p", 0.7)
-        self.temperature = config.get("temperature", 0.95)
-        self.max_tokens = config.get("max_tokens", 1024)
-        self.seed = config.get("seed", None)
-        self.max_attempts = config.get("max_attempts", 10)
-        self.sleep_time = config.get("sleep_time", 2)
-
         api_key = config.get("api_key", "EMPTY")
         self.client = OpenAI(base_url=self.base_url, api_key=api_key)
 
@@ -56,9 +49,12 @@ class VLLMClient(BaseLLMClient):
         return norm
 
     def chat_once(self) -> str:
+        messages = self.normalize_messages_for_vllm()
+        if not self.think:
+            messages[-1]["content"] += "/no_think"
         resp = self.client.chat.completions.create(
             model=self.model,
-            messages=self.normalize_messages_for_vllm(),
+            messages=messages,
             temperature=self.temperature,
             top_p=self.top_p,
             max_tokens=self.max_tokens,
@@ -69,9 +65,12 @@ class VLLMClient(BaseLLMClient):
         return msg.content or ""
 
     def chat_once_with_tools(self, tools: List[Dict] = None) -> List[Tuple[str, Dict]]:
+        messages = self.normalize_messages_for_vllm()
+        if not self.think:
+            messages[-1]["content"] += "/no_think"
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=self.normalize_messages_for_vllm(),
+            messages=messages,
             tools=tools,
             tool_choice="required",
             temperature=self.temperature,

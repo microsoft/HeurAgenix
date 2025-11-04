@@ -18,12 +18,6 @@ class AzureGPTClient(BaseLLMClient):
         self.api_version = config["api_version"]
         self.model = config["model"]
         self.azure_endpoint = config["azure_endpoint"]
-        self.top_p = config.get("top-p", 0.7)
-        self.temperature = config.get("temperature", 0.95)
-        self.max_tokens = config.get("max_tokens", 3200)
-        self.seed = config.get("seed", None)
-        self.max_attempts = config.get("max_attempts", 50)
-        self.sleep_time = config.get("sleep_time", 60)
 
         credential = DefaultAzureCredential()
         token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
