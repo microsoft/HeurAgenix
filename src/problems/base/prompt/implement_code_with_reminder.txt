@@ -36,7 +36,7 @@ def {function_name}(problem_state: dict, algorithm_data: dict, **kwargs) -> tupl
     """ Description for this heuristic algorithm.
 
     Args:
-        problem_state (dict): The dictionary contains the problem state.. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - necessary_key (value type): description
             - necessary_key (value type): description
             ...
