@@ -33,5 +33,4 @@ def {function_name}(problem_state: dict, algorithm_data: dict, **kwargs) -> tupl
 
         ...
     """
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.
+

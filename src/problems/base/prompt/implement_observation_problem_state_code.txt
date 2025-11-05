@@ -12,7 +12,7 @@ Please note:
 4. Comments in the code are very important.
 
 
-The response format is very important. For better communication, please respond to me in this format:
+RESPOND IN THIS FORMAT:
 ***python_code:
 import library (if necessary)
 
@@ -30,5 +30,3 @@ def get_observation_problem_state(solution_problem_state: dict) -> dict:
         "xxx": problem_state_name["xxx"],
     }
 ***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.

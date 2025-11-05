@@ -229,7 +229,7 @@ class HeuristicGenerator:
         # Save code
         output_heuristic_file = os.path.join(self.output_dir, function_name + ".py")
         print(f"Save {function_name} code to {output_heuristic_file}")
-        with open(output_heuristic_file, "w") as fp:
+        with open(output_heuristic_file, "w", encoding="utf-8") as fp:
             fp.write(code)
         return output_heuristic_file
 

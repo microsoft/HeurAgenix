@@ -5,7 +5,7 @@ Now please implement it in python function {function_name}.
 
 The comments are crucial for the selection and updating of future algorithms. There's no need to repeat points that are obvious and widely known, such as input and output details, or redundant safety code like returning None; instead, it's important to emphasize aspects that are unique to the algorithm.
 
-The response format is very important. For better communication, please respond to me in this format:
+RESPOND IN THIS FORMAT:
 ***python_code:
 from {components_file} import *
 import other_library (if necessary)
@@ -29,5 +29,4 @@ def {function_name}(problem_state: dict, algorithm_data: dict, **kwargs) -> tupl
 
         ...
     """
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.
+

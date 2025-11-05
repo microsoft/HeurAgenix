@@ -33,11 +33,9 @@ Please note:
 5. If there is only one item, there is no need to force multiple answers.
 6. Try to propose a better operator than origin one and you can learn from positive solution or others.
 
-The response format is very important. For better communication, please respond to me in this format:
+RESPOND IN THIS FORMAT:
 ***bottleneck_operations:
 negative_operation_id; proposed_better_operator; reason
 negative_operation_id; proposed_better_operator; reason
 ....
 ***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.
