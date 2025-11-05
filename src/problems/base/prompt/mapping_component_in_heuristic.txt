@@ -17,11 +17,9 @@ This is the code for {referenced_heuristic}:
 Try to make up the similarities between {referenced_heuristic} and this new problem {problem}.
 If no more similarities, return me ***similarities:None***
 
-The response format is very important. For better communication, please respond to me in this format:
+RESPOND IN THIS FORMAT:
 ***similarities:
 components_in_{referenced_heuristic};similar_components_in_{problem};reason;
 components_in_{referenced_heuristic};similar_components_in_{problem};reason;
 ...
 ***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.

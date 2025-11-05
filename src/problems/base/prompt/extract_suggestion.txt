@@ -22,8 +22,6 @@ To make sure the suggestion is useful, please check in following aspects:
 3. If we run the updated function on this data from beginning to end, will the result be better than {positive_solution} ({positive_result})?
 4. Is this a commonly useful update for all instances or states?
 
-The response format is very important. For better communication, please respond to me in this format:
+RESPOND IN THIS FORMAT:
 ***suggestion: xxx
 ***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.
