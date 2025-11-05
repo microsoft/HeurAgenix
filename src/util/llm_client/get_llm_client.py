@@ -22,4 +22,5 @@ def get_llm_client(
     elif llm_type == "vllm":
         from src.util.llm_client.vllm_client import VLLMClient
         llm_client = VLLMClient(config=config, prompt_dir=prompt_dir, output_dir=output_dir)
-    return llm_client, config
+    llm_client.name = config.get("name", config_file.split(os.sep)[-1].split(".")[0])
+    return llm_client

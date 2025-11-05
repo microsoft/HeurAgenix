@@ -19,6 +19,7 @@ class BaseLLMClient:
         self.output_dir = output_dir
         self.config = config
         
+        self.name = config.get("name", "unknown_model")
         self.top_p = config.get("top-p", 0.7)
         self.temperature = config.get("temperature", 0.95)
         self.max_tokens = config.get("max_tokens", 3200)
