@@ -53,7 +53,7 @@ class AzureGPTClient(BaseLLMClient):
             model=self.model,
             messages=self.messages,
             tools=tools,
-            tool_choice="required",
+            tool_choice="auto",
             seed=self.seed,
             frequency_penalty=0,
             presence_penalty=0,
