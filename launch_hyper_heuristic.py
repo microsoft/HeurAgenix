@@ -49,7 +49,7 @@ def main():
     if heuristic == "llm_hh":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
-        experiment_name = f"{llm_client.llm_name}.{datetime_str}"
+        experiment_name = f"{llm_client.name}.{datetime_str}"
         hyper_heuristic = LLMSelectionHyperHeuristic(
             llm_client=llm_client,
             heuristic_pool=heuristic_pool,

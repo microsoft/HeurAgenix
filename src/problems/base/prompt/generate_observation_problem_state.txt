@@ -5,7 +5,7 @@ In determining the optimal problem states to represent instance, we must adhere 
 1. Must select from solution problem state, not instance problem state
 
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***observation_problem_state:
 problem_state_name;
 problem_state_name;

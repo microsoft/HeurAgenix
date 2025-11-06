@@ -13,7 +13,7 @@ Please note:
 4. Comments in the code are very important.
 
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***python_code:
 import library (if necessary)
 def get_instance_problem_state(instance_data: dict) -> dict:

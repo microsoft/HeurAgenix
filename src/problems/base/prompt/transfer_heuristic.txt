@@ -4,5 +4,5 @@ First generate a new heuristic name for this new heuristic and also a new detail
 Please consider the differences between {referenced_heuristic} and the new problem that may lead to different algorithms.
 By the way, the last 4 digits after last '_' are identifiers and we can ignore in new_heuristic_name.
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***heuristic:new_heuristic_name;description***

@@ -21,4 +21,4 @@ Before this discuss, we have already {discuss_round} rounds discuss and the most
 Now we hope to select heuristic for next {selection_frequency} steps.
 
 
-RESPOND IN THIS FORMAT: ***Selected heuristic: {demo_heuristic_str}***
+ANSWER IN FORMAT: ***Selected heuristic: {demo_heuristic_str}***

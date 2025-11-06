@@ -62,8 +62,9 @@ class AzureGPTClient(BaseLLMClient):
         )
 
         function_name_parameters = []
+        content = response.choices[-1].message.content
         for tool_call in response.choices[-1].message.tool_calls:
             function_name = tool_call.function.name
             parameters = json.loads(tool_call.function.arguments)
             function_name_parameters.append((function_name, parameters))
-        return function_name_parameters
+        return content, function_name_parameters
