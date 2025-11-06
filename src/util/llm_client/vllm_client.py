@@ -50,9 +50,7 @@ class VLLMClient(BaseLLMClient):
 
     def chat_once(self) -> str:
         messages = self.normalize_messages_for_vllm()
-        if not self.think:
-            messages[-1]["content"] += "/no_think"
-        resp = self.client.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             temperature=self.temperature,
@@ -61,13 +59,11 @@ class VLLMClient(BaseLLMClient):
             seed=self.seed,
             stream=False,
         )
-        msg = resp.choices[-1].message
-        return msg.content or ""
+        response_content = response.choices[-1].message.content
+        return response_content
 
-    def chat_once_with_tools(self, tools: List[Dict] = None) -> List[Tuple[str, Dict]]:
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, List[Tuple[str, Dict]]]:
         messages = self.normalize_messages_for_vllm()
-        if not self.think:
-            messages[-1]["content"] += "/no_think"
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -81,12 +77,10 @@ class VLLMClient(BaseLLMClient):
         )
 
         tool_calls = response.choices[-1].message.tool_calls or []
+        response_content = response.choices[-1].message.content
         function_name_parameters = []
         for tool_call in tool_calls:
             function_name = tool_call.function.name
             parameters = json.loads(tool_call.function.arguments)
             function_name_parameters.append((function_name, parameters))
-        return function_name_parameters
-
-        
-
+        return response_content, function_name_parameters

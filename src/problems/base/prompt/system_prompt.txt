@@ -5,7 +5,7 @@
     a) Ensure there is no other content inside the triple asterisks (***).
     b) If no answer can be provided, return ***None***.
 - When asked to make choice(s) with the phrase "MAKE n CHOICE(s)", produce the analysis in the chat context and the final choice(s) via the tool-calling interface:
-  - Provide the analysis as regular text in the chat context.
-  - Provide the final choice(s) via the function-calling interface.
+  - First, provide the analysis as regular text in the chat context.
+  - Then, provide the final choice(s) via the function-calling interface.
     a) You must invoke exactly n of the provided tools using the function-calling interface.
     b) Use only tools provided in this chat session; do not invent tools.
