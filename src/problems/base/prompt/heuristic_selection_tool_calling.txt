@@ -15,4 +15,4 @@ Before this discuss, we have already {discuss_round} rounds discuss and the most
 
 Now we hope to select heuristic for next {selection_frequency} steps.
 
-MAKE {num_candidate_heuristics} CHOICES: To take any action, you must call exactly {num_candidate_heuristics} of the provided tools.
+MAKE {num_candidate_heuristics} CHOICE(S): To take any action, you must call exactly {num_candidate_heuristics} of the provided tools.

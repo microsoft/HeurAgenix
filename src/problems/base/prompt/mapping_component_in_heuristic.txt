@@ -17,7 +17,7 @@ This is the code for {referenced_heuristic}:
 Try to make up the similarities between {referenced_heuristic} and this new problem {problem}.
 If no more similarities, return me ***similarities:None***
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***similarities:
 components_in_{referenced_heuristic};similar_components_in_{problem};reason;
 components_in_{referenced_heuristic};similar_components_in_{problem};reason;

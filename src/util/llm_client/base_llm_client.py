@@ -52,11 +52,11 @@ class BaseLLMClient:
         self.dump("error")
         return None
 
-    def chat_with_tools(self, tools) -> List[Tuple[str, Dict]]:
+    def chat_with_tools(self, tools) -> Tuple[str, List[Tuple[str, Dict]]]:
         for index in range(self.max_attempts):
             try:
-                function_name_parameters = self.chat_once_with_tools(tools)
-                current_message = "\n".join([f"function: {function_name}, parameters: {parameters}" for function_name, parameters in function_name_parameters])
+                response_content, function_name_parameters = self.chat_once_with_tools(tools)
+                current_message = response_content + "\n\nChoices:\n" + "\n".join([f"function: {function_name}, parameters: {parameters}" for function_name, parameters in function_name_parameters])
                 self.messages.append({"role": "assistant", "content": [{"type": "text", "text": current_message}]})
                 return function_name_parameters
             except Exception as e:

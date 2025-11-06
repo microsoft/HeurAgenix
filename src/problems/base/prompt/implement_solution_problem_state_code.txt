@@ -15,7 +15,7 @@ Please note:
 4. Comments in the code are very important.
 5. The solution is already defined, do not implement it again.
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***python_code:
 import library (if necessary)
 def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:

@@ -4,7 +4,7 @@ OK. Now let's review the all heuristic we have built for {referenced_problem}:
 Tell me, which heuristics can be transfer into {problem}?
 It can be transferred from a single heuristic or multiple heuristics.
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***referenced_heuristics:
 referenced_heuristic_name;introduction
 referenced_heuristic_name;introduction

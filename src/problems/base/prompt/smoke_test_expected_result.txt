@@ -12,5 +12,5 @@ with related problem state
 
 Now we run {function_name} once and think about what the expected output is.
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***expected_result:xxx***

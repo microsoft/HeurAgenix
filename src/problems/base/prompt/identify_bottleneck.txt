@@ -33,7 +33,7 @@ Please note:
 5. If there is only one item, there is no need to force multiple answers.
 6. Try to propose a better operator than origin one and you can learn from positive solution or others.
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 ***bottleneck_operations:
 negative_operation_id; proposed_better_operator; reason
 negative_operation_id; proposed_better_operator; reason

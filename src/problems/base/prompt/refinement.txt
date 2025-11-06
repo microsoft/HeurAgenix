@@ -20,7 +20,7 @@ While we need detailed refinement, such as:
 2. This includes aspects such as operation type, subject, location, and timing.
 3. Should we continue to deepen origin suggestion or weaken this suggestion.
 
-RESPOND IN THIS FORMAT:
+ANSWER IN FORMAT:
 1. If you believe the code still need to be updated, please respond to me in this format:
 ***refinement: 
 result analysis: xxx
