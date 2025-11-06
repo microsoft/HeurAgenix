@@ -68,7 +68,7 @@ class VLLMClient(BaseLLMClient):
             model=self.model,
             messages=messages,
             tools=tools,
-            tool_choice="required",
+            tool_choice="auto",
             temperature=self.temperature,
             top_p=self.top_p,
             max_tokens=self.max_tokens,
