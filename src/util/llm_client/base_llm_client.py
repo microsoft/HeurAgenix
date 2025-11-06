@@ -52,7 +52,7 @@ class BaseLLMClient:
         self.dump("error")
         return None
 
-    def chat_with_tools(self, tools) -> Tuple[str, List[Tuple[str, Dict]]]:
+    def chat_with_tools(self, tools) -> List[Tuple[str, Dict]]:
         for index in range(self.max_attempts):
             try:
                 response_content, function_name_parameters = self.chat_once_with_tools(tools)
@@ -175,5 +175,5 @@ class BaseLLMClient:
     def chat_once(self) -> str:
         raise NotImplemented
 
-    def chat_once_with_tools(self, tools: List[Dict] = None) -> List[Tuple[str, Dict]]:
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, List[Tuple[str, Dict]]]:
         raise NotImplemented

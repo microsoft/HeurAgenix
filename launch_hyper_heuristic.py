@@ -88,6 +88,8 @@ def main():
 
         paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 
         paras += f"\ndata_path={env.data_path}"
+        llm_config = open(llm_config_file, encoding="utf-8").read()
+        paras += f"llm_config={llm_config}\n"
         with open(os.path.join(env.output_dir, "parameters.txt"), 'w') as file:
             file.write(paras)
 
