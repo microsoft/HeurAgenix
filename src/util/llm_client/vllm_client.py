@@ -77,7 +77,7 @@ class VLLMClient(BaseLLMClient):
         )
 
         tool_calls = response.choices[-1].message.tool_calls or []
-        response_content = response.choices[-1].message.content
+        response_content = str(response.choices[-1].message.content)
         function_name_parameters = []
         for tool_call in tool_calls:
             function_name = tool_call.function.name
