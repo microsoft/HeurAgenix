@@ -59,7 +59,7 @@ class VLLMClient(BaseLLMClient):
             seed=self.seed,
             stream=False,
         )
-        response_content = response.choices[-1].message.content
+        response_content = str(response.choices[-1].message.content or "") + str(response.choices[-1].message.reasoning_content or "")
         return response_content
 
     def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, List[Tuple[str, Dict]]]:
@@ -68,7 +68,7 @@ class VLLMClient(BaseLLMClient):
             model=self.model,
             messages=messages,
             tools=tools,
-            tool_choice="auto",
+            tool_choice="required",
             temperature=self.temperature,
             top_p=self.top_p,
             max_tokens=self.max_tokens,
@@ -77,7 +77,7 @@ class VLLMClient(BaseLLMClient):
         )
 
         tool_calls = response.choices[-1].message.tool_calls or []
-        response_content = str(response.choices[-1].message.content)
+        response_content = str(response.choices[-1].message.content or "") + str(response.choices[-1].message.reasoning_content or "")
         function_name_parameters = []
         for tool_call in tool_calls:
             function_name = tool_call.function.name
