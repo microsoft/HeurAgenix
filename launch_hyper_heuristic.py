@@ -102,6 +102,8 @@ def main():
             print(os.path.join(env.output_dir, "result.txt"), heuristic, data_name, env.key_item, env.key_value)
         else:
             print("Invalid solution", heuristic, data_name)
+            finish_flag = open(os.path.join(env.output_dir, "invalid.txt"), "w")
+            finish_flag.close()
 
 
 if __name__ == "__main__":
