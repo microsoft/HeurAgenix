@@ -22,7 +22,8 @@ def parse_arguments():
     parser.add_argument("-m", "--selection_frequency", type=int, default=5, help="Number of steps executed per heuristic selection in LLM mode. Default is 5.")
     parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.")
     parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.")
-    parser.add_argument("-o", "--experiment_name", type=str, default=None, help="Target directory for saving results.")
+    parser.add_argument("-res", "--result_name", type=str, default=None, help="Target directory for saving results.")
+    parser.add_argument("-exp", "--experiment_name", type=str, default=None, help="Naming for experiments results.")
 
     return parser.parse_args()
 
@@ -38,9 +39,11 @@ def main():
     selection_frequency = args.selection_frequency
     num_candidate_heuristics = args.num_candidate_heuristics
     rollout_budget = args.rollout_budget
+    result_name = args.result_name
     experiment_name = args.experiment_name
 
-    datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    datetime_str = datetime.now().strftime("%Y%m%d")
+    result_name = result_name if result_name is not None else f"result.{datetime_str}"
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
     heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_dir))
 
@@ -49,7 +52,6 @@ def main():
     if heuristic == "llm_hh":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
-        experiment_name = f"{llm_client.name}.{datetime_str}"
         hyper_heuristic = LLMSelectionHyperHeuristic(
             llm_client=llm_client,
             heuristic_pool=heuristic_pool,
@@ -61,15 +63,12 @@ def main():
             rollout_budget=rollout_budget,
         )
     elif heuristic == "random_hh":
-        experiment_name = f"{heuristic}.{heuristic_dir}.{datetime_str}"
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem, iterations_scale_factor=iterations_scale_factor)
     elif heuristic == "or_solver":
-        experiment_name = "or_solver"
         module = importlib.import_module(f"src.problems.{problem}.or_solver")
         globals()["ORSolver"] = getattr(module, "ORSolver")
         hyper_heuristic = ORSolver(problem=problem)
     else:
-        experiment_name = heuristic
         hyper_heuristic = SingleHyperHeuristic(heuristic=heuristic, problem=problem)
 
     module = importlib.import_module(f"src.problems.{problem}.env")
@@ -82,8 +81,8 @@ def main():
 
     for data_name in test_data:
         env = Env(data_name=data_name)
-        experiment_name = args.experiment_name if args.experiment_name else experiment_name
-        output_dir = os.path.join(base_output_dir, problem, "result", env.data_ref_name, experiment_name)
+        experiment_name = experiment_name if experiment_name else heuristic
+        output_dir = os.path.join(base_output_dir, problem, result_name, env.data_ref_name, experiment_name)
         env.reset(output_dir)
 
         paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 
@@ -98,6 +97,8 @@ def main():
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result()
+            finish_flag = open(os.path.join(env.output_dir, "finished.txt"), "w")
+            finish_flag.close()
             print(os.path.join(env.output_dir, "result.txt"), heuristic, data_name, env.key_item, env.key_value)
         else:
             print("Invalid solution", heuristic, data_name)
