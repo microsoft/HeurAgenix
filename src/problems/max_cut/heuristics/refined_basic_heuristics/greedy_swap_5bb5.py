@@ -1,0 +1,48 @@
+from src.problems.max_cut.components import Solution, SwapOperator
+
+def greedy_swap_5bb5(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
+    """
+    Single-step best-improvement node flip. Precomputes per-node sums to each side (weight_to_a, weight_to_b) and scans all nodes to select the single node with strictly positive maximal gain delta, where delta for a node in A is sum_to_A − sum_to_B (flip to B), and for a node in B is sum_to_B − sum_to_A (flip to A). Returns a SwapOperator that flips exactly one node; no pairwise swaps or iterative updates are performed. Ties are broken by scan order due to strict “>” comparison (earliest index retained; equal gains ignored). Does not use current_cut_value. Works for weighted graphs; if weights are asymmetric, gains are computed from row sums (outgoing weights). Time complexity: O(n|A| + n|B|) to aggregate plus O(n) to select (O(n^2) worst-case); O(n) extra memory.
+
+    Args:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
+            - "weight_matrix" (numpy.ndarray): A 2D array representing the weight between nodes.
+            - "current_solution" (Solution): The current solution of the Max Cut problem.
+            - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
+        algorithm_data (dict): Not used in this heuristic.
+        **kwargs: Additional hyperparameters, not used in this heuristic.
+
+    Returns:
+        SwapOperator: The operator that swaps a single node between sets to improve the cut value.
+        dict: Empty dictionary as no algorithm data is updated.
+    """
+    current_solution = problem_state['current_solution']
+    weight_matrix = problem_state['weight_matrix']
+    best_increase = 0
+    best_node = None
+
+    # Precompute the sum of weights to and from each node to sets A and B
+    weight_to_a = weight_matrix[:, list(current_solution.set_a)].sum(axis=1)
+    weight_to_b = weight_matrix[:, list(current_solution.set_b)].sum(axis=1)
+
+    # Evaluate all possible swaps to find the best one
+    for node in range(len(weight_matrix)):
+        if node in current_solution.set_a:
+            # Calculate the delta in cut value for moving this node from A to B
+            delta = weight_to_a[node] - weight_to_b[node]
+        elif node in current_solution.set_b:
+            # Calculate the delta in cut value for moving this node from B to A
+            delta = weight_to_b[node] - weight_to_a[node]
+        else:
+            continue  # Skip if node is not in either set
+
+        # Check if this swap improves the cut value
+        if delta > best_increase:
+            best_increase = delta
+            best_node = node
+
+    # If a beneficial swap was found, return the corresponding operator
+    if best_node is not None:
+        return SwapOperator([best_node]), {}
+    else:
+        return None, {}
