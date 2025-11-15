@@ -374,10 +374,9 @@ class HeuristicEvolver:
             heuristic_file: str
         ) -> list[float]:
         validation_results = []
-        heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
         for data_name in validation_cases:
             env = Env(data_name=data_name)
-            env.reset(heuristic_name)
+            env.reset()
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
             is_complete_valid_solution = hyper_heuristic.run(env)
             result = env.key_value if is_complete_valid_solution else None
