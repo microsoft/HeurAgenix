@@ -227,7 +227,7 @@ class HeuristicEvolver:
     def load_function_code(self, heuristic_file: str, prompt_dict: dict) -> str:
         heuristic_file = search_file(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
-        function_code = open(heuristic_file).read()
+        function_code = open(heuristic_file, encoding="utf-8").read()
         heuristic_name = function_name[:-5]
         prompt_dict["function_name"] = function_name
         prompt_dict["function_code"] = function_code
@@ -266,7 +266,10 @@ class HeuristicEvolver:
         bottlenecks = []
         for bottleneck_operation_str in bottleneck_operation_strs:
             # Reproduce the state before bottleneck
-            bottleneck_operation_id, proposed_operation, reason = bottleneck_operation_str.split(";")
+            outputs = bottleneck_operation_str.split(";")
+            if outputs.__len__() < 3:
+                continue
+            bottleneck_operation_id, proposed_operation, reason = outputs[0], outputs[1], outputs[2]
             bottleneck_operation_id = int(re.search(r'\d+', bottleneck_operation_id).group())
             bottlenecks.append([bottleneck_operation_id, proposed_operation, reason])
 
