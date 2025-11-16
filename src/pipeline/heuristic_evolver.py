@@ -10,6 +10,7 @@ from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.perturbation import PerturbationHyperHeuristic
 from src.util.util import df_to_str, extract, filter_dict_to_str, parse_text_to_dict, load_function, extract_function_with_short_docstring, search_file
 from src.util.llm_client.base_llm_client import BaseLLMClient
+import shutil
 class HeuristicEvolver:
     def __init__(
         self,
@@ -46,6 +47,7 @@ class HeuristicEvolver:
             instance_problem_state.update(self.get_instance_problem_state(global_data))
             instance_problem_states.append(instance_problem_state)
         self.instance_problem_states_df = pd.DataFrame(instance_problem_states)
+        os.makedirs(os.path.join("output", self.problem, "evolved_heuristics"), exist_ok=True)
 
     def evolve(
             self,
@@ -144,6 +146,7 @@ class HeuristicEvolver:
                     )
                     if suggested_heuristic_file:
                         output_heuristic_name = suggested_heuristic_file.split(os.sep)[-1].split(".")[0]
+                        shutil.copyfile(suggested_heuristic_file, os.path.join("output", self.problem, "evolved_heuristics", f"{output_heuristic_name}.py"))
                         self.llm_client.dump(f"{basic_heuristic_name}_to_{output_heuristic_name}")
 
                         suggested_improvement = sum(self.get_improvement(env, basic_heuristic_result, suggested_result)) / len(basic_heuristic_result)
@@ -175,6 +178,7 @@ class HeuristicEvolver:
                                 continue
                             if refined_heuristic_file:
                                 output_heuristic_name = refined_heuristic_file.split(os.sep)[-1].split(".")[0]
+                                shutil.copyfile(output_heuristic_name, os.path.join("output", self.problem, "evolved_heuristics", f"{output_heuristic_name}.py"))
                                 self.llm_client.dump(f"{last_heuristic_name}_to_{output_heuristic_name}")
                                 refined_improvement = sum(self.get_improvement(env, basic_heuristic_result, refined_result)) / len(basic_heuristic_result)
                                 print(f"Improvement for {refined_heuristic_file}: {refined_improvement}")
