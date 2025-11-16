@@ -40,8 +40,10 @@ def main():
     smoke_test = args.smoke_test
     llm_config_file = args.llm_config_file
 
-    evolution_dir = search_file(evolution_dir, problem)
-    validation_dir = search_file(validation_dir, problem)
+    if not os.path.exists(evolution_dir):
+        evolution_dir = search_file(evolution_dir, problem)
+    if not os.path.exists(validation_dir):
+        validation_dir = search_file(validation_dir, problem)
     if not basic_heuristic_file.endswith(".py"):
         basic_heuristic_file += ".py"
     basic_heuristic_file = search_file(basic_heuristic_file, problem)
