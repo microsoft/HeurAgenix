@@ -223,7 +223,7 @@ class HeuristicEvolver:
     def load_function_code(self, heuristic_file: str, prompt_dict: dict) -> str:
         heuristic_file = search_file(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
-        function_code = open(heuristic_file).read()
+        function_code = open(heuristic_file, encoding="utf-8").read()
         heuristic_name = function_name[:-5]
         prompt_dict["function_name"] = function_name
         prompt_dict["function_code"] = function_code
