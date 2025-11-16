@@ -22,7 +22,6 @@ experiments = [
     "qwen3-32B.think.no_tc.no_reason", "qwen3-32B.think.no_tc.reason", "qwen3-32B.think.tc.no_reason", "qwen3-32B.think.tc.reason"
 ]
 
-
 def found_key(file_path: str, key_item: str) -> float:
     with open(file_path) as file:
         for line in file.readlines():

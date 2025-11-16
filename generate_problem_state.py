@@ -21,7 +21,7 @@ def main():
     llm_config_file = args.llm_config_file
 
     prompt_dir = os.path.join("src", "problems", "base", "prompt")
-    output_dir = output_dir=os.path.join("output", problem, "generate_problem_state")
+    output_dir = os.path.join("output", problem, "generate_problem_state")
     llm_client = get_llm_client(llm_config_file, prompt_dir, output_dir)
 
     problem_state_generator = ProblemStateGenerator(llm_client=llm_client, problem=problem)
