@@ -63,7 +63,7 @@ class HeuristicEvolver:
         heuristic_dir = os.path.dirname(basic_heuristic_file)
 
         heuristic_introduction_docs = "\n".join([
-            extract_function_with_short_docstring(open(search_file(heuristic_file, self.problem)).read(), heuristic_file.split(".")[0])
+            extract_function_with_short_docstring(open(search_file(heuristic_file, self.problem), encoding="utf-8").read(), heuristic_file.split(".")[0])
             for heuristic_file in os.listdir(heuristic_dir)
         ])
 
