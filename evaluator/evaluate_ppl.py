@@ -27,10 +27,14 @@ def compute_ppl(
     total_loss_sum = 0.0
     total_tok_cnt = 0
 
-    # For simple, assume test_dataset is a list of dict with keys: "message"
-    system_prompts = [ex["message"][0]["content"] for ex in test_dataset]
-    questions      = [ex["message"][1]["content"] for ex in test_dataset]
-    refs           = [ex["message"][2]["content"] for ex in test_dataset]
+    if 'message' in test_dataset[0].keys():
+        system_prompts = [data["message"][0]["content"] for data in test_dataset]
+        questions      = [data["message"][1]["content"] for data in test_dataset]
+        refs           = [data["message"][2]["content"] for data in test_dataset]
+    elif 'chosen_message' in test_dataset[0].keys():
+        system_prompts = [data["chosen_message"][0]["content"] for data in test_dataset]
+        questions      = [data["chosen_message"][1]["content"] for data in test_dataset]
+        refs           = [data["chosen_message"][2]["content"] for data in test_dataset]
 
     with torch.no_grad():
         for i in tqdm(range(0, len(questions), batch_size)):
@@ -105,57 +109,3 @@ def compute_ppl(
         "loss_sum": total_loss_sum,
         "tok_cnt": total_tok_cnt,
     }
-
-def compute_ppl_distributed(
-    model,
-    tokenizer,
-    test_dataset,
-    batch_size: int = 4,
-    enable_thinking: bool = False,
-):
-    import os
-    import math
-    import torch
-    import torch.distributed as dist
-
-    dist_inited = dist.is_available() and dist.is_initialized()
-    if dist_inited:
-        rank = dist.get_rank()
-        world = dist.get_world_size()
-        local_rank = int(os.environ.get("LOCAL_RANK", rank))
-    else:
-        rank, world, local_rank = 0, 1, 0
-
-    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
-    if device.type == "cuda":
-        torch.cuda.set_device(device)
-
-    total = len(test_dataset)
-    shard_idx = list(range(rank, total, world))
-    sub_dataset = test_dataset.select(shard_idx) if hasattr(test_dataset, "select") else [test_dataset[i] for i in shard_idx]
-
-    part = compute_ppl(
-        model=model,
-        tokenizer=tokenizer,
-        test_dataset=sub_dataset,
-        batch_size=batch_size,
-        enable_thinking=enable_thinking,
-    )
-
-    loss_sum_local = torch.tensor([part["loss_sum"]], dtype=torch.float64, device=device)
-    tok_cnt_local  = torch.tensor([part["tok_cnt"]],  dtype=torch.float64, device=device)
-
-    if dist_inited:
-        dist.all_reduce(loss_sum_local, op=dist.ReduceOp.SUM)
-        dist.all_reduce(tok_cnt_local,  op=dist.ReduceOp.SUM)
-
-        loss_sum_g = loss_sum_local.item()
-        tok_cnt_g  = tok_cnt_local.item()
-        avg_nll = loss_sum_g / max(tok_cnt_g, 1.0)
-        avg_ppl = float(math.exp(avg_nll))
-        if rank == 0:
-            return {"avg_nll": avg_nll, "avg_ppl": avg_ppl}
-        else:
-            return None
-    else:
-        return {"avg_nll": part["avg_nll"], "avg_ppl": part["avg_ppl"]}
