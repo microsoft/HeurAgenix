@@ -1,7 +1,10 @@
+import os
+import json
+import math
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-import json, os
+
 
 def compute_ppl(
     model,
@@ -9,12 +12,9 @@ def compute_ppl(
     test_dataset,
     batch_size: int = 4,
     enable_thinking: bool = False,
+    output_dir: str = None,
+    **kwargs
 ):
-    import math
-    import torch
-    import torch.nn.functional as F
-    from tqdm import tqdm
-
     model.eval()
     device = next(model.parameters()).device
 
@@ -103,9 +103,14 @@ def compute_ppl(
 
     tokenizer.padding_side = prev_side
 
-    return {
+    results = {
         "avg_nll": avg_nll,
         "avg_ppl": avg_ppl,
         "loss_sum": total_loss_sum,
         "tok_cnt": total_tok_cnt,
     }
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, "ppl_results.json"), "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+    return results

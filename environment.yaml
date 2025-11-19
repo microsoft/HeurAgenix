@@ -2,33 +2,33 @@ name: my_env
 channels:
   - defaults
 dependencies:
-  - _libgcc_mutex=0.1
-  - _openmp_mutex=5.1
-  - bzip2=1.0.8
-  - ca-certificates=2025.7.15
-  - ld_impl_linux-64=2.40
-  - libffi=3.4.4
-  - libgcc-ng=11.2.0
-  - libgomp=11.2.0
-  - libstdcxx-ng=11.2.0
-  - libuuid=1.41.5
-  - libxcb=1.17.0
-  - ncurses=6.5
-  - openssl=3.0.17
-  - pip=25.2
-  - pthread-stubs=0.3
-  - python=3.10.14
-  - readline=8.3
-  - setuptools=78.1.1
-  - sqlite=3.50.2
-  - tk=8.6.15
-  - wheel=0.45.1
-  - xorg-libx11=1.8.12
-  - xorg-libxau=1.0.12
-  - xorg-libxdmcp=1.1.5
-  - xorg-xorgproto=2024.1
-  - xz=5.6.4
-  - zlib=1.2.13
+  - _libgcc_mutex=0.1=main
+  - _openmp_mutex=5.1=1_gnu
+  - bzip2=1.0.8=h5eee18b_6
+  - ca-certificates=2025.7.15=h06a4308_0
+  - ld_impl_linux-64=2.40=h12ee557_0
+  - libffi=3.4.4=h6a678d5_1
+  - libgcc-ng=11.2.0=h1234567_1
+  - libgomp=11.2.0=h1234567_1
+  - libstdcxx-ng=11.2.0=h1234567_1
+  - libuuid=1.41.5=h5eee18b_0
+  - libxcb=1.17.0=h9b100fa_0
+  - ncurses=6.5=h7934f7d_0
+  - openssl=3.0.17=h5eee18b_0
+  - pip=25.2=pyhc872135_1
+  - pthread-stubs=0.3=h0ce48e5_1
+  - python=3.10.14=h955ad1f_1
+  - readline=8.3=hc2a1206_0
+  - setuptools=78.1.1=py310h06a4308_0
+  - sqlite=3.50.2=hb25bd0a_1
+  - tk=8.6.15=h54e0aa7_0
+  - wheel=0.45.1=py310h06a4308_0
+  - xorg-libx11=1.8.12=h9b100fa_1
+  - xorg-libxau=1.0.12=h9b100fa_0
+  - xorg-libxdmcp=1.1.5=h9b100fa_0
+  - xorg-xorgproto=2024.1=h5eee18b_1
+  - xz=5.6.4=h5eee18b_1
+  - zlib=1.2.13=hd233ad5_2
   - pip:
       - accelerate==1.10.1
       - aiohappyeyeballs==2.6.1
@@ -38,6 +38,7 @@ dependencies:
       - anyio==4.10.0
       - async-timeout==5.0.1
       - attrs==25.3.0
+      - bert_score==0.3.13
       - blinker==1.9.0
       - certifi==2025.8.3
       - charset-normalizer==3.4.3
@@ -96,6 +97,7 @@ dependencies:
       - openai==1.102.0
       - packaging==25.0
       - pandas==2.3.2
+      - peft==0.18.0
       - pillow==11.3.0
       - platformdirs==4.4.0
       - propcache==0.3.2
@@ -118,6 +120,7 @@ dependencies:
       - scipy==1.13.0
       - sentence-transformers==5.1.0
       - sentry-sdk==2.37.0
+      - shellingham==1.5.4
       - shtab==1.7.2
       - six==1.17.0
       - smmap==5.0.2
@@ -125,15 +128,16 @@ dependencies:
       - sympy==1.14.0
       - threadpoolctl==3.6.0
       - tiktoken==0.6.0
-      - tokenizers==0.21.2
-      - torch==2.2.2+cu121
-      - torchaudio==2.2.2+cu121
-      - torchvision==0.17.2+cu121
+      - tokenizers==0.22.1
+      - torch==2.2.2
+      - torchaudio==2.2.2
+      - torchvision==0.17.2
       - tqdm==4.67.1
-      - transformers==4.51.0
+      - transformers==4.57.1
       - triton==2.2.0
       - trl==0.9.6
       - typeguard==4.4.4
+      - typer-slim==0.20.0
       - typing-extensions==4.15.0
       - typing-inspection==0.4.1
       - tyro==0.9.31

@@ -26,8 +26,8 @@ def main(model_args, data_args, training_args, test_args, train_function):
     if os.getenv("AMLT_DATA_DIR"):
         base_dir =  os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..")
         training_args.output_dir = os.path.join(base_dir, training_args.output_dir)
-        model_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "model_cache")
-        model_args.model_name_or_path = os.path.join(model_dir, model_args.model_name_or_path.replace("/", "___"))
+        base_model_dir = os.path.join(os.getenv("AMLT_DATA_DIR"), "model_cache")
+        model_args.model_name_or_path = os.path.join(base_model_dir, model_args.model_name_or_path.replace("/", "___"))
     os.makedirs(training_args.output_dir, exist_ok=True)
     logger = get_log(os.path.join(training_args.output_dir, "log.txt"))
     if not int(os.environ.get("RANK", "0")) == 0:
@@ -147,8 +147,9 @@ def main(model_args, data_args, training_args, test_args, train_function):
     logger.info("*** Save model ***")
     # Align the model's generation config with the tokenizer's eos token
     # to avoid unbounded generation in the transformers `pipeline()` function
-    trainer.save_model(training_args.output_dir)
-    logger.info(f"Model saved to {training_args.output_dir}")
+    model_path = os.path.join(training_args.output_dir, "model")
+    trainer.save_model(model_path)
+    logger.info(f"Model saved to {model_path}")
     trainer.accelerator.wait_for_everyone()
 
     if trainer.accelerator.is_main_process:

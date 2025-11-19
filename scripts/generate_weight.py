@@ -32,6 +32,7 @@ def main(model_args, data_args, training_args, test_args, train_function):
         weight_args["model"] = model
         weight_args["tokenizer"] = tokenizer
         weights = weight_function(**weight_args)
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         np.save(cache_file, weights)
 
 

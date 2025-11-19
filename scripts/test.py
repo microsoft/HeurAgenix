@@ -41,20 +41,21 @@ def main(model_args, data_args, training_args, test_args, train_function):
 
     if os.getenv("AMLT_DATA_DIR"):
         base_dir =  os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..")
-        output_dir = os.path.join(base_dir, output_dir)
+        training_args.output_dir = os.path.join(base_dir, training_args.output_dir)
 
     is_dist, rank, world_size, local_rank = init_dist_if_needed()
 
     ################
     # Load tokenizer and model
     ################
-    tokenizer = AutoTokenizer.from_pretrained(output_dir, use_fast=True, trust_remote_code=model_args.trust_remote_code)
+    model_path = os.path.join(training_args.output_dir, "model")
+    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, trust_remote_code=model_args.trust_remote_code)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     torch_dtype = torch.float16 if model_args.torch_dtype in (None, "auto") else getattr(torch, model_args.torch_dtype)
     model = AutoModelForCausalLM.from_pretrained(
-        output_dir,
+        model_path,
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
         device_map={"": local_rank},

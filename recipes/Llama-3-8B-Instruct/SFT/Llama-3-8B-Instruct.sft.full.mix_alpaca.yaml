@@ -44,9 +44,13 @@ seed: 42
 warmup_ratio: 0.1
 
 # Tester config:
-eval_function: evaluator.evaluate.generate_output_distributed
+eval_function: evaluator.evaluate_combined.evaluate_combined
 eval_args:
-  prompt_template_file: evaluator/eval_prompt_with_tie.txt
   batch_size: 16
   max_new_tokens: 512
+  enable_thinking: False
+  bert_model_type: "roberta-large"
+  language: "en"
+  rescale_with_baseline: False
+  idf: False
   length_control: False

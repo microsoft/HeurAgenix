@@ -1,122 +1,111 @@
-# Weighted Training
+accelerate==1.10.1
+aiohappyeyeballs==2.6.1
+aiohttp==3.12.15
+aiosignal==1.4.0
+annotated-types==0.7.0
+anyio==4.10.0
+async-timeout==5.0.1
+attrs==25.3.0
+blinker==1.9.0
+certifi==2025.8.3
+charset-normalizer==3.4.3
+click==8.2.1
+datasets==4.0.0
+deepspeed==0.15.4
+dill==0.3.8
+distro==1.9.0
+docstring-parser==0.17.0
+einops==0.8.1
+evaluate==0.4.0
+exceptiongroup==1.3.0
+faiss-cpu==1.12.0
+faiss-gpu==1.7.2
+filelock==3.19.1
+flash-attn==2.6.3
+flask==2.3.3
+frozenlist==1.7.0
+fsspec==2025.3.0
+gitdb==4.0.12
+gitpython==3.1.45
+h11==0.16.0
+hf-xet==1.1.9
+hjson==3.1.0
+httpcore==1.0.9
+httpx==0.28.1
+huggingface-hub==0.34.4
+idna==3.10
+itsdangerous==2.2.0
+jinja2==3.1.6
+jiter==0.10.0
+joblib==1.5.2
+markdown-it-py==4.0.0
+markupsafe==3.0.2
+mdurl==0.1.2
+mpmath==1.3.0
+msgpack==1.1.1
+multidict==6.6.4
+multiprocess==0.70.16
+networkx==3.4.2
+ninja==1.13.0
+numpy==1.26.4
+nvidia-cublas-cu12==12.1.3.1
+nvidia-cuda-cupti-cu12==12.1.105
+nvidia-cuda-nvrtc-cu12==12.1.105
+nvidia-cuda-runtime-cu12==12.1.105
+nvidia-cudnn-cu12==8.9.2.26
+nvidia-cufft-cu12==11.0.2.54
+nvidia-curand-cu12==10.3.2.106
+nvidia-cusolver-cu12==11.4.5.107
+nvidia-cusparse-cu12==12.1.0.106
+nvidia-ml-py==13.580.65
+nvidia-nccl-cu12==2.19.3
+nvidia-nvjitlink-cu12==12.9.86
+nvidia-nvtx-cu12==12.1.105
+openai==1.102.0
+packaging==25.0
+pandas==2.3.2
+pillow==11.3.0
+platformdirs==4.4.0
+propcache==0.3.2
+protobuf==6.32.0
+psutil==7.0.0
+py-cpuinfo==9.0.0
+pyarrow==21.0.0
+pydantic==2.11.7
+pydantic-core==2.33.2
+pygments==2.19.2
+python-dateutil==2.9.0.post0
+pytz==2025.2
+pyyaml==6.0.1
+regex==2025.9.1
+requests==2.32.5
+responses==0.18.0
+rich==14.1.0
+safetensors==0.6.2
+scikit-learn==1.7.1
+scipy==1.13.0
+sentence-transformers==5.1.0
+sentry-sdk==2.37.0
+shtab==1.7.2
+six==1.17.0
+smmap==5.0.2
+sniffio==1.3.1
+sympy==1.14.0
+threadpoolctl==3.6.0
+tiktoken==0.6.0
+tokenizers==0.21.2
 
-A lightweight framework to train instruction-following models with per-example weights. It supports:
-- Supervised Fine-Tuning (SFT)
-- Direct Preference Optimization (DPO)
-- SimPO (work-in-progress)
-- Weighting mechanisms that can be computed offline (e.g., via a holdout set) and applied during training
-
-The project provides dataset loaders, weighted trainers, evaluation utilities (Azure GPT-based), and recipes to reproduce experiments with different models and datasets.
-
-## Features
-- Weighted SFT and DPO training
-- SimPO support (under testing and adjustments)
-- Per-example ID tracking and custom collators (EoTCompletionCollator) compatible with TRL 0.9.6
-- Response template inference for chat models (e.g., Llama-3 Instruct)
-- DeepSpeed ZeRO-3 acceleration via Accelerate
-- Config-driven recipes for common tasks
-
-## Repository Structure
-
-| Path | Description |
-|------|-------------|
-| environment.yaml | Conda environment definition |
-| run.sh | One-click script to run the full pipeline |
-| alignment/configs.py | Config parsing utilities |
-| alignment/dataset_utils.py | Dataset helper utilities |
-| alignment/log.py | Logging utilities |
-| alignment/model_utils.py | Model/tokenizer helper utilities |
-| dataset_loader/mix_alpaca.py | SFT dataset loader and preprocessing (e.g., Alpaca mixes) |
-| dataset_loader/sub_SHP_2.py | Preference dataset loader (SHP subset) |
-| dataset_loader/sub_yahoo_answers_topics.py | SFT dataset loader (Yahoo Answers topics subset) |
-| dataset_loader/ultrafeedback_binarized_enhancement.py | Preference dataset loader (UltraFeedback binarized) |
-| evaluator/azure_gpt_client.py | Azure GPT client for evaluation |
-| evaluator/eval_prompt.txt | Evaluation prompt template |
-| evaluator/evaluate.py | Distributed generation and win/tie/loss evaluation |
-| recipes/accelerate_configs/zero3.yaml | Accelerate config for DeepSpeed ZeRO-3 |
-| recipes/*.yaml | Training recipes for SFT/DPO/SimPO (weighted and non-weighted) |
-| scripts/generate_weight.py | Offline weight generation script |
-| scripts/test.py | Distributed evaluation script |
-| scripts/weighted_sft.py | Weighted SFT training entrypoint |
-| scripts/weighted_dpo.py | Weighted DPO training entrypoint |
-| scripts/weighted_sft_trainer.py | Weighted SFT Trainer implementation |
-| scripts/weighted_dpo_trainer.py | Weighted DPO Trainer implementation |
-| weight_function/uniform_weight.py | Uniform weight baseline |
-| weight_function/weight_by_holdout.py | Example weight function using a holdout set |
-
-## Data Formats
-
-- SFT data (after preprocessing):
-  - Each example:
-    - message: [{"role": "user", "content": ...}, {"role": "assistant", "content": ...}]
-    - text: string (flattened from messages via chat template)
-    - example_id: int (stable ID for weighting)
-
-- Preference data:
-  - Fields:
-    - chosen_messages: list of messages for the chosen answer
-    - rejected_message: list of messages for the rejected answer
-    - prompt: string (flattened prompt text)
-    - chosen: string (chosen answer)
-    - rejected: string (rejected answer)
-    - example_id: int
-
-Example preference entry:
-- {"chosen_messages": [...], "rejected_message": [...], "prompt": "...", "chosen": "...", "rejected": "...", "example_id": 123}
-
-## Installation
-
-1) Create and activate the Conda environment:
-```
-conda env create -f environment.yaml
-conda activate <your-env-name>
-```
-
-2) (Optional) Configure any credentials needed for evaluation (Azure OpenAI), if you plan to run the evaluator.
-
-## Usage
-
-### 1. Generate Weights Offline
-Compute and cache weights for your training set:
-```
-python scripts/generate_weight.py --config recipes/<your_recipe>.yaml
-```
-This will use the configured weight_function (e.g., uniform_weight or holdout-based) and save weights to the specified cache file.
-
-### 2. Train
-Run weighted training with DeepSpeed ZeRO-3 acceleration:
-```
-ACCELERATE_LOG_LEVEL=info \
-accelerate launch \
-  --config_file recipes/accelerate_configs/zero3.yaml \
-  scripts/train.py \
-  --config recipes/<your_recipe>.yaml \
-  --output_dir <OUTPUT_DIR>
-  --train_function <SFT|DPO|SimPO>
-```
-
-### 3. Evaluate
-Distributed generation and evaluation:
-```
-torchrun --standalone --nnodes=1 --nproc_per_node=4 \
-  scripts/test.py \
-  --config recipes/<your_recipe>.yaml \
-  --output_dir <OUTPUT_DIR>
-```
-
-### 4. One-click Pipeline
-Alternatively, you can run the entire pipeline via:
-```
-bash run.sh
-```
-
-## Notes and Tips
-- The project infers the model’s response template automatically and uses a custom EoTCompletionCollator to include the <|eot_id|> token in labels where appropriate (necessary for TRL 0.9.6 which lacks label_eos_token=True).
-- example_id is preserved through the data pipeline and carried in batches, ensuring correct alignment with per-example weights even under shuffling and distributed training.
-- The provided zero3.yaml accelerates training with DeepSpeed ZeRO-3; adjust num_processes for your GPU count.
-- Ensure your tokenizer’s chat_template aligns with your model (e.g., Llama-3-Instruct). The code falls back to a provided template if missing.
-
-## Roadmap
-1) Finalize and test SimPO
-2) Unify and simplify run scripts
-3) Add additional weight computation methods (e.g., RHO-Loss, One-shot learning)
+tqdm==4.67.1
+transformers==4.51.0
+triton==2.2.0
+trl==0.9.6
+typeguard==4.4.4
+typing-extensions==4.15.0
+typing-inspection==0.4.1
+tyro==0.9.31
+tzdata==2025.2
+urllib3==2.5.0
+wandb==0.21.3
+werkzeug==3.1.3
+xxhash==3.5.0
+yarl==1.20.1
