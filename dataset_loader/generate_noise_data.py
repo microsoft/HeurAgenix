@@ -97,26 +97,34 @@ def generate_noise_data(
     records = []
 
 
-    for data in source_dataset:
+    for index, data in enumerate(source_dataset):
+        if index % 100 == 0:
+            print(index)
         question = data["question"].strip()
         source_cot, source_ans = parse_gsm8k_answer(data["answer"])
 
         r = random.random()
         if r < dropout_ratio:
             noisy_cot = dropout_cot(source_cot)
+            noise = "dropout_cot"
         elif r < dropout_ratio + shuffle_ratio:
             noisy_cot = shuffle_cot(source_cot)
+            noise = "shuffle_cot"
         elif r < dropout_ratio + shuffle_ratio + replace_ratio:
             noisy_cot = perturb_cot(source_cot)
+            noise = "perturb_cot"
         elif r < dropout_ratio + shuffle_ratio + replace_ratio + generate_ratio:
             noisy_cot = generate_cot(question, tokenizer, generate_model, temperature=temperature, top_p=top_p, max_new_tokens=max_new_tokens)
+            noise = "generate_cot"
         else:
             noisy_cot = source_cot
+            noise = "keep_original"
         noisy_answer_combined = format_answer(noisy_cot, source_ans)
 
         rec = {
             "question": question,
             "answer": noisy_answer_combined,
+            "noise": noise
         }
         records.append(rec)
 

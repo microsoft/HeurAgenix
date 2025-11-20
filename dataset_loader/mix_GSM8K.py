@@ -34,5 +34,21 @@ def subset_map(dataset: Dataset, split_name: str, num_proc: int, tokenizer) -> D
 
 
 def get_dataset(tokenizer, data_config: DataConfig=None, **kwargs) -> DatasetDict:
-    gsm8k = load_dataset("openai/gsm8k", "main", split="train")
+    gsm8k_train = load_dataset("openai/gsm8k", "main", split="train")
+    gsm8k_noise = load_dataset("VictorYXL/noise_gsm8k", split="noise")
+    gsm8k_test  = load_dataset("openai/gsm8k", "main", split="test")
+
+    holdout_dataset = gsm8k_train.select(range(0, 1000))
+    train_dataset   = gsm8k_noise.select(range(1000, gsm8k_noise.num_rows))
+    train_dataset   = concatenate_datasets([holdout_dataset, train_dataset])
+    test_dataset    = gsm8k_test
     num_proc = getattr(data_config, "dataset_process_num", None) if data_config else None
+
+    holdout_dataset = subset_map(holdout_dataset, "holdout", num_proc, tokenizer)
+    train_dataset   = subset_map(train_dataset, "train", num_proc, tokenizer)
+    test_dataset    = subset_map(test_dataset, "test", num_proc, tokenizer)
+    return DatasetDict(
+        holdout=holdout_dataset,
+        train=train_dataset,
+        test=test_dataset
+    )
