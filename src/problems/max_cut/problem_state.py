@@ -90,6 +90,7 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     average_cut_edge_weight = current_cut_value / len(selected_nodes) if selected_nodes else 0
     selected_nodes_ratio = len(selected_nodes) / node_num
     unselected_nodes_ratio = len(unselected_nodes) / node_num
+
     internal_edges = [weight_matrix[i][j] for i in current_solution.set_a for j in current_solution.set_a if i != j] + \
                      [weight_matrix[i][j] for i in current_solution.set_b for j in current_solution.set_b if i != j]
     edge_weight_variance_within_sets = np.var(internal_edges) if internal_edges else 0

@@ -28,6 +28,7 @@ class BaseEnv:
         assert problem_state_file is not None, f"Problem state code file {problem_state_file} does not exist"
         self.get_instance_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_instance_problem_state")
         self.get_solution_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_solution_problem_state")
+        self.instance_problem_state = self.get_instance_problem_state(self.instance_data)
         self.problem_state = self.get_problem_state()
 
 
@@ -77,7 +78,6 @@ class BaseEnv:
     def get_problem_state(self, solution: BaseSolution=None) -> dict:
         if solution is None:
             solution = self.current_solution
-        instance_problem_state = self.get_instance_problem_state(self.instance_data)
         solution_problem_state = self.get_solution_problem_state(self.instance_data, solution)
         helper_function = self.helper_function()
         problem_state = None
@@ -87,7 +87,7 @@ class BaseEnv:
                 "current_solution": solution,
                 self.key_item: self.key_value,
                 **helper_function,
-                **instance_problem_state,
+                **self.instance_problem_state,
                 **solution_problem_state,
             }
         return problem_state

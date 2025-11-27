@@ -75,3 +75,7 @@ best_known = {
     "g77": 9942,
     "g81": 14060,
 }
+import os
+def get_best(data:str) -> int:
+    key = data.split(os.sep)[-1].split(".")[0]
+    return best_known.get(key, None)

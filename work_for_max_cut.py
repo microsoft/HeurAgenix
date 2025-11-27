@@ -6,7 +6,7 @@ from src.util.llm_client.get_llm_client import get_llm_client
 from src.util.util import load_function
 from src.problems.max_cut.env import Env
 from collections import defaultdict, deque
-from best_known import best_known
+from best_known import get_best
 
 
 def refine_code():
@@ -34,36 +34,6 @@ def dedup():
     llm_client.load("deduce_code.txt", {"num": num, "all_code": all_code})
     llm_client.chat()
     llm_client.dump("dedup3")
- 
-def test_speed(heuristic_file: str):
-    # For each heuristic, test 10 times:
-    # Random select one dataset, run random heuristic random times (nodes / 3 < = random , nodes * 2 / 3) and run this heuristics for 5 times, collect the results.
-    # If this heuristics crashed / return 4 or 5 None / cost too much time, then fix.
-    try:
-        heuristic = load_function(heuristic_file, "max_cut")
-    except Exception as e:
-        return 0, 0, f"Load Error: {str(e)}"
-    random_heuristic = load_function("random_5c59.py", "max_cut")
-    total_seconds = 0
-    nones = 0
-    crashed = []
-    for i in range(10):
-        env = Env(data_name=f"g{i+1}.mc")
-        env.reset()
-        previous_actions_num = random.randint(env.construction_steps // 5, env.construction_steps * 2 // 5 )
-        for j in range(previous_actions_num):
-            env.run_heuristic(random_heuristic)
-        begin_time = datetime.datetime.now()
-        for k in range(10):
-            op = env.run_heuristic(heuristic)
-            if op is None:
-                nones += 1
-            if isinstance(op, str):
-                crashed.append(op)
-        env_time = datetime.datetime.now()
-        seconds = (env_time - begin_time).total_seconds()
-        total_seconds += seconds
-    return total_seconds, nones, "\n".join(crashed)
  
  
 def generate_data(source_file: str, new_file: str):
@@ -186,27 +156,70 @@ def generate_data(source_file: str, new_file: str):
             f.write(f"{mapping[a]} {mapping[b]} {w}\n")
    
  
-def test_all(heuristics_pool: list[str]):
-    for heuristic_file in heuristics_pool:
-        heuristic_name = heuristic_file.split(".py")[0]
-        threshold_total_seconds = 2 * 200
-        total_seconds, nones, crashed = test_speed(heuristic_file)
-        print("===================================")
-        print(heuristic_file)
-        print("Total seconds:", total_seconds)    
-        print("Nones:", nones)
-        print("Crashed:", crashed)
-        print("===================================")
-    
+
 
 def batch_evolved():
     for heuristic_file in os.listdir(os.path.join("src", "problems", "max_cut", "heuristics", "refined_basic_heuristics")):
         s = f"start \"\" /B python evolve_heuristic.py -p max_cut -m -l data\\llm_config\\azure_gpt_5.json -ed output\\max_cut\\generated_data -e {heuristic_file}"
         print(s)
 
-heuristics_pool = os.path.join("src", "problems", "max_cut", "heuristics", "basic_heuristics") + os.path.join("", os.listdir(os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")))
-test_all()
-# batch_evolved()
 
-# os.makedirs(os.path.join("output", "max_cut", "generated_data"), exist_ok=True)
-# generate_data("g1.mc", "train1.mc")
+ 
+def test_single_heuristic(target_heuristic: callable, heuristic_pools: list[callable], test_data_list: list[str], test_ratio: float=0.3):
+    total_ms = 0
+    nones = 0
+    crashed = []
+    running_steps = 0
+    complete = 0
+    total_gap = 0
+    for test_data in test_data_list:
+        env = Env(data_name=test_data)
+        env.reset()
+        total_times = int(env.construction_steps * 2)
+        test_times = int(env.construction_steps * 2 * test_ratio)
+        test_steps = random.sample(range(total_times), test_times)
+        test_step_flag = [1 if i in test_steps else 0 for i in range(total_times)]
+        for j in range(env.construction_steps * 2):
+            if test_step_flag[j] == 1:
+                begin = datetime.datetime.now()
+                op = env.run_heuristic(target_heuristic)
+                end = datetime.datetime.now()
+                running_steps += 1
+                if op is None:
+                    nones += 1
+                if isinstance(op, str):
+                    crashed.append(op)
+                total_ms += (end - begin).microseconds
+            else:
+                env.run_heuristic(random.choice(heuristic_pools))
+        if env.is_complete_solution and env.is_valid_solution:
+            complete += 1
+            best_known = get_best(test_data)
+            total_gap += abs(env.key_value - best_known) / best_known
+    return running_steps, total_ms / running_steps, nones / running_steps, complete / len(test_data_list), total_gap / len(test_data_list), "\n".join(crashed)
+
+def test_all_heuristics(test_dir, test_data_list):
+    test_data_names = ",".join(test_data_list)
+    result_name = "comparison_test.txt"
+    with open(result_name, "w", encoding="utf-8") as f:
+        f.write(test_data_names + "\n")
+        f.write("Heuristic\ttotal_running_steps\taverage_time_cost(ms)\taverage_nones\tcomplete_ratio\taverage_gap\tcrashed\n")
+        f.close()
+    heuristics_pool = []
+    for heuristic_file in os.listdir(test_dir):
+        heuristic = load_function(os.path.join(test_dir, heuristic_file), "max_cut")
+        heuristics_pool.append(heuristic)
+    for heuristic_file in heuristics_pool:
+        copied_heuristics = heuristics_pool.copy()
+        copied_heuristics.remove(heuristic_file)
+        running_steps, average_ms, average_nones, complete_ratio, average_gap, crashed = \
+            test_single_heuristic(heuristic_file, copied_heuristics, test_data_list, test_ratio=0.3)
+        with open("comparison_test.txt", "a", encoding="utf-8") as f:
+            f.write(f"{heuristic_file.__name__}\t{running_steps}\t{average_ms}\t{average_nones}\t{complete_ratio}\t{average_gap}\t{crashed}\n")
+            f.close()
+
+def work():
+    test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
+    test_data_list = [f"g{i}.mc" for i in [1, 11, 21, 31, 41, 51, 61]]
+    test_all_heuristics(test_dir, test_data_list)
+work()
