@@ -18,6 +18,7 @@ def run_random_hh(
     random_hh = RandomHyperHeuristic(heuristic_pool, problem, iterations_scale_factor)
     env = dill.loads(env_serialized)
     complete_and_valid_solution = random_hh.run(env)
+    print(complete_and_valid_solution, best_result_proxy.value == float('-inf'), env.compare(env.key_value, best_result_proxy.value))
 
     if complete_and_valid_solution:
         # If found best, save it

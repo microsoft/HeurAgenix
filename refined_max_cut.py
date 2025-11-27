@@ -6,7 +6,9 @@ from src.util.llm_client.get_llm_client import get_llm_client
 from src.util.util import load_function
 from src.problems.max_cut.env import Env
 from collections import defaultdict, deque
- 
+from best_known import best_known
+
+
 def refine_code():
     llm_client = get_llm_client(os.path.join("data", "llm_config", "azure_gpt_5.json"), output_dir=os.path.join("output", "refine_code"))
     for heuristic_file in os.listdir(os.path.join("src", "problems", "max_cut", "heuristics", "basic_heuristics")):
@@ -33,11 +35,10 @@ def dedup():
     llm_client.chat()
     llm_client.dump("dedup3")
  
-def test(heuristic_name: str):
+def test_speed(heuristic_file: str):
     # For each heuristic, test 10 times:
     # Random select one dataset, run random heuristic random times (nodes / 3 < = random , nodes * 2 / 3) and run this heuristics for 5 times, collect the results.
     # If this heuristics crashed / return 4 or 5 None / cost too much time, then fix.
-    heuristic_file = os.path.join("src", "problems", "max_cut", "heuristics", "refined_basic_heuristics", heuristic_name + ".py")
     try:
         heuristic = load_function(heuristic_file, "max_cut")
     except Exception as e:
@@ -185,23 +186,27 @@ def generate_data(source_file: str, new_file: str):
             f.write(f"{mapping[a]} {mapping[b]} {w}\n")
    
  
-def test():
-    for heuristic_file in os.listdir(os.path.join("src", "problems", "max_cut", "heuristics", "refined_basic_heuristics")):
+def test_all(heuristics_pool: list[str]):
+    for heuristic_file in heuristics_pool:
         heuristic_name = heuristic_file.split(".py")[0]
         threshold_total_seconds = 2 * 200
-        total_seconds, nones, crashed = test(heuristic_name)
+        total_seconds, nones, crashed = test_speed(heuristic_file)
         print("===================================")
         print(heuristic_file)
-        print("Total seconds:", total_seconds)
+        print("Total seconds:", total_seconds)    
         print("Nones:", nones)
         print("Crashed:", crashed)
         print("===================================")
+    
 
 def batch_evolved():
     for heuristic_file in os.listdir(os.path.join("src", "problems", "max_cut", "heuristics", "refined_basic_heuristics")):
         s = f"start \"\" /B python evolve_heuristic.py -p max_cut -m -l data\\llm_config\\azure_gpt_5.json -ed output\\max_cut\\generated_data -e {heuristic_file}"
         print(s)
 
-batch_evolved()
+heuristics_pool = os.path.join("src", "problems", "max_cut", "heuristics", "basic_heuristics") + os.path.join("", os.listdir(os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")))
+test_all()
+# batch_evolved()
+
 # os.makedirs(os.path.join("output", "max_cut", "generated_data"), exist_ok=True)
 # generate_data("g1.mc", "train1.mc")

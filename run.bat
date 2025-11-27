@@ -1,0 +1,1 @@
+python launch_hyper_heuristic.py -p max_cut -e llm_hh -d refined_basic_heuristics -l data\llm_config\azure_gpt_5.json -c 3 -b 10 -n 0.5 -t g81.mc,g77.mc,g72.mc

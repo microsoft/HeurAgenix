@@ -74,7 +74,7 @@ class HeuristicEvolver:
             # Filter the best heuristics
             filtered_heuristic_benchmarks = sorted(total_heuristic_benchmarks, key=lambda x: x[1], reverse=True)[: filtered_num]
             for basic_heuristic_file, _ in filtered_heuristic_benchmarks:
-                for data_name in self.evolution_cases:
+                for data_name in self.evolution_cases[::-1]:
                     evolved_heuristic_with_improvements = self.evolution_single(
                         evolution_data=data_name,
                         basic_heuristic_file=basic_heuristic_file,

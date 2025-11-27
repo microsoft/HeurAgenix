@@ -13,8 +13,6 @@ Please provide suggestion in following one or more aspects:
 2. Add more logic to this function for better control.
 3. Limit the application scope of certain logic with an if-check.
 4. Consider providing different output operators, such as operation type, operation subject, operation location, operation time, etc.
-5. Also consider learning from other heuristics:
-{all_heuristic_docs}
 
 To make sure the suggestion is useful, please check in following aspects:
 1. Is this suggestion clear and achievable? For example, choosing operation A brings greater benefits in the form of rebates is not a clear and achievable suggestion because we do not know how to measure future benefits.

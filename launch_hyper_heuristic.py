@@ -22,7 +22,7 @@ def parse_arguments():
     parser.add_argument("-m", "--selection_frequency", type=int, default=5, help="Number of steps executed per heuristic selection in LLM mode. Default is 5.")
     parser.add_argument("-c", "--num_candidate_heuristics", type=int, default=1, help="Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.")
     parser.add_argument("-b", "--rollout_budget", type=int, default=0, help="Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.")
-    parser.add_argument("-res", "--result_name", type=str, default=None, help="Target directory for saving results.")
+    parser.add_argument("-res", "--result_name", type=str, default="result", help="Target directory for saving results.")
     parser.add_argument("-exp", "--experiment_name", type=str, default=None, help="Naming for experiments results.")
 
     return parser.parse_args()
@@ -42,8 +42,7 @@ def main():
     result_name = args.result_name
     experiment_name = args.experiment_name
 
-    datetime_str = datetime.now().strftime("%Y%m%d")
-    result_name = result_name if result_name is not None else f"result.{datetime_str}"
+    datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
     heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_dir))
 
@@ -78,10 +77,11 @@ def main():
         test_data = os.listdir(search_file("test_data", problem))
     else:
         test_data = test_data.split(",")
+    
 
     for data_name in test_data:
         env = Env(data_name=data_name)
-        experiment_name = experiment_name if experiment_name else heuristic
+        experiment_name = experiment_name if experiment_name else datetime_str
         output_dir = os.path.join(base_output_dir, problem, result_name, env.data_ref_name, experiment_name)
         env.reset(output_dir)
 
