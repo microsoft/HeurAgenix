@@ -72,7 +72,7 @@ class BaseLLMClient:
             chat_file = chat_file + ".json"
         if self.prompt_dir is not None and os.path.exists(os.path.join(self.prompt_dir, chat_file)):
             chat_file = os.path.join(self.prompt_dir, chat_file)
-        elif self.prompt_dir is not None and os.path.exists(os.path.join(self.output_dir, chat_file)):
+        elif self.output_dir is not None and os.path.exists(os.path.join(self.output_dir, chat_file)):
             chat_file = os.path.join(self.output_dir, chat_file)
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)

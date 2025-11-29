@@ -7,7 +7,7 @@ from src.util.util import load_function
 from src.problems.max_cut.env import Env
 from collections import defaultdict, deque
 from best_known import get_best
-
+import numpy as np
 
 def refine_code():
     llm_client = get_llm_client(os.path.join("data", "llm_config", "azure_gpt_5.json"), output_dir=os.path.join("output", "refine_code"))
@@ -175,11 +175,25 @@ def test_single_heuristic(target_heuristic: callable, heuristic_pools: list[call
     for test_data in test_data_list:
         env = Env(data_name=test_data)
         env.reset()
+        f = open("time_cost.txt", "a", encoding="utf-8")
+        f.write(f"---{target_heuristic.__name__}, {test_data}, {env.instance_data['node_num']}---\n")
+        f.close()
         total_times = int(env.construction_steps * 2)
         test_times = int(env.construction_steps * 2 * test_ratio)
         test_steps = random.sample(range(total_times), test_times)
         test_step_flag = [1 if i in test_steps else 0 for i in range(total_times)]
+        time_cost = {heuristic.__name__: [] for heuristic in heuristic_pools}
         for j in range(env.construction_steps * 2):
+            if j % 500 == 0 or j == env.construction_steps * 2 - 1:
+                f = open("time_cost.txt", "a", encoding="utf-8")
+                time_cost_list = [(heuristic, np.mean(ms)) if len(ms) > 0 else (heuristic, 0) for heuristic, ms in time_cost.items()]
+                time_cost_list = sorted(time_cost_list, key=lambda x: x[1], reverse=True)
+                time_cost_str = ", ".join([f"{heuristic}: {ms:.2f}ms" for heuristic, ms in time_cost_list if ms > 500])
+                time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"{time}\t{j}\t{time_cost_str}\n")
+                f.close()
+                time_cost = {heuristic.__name__:[] for heuristic in heuristic_pools}
+                
             if test_step_flag[j] == 1:
                 begin = datetime.datetime.now()
                 op = env.run_heuristic(target_heuristic)
@@ -189,9 +203,14 @@ def test_single_heuristic(target_heuristic: callable, heuristic_pools: list[call
                     nones += 1
                 if isinstance(op, str):
                     crashed.append(op)
-                total_ms += (end - begin).microseconds
+                total_ms += (end - begin).microseconds / 1000
             else:
-                env.run_heuristic(random.choice(heuristic_pools))
+                heuristic = random.choice(heuristic_pools)
+                begin = datetime.datetime.now()
+                env.run_heuristic(heuristic)
+                end = datetime.datetime.now()
+                ms = (end - begin).microseconds / 1000
+                time_cost[heuristic.__name__].append(ms)
         if env.is_complete_solution and env.is_valid_solution:
             complete += 1
             best_known = get_best(test_data)
@@ -209,7 +228,7 @@ def test_all_heuristics(test_dir, test_data_list):
     for heuristic_file in os.listdir(test_dir):
         heuristic = load_function(os.path.join(test_dir, heuristic_file), "max_cut")
         heuristics_pool.append(heuristic)
-    for heuristic_file in heuristics_pool:
+    for heuristic_file in heuristics_pool[5:]:
         copied_heuristics = heuristics_pool.copy()
         copied_heuristics.remove(heuristic_file)
         running_steps, average_ms, average_nones, complete_ratio, average_gap, crashed = \
@@ -220,6 +239,7 @@ def test_all_heuristics(test_dir, test_data_list):
 
 def work():
     test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
-    test_data_list = [f"g{i}.mc" for i in [1, 11, 21, 31, 41, 51, 61]]
+    test_data_list = [f"g{i}.mc" for i in [30]]
     test_all_heuristics(test_dir, test_data_list)
+
 work()

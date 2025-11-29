@@ -56,7 +56,7 @@ def parse_text_to_dict(text):
         result[current_key.replace(" ", "")] = "\n".join(current_content).strip()
     return result
 
-def load_function(file:str, problem: str="base", function_name: str=None) -> callable:
+def load_function(file: str, problem: str="base", function_name: str=None) -> callable:
     if not "\n" in file:
         if not file.endswith(".py"):
             # File name

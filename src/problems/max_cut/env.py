@@ -2,6 +2,7 @@ import os
 import numpy as np
 from src.problems.base.env import BaseEnv
 from src.problems.max_cut.components import Solution
+from src.problems.max_cut.best_known import best_known
 
 
 class Env(BaseEnv):
@@ -17,6 +18,8 @@ class Env(BaseEnv):
         return len(self.current_solution.set_a) + len(self.current_solution.set_b) == self.instance_data["node_num"]
 
     def load_data(self, data_path: str) -> tuple:
+        data_name = data_path.split(os.sep)[-1].split(".")[0]
+        self.best_known = best_known.get(data_name, None)
         with open(data_path) as file:
             node_num = int(file.readline().split(" ", 1)[0])
             weight_matrix = np.zeros((node_num, node_num))
