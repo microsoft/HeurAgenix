@@ -28,7 +28,6 @@ class RandomHyperHeuristic:
         node_num = env.instance_data["node_num"]
         while current_steps <= max_steps and env.continue_run:
             heuristic = random.choice(self.heuristic_pools)
-            _ = env.run_heuristic(heuristic)
             if current_steps % 1000 == 0:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
@@ -38,7 +37,8 @@ class RandomHyperHeuristic:
                     if env.is_complete_solution and best_value == last_best:
                         f.write(f"No better result found.\n")
                         return env.is_complete_solution and env.is_valid_solution
-                last_best = best_value
+            _ = env.run_heuristic(heuristic)
+            last_best = best_value
             if env.key_value >= env.best_known:
                 env.dump_result(result_file=f"break_best_known_result.txt")
                 found_best = True

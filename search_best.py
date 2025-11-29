@@ -29,6 +29,7 @@ def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
         np.random.seed(seed & 0xFFFFFFFF)
 
     env = Env(data_name=data_name)
+    construction_steps = env.construction_steps
     env.reset()
     algorithm = RandomHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 2)
 
@@ -39,7 +40,7 @@ def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
         import gc; gc.collect()
     except Exception:
         pass
-    return rss, env.construction_steps
+    return rss, construction_steps
 
 def pick_safe_workers(data_name: str, heuristic_dir: str,
                       safety_factor: float = 1.5,
@@ -55,8 +56,8 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
     max_by_cpu = os.cpu_count() or 1
     workers = max(1, min(max_by_cpu, max_by_mem))
 
-    if construction_steps >= 5000:
-        workers = min(workers, 12)
+    if construction_steps > 5000:
+        workers = min(workers, 24)
     print(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, "
           f"avail ~ {avail/1024/1024:.1f} MiB, choose workers={workers}")
 
@@ -92,7 +93,7 @@ def main(data_name: str, heuristic_dir: str, num_runs: int):
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
 
     remaining = list(range(num_runs))
-    results = []
+    finished_ids = []
 
     while remaining:
         print(f"Start batch with workers={workers}, remaining tasks={len(remaining)}")
@@ -104,12 +105,13 @@ def main(data_name: str, heuristic_dir: str, num_runs: int):
                 run_id = fut_map[fut]
                 try:
                     found_best, experiment_name = fut.result()
+                    finished_ids.append(run_id)
                     if found_best:
                         print(f"Run {run_id} found best solution in experiment {experiment_name}.")
                 except Exception as e:
                     print(f"Run {run_id} failed: {e}")
 
-        done_ids = {run_id for run_id, _ in results}
+        done_ids = {run_id for run_id in finished_ids}
         remaining = [rid for rid in remaining if rid not in done_ids]
 
         if remaining:
