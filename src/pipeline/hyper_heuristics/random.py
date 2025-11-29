@@ -19,14 +19,28 @@ class RandomHyperHeuristic:
     def run(self, env:BaseEnv) -> bool:
         max_steps = int(env.construction_steps * self.iterations_scale_factor)
         current_steps = 0
+        with open(os.path.join(env.output_dir, "running_log.txt"), "w") as f:
+            f.write(f"current_steps\tselected_nodes\tcurrent_value\tbest_known\ttotal_time_cost(s)\n")
+        begin = datetime.now()
+        best_value = 0
+        last_best = 0
         while current_steps <= max_steps and env.continue_run:
             heuristic = random.choice(self.heuristic_pools)
-            begin = datetime.now()
             _ = env.run_heuristic(heuristic)
-            end = datetime.now()
-            time_cost = (end - begin).total_seconds() * 1000
-            current_steps += 1
-            print(current_steps, env.key_value, env.best_known, heuristic.__name__, time_cost)
+            if current_steps % 100 == 0:
+                selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
+                end = datetime.now()
+                time_cost = (end - begin).total_seconds()
+                with open(os.path.join(env.output_dir, "running_log.txt"), "a") as f:
+                    f.write(f"{current_steps}\t{selected_nodes}\t{env.key_value}\t{env.best_known}\t{time_cost}\n")
+                    if env.is_complete_solution and best_value == last_best:
+                        f.write(f"No better result found.\n")
+                        return env.is_complete_solution and env.is_valid_solution
+                last_best = best_value
             if env.key_value >= env.best_known:
-                env.dump_result(result_file=f"found_best_best_result_{env.key_value}.txt")
+                env.dump_result(result_file=f"break_best_known_result.txt")
+            if env.is_complete_solution and env.key_value >= best_value:
+                best_value = env.key_value
+                env.dump_result(result_file=f"current_best_result.txt")
+            current_steps += 1
         return env.is_complete_solution and env.is_valid_solution
