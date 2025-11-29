@@ -39,14 +39,14 @@ def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
         import gc; gc.collect()
     except Exception:
         pass
-    return rss
+    return rss, env.construction_steps
 
 def pick_safe_workers(data_name: str, heuristic_dir: str,
                       safety_factor: float = 1.5,
                       reserve_fraction: float = 0.2) -> int:
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
     with ctx.Pool(1) as pool:
-        mem_per_task = pool.apply(_probe_env_mem, (data_name, heuristic_dir))
+        mem_per_task, construction_steps = pool.apply(_probe_env_mem, (data_name, heuristic_dir))
 
     avail = psutil.virtual_memory().available
     budget = int(avail * (1.0 - reserve_fraction))
@@ -55,8 +55,11 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
     max_by_cpu = os.cpu_count() or 1
     workers = max(1, min(max_by_cpu, max_by_mem))
 
+    if construction_steps >= 5000:
+        workers = min(workers, 12)
     print(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, "
           f"avail ~ {avail/1024/1024:.1f} MiB, choose workers={workers}")
+
     return workers
 
 def run_once(data_name: str, heuristic_dir: str, run_id: int) -> float:
@@ -73,16 +76,16 @@ def run_once(data_name: str, heuristic_dir: str, run_id: int) -> float:
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment_name = f"{datetime_str}_id_{run_id}"
 
-    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     output_dir = os.path.join(base_output_dir, "max_cut", "search_best_result", env.data_ref_name, experiment_name)
 
     env.reset(output_dir=output_dir)
     print(f"Run id: {run_id}, seed: {seed}, output_dir: {output_dir}")
     algorithm = RandomHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 2)
-    result = algorithm.run(env)
+    found_best = algorithm.run(env)
     env.dump_result(result_file="result.txt")
-    print(f"Finish run id: {run_id}, result: {result}")
-    return result
+    print(f"Finish run id: {run_id}, found_best: {found_best}")
+    return found_best, experiment_name
 
 def main(data_name: str, heuristic_dir: str, num_runs: int):
     workers = pick_safe_workers(data_name, heuristic_dir)
@@ -100,17 +103,16 @@ def main(data_name: str, heuristic_dir: str, num_runs: int):
             for fut in as_completed(fut_map):
                 run_id = fut_map[fut]
                 try:
-                    r = fut.result()
-                    results.append((run_id, r))
+                    found_best, experiment_name = fut.result()
+                    if found_best:
+                        print(f"Run {run_id} found best solution in experiment {experiment_name}.")
                 except Exception as e:
                     print(f"Run {run_id} failed: {e}")
 
-        # 更新剩余任务
         done_ids = {run_id for run_id, _ in results}
         remaining = [rid for rid in remaining if rid not in done_ids]
 
         if remaining:
-            # 有失败任务则降并发重试
             workers = max(1, workers // 2)
             time.sleep(1.0)
 if __name__ == '__main__':

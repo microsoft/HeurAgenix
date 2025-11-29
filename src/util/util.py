@@ -208,8 +208,9 @@ def search_file(file_name: str, problem: str="base") -> str:
         return file_path
 
     if os.getenv("AMLT_DATA_DIR"):
-        data_dir = os.getenv("AMLT_DATA_DIR")
-        output_dir = os.getenv("AMLT_OUTPUT_DIR")
+        root_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm")
+        data_dir = os.path.join(root_dir, "data")
+        output_dir = os.path.join(root_dir, "output")
     else:
         data_dir = "data"
         output_dir = "output"

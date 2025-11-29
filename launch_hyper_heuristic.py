@@ -46,7 +46,7 @@ def main():
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
     heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_dir))
 
-    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
 
     if heuristic == "llm_hh":
         prompt_dir = os.path.join("src", "problems", "base", "prompt")

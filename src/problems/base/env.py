@@ -62,7 +62,7 @@ class BaseEnv:
             if os.sep in output_dir:
                 self.output_dir = output_dir
             else:
-                base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+                base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
                 self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, output_dir)
             os.makedirs(self.output_dir, exist_ok=True)
 
