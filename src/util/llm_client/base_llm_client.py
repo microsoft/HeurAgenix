@@ -46,7 +46,7 @@ class BaseLLMClient:
             chat_file = chat_file + ".json"
         if self.prompt_dir is not None and os.path.exists(os.path.join(self.prompt_dir, chat_file)):
             chat_file = os.path.join(self.prompt_dir, chat_file)
-        elif self.prompt_dir is not None and os.path.exists(os.path.join(self.output_dir, chat_file)):
+        elif self.output_dir is not None and os.path.exists(os.path.join(self.output_dir, chat_file)):
             chat_file = os.path.join(self.output_dir, chat_file)
         with open(chat_file, "r") as fp:
             self.messages = json.load(fp)
@@ -90,10 +90,12 @@ class BaseLLMClient:
     def load(self, message: str, replace: dict={}) -> None:
         if self.prompt_dir is not None and os.path.exists(os.path.join(self.prompt_dir, message)):
             message = open(os.path.join(self.prompt_dir, message), "r", encoding="UTF-8").read()
-        elif self.prompt_dir is not None and os.path.exists(os.path.join(self.prompt_dir, message)):
-            message = open(os.path.join(self.prompt_dir, message), "r", encoding="UTF-8").read()
         elif self.prompt_dir is not None and os.path.exists(os.path.join(self.prompt_dir, message + ".txt")):
             message = open(os.path.join(self.prompt_dir, message + ".txt"), "r", encoding="UTF-8").read()
+        elif self.output_dir is not None and os.path.exists(os.path.join(self.output_dir, message)):
+            message = open(os.path.join(self.output_dir, message), "r", encoding="UTF-8").read()
+        elif self.output_dir is not None and os.path.exists(os.path.join(self.output_dir, message + ".txt")):
+            message = open(os.path.join(self.output_dir, message + ".txt"), "r", encoding="UTF-8").read()
         elif os.path.exists(message):
             message = open(message, "r", encoding="UTF-8").read()
         elif os.path.exists(message + ".txt"):
