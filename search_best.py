@@ -78,14 +78,15 @@ def run_once(data_name: str, heuristic_dir: str, run_id: int) -> float:
     experiment_name = f"{datetime_str}_id_{run_id}"
 
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
-    output_dir = os.path.join(base_output_dir, "max_cut", "search_best_result", env.data_ref_name, experiment_name)
+    output_dir = os.path.join(base_output_dir, "max_cut", "search_best_result.update", env.data_ref_name, experiment_name)
+    os.makedirs(os.path.join(base_output_dir, "max_cut", "search_best_result.update", env.data_ref_name), exist_ok=True)
 
     env.reset(output_dir=output_dir)
     print(f"Run id: {run_id}, seed: {seed}, output_dir: {output_dir}")
-    algorithm = RandomHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 2)
+    algorithm = RandomHyperHeuristic(os.listdir(heuristic_dir), "max_cut", run_id, 5)
     found_best = algorithm.run(env)
-    env.dump_result(result_file="result.txt")
-    print(f"Finish run id: {run_id}, found_best: {found_best}")
+    # env.dump_result(result_file="result.txt")
+    print(f"Finish run id: {run_id}, env.key_value: {env.key_value}")
     return found_best, experiment_name
 
 def main(data_name: str, heuristic_dir: str, num_runs: int):

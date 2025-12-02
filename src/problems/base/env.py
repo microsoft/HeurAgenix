@@ -64,7 +64,7 @@ class BaseEnv:
             else:
                 base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
                 self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, output_dir)
-            os.makedirs(self.output_dir, exist_ok=True)
+            # os.makedirs(self.output_dir, exist_ok=True)
 
     def load_data(self, data_path: str) -> dict:
         pass
@@ -136,6 +136,7 @@ class BaseEnv:
         self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
 
     def dump_result(self, content_dict: dict={}, dump_records: list=["operation_id", "operator", "heuristic"], result_file: str="result.txt") -> str:
+        os.makedirs(self.output_dir, exist_ok=True)
         content = f"-data: {self.data_path}\n"
         content += f"-current_solution:\n{self.current_solution}\n"
         content += f"-is_complete_solution: {self.is_complete_solution}\n"
