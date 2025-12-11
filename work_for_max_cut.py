@@ -6,7 +6,6 @@ from src.util.llm_client.get_llm_client import get_llm_client
 from src.util.util import load_function
 from src.problems.max_cut.env import Env
 from collections import defaultdict, deque
-from best_known import get_best
 import numpy as np
 
 def refine_code():
@@ -213,7 +212,7 @@ def test_single_heuristic(target_heuristic: callable, heuristic_pools: list[call
                 time_cost[heuristic.__name__].append(ms)
         if env.is_complete_solution and env.is_valid_solution:
             complete += 1
-            best_known = get_best(test_data)
+            best_known = env.best_known(test_data)
             total_gap += abs(env.key_value - best_known) / best_known
     return running_steps, total_ms / running_steps, nones / running_steps, complete / len(test_data_list), total_gap / len(test_data_list), "\n".join(crashed)
 
@@ -239,7 +238,8 @@ def test_all_heuristics(test_dir, test_data_list):
 
 def work():
     test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
-    test_data_list = [f"g{i}.mc" for i in [30]]
+    # test_data_list = [f"g{i}.mc" for i in [30]]
+    test_data_list = ["g72.mc"]
     test_all_heuristics(test_dir, test_data_list)
 
 work()
