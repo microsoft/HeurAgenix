@@ -2,8 +2,9 @@ from src.problems.dposp.components import Solution, InsertOperator
 
 def longest_order_next_c9cb(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Longest Order Next heuristic algorithm for DPOSP which selects the unfulfilled order with the longest processing time
-    and schedules it in the most appropriate position on a production line that minimizes delays and respects deadlines.
+    Longest-processing-time (LPT) insertion with first-feasible placement. Candidate selection: among feasible_orders_to_fulfill, choose the order maximizing Q_k / mean_i v_{i,P_k} (exclude products with zero mean rate). Placement rule: iterate production lines in ascending id; within each line, scan positions 0..L and return the first position whose schedule passes validation_single_production_schedule. Selection policy: first-improvement; tie-breaking implicitly favors smaller production_line_id and earlier positions.
+    Feasibility is enforced solely via validation_single_production_schedule, which encapsulates deadlines, product transitions, and line capabilities; no explicit transition-time or per-line speed evaluation is performed during selection beyond the mean-rate processing-time proxy.
+    Complexity: O(|feasible_orders| · production_line_num) to compute processing-time estimates, plus up to Σ_i (|schedule_i| + 1) validation checks until the first feasible insertion is found; constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

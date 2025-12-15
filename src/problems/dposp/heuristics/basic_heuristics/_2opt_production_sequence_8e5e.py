@@ -2,11 +2,8 @@ from src.problems.dposp.components import *
 import numpy as np
 
 def _2opt_production_sequence_8e5e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
-    """The 2-opt Production Sequence heuristic adapts the 2-opt approach from TSP to the context of DPOSP. 
-    It aims to improve the sequence of production orders on each production line by swapping two non-adjacent orders and re-evaluating the schedule's efficiency.
-    By considering the production rates, transition times, and order deadlines, this heuristic explores alternative sequences that could lead to a higher number of completed orders or reduced total production and transition time.
-    The heuristic iteratively checks all possible pairs of non-adjacent orders within a production line to determine if a more optimal order sequence can be found, taking care to maintain the feasibility of the schedule with respect to order deadlines.
-    If a more efficient sequence is identified, the heuristic generates a ReverseSegmentOperator that applies this improved order sequence to the production line.
+    """
+    Production-line path 2-opt with feasibility screening and best-improvement selection. For each line, it evaluates reversing the contiguous segment (i+1..j) for all i<j, using a transition-only delta: original t(A→B) + t(B→C) versus new t(A→C) + t(C→B), where A=schedule[i], B=schedule[i+1], C=schedule[j]; if j is the last position, the far-end term is omitted (open-chain model). Production rates and deadlines do not enter the scoring; they are enforced by validating the mutated line schedule. Among all lines and pairs, it selects the globally best feasible move (most negative delta) and returns a single ReverseSegmentOperator for that segment. Operates strictly within one production line, respects forbidden transitions via validation, and targets transition-time reduction as a proxy to improve deadline feasibility. Time complexity: O(∑|line|²); constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

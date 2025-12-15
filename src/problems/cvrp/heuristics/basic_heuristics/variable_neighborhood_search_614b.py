@@ -1,9 +1,8 @@
 from src.problems.cvrp.components import *
 
 def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[BaseOperator, dict]:
-    """ Variable Neighborhood Search heuristic algorithm for CVRP.
-    This function performs a Variable Neighborhood Search by systematically changing the neighborhood structure within a local search algorithm to escape local optima and search for better solutions.
-    It uses a series of pre-defined operators to create new neighborhoods and improve upon the current solution.
+    """ 
+    Global best-improvement feasible insertion across all vehicles and positions. Scans every (vehicle, node, position) triple and selects the argmin marginal cost computed with depot-anchored boundaries: before=depot at position 0 and after=depot at position L, supporting empty routes via depot-node-depot bridging. Enforces capacity feasibility per vehicle (load + demand ≤ capacity) before evaluating positions. Does not require a negative marginal cost; if all insertions are worsening, returns the least-worsening feasible insertion, making it suitable for constructive/repair phases rather than strict local improvement. Despite the VNS label, no neighborhood change or shaking is performed; only a single InsertOperator is considered and the neighborhood_size parameter is unused. Works with asymmetric distance matrices. Time complexity: O(vehicle_num × |unvisited_nodes| × (avg_route_length + 1)); O(1) extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

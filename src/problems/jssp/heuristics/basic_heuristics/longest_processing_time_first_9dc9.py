@@ -1,7 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
 def longest_processing_time_first_9dc9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Selects the next job to be scheduled based on the Longest Processing Time (LPT) heuristic.
+    """
+    Greedy LPT-next-operation scheduling for a partial JSSP. At each decision step it scans all unfinished jobs, computes the processing time of each job’s immediate next operation (via job_operation_index), and selects the global argmax. The chosen job is advanced by appending its next operation to the queue of its designated machine, as dictated implicitly by the current solution’s operation sequence and index. This is a “best” selection rule (not first-fit), targeting the longest imminent tasks to be queued early, biasing the schedule toward reducing makespan when long operations are critical. Operates in the constructive phase; precedence is enforced by the index, while machine choice follows the job’s operation sequence. Tie handling is implicit through iteration order due to strict greater-than comparison. Time per step: O(|unfinished_jobs|); constant extra memory.    
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

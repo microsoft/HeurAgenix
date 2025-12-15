@@ -2,7 +2,7 @@ from src.problems.tsp.components import *
 
 def nearest_insertion_c1f0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Implements the nearest insertion heuristic for the TSP problem. This heuristic starts with a sub-tour and at each step, inserts the non-tour city that is closest to any city in the current tour. The city is inserted at the position that results in the least cost increase.
+    Cycle-aware cheapest-insertion via global node–edge scan. At each step, evaluate the marginal increase Δ = d[i,v] + d[v,j] − d[i,j] for every unvisited node v against every tour edge (i,j), including the wrap-around edge (last → first), and select the minimum-Δ pair. This treats the current solution as a closed tour during insertion and uses a full edge-based cheapest-insertion criterion (not solely nearest-by-single-arc). Works for asymmetric distance matrices because directional costs are respected in Δ. Seeding when the tour is empty is deterministic (append the first unvisited node). Requires visited_nodes to reflect the current tour order for indexing positions. Time complexity: O(|unvisited| · |tour|); O(1) extra memory; deterministic first-minimum tie-breaking.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

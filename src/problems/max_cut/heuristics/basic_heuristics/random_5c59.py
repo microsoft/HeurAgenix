@@ -2,7 +2,8 @@ from src.problems.max_cut.components import Solution, InsertNodeOperator
 import random
 
 def random_5c59(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
-    """Random node insertion heuristic for Max Cut.
+    """
+    Stochastic diversification move for partial MaxCut constructions. Uniformly samples one unassigned vertex and assigns it to a random side (A or B) with equal probability, without evaluating cut-gain or partition balance. Pure exploration: ignores edge weights and current cut value, providing unbiased diversification irrespective of current set sizes. Feasibility preserved by design (vertex belongs to exactly one set). Suitable as a warm-start builder, perturbation step in ILS/VNS, or population diversification in metaheuristics. No improvement guarantee; effectiveness arises when followed by gain-based local search (e.g., single-vertex flip). Time complexity per call: O(1) aside from sampling; O(1) extra memory. Determinism controllable via RNG seeding.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

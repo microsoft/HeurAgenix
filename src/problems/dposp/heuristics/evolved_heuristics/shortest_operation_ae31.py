@@ -2,10 +2,8 @@ from src.problems.dposp.components import *
 import numpy as np
 
 def shortest_operation_ae31(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """Shortest Operation Heuristic with Optimization (AE31) for DPOSP.
-
-    This heuristic aims to maximize the number of fulfilled orders by prioritizing orders based on deadlines, feasibility, and production times. 
-    It dynamically searches for better insertion positions, shifts orders, and periodically optimizes through swaps.
+    """
+    Hybrid best-improvement constructive with periodic intensification. Feasible orders are prioritized by (earlier deadline, smaller quantity), then globally scanned across all lines and insertion positions; the operator selected is the one with the smallest get_time_cost_delta among all validated inserts (best-improvement, not first-improvement). Feasibility gating relies on validation_single_production_schedule, which must encapsulate machine capability, transition admissibility, and deadline compliance; lines with zero production_rate for the order’s product are ignored. Every shift_frequency operations, cross-line relocate is attempted: each scheduled order is considered for insertion at any position on any capable target line; both source and target schedules are validated, but the improvement surrogate evaluates only the target-line delta, allowing moves that may increase source-line time cost if the target-line surrogate decreases. Every swap_frequency operations, intra-line swaps are scanned exhaustively; validation is performed on the swapped schedule, while the improvement surrogate is the sum of two get_time_cost_delta evaluations for placing each order into the other’s position (local surrogate rather than a full recomputation on the new schedule). Swaps are confined within a single line. A single operator (Insert or Relocate or Swap) is emitted per iteration—the one with the lowest surrogate among all candidates examined in that iteration. Periodicity is controlled by operation_count in algorithm_data. The approach is constructive-improvement: insertion builds schedules under feasibility, while relocate/swap provide periodic intensification without closing schedules or merging lines.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

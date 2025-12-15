@@ -7,7 +7,7 @@ While executing {function_name} with the given dataset, the program encountered 
 
 Please try to fix it.
 
-The response format is very important. For better communication, please respond to me in this format:
+ANSWER IN FORMAT:
 1. If you think this heuristic can not be implemented, respond to me ***python_code:None*** and we will stop this generation.
 2. If you can fix up this issues, please respond to me in this format:
 ***python_code:
@@ -33,5 +33,4 @@ def {function_name}(problem_state: dict, algorithm_data: dict, **kwargs) -> tupl
 
         ...
     """
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.
+

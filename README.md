@@ -8,7 +8,8 @@ HeurAgenix is a novel framework based on LLM, designed to generate, evolve, eval
 ## Set up environment
 To set up the environment, run the following command:
 ```bash
-pip install -r requirements.txt
+conda env create -f environment.yml
+conda activate orllm
 ```
 
 ## Set up LLM
@@ -18,7 +19,8 @@ Currently, the framework supports GPT from Azure using tokens and api based mode
 Azure GPT config:
 ```json
 {
-    "type": "azure_apt",
+    "type": "azure_gpt",
+    "name": "...", 
 
     "api_type": "azure",
     "api_base": "...",
@@ -37,6 +39,7 @@ API model config:
 ```json
 {
     "type": "api_model",
+    "name": "...",
 
     "url": "...",
     "api_key": "...",
@@ -53,23 +56,63 @@ Local model config:
 ```json
 {
     "type": "local_model",
+    "name": "...",
 
     "temperature": 0.7,
     "top-p": 0.95,
     "max_tokens": 1600,
     "model_path": "...",
+    "think": false,
 
     "max_attempts": 50,
     "sleep_time": 10
 }
 ```
-2. Test the LLM activation by:
+vLLM (OpenAI-compatible server) config:
+```json
+{
+    "type": "vllm",
+    "name": "...",
+
+    "temperature": 0.7,
+    "top-p": 0.95,
+    "max_tokens": 1600,
+    "model_path": "...",
+    "base_url": "http://localhost:8000/v1",
+    "think": false,
+
+    "max_attempts": 50,
+    "sleep_time": 10
+}
+```
+2. For vLLM server (use either local path or model name):
+```bash
+# Using local path or model name (with reasoning mode)
+vllm serve /path/to/model --port 8000 --max-model-len 8192 --dtype auto (--reasoning-parser ...)
+
+# For example
+vllm serve meta-llama/Meta-Llama-3-8B-Instruct --port 8000 --max-model-len 8192 --dtype auto
+```
+- Note: If you plan to use automatic tool calling (tool_choice="auto"), vLLM ≥ 0.5.4 requires enabling:
+  --enable-auto-tool-choice and a suitable --tool-call-parser (e.g., llama3 for Llama-3-Instruct, qwen2 for Qwen2/2.5-Instruct).
+
+3. Test the LLM activation by:
 Modify the `config_file` in chat.py and run
 ```bash
 python chat.py
 ```
 
 ## Prepare Data
+### Quick download (recommended)
+We host the public dataset on Hugging Face. To download everything into ./data, simply run:
+```bash
+python download_data.py
+```
+Notes:
+- This will create and populate the local data/ directory with the dataset files.
+- Make sure huggingface_hub is installed (it is included in requirements.txt; if not, run pip install -U huggingface_hub).
+- For reproducibility, the script can pin a specific revision/tag.
+
 ### Data for Classical CO Problem
 Data sources and formatting requirements for TSP, CVRP, JSSP, MaxCut, and MKP are detailed in the respective readme files.
 
@@ -90,7 +133,7 @@ python src/problems/dposp/generate_data.py
 ```
 
 ### Data Structure
-It is recommended to organize data into this structure `output/{problem}/data/(train_data, validation_data, test_data, smoke_data)`.
+It is recommended to organize data into this structure `/data/{problem}/(train_data, validation_data, test_data, smoke_data)`.
   
 - **Evolution Data**: Used by LLM to extract evolution policy during heuristic evolution. Typically consists of small instances either manually designed or sampled from the data.  
 - **Validation Data**: Used for evaluating and filtering heuristics during evolution.  
@@ -221,7 +264,7 @@ The evolved heuristics are stored in `output/{problem}/evolution_result/{seed_he
 To apply a heuristic or heuristic selector by:
 
 ```bash
-python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-l <llm_config_file>] [-d <heuristic_dir>] [-t <test_case>] [-n <iterations_scale_factor>] [-m <steps_per_selection>] [-c <num_candidate_heuristics>] [-b <rollout_budget>] [-r <result_dir>]
+python launch_hyper_heuristic.py -p <problem> -e <heuristic> [-l <llm_config_file>] [-d <heuristic_dir>] [-t <test_case>] [-n <iterations_scale_factor>] [-m <selection_frequency>] [-c <num_candidate_heuristics>] [-b <rollout_budget>] [-r <result_dir>]
 ```
 
 Parameters:
@@ -232,10 +275,10 @@ Parameters:
   - `'random_hh'`: Randomly selects a heuristic from the directory.
   - `'or_solver'`: Uses an exact OR solver, where applicable.
 - `-d`, `--heuristic_dir`: Directory containing heuristics for llm_hh or random_hh. Default is 'basic_heuristics'.
-- `-t`, `--test_data`: Path to a specific test data file. Defaults to testing all files in the `test_data` directory if not specified.
+- `-t`, `--test_data`: Name to test data files. Split by ','. Defaults to testing all files in the `test_data` directory if not specified.
 - `-l`, `--llm_config_file`: Path to LLM configuration. Defaults is `azure_gpt_4o.json`.
 - `-n`, `--iterations_scale_factor`: Scale factor determining total heuristic steps relative to problem size. Default is 2.0.
-- `-m`, `--steps_per_selection`: Number of steps executed per heuristic selection in LLM mode. Default is 5.
+- `-m`, `--selection_frequency`: Number of steps executed per heuristic selection in LLM mode. Default is 5.
 - `-c`, `--num_candidate_heuristics`: Number of candidate heuristics considered in LLM mode. 1 represents select by LLM without TTS. Default is 1.
 - `-b`, `--rollout_budget`: Number of Monte-Carlo evaluations per heuristic in LLM mode. 0 represents select by LLM without TTS. Default is 0.
 - `-r`, `--result_dir`: Target directory for saving results. Default is 'result'.

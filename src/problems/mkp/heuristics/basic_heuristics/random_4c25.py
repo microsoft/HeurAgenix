@@ -3,8 +3,7 @@ import random
 
 def random_4c25(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Random Heuristic for the Multidimensional Knapsack Problem.
-    Randomly selects items to add to the knapsack until no further items can be added without violating resource constraints.
+    Randomized feasible-first add for MKP. Shuffles the candidate set (items_not_in_knapsack) and scans once, adding the first item that satisfies all resource capacities using remaining_capacity and per-resource weights (weights[res][item]; rows correspond to resources). Selection policy: first improvement under a random permutation; no profit-based scoring and no best-improvement search. Single AddOperator is returned per call; no toggles/swaps/removals.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

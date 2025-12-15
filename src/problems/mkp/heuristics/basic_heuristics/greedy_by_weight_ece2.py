@@ -2,10 +2,10 @@ from src.problems.mkp.components import *
 
 def greedy_by_weight_ece2(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Greedy by Weight heuristic for the Multidimensional Knapsack Problem.
-    This heuristic selects items based on the smallest weight for a given dimension,
-    adding them to the knapsack until no further items can be added without exceeding
-    the capacity for that dimension.
+    Greedy first-fit by a single resource dimension. Items not yet in the knapsack are sorted ascending by weight on resource 0 (weights indexed as weights[resource][item]). The heuristic scans this order and selects the first item that is feasible across all resources with respect to remaining_capacity. Selection policy: first-improvement (first feasible after sorting), not best-improvement. Profit is ignored; ranking is driven solely by the chosen resource dimension, with other dimensions used only for feasibility filtering.
+    Required problem_state items: "weights" (2D array indexed by [resource][item]), "capacities" (used for resource count), "remaining_capacity" (per-resource available capacity vector aligned to capacities), "items_not_in_knapsack", "current_solution". No algorithm_data is used.
+    Neighborhood and operator: returns a single AddOperator for the selected item; constructive step toward filling capacity.
+
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

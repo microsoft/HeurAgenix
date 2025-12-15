@@ -2,9 +2,7 @@ from src.problems.mkp.components import *
 
 def greedy_by_resource_balance_52f0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Greedy by Resource Balance heuristic for the Multidimensional Knapsack Problem.
-    This heuristic selects items that help to balance the resource usage across all dimensions.
-    It prefers items that use less of the more consumed resources and more of the less consumed ones.
+    Resource-balance greedy add. Computes per-dimension utilization u_d = used_d / capacity_d = 1 − remaining_d / capacity_d, then scores each candidate item i by s_i = Σ_d u_d · w_{d,i}. Among feasible items (respecting remaining capacity), select the item with the minimum score, i.e., the one least increasing load on currently stressed resources and most leveraging slack dimensions. Selection policy: best-improvement across all feasible candidates; no profit is considered, making this suitable for repair/diversification to mitigate bottleneck dimensions.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

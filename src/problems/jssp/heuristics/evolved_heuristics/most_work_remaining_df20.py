@@ -1,7 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator, SwapOperator, ShiftOperator
 
 def most_work_remaining_df20(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Most Work Remaining Heuristic with Dynamic Scoring and Local Optimization for JSSP.
+    """
+    Dynamic earliest-start selection with progression bias, plus periodic best-improvement intra-machine reordering. The constructive priority chooses the unfinished job whose next operation minimizes score = max(machine_last_end[next_machine], job_last_end[job]) + bias_weight/(1 + next_operation_index). The bias term decreases with progress, favoring jobs further along in their operation sequence. AdvanceOperator schedules the next operation by appending the job to its required machine’s queue (from job_operation_sequence[job][index]).  Local optimization is triggered when iteration is a multiple of either k_flip_frequency or swap_frequency. It performs a best-improvement search over: - Non-adjacent pair swaps within each machine queue (i, j with j ≥ i + 2) via SwapOperator. - Single-job shifts to any other position within the same machine queue via ShiftOperator. Each move is evaluated by get_problem_state on the modified solution, using makespan delta = new_makespan − current_makespan, and the globally best delta (minimum value) is selected across all candidates; selection does not require the delta to be negative. Invalid states (None) are skipped. If a move is selected, it is returned; otherwise the constructive AdvanceOperator is used.  Iteration is stored and incremented in algorithm_data. Complexity: scoring O(|unfinished_jobs|); when triggered, swap search O(Σ_m |queue_m|²) and shift search O(Σ_m |queue_m|²). Constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

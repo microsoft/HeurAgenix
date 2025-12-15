@@ -26,7 +26,9 @@ The problem will work on following data.
 Please try to understand the data and generate based on them, especially setting the default value for hyper-parameters:
 {env_summarize}
 
-The response format is very important. For better communication, please respond to me in this format:
+The comments are crucial for the selection and updating of future algorithms. There's no need to repeat points that are obvious and widely known, such as input and output details, or redundant safety code like returning None; instead, it's important to emphasize aspects that are unique to the algorithm.
+
+ANSWER IN FORMAT:
 ***python_code:
 from {components_file} import *
 import other_library (if necessary)
@@ -34,7 +36,7 @@ def {function_name}(problem_state: dict, algorithm_data: dict, **kwargs) -> tupl
     """ Description for this heuristic algorithm.
 
     Args:
-        problem_state (dict): The dictionary contains the problem state.. In this algorithm, the following items are necessary:
+        problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - necessary_key (value type): description
             - necessary_key (value type): description
             ...
@@ -50,5 +52,4 @@ def {function_name}(problem_state: dict, algorithm_data: dict, **kwargs) -> tupl
 
         ...
     """
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.
+

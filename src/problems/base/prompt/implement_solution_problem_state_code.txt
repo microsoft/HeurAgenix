@@ -15,7 +15,7 @@ Please note:
 4. Comments in the code are very important.
 5. The solution is already defined, do not implement it again.
 
-The response format is very important. For better communication, please respond to me in this format:
+ANSWER IN FORMAT:
 ***python_code:
 import library (if necessary)
 def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
@@ -32,5 +32,3 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     """
     ...
 ***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.

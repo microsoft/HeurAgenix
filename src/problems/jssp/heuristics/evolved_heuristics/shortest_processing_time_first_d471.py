@@ -1,10 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
 def shortest_processing_time_first_d471(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Shortest Processing Time First with Dynamic Scoring Heuristic for JSSP.
-
-    This heuristic dynamically evaluates unfinished jobs based on their next operation's machine availability,
-    alignment with the optimal trajectory, and a bias factor to guide towards jobs that minimize makespan.
+    """
+    Earliest-ready-time dispatch with uniform diversity offset and simple fallback. At each step it scans all unfinished jobs and selects the job whose next operation can start earliest, using priority_score = max(machine_last_end_times[next_machine], job_last_end_times[job]); selection is best-improvement (minimum priority_score) over all candidates. A global bias term −bias_weight/(job_diversity+1) is applied uniformly to all jobs; it shifts scores but does not change the ordering. When job_diversity ≤ diversity_threshold and there is exactly one unfinished job, it immediately advances that job. The AdvanceOperator appends the chosen job to its next machine’s queue and increments the job’s operation index (incremental, open schedule construction). Processing times are not used directly in ranking; readiness is inferred from accumulated end times. Time complexity per decision: O(|unfinished_jobs|); constant extra memory; no algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

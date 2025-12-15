@@ -1,4 +1,6 @@
 import os
+import json
+from typing import Dict, List, Tuple
 from openai import AzureOpenAI
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from src.util.llm_client.base_llm_client import BaseLLMClient
@@ -16,12 +18,6 @@ class AzureGPTClient(BaseLLMClient):
         self.api_version = config["api_version"]
         self.model = config["model"]
         self.azure_endpoint = config["azure_endpoint"]
-        self.top_p = config.get("top-p", 0.7)
-        self.temperature = config.get("temperature", 0.95)
-        self.max_tokens = config.get("max_tokens", 3200)
-        self.seed = config.get("seed", None)
-        self.max_attempts = config.get("max_attempts", 50)
-        self.sleep_time = config.get("sleep_time", 60)
 
         credential = DefaultAzureCredential()
         token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
@@ -51,3 +47,24 @@ class AzureGPTClient(BaseLLMClient):
         )
         response_content = response.choices[-1].message.content
         return response_content
+
+    def chat_once_with_tools(self, tools: List[Dict] = None) -> Tuple[str, List[Tuple[str, Dict]]]:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=self.messages,
+            tools=tools,
+            tool_choice="auto",
+            seed=self.seed,
+            frequency_penalty=0,
+            presence_penalty=0,
+            stop=None,
+            stream=False,
+        )
+
+        function_name_parameters = []
+        response_content = str(response.choices[-1].message.content)
+        for tool_call in response.choices[-1].message.tool_calls:
+            function_name = tool_call.function.name
+            parameters = json.loads(tool_call.function.arguments)
+            function_name_parameters.append((function_name, parameters))
+        return response_content, function_name_parameters

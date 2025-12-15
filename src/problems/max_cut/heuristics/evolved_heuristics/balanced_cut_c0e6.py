@@ -2,8 +2,8 @@ from src.problems.max_cut.components import Solution, InsertNodeOperator, SwapOp
 import numpy as np
 
 def balanced_cut_c0e6(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertNodeOperator, dict]:
-    """Balanced Cut heuristic for the Max Cut problem with improvements to ensure balanced partitions, 
-    future impact consideration, and periodic swap operations.
+    """
+    Degree-prioritized construction with immediate-gain assignment and unconditional periodic cross-set swaps. The global ordering caches unselected nodes by future impact = Σ_k |w(node,k)| (descending), updated incrementally via algorithm_data["sorted_nodes"]. At each step, it takes the next node from this list and assigns it to the set that yields the larger immediate cut gain: gain_A = Σ_{b∈B} w(node,b), gain_B = Σ_{a∈A} w(node,a). The scaling_factor·future_impact term is added symmetrically to both gains and does not affect the argmax; there is no explicit balance objective (partition sizes are not controlled).  Swap refinement triggers every swap_frequency operations and evaluates all pairs (i∈A, j∈B) using pre-aggregated vectors weight_to_A[v] = Σ_{a∈A} w(v,a) and weight_to_B[v] = Σ_{b∈B} w(v,b). The swap delta is computed as Δ = weight_to_A[i] − weight_to_A[j] + weight_to_B[j] − weight_to_B[i] + 2·w(i,j) if the edge (i,j) exists, selecting the single best pair (best-improvement over all pairs). The swap is executed regardless of whether Δ is positive.  Complexity: future-impact initialization O(n²); per-step insertion decision O(|A|+|B|); swap trigger O(n(|A|+|B|) + |A|·|B|) due to aggregation and pairwise evaluation. Algorithm_data uses operation_count for triggering and caches sorted_nodes to amortize ranking.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

@@ -1,8 +1,10 @@
 from src.problems.jssp.components import Solution, SwapOperator
 
 def _3opt_6ee0(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
-    """3-opt heuristic for Job Shop Scheduling Problem (JSSP).
-    This function does not generate a complete 3-opt operator since JSSP requires operations within a job to be executed in sequence and does not allow reordering of these operations.The heuristic is adapted to generate a series of 2-opt swaps (using the SwapOperator) which approximate a 3-opt move.
+    """
+    Machine-local 3-opt approximation via non-adjacent 2-opt swap. For each machine with at least three scheduled jobs, iterate all triplets of positions i < j < k and evaluate swapping the jobs at i and k (j serves only to enforce non-adjacency, mimicking a 3-edge reconnection without violating job precedence). Only machine-local swaps are considered; job operation order across machines remains intact.
+    Selection policy: best-improvement. Among all evaluated (machine_id, i, k) pairs across all machines, choose the swap that yields the largest makespan reduction. Validity is enforced by recomputing the problem state via get_problem_state; invalid schedules are discarded.
+    Required problem_state items: "machine_num", "job_num" (used for an early size check), "current_solution", "get_problem_state", "current_makespan". No algorithm_data is used.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

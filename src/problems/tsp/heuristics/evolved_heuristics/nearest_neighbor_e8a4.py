@@ -2,11 +2,8 @@ from src.problems.tsp.components import *
 import numpy as np
 
 def nearest_neighbor_e8a4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """Enhanced nearest neighbor heuristic for the Traveling Salesman Problem (TSP).
-
-    This heuristic begins at a node with the second-lowest average distance to all other nodes if the tour is initially empty.
-    It extends the tour by employing nearest neighbor, nearest insertion, or cheapest insertion strategies based on specific criteria.
-    Additionally, it periodically applies the 2-opt heuristic to optimize the tour by reducing crossings.
+    """
+    Hybrid constructive-improvement for an open, asymmetric TSP path. Initialization picks a sub-central anchor: select the node with the second-lowest mean distance, then start from the unvisited node closest to this anchor, reducing extreme-centrality bias. Growth is gated by a nearest-neighbor significance test: compute the nearest unvisited from last_visited and compare to its average-to-unvisited; if nearest is markedly shorter (< threshold_factor), extend the path by nearest neighbor at the end. Otherwise, restrict candidates to nodes within (1 + percentage_range) of the nearest distance to maintain diversity around locally plausible choices, falling back to all unvisited if too few.  For each candidate, evaluate all insertion positions 0..L using a marginal cost model tailored to an open path: endpoints add a single incident edge; interior positions replace (prev,next) with (prev,node)+(node,next). The score blends immediate marginal cost with a progress-weighted future-impact term (sum of distances from the candidate to remaining unvisited), scaled by visited_num / node_num^2. Early stages emphasize nodes well connected to the remaining set; late stages converge toward cheapest insertion.  Periodically apply 2-opt every apply_2opt_frequency steps on paths of length > 2: scan disjoint edge pairs and select the segment reversal with the most negative cost delta, excluding the start–end pair to preserve the open-path structure.  Time complexity: insertion phase O(|candidates|  (L + 1)); 2-opt phase O(L^2) when triggered; constant extra memory. Designed for partial tours and compatible with asymmetric distance matrices.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

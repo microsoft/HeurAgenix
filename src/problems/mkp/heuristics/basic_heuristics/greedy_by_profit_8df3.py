@@ -2,8 +2,8 @@ from src.problems.mkp.components import *
 
 def greedy_by_profit_8df3(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AddOperator, dict]:
     """
-    Greedy by Profit Heuristic for the Multidimensional Knapsack Problem.
-    This heuristic selects items based on the highest profit value until no further items can be added without violating resource constraints.
+    Greedy constructive addition by absolute profit under multidimensional feasibility. Items not yet in the knapsack are sorted by profit descending; iteration then uses first-improvement: select the first item in this order whose per-resource weight fits within the current remaining capacities. Feasibility is checked across all resource dimensions via weights[res][item] ≤ remaining_capacity[res], assuming a resource-major weight layout (weights indexed as [resource][item]) and remaining_capacity aligned with capacities.
+    Selection policy: first feasible among profit-sorted items; no best-improvement scan and no ratio-based scoring. Returns a single AddOperator for the chosen item.     Scope: single-item addition only; no repair, toggling, or swaps. Complexity: O(k log k + R·k), where k = |items_not_in_knapsack| and R = number of resources; constant extra memory. Tailored to constructive phases where remaining capacities are maintained externally.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

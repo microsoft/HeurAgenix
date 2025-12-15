@@ -1,8 +1,8 @@
 from src.problems.jssp.components import Solution, AdvanceOperator
 
 def most_work_remaining_930e(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[AdvanceOperator, dict]:
-    """Most Work Remaining heuristic for JSSP.
-    Selects the unfinished job with the maximum remaining work (total processing time of remaining operations) and returns an AdvanceOperator for that job to proceed with the next operation in sequence.
+    """
+    Most-Work-Remaining (MWR) dispatch rule for JSSP. At each decision point it scans all unfinished jobs, sums the processing times of their unscheduled operations (job_operation_time[j][job_operation_index[j]:]), and selects the job with the largest remaining total. It then issues an AdvanceOperator for that job, appending its next operation to the queue of its required machine as defined by the solution’s job_operation_sequence and job_operation_index. This is a global argmax over unfinished jobs (not first-fit), advancing exactly one operation per call. The rule is machine-agnostic (no consideration of machine idleness, queue lengths, or blocking) and focuses on front-loading heavy jobs to mitigate long tails in makespan. Required inputs: job_operation_time, unfinished_jobs, job_operation_index. Time complexity: O(∑ lengths of remaining-operation slices across unfinished jobs); constant extra memory.
     
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

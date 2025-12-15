@@ -2,9 +2,8 @@ from src.problems.cvrp.components import *
 import numpy as np
 
 def nearest_neighbor_54a9(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
-    """ Enhanced Nearest Neighbor Heuristic for CVRP.
-
-    This heuristic prioritizes nodes with higher demands that can fit into the vehicle's remaining capacity, especially when the number of unvisited nodes is low. It also periodically applies a 2-opt heuristic to improve route compactness.
+    """ 
+    Constructive, capacity-aware global cheapest-insertion across multiple routes. Seeding policy: pick the highest-demand customer and assign it to the first vehicle with sufficient remaining capacity (first-fit), inserting at position 0. For subsequent steps, evaluate all feasible (node, vehicle, position) triples and select the best-improvement by minimal marginal cost increase. Cost model: for middle positions, replace (prev,next) by (prev,node)+(node,next); at route ends, connect via the depot (prev=depot at position 0, next=depot at position L), consistent with asymmetric distances and depot-anchored routes. High-demand gating: when the remaining customer count is ≤ high_demand_threshold, restrict candidates to the residual set but still apply full best-improvement insertion. Decisions are global (do not rely on per-vehicle last_visited). Complexity per insertion: O(|unvisited| × Σ_v (|route_v|+1)); constant extra memory; no algorithm_data updates.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

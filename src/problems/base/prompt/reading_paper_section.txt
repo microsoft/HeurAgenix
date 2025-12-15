@@ -13,7 +13,7 @@ Please consider whether the read content are enough for you to generate the heur
 Please select at most one section each time, and the section name should align with provided dict.
 Also to avoid the content is too large, we can start from leaf section.
 
-The response format is very important. For better communication, please respond to me in this format:
+ANSWER IN FORMAT:
 ***interested_section:section_name/your_heuristic_name/None***
 Ensure there is no other content inside the ***, and analysis outside *** is welcome.
 If you think no superior operation, simply respond with ***None***.

@@ -63,7 +63,7 @@ class HeuristicEvolver:
         heuristic_dir = os.path.dirname(basic_heuristic_file)
 
         heuristic_introduction_docs = "\n".join([
-            extract_function_with_short_docstring(open(search_file(heuristic_file, self.problem)).read(), heuristic_file.split(".")[0])
+            extract_function_with_short_docstring(open(search_file(heuristic_file, self.problem), encoding="utf-8").read(), heuristic_file.split(".")[0])
             for heuristic_file in os.listdir(heuristic_dir)
         ])
 
@@ -223,7 +223,7 @@ class HeuristicEvolver:
     def load_function_code(self, heuristic_file: str, prompt_dict: dict) -> str:
         heuristic_file = search_file(heuristic_file, problem=self.problem)
         function_name = heuristic_file.split(os.sep)[-1].split(".")[0]
-        function_code = open(heuristic_file).read()
+        function_code = open(heuristic_file, encoding="utf-8").read()
         heuristic_name = function_name[:-5]
         prompt_dict["function_name"] = function_name
         prompt_dict["function_code"] = function_code
@@ -374,10 +374,9 @@ class HeuristicEvolver:
             heuristic_file: str
         ) -> list[float]:
         validation_results = []
-        heuristic_name = heuristic_file.split(os.sep)[-1].split(".py")[0]
         for data_name in validation_cases:
             env = Env(data_name=data_name)
-            env.reset(heuristic_name)
+            env.reset()
             hyper_heuristic = SingleHyperHeuristic(heuristic_file, problem=self.problem)
             is_complete_valid_solution = hyper_heuristic.run(env)
             result = env.key_value if is_complete_valid_solution else None

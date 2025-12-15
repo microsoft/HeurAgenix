@@ -16,13 +16,7 @@ class APIModelClient(BaseLLMClient):
         self.url = config["url"]
         model = config["model"]
         stream = config.get("stream", False)
-        top_p = config.get("top-p", 0.7)
-        temperature = config.get("temperature", 0.95)
-        max_tokens = config.get("max_tokens", 3200)
-        seed = config.get("seed", None)
         api_key = config["api_key"]
-        self.max_attempts = config.get("max_attempts", 50)
-        self.sleep_time = config.get("sleep_time", 60)
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -30,10 +24,10 @@ class APIModelClient(BaseLLMClient):
         self.payload = {
             "model": model,
             "stream": stream,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-            "seed": seed
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "seed": self.seed
         }
 
 

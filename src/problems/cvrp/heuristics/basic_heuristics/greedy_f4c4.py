@@ -2,9 +2,18 @@ from src.problems.cvrp.components import Solution, InsertOperator
 
 def greedy_f4c4(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[InsertOperator, dict]:
     """
-    Greedy heuristic algorithm for the CVRP.
-    This algorithm attempts to construct a solution by iteratively adding the closest unvisited node to a vehicle's route until all nodes are visited or the vehicle reaches its capacity.
-    It starts with an empty route for each vehicle and selects nodes based on the shortest distance from the last node in the route.
+    Constructive nearest-from-depot assignment for CVRP. Each call scans vehicles in ascending ID and selects the first vehicle with remaining capacity to perform a single insertion: among all unvisited nodes whose demand fits that vehicle, pick the node with minimum distance from the depot and append it to the end of that vehicle’s route.
+
+    Key characteristics:
+    - “Best” is evaluated only by depot→node distance for the chosen vehicle; incremental route cost from the current tail is not considered.
+    - Single-step extension per call; no lookahead, no route merging, no closure to the depot.
+    - Capacity feasibility enforced nodewise (demands[node] ≤ remaining capacity); no global balancing.
+    - Vehicle priority is first-fit by ID and serves as a tie-breaker across vehicles.
+    - Positioning is end-of-route only; existing route order remains unchanged.
+    - Depot is assumed to be ID 0 for distance evaluation.
+
+    Inputs used: distance_matrix, demands, vehicle_num, capacity, unvisited_nodes, vehicle_remaining_capacity, current_solution (for route length only).
+    Time complexity per call: O(vehicle_num + |unvisited_nodes|); constant extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

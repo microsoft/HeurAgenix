@@ -34,14 +34,14 @@ def evaluate_heuristic(
         heuristic_pool: list[str],
         problem: str,
         iterations_scale_factor: float,
-        steps_per_selection: int,
+        selection_frequency: int,
         rollout_budget: int,
         best_result_proxy: multiprocessing.managers.ValueProxy,
 ) -> tuple[float, str, bytes]:
     env = dill.loads(env_serialized)
     heuristic = load_function(heuristic_name, problem)
     operators = []
-    for _ in range(steps_per_selection):
+    for _ in range(selection_frequency):
         operators.append(env.run_heuristic(heuristic))
     after_step_env_serialized = dill.dumps(env)
     # MCTS to evaluate heuristic performance
@@ -69,7 +69,7 @@ def tts_bon(
         heuristic_pool: list[str],
         problem: str,
         iterations_scale_factor: float,
-        steps_per_selection: int,
+        selection_frequency: int,
         rollout_budget: int,
 ) -> tuple[str, bytes]:
     if rollout_budget == 0 or len(candidate_heuristics) == 1:
@@ -87,7 +87,7 @@ def tts_bon(
                 heuristic_pool,
                 problem,
                 iterations_scale_factor,
-                steps_per_selection,
+                selection_frequency,
                 rollout_budget,
                 best_result_proxy
             ))

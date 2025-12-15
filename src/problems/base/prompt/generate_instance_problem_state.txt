@@ -10,11 +10,9 @@ In determining the optimal problem states to represent instance, we must adhere 
 
 Now, please tell me which statistical data are best serve as instance problem state.
 
-The response format is very important. For better communication, please respond to me in this format:
+ANSWER IN FORMAT:
 ***instance_problem_state:
 problem_state_name;how_to_calculate;reason
 problem_state_name;how_to_calculate;reason
 ....
 ***
-Ensure there is no other content inside the ***, and analysis outside *** is welcome.
-If you have no information to provide, simply respond with ***None***.

@@ -63,7 +63,7 @@ def load_function(file:str, problem: str="base", function_name: str=None) -> cal
             file += ".py"
         file_path = search_file(file, problem)
         assert file_path is not None
-        code = open(file_path, "r").read()
+        code = open(file_path, "r", encoding="utf-8").read()
     else:
         # code only
         code = file
@@ -208,19 +208,25 @@ def search_file(file_name: str, problem: str="base") -> str:
         return file_path
 
     if os.getenv("AMLT_DATA_DIR"):
-        output_dir = os.getenv("AMLT_DATA_DIR")
+        data_dir = os.getenv("AMLT_DATA_DIR")
+        output_dir = os.getenv("AMLT_OUTPUT_DIR")
     else:
+        data_dir = "data"
         output_dir = "output"
+
+    file_path = find_file_in_folder(os.path.join(data_dir, problem, "data"), file_name)
+    if file_path:
+        return file_path
 
     file_path = find_file_in_folder(os.path.join(output_dir, problem, "data"), file_name)
     if file_path:
         return file_path
 
-    file_path = find_file_in_folder(os.path.join(output_dir, problem, "heuristics"), file_name)
+    file_path = find_file_in_folder(os.path.join(data_dir, problem, "heuristics"), file_name)
     if file_path:
         return file_path
 
-    file_path = find_file_in_folder(os.path.join(output_dir, problem), file_name)
+    file_path = find_file_in_folder(os.path.join(data_dir, problem), file_name)
     if file_path:
         return file_path
     return None

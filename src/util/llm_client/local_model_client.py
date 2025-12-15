@@ -18,12 +18,6 @@ class LocalModelClient(BaseLLMClient):
             self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(config['model_path']))
         else:
             self.model = os.path.normpath(config['model_path'])
-        self.top_p = config.get("top-p", 0.7)
-        self.temperature = config.get("temperature", 0.95)
-        self.max_tokens = config.get("max_tokens", 3200)
-        self.seed = config.get("seed", None)
-        self.max_attempts = config.get("max_attempts", 50)
-        self.sleep_time = config.get("sleep_time", 60)
 
         self.pipeline = transformers.pipeline(
             "text-generation",
@@ -33,16 +27,33 @@ class LocalModelClient(BaseLLMClient):
 
     def chat_once(self) -> str:
         format_messages = []
-        for message in self.messages:
-            format_messages.append({
-                "role": message["role"],
-                "content": message["content"][0]["text"]
-            })
-        response = self.pipeline(
+        for m in self.messages:
+            c = m.get("content", "")
+            if isinstance(c, list):
+                parts = []
+                for p in c:
+                    if isinstance(p, dict) and p.get("type") == "text":
+                        parts.append(p.get("text", ""))
+                    elif isinstance(p, str):
+                        parts.append(p)
+                c = "\n".join(parts)
+            elif not isinstance(c, str):
+                c = str(c)
+            format_messages.append({"role": m["role"], "content": c})
+
+        text = self.pipeline.tokenizer.apply_chat_template(
             format_messages,
-            max_new_tokens = self.max_tokens,
-            temperature = self.temperature,
-            top_p = self.top_p
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=self.think,
         )
-        response_content = response[0]["generated_text"][-1]['content']
+        response = self.pipeline(
+            text,
+            max_new_tokens=self.max_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            do_sample=True,
+            return_full_text=False,
+        )
+        response_content = response[0]["generated_text"].strip()
         return response_content

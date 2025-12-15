@@ -2,9 +2,7 @@ from src.problems.mkp.components import *
 
 def single_swap_heuristic_b3d6(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
-    SingleSwapHeuristic tries to find the best single swap of items that increases the total profit
-    of the knapsack without violating resource constraints.
-
+    Single-swap best-improvement local search over a 1-for-1 exchange neighborhood. Enumerates all pairs (item_in ∈ included, item_out ∈ excluded) and evaluates the exchange encoded by SwapOperator (effectively remove item_in, add item_out). Feasibility is enforced via validation_solution and a capacity check across all resource dimensions using recomputed weights from get_problem_state; infeasible or non-improving swaps are discarded. Selection policy: best-improvement—choose the feasible swap with the largest positive profit gain (strictly > 0), ties ignored. Uses full state recomputation rather than ratio-based proxies, making it robust under multi-resource interactions. 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
             - "weights" (numpy.array): A 2D array where each row represents the resource consumption of an item across all dimensions.

@@ -2,11 +2,8 @@ from src.problems.dposp.components import *
 import random
 
 def random_c05a(problem_state: dict, algorithm_data: dict, max_attempts: int = 100) -> tuple[AppendOperator, dict]:
-    """Random Order Selection Heuristic for DPOSP.
-    
-    This heuristic randomly selects an unfulfilled order from the list of feasible orders and attempts to append it
-    to a randomly selected production line's schedule. The insertion is validated to ensure that it
-    maintains a valid schedule respecting all production and transition constraints.
+    """
+    Stochastic constructive append restricted to end-of-line positions. At each iteration, uniformly sample an order from the prefiltered feasible_orders_to_fulfill and a production line, then accept the first append that passes validation_single_production_schedule for that line. Selection policy: first-improvement via random trials (no scoring or ranking), capped by max_attempts; no insertion into middle positions and no cross-line coordination beyond the feasibility filter. Feasibility is enforced line-locally, implicitly respecting production rates, product transitions, and deadlines; global uniqueness and non-delay constraints are assumed embedded in feasible_orders_to_fulfill.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:

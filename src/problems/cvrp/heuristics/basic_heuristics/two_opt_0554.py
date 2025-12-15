@@ -2,7 +2,7 @@ from src.problems.cvrp.components import *
 
 def two_opt_0554(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[ReverseSegmentOperator, dict]:
     """
-    Implements a 2-opt heuristic algorithm for the Capacitated Vehicle Routing Problem (CVRP).
+    Intra-route 2-opt with best-improvement pivoting under a circular-route assumption. For every route and for all index pairs i < j (including cuts that involve the last–first edge via modulo wrap-around), compute the 2-edge exchange delta: replace edges (A,B) and (C,D) with (A,C) and (B,D), where A=route[i-1], B=route[i], C=route[j-1], D=route[j%n]. Select the most negative delta across all routes and emit a single ReverseSegmentOperator(vehicle_id, [(i, j-1)]) that reverses the contiguous segment B..C. Capacity feasibility is preserved (pure reordering within one route); inter-route exchanges (2-opt) are not considered. Assumes symmetric distances; in asymmetric metrics the simple 2-edge delta is not valid because internal arc directions flip. One move per call (returns None if no improvement). Time complexity: O(sum_r n_r^2); O(1) extra memory.
 
     Args:
         problem_state (dict): The dictionary contains the problem state. In this algorithm, the following items are necessary:
