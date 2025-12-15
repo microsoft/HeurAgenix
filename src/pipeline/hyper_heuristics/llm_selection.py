@@ -1,3 +1,4 @@
+import os
 import traceback
 import math
 from src.problems.base.env import BaseEnv
@@ -30,15 +31,19 @@ class LLMSelectionHyperHeuristic:
         self.rollout_budget = rollout_budget
         self.problem_state_content_threshold = problem_state_content_threshold
 
-        self.heuristic_docs = {}
         self.heuristic_functions = {}
-        self.tools = []
-        for heuristic in self.heuristic_pool:
+        self.heuristic_names = {}
+        self.heuristic_pool_doc = ""
+        heuristic_id = "A"
+        for heuristic in heuristic_pool:
             heuristic_name = heuristic.split(".")[0]
             heuristic_code = open(search_file(heuristic_name + ".py", problem), "r", encoding="utf-8").read()
-            self.heuristic_docs[heuristic_name] = extract_function_with_short_docstring(heuristic_code, heuristic) 
-            self.heuristic_functions[heuristic_name] = load_function(heuristic, problem=self.problem)
-            self.tools.append(convert_function_to_tool(heuristic_name, code=heuristic_code))
+
+            self.heuristic_functions[heuristic_id] = load_function(heuristic, problem=problem)
+            self.heuristic_names[heuristic_id] = heuristic_name
+            self.heuristic_pool_doc += heuristic_id + "," + extract_function_with_short_docstring(heuristic_code, heuristic.split(".")[0]).split("def ")[-1] + "\n"
+            heuristic_id = chr(ord(heuristic_id) + 1)
+        self.last_heuristic_id = chr(ord(heuristic_id) - 1)
 
         self.get_instance_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_instance_problem_state")
         self.get_solution_problem_state = load_function("problem_state.py", problem=self.problem, function_name="get_solution_problem_state")
@@ -52,7 +57,14 @@ class LLMSelectionHyperHeuristic:
         heuristic_traject = []
 
         # Load background
-        prompt_dict = self.llm_client.load_background(self.problem, background_file="background_without_code.txt")
+        # prompt_dict = self.llm_client.load_background(self.problem, background_file="background_without_code.txt")
+        # Load system prompt 
+        system_prompt_file = os.path.join("src", "problems", "base", "prompt", "system_prompt.txt")
+        system_prompt = open(system_prompt_file, encoding="UTF-8").read()
+        self.llm_client.messages.append({"role": "system", "content": [{"type": "text", "text": system_prompt}]})
+        prompt_dict = {}
+        prompt_dict["problem"] = self.problem
+        prompt_dict["problem_description"] = open(search_file("problem_description.txt", self.problem), encoding="utf-8").read()
 
         # Generate global heuristic value
         instance_data = env.instance_data
@@ -64,14 +76,11 @@ class LLMSelectionHyperHeuristic:
             try:
                 if env.is_complete_solution:
                     env.dump_result()
-                self.llm_client.load_chat("background")
+                
+                self.llm_client.messages = []
 
                 # Load heuristic pool
-                heuristic_pool_doc = ""
-                for heuristic in self.heuristic_pool:
-                    if heuristic not in hidden_heuristics:
-                        heuristic_pool_doc += self.heuristic_docs[heuristic] + "\n"
-                prompt_dict["heuristic_pool_introduction"] = heuristic_pool_doc
+                prompt_dict["heuristic_pool_introduction"] = self.heuristic_pool_doc
 
                 # Generate state heuristic value
                 solution_data = {"current_solution": env.current_solution, env.key_item: env.key_value}
@@ -89,46 +98,25 @@ class LLMSelectionHyperHeuristic:
                 prompt_dict["selection_frequency"] = self.selection_frequency
                 prompt_dict["max_rounds"] = max_rounds
                 prompt_dict["num_candidate_heuristics"] = self.num_candidate_heuristics
-                prompt_dict["demo_heuristic_str"] = ",".join([f"heuristic_name_{i + 1}"for i in range(self.num_candidate_heuristics)])
+                prompt_dict["demo_heuristic_str"] = f"A/B/.../{self.last_heuristic_id}"
                 
-                if self.tool_calling:
-                    self.llm_client.load("heuristic_selection_tool_calling", prompt_dict)
-                    function_name_parameters = self.llm_client.chat_with_tools(self.tools)
-                    self.llm_client.dump(f"step_{selection_round}")
-                    candidate_heuristics = [function[0] for function in function_name_parameters]
-                else:
-                    self.llm_client.load("heuristic_selection", prompt_dict)
-                    response = self.llm_client.chat()
-                    self.llm_client.dump(f"step_{selection_round}")
-                    candidate_heuristics = extract(response, key="Selected heuristic", sep=",")
-
-                matched_candidate_heuristics = []
-                for heuristic in candidate_heuristics:
-                    matched_candidate_heuristic = find_closest_match(heuristic, self.heuristic_pool)
-                    if matched_candidate_heuristic:
-                        matched_candidate_heuristics.append(matched_candidate_heuristic)
-                assert len(matched_candidate_heuristics) > 0
-                
-                # TTS selection
-                selected_heuristic_name = tts_bon(
-                    env,
-                    matched_candidate_heuristics,
-                    self.heuristic_pool,
-                    self.problem,
-                    self.iterations_scale_factor,
-                    self.selection_frequency,
-                    self.rollout_budget,
-                )
+                self.llm_client.load("heuristic_selection", prompt_dict)
+                response = self.llm_client.chat()
+                self.llm_client.dump(f"step_{selection_round}")
+                selected_heuristic_id = extract(response, key="Selected heuristic id")
+                selected_heuristic_name = self.heuristic_names[selected_heuristic_id]
+                selected_heuristic = self.heuristic_functions[selected_heuristic_id]
                 # Record selection and observation
                 pre_observation = self.get_observation_problem_state(solution_problem_state)
                 pre_observation[env.key_item] = env.key_value
                 for _ in range(self.selection_frequency):
-                    env.run_heuristic(self.heuristic_functions[selected_heuristic_name], add_record_item={"step": selection_round})
+                    env.run_heuristic(selected_heuristic, add_record_item={"step": selection_round})
                 next_solution_problem_state = self.get_solution_problem_state(instance_data, env.current_solution)
                 next_observation = self.get_observation_problem_state(next_solution_problem_state)
                 next_observation[env.key_item] = env.key_value
                 heuristic_dict = {
                     "Selection Index": selection_round,
+                    "Selected heuristic ID": selected_heuristic_id,
                     "Heuristic": selected_heuristic_name,
                 }
                 for key in pre_observation.keys():

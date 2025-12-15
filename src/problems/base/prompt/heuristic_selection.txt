@@ -1,5 +1,11 @@
+I am working on Hyper-heuristics for Combinatorial Operation (CO) problem.
+
+Currently, I am working on {problem} problem:
+{problem_description}
+
 We have already implement the following heuristics.
-These are the heuristics in format: heuristic_name(parameter=default_value, ..): introduction
+These are the heuristics in format: 
+heuristic ID, heuristic_name(parameter=default_value, ..): introduction
 {heuristic_pool_introduction}
 
 
@@ -19,6 +25,6 @@ Before this discuss, we have already {discuss_round} rounds discuss and the most
 {heuristic_traject}
 
 Now we hope to select heuristic for next {selection_frequency} steps.
+Please select ONE heuristic id not heuristic name.
 
-
-ANSWER IN FORMAT: ***Selected heuristic: {demo_heuristic_str}***
+ANSWER IN FORMAT: ***Selected heuristic id:{demo_heuristic_str}***, such as ***Selected heuristic id:A***, ***Selected heuristic id:B***
