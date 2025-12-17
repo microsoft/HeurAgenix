@@ -32,7 +32,6 @@ class LLMSelectionHyperHeuristic:
         self.problem_state_content_threshold = problem_state_content_threshold
 
         self.heuristic_functions = {}
-        self.heuristic_names = {}
         self.heuristic_pool_doc = ""
         heuristic_id = "A"
         for heuristic in heuristic_pool:
@@ -40,7 +39,6 @@ class LLMSelectionHyperHeuristic:
             heuristic_code = open(search_file(heuristic_name + ".py", problem), "r", encoding="utf-8").read()
 
             self.heuristic_functions[heuristic_id] = load_function(heuristic, problem=problem)
-            self.heuristic_names[heuristic_id] = heuristic_name
             self.heuristic_pool_doc += heuristic_id + "," + extract_function_with_short_docstring(heuristic_code, heuristic.split(".")[0]).split("def ")[-1] + "\n"
             heuristic_id = chr(ord(heuristic_id) + 1)
         self.last_heuristic_id = chr(ord(heuristic_id) - 1)
@@ -104,8 +102,10 @@ class LLMSelectionHyperHeuristic:
                 response = self.llm_client.chat()
                 self.llm_client.dump(f"step_{selection_round}")
                 selected_heuristic_id = extract(response, key="Selected heuristic id")
-                selected_heuristic_name = self.heuristic_names[selected_heuristic_id]
+                if selected_heuristic_id and "[" in selected_heuristic_id:
+                    selected_heuristic_id = selected_heuristic_id.replace("[", "").replace("]", "").strip()
                 selected_heuristic = self.heuristic_functions[selected_heuristic_id]
+                selected_heuristic_name = selected_heuristic.__name__
                 # Record selection and observation
                 pre_observation = self.get_observation_problem_state(solution_problem_state)
                 pre_observation[env.key_item] = env.key_value

@@ -27,4 +27,4 @@ Before this discuss, we have already {discuss_round} rounds discuss and the most
 Now we hope to select heuristic for next {selection_frequency} steps.
 Please select ONE heuristic id not heuristic name.
 
-ANSWER IN FORMAT: ***Selected heuristic id:{demo_heuristic_str}***, such as ***Selected heuristic id:A***, ***Selected heuristic id:B***
+ANSWER IN FORMAT: ***Selected heuristic id:[ {demo_heuristic_str} ]***, such as ***Selected heuristic id:[ A ]***, ***Selected heuristic id:[ B ]***

@@ -30,6 +30,16 @@ class BaseEnv:
         self.get_solution_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_solution_problem_state")
         self.problem_state = self.get_problem_state()
 
+    def copy(self):
+        """Create a deep copy of the environment."""
+        import copy
+        new_env = copy.copy(self)
+        new_env.current_solution = copy.deepcopy(self.current_solution)
+        new_env.algorithm_data = copy.deepcopy(self.algorithm_data)
+        new_env.recordings = copy.deepcopy(self.recordings)
+        # instance_data is usually read-only, so shallow copy is fine or just reference
+        return new_env
+
 
     @property
     def is_complete_solution(self) -> bool:
