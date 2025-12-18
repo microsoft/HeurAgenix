@@ -1,4 +1,3 @@
-
 from typing import List, Dict, Tuple
 import os
 import json
@@ -84,3 +83,36 @@ class VLLMClient(BaseLLMClient):
             parameters = json.loads(tool_call.function.arguments)
             function_name_parameters.append((function_name, parameters))
         return response_content, function_name_parameters
+
+    def chat_with_logprobs(self) -> Tuple[str, List[Dict[str, float]], List[str]]:
+        messages = self.normalize_messages_for_vllm()
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            max_tokens=self.max_tokens,
+            seed=self.seed,
+            stream=False,
+            logprobs=True,
+            top_logprobs=20
+        )
+        response_content = str(response.choices[-1].message.content or "") + str(response.choices[-1].message.reasoning_content or "")
+        
+        # Process logprobs
+        logprobs_data = []
+        generated_tokens = []
+        if response.choices[-1].logprobs and response.choices[-1].logprobs.content:
+            for token_logprob in response.choices[-1].logprobs.content:
+                generated_tokens.append(token_logprob.token)
+                # Create a dict of {token: logprob} for the top candidates at this position
+                position_logprobs = {}
+                if token_logprob.top_logprobs:
+                    for top_lp in token_logprob.top_logprobs:
+                        position_logprobs[top_lp.token] = top_lp.logprob
+                else:
+                    # Fallback if top_logprobs is empty but we have the chosen token
+                    position_logprobs[token_logprob.token] = token_logprob.logprob
+                logprobs_data.append(position_logprobs)
+                
+        return response_content, logprobs_data, generated_tokens

@@ -47,14 +47,72 @@ class MultiAgentLLMSelectionHyperHeuristic(LLMSelectionHyperHeuristic):
         return new_prompt_dict
 
     def estimate_state_value(self, env: BaseEnv, prompt_dict: dict) -> float:
-        client = self.llm_clients[0]
-        # Load system prompt
-        system_prompt_file = os.path.join("src", "problems", "base", "prompt", "system_prompt.txt")
-        system_prompt = open(system_prompt_file, encoding="UTF-8").read()
-        client.messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt}]}]
-        client.load("heuristic_selection", prompt_dict)
-        response = client.chat()
-        return 0
+        # 1. Ask all agents to generate their reasoning and choice for the current state
+        responses = []
+        for i, client in enumerate(self.llm_clients):
+            # Load system prompt
+            system_prompt_file = os.path.join("src", "problems", "base", "prompt", "system_prompt.txt")
+            system_prompt = open(system_prompt_file, encoding="UTF-8").read()
+            client.messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt}]}]
+            client.load("heuristic_selection", prompt_dict)
+            try:
+                response_content = client.chat()
+                responses.append(response_content)
+            except Exception as e:
+                print(f"Agent {i} failed to generate response in estimate_state_value: {e}")
+                responses.append("") # Append empty string to maintain index alignment
+
+        # 2. Cross-Consistency Evaluation
+        # Calculate the NLL of each response evaluated by all other agents
+        # Score(R_i) = Average(NLL(R_i | M_j)) for all j != i
+        
+        scores = []
+        for i, response_i in enumerate(responses):
+            if not response_i:
+                scores.append(float('inf')) # Penalize failed generations
+                continue
+            
+            nll_sum = 0
+            count = 0
+            for j, client in enumerate(self.llm_clients):
+                if i == j:
+                    continue # Skip self-evaluation (optional, but recommended for cross-consistency)
+                
+                try:
+                    # Reset client messages to the state before generating its own response
+                    # We need to reconstruct the context for client j to evaluate response i
+                    system_prompt_file = os.path.join("src", "problems", "base", "prompt", "system_prompt.txt")
+                    system_prompt = open(system_prompt_file, encoding="UTF-8").read()
+                    client.messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt}]}]
+                    client.load("heuristic_selection", prompt_dict)
+                    
+                    nll = client.get_choice_score(response_i)
+                    nll_sum += nll
+                    count += 1
+                except Exception as e:
+                    print(f"Agent {j} failed to evaluate response from Agent {i}: {e}")
+            
+            if count > 0:
+                avg_nll = nll_sum / count
+                scores.append(avg_nll)
+            else:
+                scores.append(float('inf'))
+
+        # 3. Calculate State Value
+        # Lower NLL is better. We want higher value for better states.
+        # We can use the negative of the best (minimum) NLL score as the state value.
+        # Or the negative of the average NLL score.
+        # Let's use the best score (most plausible explanation found).
+        
+        valid_scores = [s for s in scores if s != float('inf')]
+        if not valid_scores:
+            return -float('inf')
+            
+        # V(s) = - Average(Average NLL)
+        # We negate it because we want to maximize value, but NLL is a loss (minimize).
+        state_value = -sum(valid_scores) / len(valid_scores)
+        
+        return state_value
 
     def run(self, env: BaseEnv) -> bool:
         max_steps = int(env.construction_steps * self.iterations_scale_factor)
@@ -114,12 +172,13 @@ class MultiAgentLLMSelectionHyperHeuristic(LLMSelectionHyperHeuristic):
                     print(f"Round {selection_round}: Perfect consensus. Selected {selected_heuristic_id}")
                 else:
                     candidate_actions = list(set(candidate_heuristic_ids))
-                    best_action_value = -1.0
+                    best_action_value = -np.inf
                     best_action_id = None
                     for action_id in candidate_actions:
                         # Simulate action
                         sim_env = env.copy()
                         heuristic_func = self.heuristic_functions[action_id]
+                        heuristic_name = heuristic_func.__name__
                         
                         # Run heuristic for selection_frequency steps
                         for _ in range(self.selection_frequency):
@@ -132,7 +191,7 @@ class MultiAgentLLMSelectionHyperHeuristic(LLMSelectionHyperHeuristic):
                         heuristic_dict = {
                             "Selection Index": selection_round,
                             "Selected heuristic ID": action_id,
-                            "Heuristic": self.heuristic_names[action_id]
+                            "Heuristic": heuristic_name
                         }
                         for key in observation.keys():
                             heuristic_dict["Delta of " + key] = f"From {observation[key]} to {sim_next_observation[key]}"
@@ -149,8 +208,8 @@ class MultiAgentLLMSelectionHyperHeuristic(LLMSelectionHyperHeuristic):
                     selected_heuristic_id = best_action_id
                     print(f"Round {selection_round}: Lookahead selected {selected_heuristic_id} with V(s')={best_action_value:.2f}")
 
-                selected_heuristic_name = self.heuristic_names[selected_heuristic_id]
                 selected_heuristic = self.heuristic_functions[selected_heuristic_id]
+                selected_heuristic_name = selected_heuristic.__name__
                 # Record selection and observation
                 for _ in range(self.selection_frequency):
                     env.run_heuristic(selected_heuristic, add_record_item={"step": selection_round})

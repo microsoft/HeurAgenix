@@ -5,6 +5,7 @@ from datetime import datetime
 from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
 from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
 from src.pipeline.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
+from src.pipeline.hyper_heuristics.multi_agent_llm_selection import MultiAgentLLMSelectionHyperHeuristic
 from src.util.llm_client.get_llm_client import get_llm_client
 from src.util.util import search_file
 
@@ -13,8 +14,8 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Generate heuristic")
     parser.add_argument("-p", "--problem", choices=problem_pool, required=True, help="Specifies the type of combinatorial optimization problem.")
-    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Specifies which heuristic function or strategy to apply. 'heuristic_function_name': Directly specify a heuristic function. 'llm_hh': Utilizes LLM for rapid heuristic selection from the directory. 'random_hh': Randomly selects a heuristic from the directory. 'or_solver': Uses an exact OR solver, where applicable.")
-    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("data", "llm_config", "azure_gpt_4o.json"), help="Path to the language model configuration file. Default is azure_gpt_4o.json.")
+    parser.add_argument("-e", "--heuristic", type=str, required=True, help="Specifies which heuristic function or strategy to apply. 'heuristic_function_name': Directly specify a heuristic function. 'llm_hh': Utilizes LLM for rapid heuristic selection from the directory. 'multi_agent_hh': Utilizes multiple LLM agents with perplexity-based selection. 'random_hh': Randomly selects a heuristic from the directory. 'or_solver': Uses an exact OR solver, where applicable.")
+    parser.add_argument("-l", "--llm_config_file", type=str, default=os.path.join("data", "llm_config", "azure_gpt_4o.json"), help="Path to the language model configuration file. Default is azure_gpt_4o.json. For multi_agent_hh, separate multiple config files with comma.")
     parser.add_argument("-d", "--heuristic_dir", type=str, default="basic_heuristics", help="Directory containing heuristics for llm_hh or random_hh. Default is 'basic_heuristics'.")
     parser.add_argument("-t", "--test_data", type=str, default=None, help="Name to test data files. Split by ','. Defaults to testing all files in the `test_data` directory if not specified.")
     parser.add_argument("-tc", "--tool_calling", action="store_true", help="Using LLM's tool calling function.")
@@ -62,6 +63,20 @@ def main():
             num_candidate_heuristics=num_candidate_heuristics,
             rollout_budget=rollout_budget,
         )
+    elif heuristic == "multi_agent_hh":
+        prompt_dir = os.path.join("src", "problems", "base", "prompt")
+        config_files = llm_config_file.split(",")
+        llm_clients = [get_llm_client(cf.strip(), prompt_dir, None) for cf in config_files]
+        hyper_heuristic = MultiAgentLLMSelectionHyperHeuristic(
+            llm_clients=llm_clients,
+            heuristic_pool=heuristic_pool,
+            problem=problem,
+            tool_calling=tool_calling,
+            iterations_scale_factor=iterations_scale_factor,
+            selection_frequency=selection_frequency,
+            num_candidate_heuristics=num_candidate_heuristics,
+            rollout_budget=rollout_budget,
+        )
     elif heuristic == "random_hh":
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem, iterations_scale_factor=iterations_scale_factor)
     elif heuristic == "or_solver":
@@ -87,13 +102,19 @@ def main():
 
         paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 
         paras += f"\ndata_path={env.data_path}"
-        llm_config = open(llm_config_file, encoding="utf-8").read()
+        config_files = llm_config_file.split(",")
+        llm_config = ""
+        for llm_config_file in config_files:
+            llm_config += open(llm_config_file, encoding="utf-8").read()
         paras += f"llm_config={llm_config}\n"
         with open(os.path.join(env.output_dir, "parameters.txt"), 'w') as file:
             file.write(paras)
 
         if heuristic == "llm_hh":
             llm_client.reset(env.output_dir)
+        elif heuristic == "multi_agent_hh":
+            for client in llm_clients:
+                client.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result()
