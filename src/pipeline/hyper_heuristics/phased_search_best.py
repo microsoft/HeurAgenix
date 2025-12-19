@@ -95,12 +95,9 @@ class PhasedSearchBestHyperHeuristic:
         no_improve_steps = 0
         max_no_improve = 200  # Reduced threshold for faster reaction
         
-        # Track tried heuristics for immediate stagnation detection
-        tried_heuristics = set()
-        
         # Track perturbation cycles for massive ruin (Large Neighborhood Search)
         perturbation_count = 0
-        max_perturbations_before_ruin = 5 # Reduced to trigger massive ruin sooner
+        max_perturbations_before_ruin = 1 # Aggressive: If 1 small perturbation fails to break stagnation, trigger Massive Ruin immediately.
         
         # Adaptive Ruin Parameters
         current_ruin_percent = 0.2
@@ -148,119 +145,82 @@ class PhasedSearchBestHyperHeuristic:
             # Phase 2: Improvement (and Perturbation)
             else:
                 # Check if we need perturbation
-                # Condition 1: Stagnation counter (legacy/safety)
-                # Condition 2: All heuristics tried and failed (Immediate Stagnation Detection)
-                all_heuristics_failed = (len(tried_heuristics) >= len(self.improvement_heuristics))
-                
-                if no_improve_steps > max_no_improve or all_heuristics_failed:
-                    if all_heuristics_failed:
-                        print(f"Run:{run_id} Immediate Stagnation: All {len(tried_heuristics)} improvement heuristics failed. FORCING MASSIVE RUIN.")
-                        tried_heuristics.clear() # Reset for next round
-                        # Force massive ruin by setting counter above threshold
-                        perturbation_count = max_perturbations_before_ruin + 1
-
-                    if self.perturbation_heuristics:
-                        perturbation_count += 1
+                if no_improve_steps > max_no_improve:
+                    perturbation_count += 1
+                    
+                    # Check for Massive Ruin (Continuous Deletion)
+                    if perturbation_count > max_perturbations_before_ruin:
                         
-                        # Check for Massive Ruin (Continuous Deletion)
-                        if perturbation_count > max_perturbations_before_ruin:
-                            
-                            # Adaptive Logic: Did we improve since the last ruin?
-                            if current_best > best_at_last_ruin:
-                                # Yes, we improved! Reset ruin intensity.
-                                print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.")
-                                current_ruin_percent = 0.2
-                                best_at_last_ruin = current_best
-                            else:
-                                # No, we are stuck in the same basin. Increase intensity.
-                                old_ruin = current_ruin_percent
-                                current_ruin_percent = min(0.5, current_ruin_percent + 0.05)
-                                print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}")
+                        # Adaptive Logic: Did we improve since the last ruin?
+                        if current_best > best_at_last_ruin:
+                            # Yes, we improved! Reset ruin intensity.
+                            print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.")
+                            current_ruin_percent = 0.2
+                            best_at_last_ruin = current_best
+                        else:
+                            # No, we are stuck in the same basin. Increase intensity.
+                            old_ruin = current_ruin_percent
+                            current_ruin_percent = min(0.5, current_ruin_percent + 0.05)
+                            print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}")
 
-                            # EARLY STOPPING: If we are at 50% ruin and still stuck, abandon this run.
-                            # The worker will pick up a new run (new seed) from the queue.
-                            if current_ruin_percent >= 0.5:
-                                print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.")
+                        # EARLY STOPPING: If we are at 50% ruin and still stuck, abandon this run.
+                        # The worker will pick up a new run (new seed) from the queue.
+                        if current_ruin_percent >= 0.5:
+                            print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.")
+                            break
+
+                        print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.")
+                        
+                        # Determine how many nodes to remove
+                        nodes_to_remove = max(10, int(node_num * current_ruin_percent))
+                        
+                        removed_count = 0
+                        # Continuous deletion loop
+                        for _ in range(nodes_to_remove * 2): # Safety factor 2x attempts
+                            if removed_count >= nodes_to_remove:
                                 break
-
-                            print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.")
-                            
-                            # Determine how many nodes to remove
-                            nodes_to_remove = max(10, int(node_num * current_ruin_percent))
-                            
-                            removed_count = 0
-                            # Continuous deletion loop
-                            for _ in range(nodes_to_remove * 2): # Safety factor 2x attempts
-                                if removed_count >= nodes_to_remove:
-                                    break
-                                    
-                                heuristic = random.choice(self.perturbation_heuristics)
-                                env.run_heuristic(heuristic)
-                                removed_count += 1
-                                current_steps += 1
-                            
-                            print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...")
-                            perturbation_count = 0
-                            no_improve_steps = 0
-                            tried_heuristics.clear() # Reset tracking
-                            last_value = env.key_value 
-                            rebuilding_mode = True # Enable randomized rebuilding
-                            continue
-
-                        # Normal (Small) Perturbation
-                        # Delete a few nodes (1-5) instead of just 1 to shake it up more
-                        perturb_size = random.randint(1, 5)
-                        for _ in range(perturb_size):
+                                
                             heuristic = random.choice(self.perturbation_heuristics)
                             env.run_heuristic(heuristic)
+                            removed_count += 1
+                            current_steps += 1
                         
-                        no_improve_steps = 0 # Reset counter
-                        tried_heuristics.clear() # Reset tracking
-                        last_value = env.key_value
-                        # After perturbation, we might be incomplete, so next loop will go to Phase 1
-                        continue
-                    else:
-                        # No perturbation heuristics available, fallback to restart if stuck
-                        env.reset()
+                        print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...")
+                        perturbation_count = 0
                         no_improve_steps = 0
-                        tried_heuristics.clear() # Reset tracking
-                        last_value = 0
+                        last_value = env.key_value 
+                        rebuilding_mode = True # Enable randomized rebuilding
                         continue
-                
+
+                    # Normal (Small) Perturbation
+                    # Delete a few nodes (1-5) instead of just 1 to shake it up more
+                    perturb_size = random.randint(1, 5)
+                    for _ in range(perturb_size):
+                        heuristic = random.choice(self.perturbation_heuristics)
+                        env.run_heuristic(heuristic)
+                    
+                    no_improve_steps = 0 # Reset counter
+                    last_value = env.key_value
+                    # After perturbation, we might be incomplete, so next loop will go to Phase 1
+                    continue
+
                 # Normal Improvement
                 if not self.improvement_heuristics:
                      # If no improvement heuristics, just stop or continue random construction (unlikely)
                      break
                 
                 heuristic = random.choice(self.improvement_heuristics)
-                operator = env.run_heuristic(heuristic)
+                env.run_heuristic(heuristic)
                 
                 current_steps += 1
                 
-                # Check if heuristic actually performed an operation (returned a valid operator)
-                # If operator is None, it means the heuristic found no valid move (Local Optimum for that heuristic).
-                # If operator is valid, the state changed (even if value didn't improve, e.g. side-step).
-                is_valid_op = operator is not None and not isinstance(operator, str)
-                
-                if is_valid_op:
-                    # A move was made, so the state has changed.
-                    # We reset the 'tried' tracking because previous failures might now be valid in the new state.
-                    tried_heuristics.clear()
-                    
-                    # Check improvement
-                    if env.key_value > last_value:
-                        last_value = env.key_value
-                        no_improve_steps = 0
-                        if env.key_value > current_best:
-                            current_best = env.key_value
-                    else:
-                        # Move made but no improvement (Side-step or drop)
-                        no_improve_steps += 1
-                        last_value = env.key_value
+                # Check improvement
+                if env.key_value > last_value:
+                    last_value = env.key_value
+                    no_improve_steps = 0
+                    if env.key_value > current_best:
+                        current_best = env.key_value
                 else:
-                    # No move was made (None returned). State is unchanged.
-                    # We mark this heuristic as tried for this specific state.
-                    tried_heuristics.add(heuristic)
                     no_improve_steps += 1
 
             # Logging
