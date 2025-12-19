@@ -10,7 +10,7 @@ def heaviest_edge_seed_eb0d(
     orientation_mode: str='node1_marginal',
     single_node_target: str='A',
     **kwargs
-):
+) -> tuple[InsertEdgeOperator, dict]:
     """
     Greedy constructive seeding by globally heaviest unselected directed edge (fast, cached).
     Among all pairs (i, j) with i != j in the unselected set, select the edge with maximum weight_matrix[i][j].

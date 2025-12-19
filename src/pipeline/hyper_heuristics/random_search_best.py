@@ -54,5 +54,4 @@ class RandomSearchBestHyperHeuristic:
                     found_best = True
                     return found_best
             current_steps += 1
-            # env.dump_result()
         return found_best

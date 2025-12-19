@@ -7,7 +7,7 @@ def balance_biased_edge_placement_9f22(problem_state: dict,
                                        degree_power: float = 1.0,
                                        pair_scan_limit: int = 0,
                                        matrix_mode_max_m: int = 1500,
-                                       **kwargs):
+                                       **kwargs) -> tuple[InsertEdgeOperator, dict]:
     """
     Faster, cached and vectorized balance-biased pair insertion for MaxCut construction. For every unordered pair of unselected nodes {i, j}, evaluates both orientations (i→A, j→B) and (i→B, j→A) using a score that combines immediate cut gain and a balance-driven bonus. The bonus prefers sending the higher-degree node to the currently smaller side, controlled by gamma and degree_power. When pair_scan_limit <= 0 and the number of unselected nodes is moderate, all pairs are evaluated via full-matrix vectorization; otherwise, pairs are scanned in lexicographic chunks with vectorized row operations. Tie-breaking is deterministic, preferring the AB orientation on equal scores and preserving lexicographic order. The function maintains and advances caches (per-node sums to current sets and degree^power) in algorithm_data to accelerate subsequent calls, automatically refreshing them when the partition changes externally.
 

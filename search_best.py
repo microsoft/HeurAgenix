@@ -9,10 +9,7 @@ from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from src.problems.max_cut.env import Env
 from src.pipeline.hyper_heuristics.random_search_best import RandomSearchBestHyperHeuristic
-
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from datetime import datetime
-
+from src.pipeline.hyper_heuristics.phased_search_best import PhasedSearchBestHyperHeuristic
 
 
 def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
@@ -62,7 +59,7 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
 
     return workers
 
-def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int) -> float:
+def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int, method: str = "phased") -> float:
     try:
         seed = time.time_ns() ^ os.getpid() ^ int.from_bytes(os.urandom(8), 'little')
     except Exception:
@@ -77,30 +74,40 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
 
     env.reset(output_dir=output_dir)
     
-    algorithm = RandomHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 10)
+    heuristic_pool = os.listdir(heuristic_dir)
+    if method == "phased":
+        algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50.0)
+    else:
+        algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=10.0)
+        
     algorithm.run(env)
     return 
 
-def main(data_name: str, heuristic_dir: str, num_runs: int):
-    # workers = pick_safe_workers(data_name, heuristic_dir)
-    workers = 4
+def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phased"):
+    workers = pick_safe_workers(data_name, heuristic_dir)
+        
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
 
     remaining = list(range(num_runs))
     finished_ids = []
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    experiment_dir = os.path.join(base_output_dir, "max_cut", "search_best_result.update", data_name, experiment_name)
+    experiment_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, experiment_name)
+    
+    print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
 
     while remaining:
         print(f"Start batch with workers={workers}, remaining tasks={len(remaining)}", flush=True)
         with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
-            fut_map = {executor.submit(run_once, data_name, heuristic_dir, experiment_dir, run_id): run_id
+            fut_map = {executor.submit(run_once, data_name, heuristic_dir, experiment_dir, run_id, method): run_id
                        for run_id in remaining}
 
             for fut in as_completed(fut_map):
                 run_id = fut_map[fut]
-                fut.result()
+                try:
+                    fut.result()
+                except Exception as e:
+                    print(f"Run {run_id} failed: {e}")
                 finished_ids.append(run_id)
 
         done_ids = {run_id for run_id in finished_ids}
@@ -111,11 +118,16 @@ def main(data_name: str, heuristic_dir: str, num_runs: int):
             time.sleep(1.0)
 
 if __name__ == '__main__':
-    data_name = sys.argv[1]
-    num_runs = 100
-    heuristic_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
-    if len(sys.argv) > 2:
-        num_runs = int(sys.argv[2])
-    if len(sys.argv) > 3:
-        heuristic_dir = sys.argv[3]
-    main(data_name, heuristic_dir, num_runs)
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Run hyper-heuristic search for MaxCut")
+    parser.add_argument("data_name", type=str, help="Name of the dataset (e.g., g1)")
+    parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
+    parser.add_argument("-d", "--heuristic_dir", type=str, 
+                        default="evolved_heuristics.part2", help="Directory containing heuristics")
+    parser.add_argument("-m", "--method", type=str, default="phased", choices=["phased", "random"], 
+                        help="Search method: 'phased' or 'random' (default: phased)")
+
+    args = parser.parse_args()
+        
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method)
