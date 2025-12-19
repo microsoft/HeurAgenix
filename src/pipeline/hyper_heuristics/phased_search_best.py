@@ -11,11 +11,9 @@ class PhasedSearchBestHyperHeuristic:
         self,
         heuristic_pool: list[str],
         problem: str,
-        iterations_scale_factor: float = 10.0,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem
-        self.iterations_scale_factor = iterations_scale_factor
         
         self.constructive_heuristics = []
         self.improvement_heuristics = []
@@ -58,8 +56,7 @@ class PhasedSearchBestHyperHeuristic:
         
         perturbation_names = {
             "low_contribution_bottom_delete_0b5f",
-            "low_contribution_delete_worst_1_0b60",
-            "low_contribution_delete_worst_3_0b63",
+            "low_contribution_delete_worst_0b60",
             "random_delete_node_0b5f",
             "simulated_annealing_ed14",
             "simulated_annealing_ed15",
@@ -81,7 +78,6 @@ class PhasedSearchBestHyperHeuristic:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
     def run(self, env: BaseEnv) -> bool:
-        max_steps = int(env.construction_steps * self.iterations_scale_factor)
         current_steps = 0
         
         data = env.output_dir.split(os.sep)[-3]
@@ -99,6 +95,9 @@ class PhasedSearchBestHyperHeuristic:
         no_improve_steps = 0
         max_no_improve = 200  # Reduced threshold for faster reaction
         
+        # Track tried heuristics for immediate stagnation detection
+        tried_heuristics = set()
+        
         # Track perturbation cycles for massive ruin (Large Neighborhood Search)
         perturbation_count = 0
         max_perturbations_before_ruin = 5 # Reduced to trigger massive ruin sooner
@@ -106,24 +105,58 @@ class PhasedSearchBestHyperHeuristic:
         # Adaptive Ruin Parameters
         current_ruin_percent = 0.2
         best_at_last_ruin = 0
+        rebuilding_mode = False  # Flag to indicate we are rebuilding after a massive ruin
 
         current_best = 0
         
-        while current_steps <= max_steps and env.continue_run:
+        # We rely on the Early Stopping mechanism (stagnation at max ruin) to terminate the run.
+        # This allows the search to continue as long as it is making progress.
+        while env.continue_run:
             
             # Phase 1: Construction
             if not env.is_complete_solution:
                 if not self.constructive_heuristics:
                     print("Error: No constructive heuristics available but solution is incomplete.")
                     break
-                heuristic = random.choice(self.constructive_heuristics)
+                
+                # Interleaved Optimization: Small chance to run improvement during construction
+                assigned_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
+                if self.improvement_heuristics and assigned_nodes > 20 and random.random() < 0.1:
+                    # During rebuilding, we might want to avoid greedy improvements too early, 
+                    # but interleaved optimization is generally good.
+                    heuristic = random.choice(self.improvement_heuristics)
+                else:
+                    # If we are rebuilding after a massive ruin, use UNIFORM random selection
+                    # instead of weighted selection. This prevents the "smart" (greedy) heuristics
+                    # from reconstructing the exact same local optimum we just destroyed.
+                    if rebuilding_mode:
+                        heuristic = random.choice(self.constructive_heuristics)
+                    else:
+                        heuristic = random.choice(self.constructive_heuristics)
+                
                 env.run_heuristic(heuristic)
                 current_steps += 1
+                
+                last_value = env.key_value
+                if env.key_value > current_best:
+                    current_best = env.key_value
+                
+                # Check if construction just finished
+                if env.is_complete_solution:
+                    rebuilding_mode = False # Exit rebuilding mode once full
                 
             # Phase 2: Improvement (and Perturbation)
             else:
                 # Check if we need perturbation
-                if no_improve_steps > max_no_improve:
+                # Condition 1: Stagnation counter (legacy/safety)
+                # Condition 2: All heuristics tried and failed (Immediate Stagnation Detection)
+                all_heuristics_failed = (len(tried_heuristics) >= len(self.improvement_heuristics))
+                
+                if no_improve_steps > max_no_improve or all_heuristics_failed:
+                    if all_heuristics_failed:
+                        print(f"Run:{run_id} Immediate Stagnation: All {len(tried_heuristics)} improvement heuristics failed. Triggering perturbation.")
+                        tried_heuristics.clear() # Reset for next round
+
                     if self.perturbation_heuristics:
                         perturbation_count += 1
                         
@@ -142,6 +175,12 @@ class PhasedSearchBestHyperHeuristic:
                                 current_ruin_percent = min(0.5, current_ruin_percent + 0.05)
                                 print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}")
 
+                            # EARLY STOPPING: If we are at 50% ruin and still stuck, abandon this run.
+                            # The worker will pick up a new run (new seed) from the queue.
+                            if current_ruin_percent >= 0.5:
+                                print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.")
+                                break
+
                             print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.")
                             
                             # Determine how many nodes to remove
@@ -158,9 +197,12 @@ class PhasedSearchBestHyperHeuristic:
                                 removed_count += 1
                                 current_steps += 1
                             
-                            print(f"  -> Removed {removed_count} nodes. Rebuilding...")
+                            print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...")
                             perturbation_count = 0
                             no_improve_steps = 0
+                            tried_heuristics.clear() # Reset tracking
+                            last_value = env.key_value 
+                            rebuilding_mode = True # Enable randomized rebuilding
                             continue
 
                         # Normal (Small) Perturbation
@@ -171,12 +213,16 @@ class PhasedSearchBestHyperHeuristic:
                             env.run_heuristic(heuristic)
                         
                         no_improve_steps = 0 # Reset counter
+                        tried_heuristics.clear() # Reset tracking
+                        last_value = env.key_value
                         # After perturbation, we might be incomplete, so next loop will go to Phase 1
                         continue
                     else:
                         # No perturbation heuristics available, fallback to restart if stuck
                         env.reset()
                         no_improve_steps = 0
+                        tried_heuristics.clear() # Reset tracking
+                        last_value = 0
                         continue
                 
                 # Normal Improvement
@@ -185,7 +231,7 @@ class PhasedSearchBestHyperHeuristic:
                      break
                 
                 heuristic = random.choice(self.improvement_heuristics)
-                env.run_heuristic(heuristic)
+                operator = env.run_heuristic(heuristic)
                 
                 current_steps += 1
                 
@@ -193,14 +239,19 @@ class PhasedSearchBestHyperHeuristic:
                 if env.key_value > last_value:
                     last_value = env.key_value
                     no_improve_steps = 0
-                    # If we improved significantly, we could reset perturbation_count, 
-                    # but let's keep it accumulating to force exploration eventually unless we hit a NEW BEST.
+                    tried_heuristics.clear() # Reset tracking: we moved to a new state
+                    if env.key_value > current_best:
+                        current_best = env.key_value
                 else:
                     no_improve_steps += 1
+                    # If the operator was None (no action taken) or value didn't improve, mark heuristic as tried
+                    # Note: env.run_heuristic returns the operator. If it's None, definitely failed.
+                    # Even if it's not None but value didn't increase, it's a failed improvement attempt for this state.
+                    tried_heuristics.add(heuristic)
 
             # Logging
             current_best = max(current_best, env.key_value)
-            if current_steps % 100 == 0:
+            if current_steps % 1000 == 0:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()

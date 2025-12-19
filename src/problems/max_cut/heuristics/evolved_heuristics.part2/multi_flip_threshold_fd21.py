@@ -18,7 +18,7 @@ def multi_flip_threshold_fd21(problem_state: dict, algorithm_data: dict, tau: fl
             - "current_solution" (Solution): Current partition with disjoint sets set_a and set_b containing node indices.
         algorithm_data (dict): The algorithm dictionary for current algorithm only. Not used in this heuristic.
         tau (float): Minimum flip gain required to include a node in the batch. Default is 0.0 (flip non-worsening nodes).
-        max_batch_size (int or None): Upper bound on the number of nodes flipped in one batch. If None or <= 0, all qualifying nodes are flipped. Default is None.
+        max_batch_size (int or None): Upper bound on the number of nodes flipped in one batch. If None, defaults to 1% of total nodes to maintain stability. If <= 0, all qualifying nodes are flipped. Default is None.
         epsilon (float): Numerical tolerance added to the threshold comparison (Δ ≥ tau + epsilon). Useful with floating weights. Default is 0.0.
 
     Returns:
@@ -55,7 +55,13 @@ def multi_flip_threshold_fd21(problem_state: dict, algorithm_data: dict, tau: fl
 
     # Apply optional batch cap: select top-k by delta (descending), tie-break by node id.
     candidates.sort(key=lambda x: (-x[1], x[0]))
-    if max_batch_size is not None and max_batch_size > 0:
+    
+    # If max_batch_size is not specified, limit to 1% of nodes to avoid destructive interference
+    # (flipping adjacent nodes simultaneously invalidates the gain calculation)
+    if max_batch_size is None:
+        max_batch_size = max(1, int(n * 0.01))
+
+    if max_batch_size > 0:
         selected_nodes = [node for node, _ in candidates[:max_batch_size]]
     else:
         selected_nodes = [node for node, _ in candidates]

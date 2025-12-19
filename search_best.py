@@ -76,9 +76,9 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
     
     heuristic_pool = os.listdir(heuristic_dir)
     if method == "phased":
-        algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50.0)
+        algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut")
     else:
-        algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=10.0)
+        algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
         
     algorithm.run(env)
     return 
@@ -99,7 +99,7 @@ def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phase
     while remaining:
         print(f"Start batch with workers={workers}, remaining tasks={len(remaining)}", flush=True)
         with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
-            fut_map = {executor.submit(run_once, data_name, heuristic_dir, experiment_dir, run_id, method): run_id
+            fut_map = {executor.submit(run_once, data_name, heuristic_dir, experiment_dir, run_id, method=method): run_id
                        for run_id in remaining}
 
             for fut in as_completed(fut_map):
@@ -129,5 +129,4 @@ if __name__ == '__main__':
                         help="Search method: 'phased' or 'random' (default: phased)")
 
     args = parser.parse_args()
-        
     main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method)

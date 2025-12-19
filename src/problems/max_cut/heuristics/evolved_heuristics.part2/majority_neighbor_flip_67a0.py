@@ -8,7 +8,6 @@ def majority_neighbor_flip_67a0(
     exploration_rate: float = 0.0,
     fallback_to_other_mode: bool = True,
     include_zero_delta: bool = False,
-    seed: int = None,
     **kwargs
 ) -> tuple[SwapOperator, dict]:
     """Randomized majority-neighbor single-node flip (1-opt local move for MaxCut).
@@ -31,7 +30,6 @@ def majority_neighbor_flip_67a0(
         exploration_rate (float): Probability in [0.0, 1.0] to invert the selection mode for this call (e.g., pick worsening when prefer_improving=True). Enables occasional diversification. Default is 0.0.
         fallback_to_other_mode (bool): If the chosen candidate pool is empty, try the opposite pool before giving up. Default is True.
         include_zero_delta (bool): If True and both strict pools are empty, include zero-delta vertices as neutral candidates. Default is False.
-        seed (int | None): If provided, use a local RNG seeded with this value to make sampling deterministic for this call. Default is None.
 
     Returns:
         SwapOperator: An operator that flips exactly one assigned vertex to the opposite set. Returns None when no candidate exists (e.g., empty partition or all vertices yield no valid flip).
@@ -48,8 +46,6 @@ def majority_neighbor_flip_67a0(
 
     if (not set_a) and (not set_b):
         return None, {}
-
-    rng = random.Random(seed) if seed is not None else random
 
     improving_candidates = []
     worsening_candidates = []
@@ -79,7 +75,7 @@ def majority_neighbor_flip_67a0(
             zero_candidates.append(node)
 
     use_improving = prefer_improving
-    if exploration_rate > 0.0 and rng.random() < exploration_rate:
+    if exploration_rate > 0.0 and random.random() < exploration_rate:
         use_improving = not use_improving
 
     selected_list = improving_candidates if use_improving else worsening_candidates
@@ -96,7 +92,7 @@ def majority_neighbor_flip_67a0(
     if not selected_list:
         return None, {}
 
-    chosen_node = rng.choice(list(selected_list))
+    chosen_node = random.choice(list(selected_list))
     chosen_delta = delta_by_node.get(chosen_node, 0.0)
 
     op = SwapOperator([chosen_node])
