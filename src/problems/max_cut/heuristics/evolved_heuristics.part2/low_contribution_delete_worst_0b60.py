@@ -1,7 +1,7 @@
 from src.problems.max_cut.components import *
 import random
 
-def low_contribution_delete_worst_1_0b60(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[DeleteOperator, dict]:
+def low_contribution_delete_worst_0b60(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[DeleteOperator, dict]:
     """Delete the single worst contributing node (Greedy Perturbation).
     
     Identifies the node with the absolute lowest contribution to the current cut and removes it.

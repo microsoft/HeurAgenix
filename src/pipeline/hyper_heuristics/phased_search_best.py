@@ -79,8 +79,6 @@ class PhasedSearchBestHyperHeuristic:
                 self.perturbation_heuristics.append(func)
             else:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
-        
-        print(f"Classified heuristics: {len(self.constructive_heuristics)} constructive, {len(self.improvement_heuristics)} improvement, {len(self.perturbation_heuristics)} perturbation")
 
     def run(self, env: BaseEnv) -> bool:
         max_steps = int(env.construction_steps * self.iterations_scale_factor)
