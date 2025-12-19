@@ -154,8 +154,10 @@ class PhasedSearchBestHyperHeuristic:
                 
                 if no_improve_steps > max_no_improve or all_heuristics_failed:
                     if all_heuristics_failed:
-                        print(f"Run:{run_id} Immediate Stagnation: All {len(tried_heuristics)} improvement heuristics failed. Triggering perturbation.")
+                        print(f"Run:{run_id} Immediate Stagnation: All {len(tried_heuristics)} improvement heuristics failed. FORCING MASSIVE RUIN.")
                         tried_heuristics.clear() # Reset for next round
+                        # Force massive ruin by setting counter above threshold
+                        perturbation_count = max_perturbations_before_ruin + 1
 
                     if self.perturbation_heuristics:
                         perturbation_count += 1
@@ -235,19 +237,31 @@ class PhasedSearchBestHyperHeuristic:
                 
                 current_steps += 1
                 
-                # Check improvement
-                if env.key_value > last_value:
-                    last_value = env.key_value
-                    no_improve_steps = 0
-                    tried_heuristics.clear() # Reset tracking: we moved to a new state
-                    if env.key_value > current_best:
-                        current_best = env.key_value
+                # Check if heuristic actually performed an operation (returned a valid operator)
+                # If operator is None, it means the heuristic found no valid move (Local Optimum for that heuristic).
+                # If operator is valid, the state changed (even if value didn't improve, e.g. side-step).
+                is_valid_op = operator is not None and not isinstance(operator, str)
+                
+                if is_valid_op:
+                    # A move was made, so the state has changed.
+                    # We reset the 'tried' tracking because previous failures might now be valid in the new state.
+                    tried_heuristics.clear()
+                    
+                    # Check improvement
+                    if env.key_value > last_value:
+                        last_value = env.key_value
+                        no_improve_steps = 0
+                        if env.key_value > current_best:
+                            current_best = env.key_value
+                    else:
+                        # Move made but no improvement (Side-step or drop)
+                        no_improve_steps += 1
+                        last_value = env.key_value
                 else:
-                    no_improve_steps += 1
-                    # If the operator was None (no action taken) or value didn't improve, mark heuristic as tried
-                    # Note: env.run_heuristic returns the operator. If it's None, definitely failed.
-                    # Even if it's not None but value didn't increase, it's a failed improvement attempt for this state.
+                    # No move was made (None returned). State is unchanged.
+                    # We mark this heuristic as tried for this specific state.
                     tried_heuristics.add(heuristic)
+                    no_improve_steps += 1
 
             # Logging
             current_best = max(current_best, env.key_value)
