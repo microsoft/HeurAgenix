@@ -26,21 +26,56 @@ def highest_delta_node_b31b(problem_state: dict, algorithm_data: dict, **kwargs)
     # Initialize variables to keep track of the best node and delta
     best_node = None
     best_delta = -float('inf')
-
-    # Iterate over all unselected nodes to find the one with the highest delta
-    for node in unselected_nodes:
-        delta_a = sum(weight_matrix[node, other] for other in current_solution.set_b)
-        delta_b = sum(weight_matrix[node, other] for other in current_solution.set_a)
-
-        # Check if placing the node in set A or B gives a better delta
-        if delta_a > best_delta or delta_b > best_delta:
-            best_delta = max(delta_a, delta_b)
-            best_node = node
-            target_set = 'A' if delta_a > delta_b else 'B'
-
-    # If no suitable node is found (all nodes are already selected), return None
-    if best_node is None:
+    
+    import numpy as np
+    
+    # Convert sets to lists for indexing
+    unselected_list = list(unselected_nodes)
+    if not unselected_list:
         return None, {}
+        
+    set_a_list = list(current_solution.set_a)
+    set_b_list = list(current_solution.set_b)
+    
+    # Vectorized calculation
+    # Calculate weights from all unselected nodes to set A and set B at once
+    # weight_matrix[unselected_list][:, set_a_list] gives a submatrix of weights
+    # Summing along axis 1 gives the total weight to the set for each unselected node
+    
+    if set_a_list:
+        weights_to_a = weight_matrix[unselected_list][:, set_a_list].sum(axis=1)
+    else:
+        weights_to_a = np.zeros(len(unselected_list))
+        
+    if set_b_list:
+        weights_to_b = weight_matrix[unselected_list][:, set_b_list].sum(axis=1)
+    else:
+        weights_to_b = np.zeros(len(unselected_list))
+    
+    # delta_a is gain if moved to A (sum of weights to B)
+    # delta_b is gain if moved to B (sum of weights to A)
+    # Note: The original code logic was:
+    # delta_a = sum(weight_matrix[node, other] for other in current_solution.set_b) -> This is gain if put in A?
+    # Wait, MaxCut objective is to maximize edges BETWEEN sets.
+    # If I put node in A, the cut edges are those connecting to B. So gain is sum(weights to B).
+    # Yes, original code: delta_a = sum(... set_b). Correct.
+    
+    deltas_a = weights_to_b
+    deltas_b = weights_to_a
+    
+    # Find max gain for each node
+    max_gains = np.maximum(deltas_a, deltas_b)
+    best_idx = np.argmax(max_gains)
+    
+    best_gain = max_gains[best_idx]
+    best_node = unselected_list[best_idx]
+    
+    # Determine target set
+    # If deltas_a[best_idx] > deltas_b[best_idx], then target is A
+    if deltas_a[best_idx] > deltas_b[best_idx]:
+        target_set = 'A'
+    else:
+        target_set = 'B'
 
     # Create the operator to insert the best node into the chosen set
     operator = InsertNodeOperator(best_node, target_set)

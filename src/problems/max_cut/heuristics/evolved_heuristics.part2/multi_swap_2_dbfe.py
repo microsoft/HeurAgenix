@@ -26,23 +26,43 @@ The +2·w(i,j) term corrects the double subtraction of the edge (i,j) when summi
     set_b = current_solution.set_b
 
     # Precompute the sum of weights to and from each node
-    weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1)
-    weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1)
+    import numpy as np
+    
+    list_a = list(set_a)
+    list_b = list(set_b)
+    
+    if not list_a or not list_b:
+        return None, {}
+        
+    weight_to_a = weight_matrix[:, list_a].sum(axis=1)
+    weight_to_b = weight_matrix[:, list_b].sum(axis=1)
 
-    for i in set_a:
-        for j in set_b:
-            # Calculate the delta in cut value for swapping this pair of nodes
-            delta = weight_to_a[i] - weight_to_a[j] + weight_to_b[j] - weight_to_b[i]
-
-            # Adjust for the weight between i and j if they are connected
-            if weight_matrix[i, j] != 0:
-                delta += 2 * weight_matrix[i, j]
-            # Check if this swap improves the cut value
-            if delta > best_increase:
-                best_increase = delta
-                best_pair = (i, j)
-
-    if best_pair is not None:
-        return SwapOperator(list(best_pair)), {}
+    # Vectorized calculation
+    # gain_a[i] = weight_to_a[i] - weight_to_b[i] (for i in A)
+    # gain_b[j] = weight_to_b[j] - weight_to_a[j] (for j in B)
+    
+    gain_a_vals = weight_to_a[list_a] - weight_to_b[list_a]
+    gain_b_vals = weight_to_b[list_b] - weight_to_a[list_b]
+    
+    # Interaction term: 2 * W[i, j]
+    # We need submatrix W[list_a, list_b]
+    # W_sub[k, l] corresponds to W[list_a[k], list_b[l]]
+    W_sub = weight_matrix[np.ix_(list_a, list_b)]
+    
+    # Total delta matrix
+    # shape: (len(A), len(B))
+    # broadcasting: (len(A), 1) + (1, len(B)) + (len(A), len(B))
+    delta_matrix = gain_a_vals[:, None] + gain_b_vals[None, :] + 2 * W_sub
+    
+    # Find max
+    best_idx_flat = np.argmax(delta_matrix)
+    best_idx_2d = np.unravel_index(best_idx_flat, delta_matrix.shape)
+    
+    max_delta = delta_matrix[best_idx_2d]
+    
+    if max_delta > 0:
+        i = list_a[best_idx_2d[0]]
+        j = list_b[best_idx_2d[1]]
+        return SwapOperator([i, j]), {}
     else:
         return None, {}

@@ -8,7 +8,7 @@ import numpy as np
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from src.problems.max_cut.env import Env
-from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
+from src.pipeline.hyper_heuristics.random_search_best import RandomSearchBestHyperHeuristic
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
@@ -31,7 +31,7 @@ def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
     env = Env(data_name=data_name)
     construction_steps = env.construction_steps
     env.reset()
-    algorithm = RandomHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 2)
+    algorithm = RandomSearchBestHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 2)
 
     rss = psutil.Process(os.getpid()).memory_info().rss
 
@@ -109,6 +109,7 @@ def main(data_name: str, heuristic_dir: str, num_runs: int):
         if remaining:
             workers = max(1, workers // 2)
             time.sleep(1.0)
+
 if __name__ == '__main__':
     data_name = sys.argv[1]
     num_runs = 100

@@ -1,6 +1,8 @@
 import os
 import random
 import datetime
+import time
+import copy
 from src.util.util import extract
 from src.util.llm_client.get_llm_client import get_llm_client
 from src.util.util import load_function
@@ -236,10 +238,98 @@ def test_all_heuristics(test_dir, test_data_list):
             f.write(f"{heuristic_file.__name__}\t{running_steps}\t{average_ms}\t{average_nones}\t{complete_ratio}\t{average_gap}\t{crashed}\n")
             f.close()
 
-def work():
-    test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
-    # test_data_list = [f"g{i}.mc" for i in [30]]
-    test_data_list = ["g72.mc"]
-    test_all_heuristics(test_dir, test_data_list)
 
-work()
+def compare_heuristics(heuristic1_path, heuristic2_path, data_name, steps=100):
+    print(f"Comparing {heuristic1_path} and {heuristic2_path} on {data_name} for {steps} steps...")
+    
+    # Initialize environment
+    env = Env(data_name=data_name)
+    env.reset()
+    
+    # Random initialization (simulate random_hh)
+    random_heuristic_path = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "random_5c59.py")
+    if os.path.exists(random_heuristic_path):
+        random_func = load_function(random_heuristic_path, problem="max_cut")
+        print("Running random heuristic for initialization...")
+        for _ in range(100): # Run 100 random steps
+            env.run_heuristic(random_func)
+    else:
+        print(f"Error: Random heuristic not found at {random_heuristic_path}")
+        return
+
+    # Save state
+    start_solution = copy.deepcopy(env.current_solution)
+    start_algo_data = copy.deepcopy(env.algorithm_data)
+    start_problem_state = copy.deepcopy(env.problem_state)
+    print(f"Initial Cut Value: {env.key_value}")
+
+    # Run Heuristic 1
+    try:
+        func1 = load_function(heuristic1_path, problem="max_cut")
+    except Exception as e:
+        print(f"Error loading {heuristic1_path}: {e}")
+        return
+
+    t1_start = time.time()
+    for i in range(steps):
+        env.run_heuristic(func1)
+    t1_end = time.time()
+    time1 = t1_end - t1_start
+    sol1 = copy.deepcopy(env.current_solution)
+    val1 = env.key_value
+    print(f"Heuristic 1 ({os.path.basename(heuristic1_path)}): Time={time1:.4f}s, Value={val1}")
+
+    # Restore state
+    env.current_solution = copy.deepcopy(start_solution)
+    env.algorithm_data = copy.deepcopy(start_algo_data)
+    env.problem_state = copy.deepcopy(start_problem_state)
+
+    # Run Heuristic 2
+    try:
+        func2 = load_function(heuristic2_path, problem="max_cut")
+    except Exception as e:
+        print(f"Error loading {heuristic2_path}: {e}")
+        return
+
+    t2_start = time.time()
+    for i in range(steps):
+        env.run_heuristic(func2)
+    t2_end = time.time()
+    time2 = t2_end - t2_start
+    sol2 = env.current_solution
+    val2 = env.key_value
+    print(f"Heuristic 2 ({os.path.basename(heuristic2_path)}): Time={time2:.4f}s, Value={val2}")
+
+    # Compare
+    is_same = (sol1.set_a == sol2.set_a) and (sol1.set_b == sol2.set_b)
+    print(f"Solutions Identical: {is_same}")
+    
+    if is_same:
+        if time1 < time2:
+            print(f"Result: {os.path.basename(heuristic1_path)} is faster.")
+        else:
+            print(f"Result: {os.path.basename(heuristic2_path)} is faster.")
+    else:
+        print("Result: Solutions differ.")
+
+
+def work():
+    # test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
+    # test_data_list = [f"g{i}.mc" for i in [30]]
+    # test_data_list = ["g72.mc"]
+    # test_all_heuristics(test_dir, test_data_list)
+
+    h1 = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "multi_swap_2_dbfe.py")
+    h2 = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "multi_swap_2_dbfe_pre.py")
+    compare_heuristics(h1, h2, "g1.mc")
+
+    h1 = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "semi_greedy_node_grasp_bf9a.py")
+    h2 = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "semi_greedy_node_grasp_bf9a_pre.py")
+    compare_heuristics(h1, h2, "g1.mc")
+
+    h1 = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "spectral_seed_fiedler_51e0.py")
+    h2 = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2", "spectral_seed_fiedler_51e0_pre.py")
+    compare_heuristics(h1, h2, "g1.mc")
+
+if __name__ == "__main__":
+    work()

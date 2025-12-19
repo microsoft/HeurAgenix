@@ -34,14 +34,27 @@ def highest_weight_edge_eb0d(problem_state: dict, algorithm_data: dict, **kwargs
         return InsertNodeOperator(node=node, target_set='A'), algorithm_data
 
     # Build submatrix over unselected nodes and get global argmax excluding diagonal
-    U_arr = np.fromiter(U, dtype=int)
-    sub = W[np.ix_(U_arr, U_arr)].copy()
-    # Exclude self-edges
+    # Use list conversion which is often faster/safer than fromiter for sets
+    U_list = list(U)
+    if not U_list:
+        return None, algorithm_data
+        
+    # Optimization: Avoid double copy. np.ix_ returns a copy, so we don't need .copy()
+    # Also, for very large N, we might want to avoid creating the submatrix if U is small?
+    # But here U is likely large.
+    
+    # Use integer indexing
+    sub = W[np.ix_(U_list, U_list)]
+    
+    # Exclude self-edges (diagonal of submatrix)
     np.fill_diagonal(sub, -np.inf)
-    flat_idx = int(np.argmax(sub))
+    
+    # Find max
+    flat_idx = np.argmax(sub)
     i_idx, j_idx = np.unravel_index(flat_idx, sub.shape)
-    node_1 = int(U_arr[i_idx])
-    node_2 = int(U_arr[j_idx])
+    
+    node_1 = U_list[i_idx]
+    node_2 = U_list[j_idx]
 
     A = sol.set_a
     B = sol.set_b

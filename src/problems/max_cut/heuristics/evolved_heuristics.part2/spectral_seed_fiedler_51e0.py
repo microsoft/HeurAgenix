@@ -123,43 +123,55 @@ def spectral_seed_fiedler_51e0(
         if W is None:
             operator = balanced_insertion_fallback()
             return operator, {}
-        W = np.asarray(W)
-        if W.ndim != 2 or W.shape[0] != W.shape[1]:
-            operator = balanced_insertion_fallback()
-            return operator, {}
-        n = W.shape[0]
-        W_sym = 0.5 * (W + W.T) if symmetrize else W
+        
+        # Optimization: Cache spectral vector in algorithm_data
+        # Spectral properties of the graph don't change during construction (unless we consider subgraph, but here it uses full W)
+        # So we can compute it once and reuse.
+        cache_key = "spectral_vector_51e0"
+        if cache_key in algorithm_data:
+            v = algorithm_data[cache_key]
+            n = v.shape[0]
+        else:
+            W = np.asarray(W)
+            if W.ndim != 2 or W.shape[0] != W.shape[1]:
+                operator = balanced_insertion_fallback()
+                return operator, {}
+            n = W.shape[0]
+            W_sym = 0.5 * (W + W.T) if symmetrize else W
 
-        try:
-            if matrix_choice == "laplacian":
-                deg = W_sym.sum(axis=1)
-                if laplacian_type == "unnormalized":
-                    L = np.diag(deg) - W_sym
-                else:
-                    inv_sqrt_deg = np.zeros_like(deg, dtype=float)
-                    mask = deg > 0
-                    inv_sqrt_deg[mask] = 1.0 / np.sqrt(deg[mask])
-                    D_inv_sqrt = np.diag(inv_sqrt_deg)
-                    L = np.eye(n, dtype=float) - (D_inv_sqrt @ W_sym @ D_inv_sqrt)
+            try:
+                if matrix_choice == "laplacian":
+                    deg = W_sym.sum(axis=1)
+                    if laplacian_type == "unnormalized":
+                        L = np.diag(deg) - W_sym
+                    else:
+                        inv_sqrt_deg = np.zeros_like(deg, dtype=float)
+                        mask = deg > 0
+                        inv_sqrt_deg[mask] = 1.0 / np.sqrt(deg[mask])
+                        D_inv_sqrt = np.diag(inv_sqrt_deg)
+                        L = np.eye(n, dtype=float) - (D_inv_sqrt @ W_sym @ D_inv_sqrt)
 
-                if n <= max_dense_size:
-                    evals, evecs = np.linalg.eigh(L)
-                    zero_count = int(np.sum(evals <= zero_eig_tol))
-                    fiedler_index = min(max(zero_count, 1), n - 1)  # ensure at least index 1
-                    v = evecs[:, fiedler_index]
+                    if n <= max_dense_size:
+                        evals, evecs = np.linalg.eigh(L)
+                        zero_count = int(np.sum(evals <= zero_eig_tol))
+                        fiedler_index = min(max(zero_count, 1), n - 1)  # ensure at least index 1
+                        v = evecs[:, fiedler_index]
+                    else:
+                        # Use adjacency power iteration as scalable surrogate
+                        v = power_iteration_leading_eigenvector(W_sym, power_iter_max_iter, power_iter_tol)
                 else:
-                    # Use adjacency power iteration as scalable surrogate
-                    v = power_iteration_leading_eigenvector(W_sym, power_iter_max_iter, power_iter_tol)
-            else:
-                # Adjacency basis
-                if n <= max_dense_size:
-                    evals, evecs = np.linalg.eigh(W_sym)
-                    v = evecs[:, -1]
-                else:
-                    v = power_iteration_leading_eigenvector(W_sym, power_iter_max_iter, power_iter_tol)
-        except Exception:
-            # Numerical fallback: adjacency power iteration
-            v = power_iteration_leading_eigenvector(W_sym, power_iter_max_iter, power_iter_tol)
+                    # Adjacency basis
+                    if n <= max_dense_size:
+                        evals, evecs = np.linalg.eigh(W_sym)
+                        v = evecs[:, -1]
+                    else:
+                        v = power_iteration_leading_eigenvector(W_sym, power_iter_max_iter, power_iter_tol)
+            except Exception:
+                # Numerical fallback: adjacency power iteration
+                v = power_iteration_leading_eigenvector(W_sym, power_iter_max_iter, power_iter_tol)
+            
+            if v is not None:
+                algorithm_data[cache_key] = v
 
     # If spectral vector invalid, fallback to balanced insertion
     if v is None or n is None or v.shape[0] != n:
