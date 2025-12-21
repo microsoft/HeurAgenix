@@ -225,7 +225,7 @@ class PhasedSearchBestHyperHeuristic:
 
             # Logging
             current_best = max(current_best, env.key_value)
-            if current_steps % 100 == 0:
+            if current_steps % env.construction_steps == 0:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
