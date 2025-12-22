@@ -224,22 +224,21 @@ class PhasedSearchBestHyperHeuristic:
                     no_improve_steps += 1
 
             # Logging
-            current_best = max(current_best, env.key_value)
             if current_steps % env.construction_steps == 0:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
                 print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tcurrent_best:{current_best}\tbest:{env.best_known}\ttime:{time_cost:.2f}", flush=True)
 
-            if env.key_value == env.best_known:
-                if env.is_complete_solution and env.is_valid_solution:
+            if env.is_complete_solution and env.is_valid_solution:
+                current_best = max(current_best, env.key_value)
+                if env.key_value == env.best_known:
                     env.dump_result(result_file=f"match_best_known_result.txt")
                     found_best = True
                     # Don't stop, try to improve more!
                     env.best_known = env.key_value # Update local best known to keep pushing
 
-            # Check best known
-            if env.key_value > env.best_known:
+                # Check best known
                 if env.is_complete_solution and env.is_valid_solution:
                     print(f"!!! NEW BEST FOUND: {env.key_value} > {env.best_known} !!!", flush=True)
                     print(env.current_solution, flush=True)
@@ -249,3 +248,4 @@ class PhasedSearchBestHyperHeuristic:
                     env.best_known = env.key_value # Update local best known to keep pushing
 
         return found_best
+    
