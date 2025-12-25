@@ -207,7 +207,7 @@ class PhasedSearchBestHyperHeuristic:
                     heuristic = random.choice(batch_heuristics)
                     # Use ratio instead of fixed batch size
                     # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
-                    env.run_heuristic(heuristic, parameters={"batch_ratio": 0.01})
+                    env.run_heuristic(heuristic, parameters={"batch_ratio": 0.05})
                 else:
                     # Single Insertion (Precision)
                     if single_heuristics:
@@ -232,7 +232,7 @@ class PhasedSearchBestHyperHeuristic:
                     # If the constructed solution is too far from the best known (e.g. < 75%),
                     # we assume it's in a bad basin of attraction and abort immediately.
                     # This frees up the worker to try a new random seed.
-                    quality_threshold = 0.75 # 75% of best known. For G81 (14060) -> 10545
+                    quality_threshold = 0.70 # 70% of best known. For G81 (14060) -> 10545
                     quality_ratio = env.key_value / env.best_known
 
                     if env.key_value > current_best:
