@@ -207,7 +207,7 @@ class PhasedSearchBestHyperHeuristic:
                     heuristic = random.choice(batch_heuristics)
                     # Use ratio instead of fixed batch size
                     # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
-                    env.run_heuristic(heuristic, batch_ratio=0.01)
+                    env.run_heuristic(heuristic, parameters={"batch_ratio": 0.01})
                 else:
                     # Single Insertion (Precision)
                     if single_heuristics:
