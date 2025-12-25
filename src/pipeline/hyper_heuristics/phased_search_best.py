@@ -246,8 +246,8 @@ class PhasedSearchBestHyperHeuristic:
                         if quality_ratio < quality_threshold:
                             print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t [Quality Gate] Initial score {env.key_value} ({quality_ratio:.1%}) < {quality_threshold:.0%}. Aborting run to restart.", flush=True)
                             return False # Return False to signal the runner to stop this episode
-                    else:
-                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tStarting improvement phase with initial score {env.key_value}", flush=True)
+                        else:
+                            print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tStarting improvement phase with initial score {env.key_value}", flush=True)
                 
             # Phase 2: Improvement (and Perturbation)
             else:
