@@ -37,10 +37,9 @@ class RandomSearchBestHyperHeuristic:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
-                print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tbest:{env.best_known}\ttime:{time_cost}", flush=True)
-            if current_steps % 1000 == 0:
+                print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
                 if env.is_complete_solution and last_value == env.key_value:
-                    print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tbest:{env.best_known}\ttime:{time_cost}", flush=True)
+                    print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
                     print(f"No better solution found {last_value} => {env.key_value}, {current_steps}, stop", flush=True)
                     env.dump_result()
                     return found_best
@@ -55,7 +54,7 @@ class RandomSearchBestHyperHeuristic:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
-                print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tcurrent_best:{current_best}\tbest:{env.best_known}\ttime:{time_cost:.2f}", flush=True)
+                print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
 
             if env.key_value == env.best_known:
                 if env.is_complete_solution and env.is_valid_solution:

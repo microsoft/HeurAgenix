@@ -2,7 +2,7 @@ from src.problems.max_cut.components import *
 import random
 from typing import Optional
 
-def balanced_random_batch(problem_state: dict, algorithm_data: dict, batch_ratio: float = 0.05, balance_bias: float = 0.7, seed: Optional[int] = None, **kwargs) -> tuple[BatchInsertNodeOperator, dict]:
+def balanced_random_batch(problem_state: dict, algorithm_data: dict, batch_ratio: float = 0.01, balance_bias: float = 0.7, seed: Optional[int] = None, **kwargs) -> tuple[BatchInsertNodeOperator, dict]:
     """
     Random node insertion with partition-balance bias (Batch Version).
     
@@ -10,7 +10,7 @@ def balanced_random_batch(problem_state: dict, algorithm_data: dict, batch_ratio
     It tries to maintain balance by assigning nodes to the smaller set with probability `balance_bias`.
     
     Args:
-        batch_ratio (float): Ratio of total nodes to insert in this batch. Default 0.05.
+        batch_ratio (float): Ratio of total nodes to insert in this batch. Default 0.01.
         balance_bias (float): Probability to insert into the smaller set.
     """
     unselected_nodes = list(problem_state['unselected_nodes'])

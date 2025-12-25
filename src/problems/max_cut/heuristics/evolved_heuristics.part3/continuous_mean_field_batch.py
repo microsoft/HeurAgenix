@@ -3,7 +3,7 @@ import random
 import scipy.sparse as sp
 from src.problems.max_cut.components import InsertNodeOperator, BatchInsertNodeOperator
 
-def continuous_mean_field_batch(problem_state: dict, algorithm_data: dict, batch_ratio: float = 0.05, **kwargs) -> tuple[BatchInsertNodeOperator, dict]:
+def continuous_mean_field_batch(problem_state: dict, algorithm_data: dict, batch_ratio: float = 0.01, **kwargs) -> tuple[BatchInsertNodeOperator, dict]:
     """
     Continuous Mean-Field (CMF) Construction for Max-Cut with Partial Batching.
     
@@ -18,7 +18,7 @@ def continuous_mean_field_batch(problem_state: dict, algorithm_data: dict, batch
     4. It returns a BatchInsertNodeOperator for these nodes.
     
     Args:
-        batch_ratio (float): Ratio of total nodes to insert in this batch. Default 0.05 (5%).
+        batch_ratio (float): Ratio of total nodes to insert in this batch. Default 0.01 (1%).
     """
     
     node_num = problem_state["node_num"]

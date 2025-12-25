@@ -4,7 +4,7 @@ import numpy as np
 def weighted_degree_batch(
     problem_state: dict,
     algorithm_data: dict,
-    batch_ratio: float = 0.05,
+    batch_ratio: float = 0.01,
     **kwargs
 ) -> tuple[BatchInsertNodeOperator, dict]:
     """

@@ -39,6 +39,7 @@ class PhasedSearchBestHyperHeuristic:
             "random_5c59",
             "semi_greedy_node_grasp_bf9a",
             "softmax_gain_insertion_76de",
+            "spectral_fiedler_batch",
             "spectral_seed_fiedler_51e0",
             "continuous_mean_field_batch", # Part 3: Batch CMF
             "balanced_random_batch", # Part 3: Batch Random
@@ -101,7 +102,7 @@ class PhasedSearchBestHyperHeuristic:
         last_value = 0
         found_best = False
         node_num = env.instance_data["node_num"]
-        print(f"start running phased search: {data}, {experiment}, {run_id}\tstart:{begin.strftime('%Y-%m-%d %H:%M:%S')}\t", flush=True)
+        print(f"Start running phased search. Data:{data}\tExp\t{experiment}\tID:{run_id}\tStart:{begin.strftime('%Y-%m-%d %H:%M:%S')}\t", flush=True)
         
         # Optimization for Large Graphs (> 5000 nodes):
         # Use only O(1) or O(N) constructive heuristics to avoid O(N^2) bottlenecks.
@@ -119,7 +120,8 @@ class PhasedSearchBestHyperHeuristic:
                 "weighted_degree_batch",
                 "highest_delta_node_b31b", # Include slow ones for hybrid strategy?
                 "most_weight_neighbors_320c",
-                "softmax_gain_insertion_76de"
+                "softmax_gain_insertion_76de",
+                "spectral_fiedler_batch"
             }
             # Filter heuristics by name
             fast_heuristics = [h for h in self.constructive_heuristics if h.__name__ in fast_constructive_names]
@@ -190,21 +192,22 @@ class PhasedSearchBestHyperHeuristic:
                 
                 # 1. Identify Batch vs Single Heuristics
                 # We want to use it sparingly (20% prob), not frequently (80% prob).
-                batch_heuristics = [h for h in active_constructive_heuristics if ("batch" in h.__name__ or "mean_field" in h.__name__) and "spectral" not in h.__name__]
+                batch_heuristics = [h for h in active_constructive_heuristics if "batch" in h.__name__]
                 single_heuristics = [h for h in active_constructive_heuristics if h not in batch_heuristics]
                 
                 # 2. Determine Strategy
                 use_batch = False
-                # Prefer batch if available, with 80% probability
-                if batch_heuristics and (not single_heuristics or random.random() < 0.8):
+                # Prefer batch if available, with 70% probability (Balanced Hybrid)
+                # Lower probability (e.g. 0.7 vs 0.9) increases diversity by allowing more random/greedy single insertions.
+                if batch_heuristics and (not single_heuristics or random.random() < 0.5):
                     use_batch = True
                 
                 # 3. Execute
                 if use_batch:
                     heuristic = random.choice(batch_heuristics)
                     # Use ratio instead of fixed batch size
-                    # 5% of nodes per batch allows for ~20 phases of construction
-                    env.run_heuristic(heuristic)
+                    # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
+                    env.run_heuristic(heuristic, batch_ratio=0.01)
                 else:
                     # Single Insertion (Precision)
                     if single_heuristics:
@@ -213,7 +216,7 @@ class PhasedSearchBestHyperHeuristic:
                     elif batch_heuristics:
                         # Fallback: Use batch heuristic as single insertion
                         heuristic = random.choice(batch_heuristics)
-                        env.run_heuristic(heuristic, batch_ratio=1.0/node_num)
+                        env.run_heuristic(heuristic)
                 
                 current_steps += 1
                 
@@ -224,13 +227,27 @@ class PhasedSearchBestHyperHeuristic:
                 
                 # Check if construction just finished
                 if env.is_complete_solution and env.is_valid_solution and current_best == 0:
-                    rebuilding_mode = False # Exit rebuilding mode once full
+                    # === Quality Gate (Early Rejection) ===
+                    # Strategy: "Kill Low Quality"
+                    # If the constructed solution is too far from the best known (e.g. < 75%),
+                    # we assume it's in a bad basin of attraction and abort immediately.
+                    # This frees up the worker to try a new random seed.
+                    quality_threshold = 0.75 # 75% of best known. For G81 (14060) -> 10545
+                    quality_ratio = env.key_value / env.best_known
+
                     if env.key_value > current_best:
                         current_best = env.key_value
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
-                        print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tcurrent_best:{current_best}\tbest:{env.best_known}\tnow:{end.strftime('%Y-%m-%d %H:%M:%S')}\ttime_h:{time_cost/3600:.4f}", flush=True)
+                        init_value = env.key_value
+                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tConstruction completed")
+                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tInit:{init_value}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
+                        if quality_ratio < quality_threshold:
+                            print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t [Quality Gate] Initial score {env.key_value} ({quality_ratio:.1%}) < {quality_threshold:.0%}. Aborting run to restart.", flush=True)
+                            return False # Return False to signal the runner to stop this episode
+                    else:
+                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tStarting improvement phase with initial score {env.key_value}", flush=True)
                 
             # Phase 2: Improvement (and Perturbation)
             else:
@@ -285,7 +302,6 @@ class PhasedSearchBestHyperHeuristic:
                         perturbation_count = 0
                         no_improve_steps = 0
                         last_value = env.key_value 
-                        rebuilding_mode = True # Enable randomized rebuilding
                         continue
 
                     # Normal (Small) Perturbation
@@ -329,7 +345,7 @@ class PhasedSearchBestHyperHeuristic:
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
-                        print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tcurrent_best:{current_best}\tbest:{env.best_known}\tnow:{end.strftime('%Y-%m-%d %H:%M:%S')}\ttime_h:{time_cost/3600:.4f}", flush=True)
+                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tInit:{init_value}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
                 else:
                     no_improve_steps += 1
 
