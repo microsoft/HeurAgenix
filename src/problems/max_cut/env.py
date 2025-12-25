@@ -2,7 +2,7 @@ import os
 import numpy as np
 from src.problems.base.env import BaseEnv
 from src.problems.base.components import BaseOperator
-from src.problems.max_cut.components import Solution, InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator
+from src.problems.max_cut.components import Solution, InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator, BatchInsertNodeOperator
 from src.problems.max_cut.best_known import best_known
 
 
@@ -127,6 +127,29 @@ class Env(BaseEnv):
                         else:
                             delta += 2 * w
                             
+        elif isinstance(operator, BatchInsertNodeOperator):
+            nodes_to_a = operator.nodes_to_a
+            nodes_to_b = operator.nodes_to_b
+            
+            # 1. Edges between New A and Existing B
+            for u in nodes_to_a:
+                for v, w in adj[u].items():
+                    if v in solution.set_b:
+                        delta += w
+                        
+            # 2. Edges between New B and Existing A
+            for u in nodes_to_b:
+                for v, w in adj[u].items():
+                    if v in solution.set_a:
+                        delta += w
+                        
+            # 3. Edges between New A and New B
+            set_nodes_to_b = set(nodes_to_b)
+            for u in nodes_to_a:
+                for v, w in adj[u].items():
+                    if v in set_nodes_to_b:
+                        delta += w
+                
         return delta
 
     def run_operator(self, operator: BaseOperator) -> bool:

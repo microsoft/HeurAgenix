@@ -28,7 +28,8 @@ def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
     env = Env(data_name=data_name)
     construction_steps = env.construction_steps
     env.reset()
-    algorithm = RandomSearchBestHyperHeuristic(os.listdir(heuristic_dir), "max_cut", 2)
+    heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
+    algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", 2)
 
     rss = psutil.Process(os.getpid()).memory_info().rss
 
@@ -74,7 +75,9 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
 
     env.reset(output_dir=output_dir)
     
-    heuristic_pool = os.listdir(heuristic_dir)
+    # Use absolute paths for heuristics to avoid ambiguity
+    heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
+    
     if method == "phased":
         algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut")
     else:
@@ -124,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument("data_name", type=str, help="Name of the dataset (e.g., g1)")
     parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
-                        default="evolved_heuristics.part2", help="Directory containing heuristics")
+                        default="evolved_heuristics.part3", help="Directory containing heuristics")
     parser.add_argument("-m", "--method", type=str, default="phased", choices=["phased", "random"], 
                         help="Search method: 'phased' or 'random' (default: phased)")
 

@@ -44,7 +44,8 @@ def main():
 
     datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     heuristic = heuristic.split(os.sep)[-1].split(".")[0]
-    heuristic_pool = os.listdir(os.path.join("src", "problems", problem, "heuristics", heuristic_dir))
+    heuristic_dir = os.path.join("src", "problems", problem, "heuristics", heuristic_dir)
+    heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
 
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
 

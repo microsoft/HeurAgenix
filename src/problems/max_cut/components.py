@@ -88,3 +88,22 @@ class DeleteOperator(BaseOperator):
         elif self.node in solution.set_b:
             new_set_b.remove(self.node)
         return Solution(new_set_a, new_set_b, solution.cut_value)
+
+
+class BatchInsertNodeOperator(BaseOperator):
+    """Insert multiple nodes into the MaxCut solution."""
+    def __init__(self, nodes_to_a: list[int], nodes_to_b: list[int]):
+        self.nodes_to_a = nodes_to_a
+        self.nodes_to_b = nodes_to_b
+
+    def __str__(self):
+        return f"BatchInsertNodeOperator(nodes_to_a={len(self.nodes_to_a)}, nodes_to_b={len(self.nodes_to_b)})"
+
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        
+        new_set_a.update(self.nodes_to_a)
+        new_set_b.update(self.nodes_to_b)
+        
+        return Solution(new_set_a, new_set_b, solution.cut_value)

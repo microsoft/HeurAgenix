@@ -1,7 +1,7 @@
 
 # G1~G70 https://medium.com/toshiba-sbm/benchmarking-the-max-cut-problem-on-the-simulated-bifurcation-machine-e26e1127c0b0
 # G72 G77 G81 https://arxiv.org/pdf/2505.18508
-
+# G63 https://arxiv.org/pdf/2510.21105
 best_known = {
     "g1": 11624,
     "g2": 11620,
@@ -65,7 +65,7 @@ best_known = {
     "g60": 14188,
     "g61": 5796,
     "g62": 4870,
-    "g63": 27045,
+    "g63": 27047,
     "g64": 8751,
     "g65": 5562,
     "g66": 6364,
