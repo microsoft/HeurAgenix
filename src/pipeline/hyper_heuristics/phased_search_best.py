@@ -39,7 +39,6 @@ class PhasedSearchBestHyperHeuristic:
             "random_5c59",
             "semi_greedy_node_grasp_bf9a",
             "softmax_gain_insertion_76de",
-            "spectral_fiedler_batch",
             "spectral_seed_fiedler_51e0",
             "continuous_mean_field_batch", # Part 3: Batch CMF
             "balanced_random_batch", # Part 3: Batch Random
@@ -121,7 +120,6 @@ class PhasedSearchBestHyperHeuristic:
                 "highest_delta_node_b31b", # Include slow ones for hybrid strategy?
                 "most_weight_neighbors_320c",
                 "softmax_gain_insertion_76de",
-                "spectral_fiedler_batch"
             }
             # Filter heuristics by name
             fast_heuristics = [h for h in self.constructive_heuristics if h.__name__ in fast_constructive_names]
@@ -247,7 +245,7 @@ class PhasedSearchBestHyperHeuristic:
                             print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t [Quality Gate] Initial score {env.key_value} ({quality_ratio:.1%}) < {quality_threshold:.0%}. Aborting run to restart.", flush=True)
                             return False # Return False to signal the runner to stop this episode
                         else:
-                            print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tStarting improvement phase with initial score {env.key_value}", flush=True)
+                            print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t [Quality Gate] Initial score {env.key_value} ({quality_ratio:.1%}) >= {quality_threshold:.0%}. Starting improvement phase.", flush=True)
                 
             # Phase 2: Improvement (and Perturbation)
             else:
