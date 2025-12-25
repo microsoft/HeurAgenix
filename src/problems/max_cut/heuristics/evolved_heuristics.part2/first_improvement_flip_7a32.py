@@ -2,7 +2,7 @@ from src.problems.max_cut.components import *
 import random
 import numpy as np
 
-def first_improvement_flip_7a32(problem_state: dict, algorithm_data: dict, epsilon: float=1e-12, scan_order: str="A_then_B", shuffle: bool=False, **kwargs) -> tuple[SwapOperator, dict]:
+def first_improvement_flip_7a32(problem_state: dict, algorithm_data: dict, epsilon: float=1e-12, scan_order: str="A_then_B", shuffle: bool=True, **kwargs) -> tuple[SwapOperator, dict]:
     """First-improvement single-node flip local search for undirected MaxCut.
 
     Scans currently assigned vertices and flips the first vertex whose move to the opposite set yields a strictly positive increase in the cut value. The flip gain (delta) is computed using pre-aggregated weights from each vertex to sets A and B:
@@ -17,7 +17,7 @@ def first_improvement_flip_7a32(problem_state: dict, algorithm_data: dict, epsil
         algorithm_data (dict): The algorithm dictionary for current algorithm only. Not used in this heuristic.
         epsilon (float): Strict positivity threshold for accepting a flip (delta > epsilon). Default is 1e-12.
         scan_order (str): Order to scan assigned nodes. Options: "A_then_B", "B_then_A", "interleaved". Default is "A_then_B".
-        shuffle (bool): If True, randomly shuffles the final scan sequence before evaluation to reduce deterministic bias. Default is False.
+        shuffle (bool): If True, randomly shuffles the final scan sequence before evaluation to reduce deterministic bias. Default is True.
 
     Returns:
         SwapOperator: Operator flipping a single improving vertex to the opposite set (first-improvement move).

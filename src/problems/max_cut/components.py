@@ -4,14 +4,15 @@ class Solution(BaseSolution):
     """The solution for the MaxCut problem.
     Two sets of vertices representing the partition of the graph into two subsets.
     """
-    def __init__(self, set_a: set[int], set_b: set[int]):
+    def __init__(self, set_a: set[int], set_b: set[int], cut_value: float = None):
         self.set_a = set_a
         self.set_b = set_b
+        self.cut_value = cut_value
 
     def __str__(self) -> str:
         set_a_str = ",".join([str(i) for i in self.set_a])
         set_b_str = ",".join([str(i) for i in self.set_b])
-        set_strings = f"set_a: {set_a_str}\nset_b: {set_b_str}\n"
+        set_strings = f"set_a: {set_a_str}\nset_b: {set_b_str}\ncut_value: {self.cut_value}\n"
         return set_strings
 
 
@@ -34,7 +35,8 @@ class InsertNodeOperator(BaseOperator):
         elif self.target_set == "B":
             assert self.node not in solution.set_a
             new_set_b.add(self.node)
-        return Solution(new_set_a, new_set_b)
+        # Note: cut_value is not updated here, it should be updated by the Env or caller
+        return Solution(new_set_a, new_set_b, solution.cut_value)
 
 
 class InsertEdgeOperator(BaseOperator):
@@ -49,7 +51,7 @@ class InsertEdgeOperator(BaseOperator):
         assert self.node_1 not in solution.set_b
         assert self.node_2 not in solution.set_a
         new_set_a.add(self.node_1)
-        new_set_b.add(self.node_2)
+        new_set_b.add(self.node_2), solution.cut_value
         return Solution(new_set_a, new_set_b)
 
 
@@ -69,7 +71,7 @@ class SwapOperator(BaseOperator):
             elif node in solution.set_b:
                 assert node not in solution.set_a
                 new_set_b.remove(node)
-                new_set_a.add(node)
+                new_set_a.add(node), solution.cut_value
         return Solution(new_set_a, new_set_b)
 
 
@@ -85,4 +87,4 @@ class DeleteOperator(BaseOperator):
             new_set_a.remove(self.node)
         elif self.node in solution.set_b:
             new_set_b.remove(self.node)
-        return Solution(new_set_a, new_set_b)
+        return Solution(new_set_a, new_set_b, solution.cut_value)

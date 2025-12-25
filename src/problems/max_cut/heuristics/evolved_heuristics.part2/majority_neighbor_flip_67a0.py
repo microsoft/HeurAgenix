@@ -5,7 +5,7 @@ def majority_neighbor_flip_67a0(
     problem_state: dict,
     algorithm_data: dict,
     prefer_improving: bool = True,
-    exploration_rate: float = 0.0,
+    exploration_rate: float = 0.1,
     fallback_to_other_mode: bool = True,
     include_zero_delta: bool = False,
     **kwargs

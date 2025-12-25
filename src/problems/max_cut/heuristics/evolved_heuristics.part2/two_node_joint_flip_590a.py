@@ -1,5 +1,7 @@
 from src.problems.max_cut.components import *
 
+import random
+
 def two_node_joint_flip_590a(problem_state: dict, algorithm_data: dict, min_gain_threshold: float=1e-12, early_stop_first_improvement: bool=False, **kwargs) -> tuple[SwapOperator, dict]:
     """Two-node joint flip local search for MaxCut (pair swap across partition). Scans all cross-set pairs (i in A, j in B)
     and evaluates the simultaneous flip of both nodes to the opposite sets. The net cut-change is:
@@ -42,7 +44,7 @@ def two_node_joint_flip_590a(problem_state: dict, algorithm_data: dict, min_gain
     weight_to_b = weight_matrix[:, idx_b].sum(axis=1) if idx_b else weight_matrix[:, []].sum(axis=1)
 
     best_delta = 0.0
-    best_pair = None
+    best_pairs = []
 
     # Evaluate all cross pairs (i in A, j in B)
     for i in set_a:
@@ -62,10 +64,13 @@ def two_node_joint_flip_590a(problem_state: dict, algorithm_data: dict, min_gain
                     return SwapOperator([i, j]), {}
                 if delta_pair > best_delta:
                     best_delta = delta_pair
-                    best_pair = (i, j)
+                    best_pairs = [(i, j)]
+                elif abs(delta_pair - best_delta) < 1e-9:
+                    best_pairs.append((i, j))
 
     # Return the globally best improving pair if found
-    if best_pair is not None:
+    if best_pairs:
+        best_pair = random.choice(best_pairs)
         return SwapOperator([best_pair[0], best_pair[1]]), {}
 
     # No strictly improving pair found

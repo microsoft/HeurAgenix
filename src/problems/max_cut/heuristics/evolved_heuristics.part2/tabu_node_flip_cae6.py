@@ -9,7 +9,7 @@ def tabu_node_flip_cae6(
     aspiration: bool = True,
     aspiration_margin: float = 1e-12,
     allow_non_improving: bool = True,
-    break_ties_randomly: bool = False,
+    break_ties_randomly: bool = True,
     **kwargs
 ) -> tuple[SwapOperator, dict]:
     """

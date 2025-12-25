@@ -1,5 +1,7 @@
 from src.problems.max_cut.components import Solution, SwapOperator
 
+import random
+
 def greedy_swap_5bb6(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
     Single-step best-improvement node flip. Precomputes per-node sums to each side (weight_to_a, weight_to_b) and scans all nodes to select the single node with strictly positive maximal gain delta, where delta for a node in A is sum_to_A − sum_to_B (flip to B), and for a node in B is sum_to_B − sum_to_A (flip to A). Returns a SwapOperator that flips exactly one node; no pairwise swaps or iterative updates are performed. Ties are broken by scan order due to strict “>” comparison (earliest index retained; equal gains ignored). Does not use current_cut_value. Works for weighted graphs; if weights are asymmetric, gains are computed from row sums (outgoing weights). Time complexity: O(n|A| + n|B|) to aggregate plus O(n) to select (O(n^2) worst-case); O(n) extra memory.
@@ -19,7 +21,7 @@ def greedy_swap_5bb6(problem_state: dict, algorithm_data: dict, **kwargs) -> tup
     current_solution = problem_state['current_solution']
     weight_matrix = problem_state['weight_matrix']
     best_increase = 0
-    best_node = None
+    best_nodes = []
 
     # Precompute the sum of weights to and from each node to sets A and B
     weight_to_a = weight_matrix[:, list(current_solution.set_a)].sum(axis=1)
@@ -39,10 +41,13 @@ def greedy_swap_5bb6(problem_state: dict, algorithm_data: dict, **kwargs) -> tup
         # Check if this swap improves the cut value
         if delta > best_increase:
             best_increase = delta
-            best_node = node
+            best_nodes = [node]
+        elif delta == best_increase and delta > 0:
+            best_nodes.append(node)
 
     # If a beneficial swap was found, return the corresponding operator
-    if best_node is not None:
+    if best_nodes:
+        best_node = random.choice(best_nodes)
         return SwapOperator([best_node]), {}
     else:
         return None, {}

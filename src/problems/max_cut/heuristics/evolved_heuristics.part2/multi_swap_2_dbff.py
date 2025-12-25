@@ -2,7 +2,7 @@ from src.problems.max_cut.components import *
 import numpy as np
 import random
 
-def multi_swap_2_dbff(problem_state: dict, algorithm_data: dict, min_delta: float=0.0, tie_break: str='max_edge', eps: float=1e-12, **kwargs) -> tuple[SwapOperator, dict]:
+def multi_swap_2_dbff(problem_state: dict, algorithm_data: dict, min_delta: float=0.0, tie_break: str='random', eps: float=1e-12, **kwargs) -> tuple[SwapOperator, dict]:
     """Best-improvement pairwise swap (2-swap) local search with side-sum preprocessing and configurable acceptance/tie-breaking.
     Precomputes, for every vertex v, the sums of weights to current A and B (ΣA w(v,·), ΣB w(v,·)). For any pair (i ∈ A, j ∈ B), the simultaneous swap gain is:
         Δ(i,j) = (ΣA w(i,·) − ΣB w(i,·)) + (ΣB w(j,·) − ΣA w(j,·)) + 2·w(i,j).
@@ -15,7 +15,7 @@ def multi_swap_2_dbff(problem_state: dict, algorithm_data: dict, min_delta: floa
         algorithm_data (dict): Not used in this heuristic.
         min_delta (float): Minimum acceptable gain to perform the swap. Default is 0.0 (accept non-worsening moves). Set >0 to require strict improvement.
         tie_break (str): Tie-breaking rule among equal-gain pairs. One of {"max_edge", "first", "random"}.
-                         "max_edge" prefers the pair with largest w(i,j); "first" keeps the earliest found; "random" samples uniformly among best candidates. Default is "max_edge".
+                         "max_edge" prefers the pair with largest w(i,j); "first" keeps the earliest found; "random" samples uniformly among best candidates. Default is "random".
         eps (float): Numerical tolerance when comparing gains for tie detection. Default is 1e-12.
 
     Returns:

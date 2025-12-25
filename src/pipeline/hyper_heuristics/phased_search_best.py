@@ -60,6 +60,7 @@ class PhasedSearchBestHyperHeuristic:
             "random_delete_node_0b5f",
             "simulated_annealing_ed14",
             "simulated_annealing_ed15",
+            "cluster_expansion_delete_bfs4",
         }
 
         for h_name in self.heuristic_pool_names:
@@ -93,11 +94,11 @@ class PhasedSearchBestHyperHeuristic:
         
         # Track stagnation
         no_improve_steps = 0
-        max_no_improve = 200  # Reduced threshold for faster reaction
+        max_no_improve = int(node_num * 2)  # Dynamic threshold based on problem size
         
         # Track perturbation cycles for massive ruin (Large Neighborhood Search)
         perturbation_count = 0
-        max_perturbations_before_ruin = 1 # Aggressive: If 1 small perturbation fails to break stagnation, trigger Massive Ruin immediately.
+        max_perturbations_before_ruin = 5 # More patience before triggering massive ruin
         
         # Adaptive Ruin Parameters
         current_ruin_percent = 0.2
@@ -193,8 +194,8 @@ class PhasedSearchBestHyperHeuristic:
                         continue
 
                     # Normal (Small) Perturbation
-                    # Delete a few nodes (1-5) instead of just 1 to shake it up more
-                    perturb_size = random.randint(1, 5)
+                    # Delete a few nodes (5-20) instead of just 1 to shake it up more
+                    perturb_size = random.randint(5, 20)
                     for _ in range(perturb_size):
                         heuristic = random.choice(self.perturbation_heuristics)
                         env.run_heuristic(heuristic)
@@ -224,21 +225,22 @@ class PhasedSearchBestHyperHeuristic:
                     no_improve_steps += 1
 
             # Logging
-            if current_steps % env.construction_steps == 0:
+            current_best = max(current_best, env.key_value)
+            if current_steps % (env.construction_steps / 4) == 0:
                 selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
                 print(f"Run:{data}, {experiment}, {run_id}\tsteps:{current_steps}\tselected:{selected_nodes}\ttotal:{node_num}\tnow:{env.key_value}\tcurrent_best:{current_best}\tbest:{env.best_known}\ttime:{time_cost:.2f}", flush=True)
 
-            if env.is_complete_solution and env.is_valid_solution:
-                current_best = max(current_best, env.key_value)
-                if env.key_value == env.best_known:
+            if env.key_value == env.best_known:
+                if env.is_complete_solution and env.is_valid_solution:
                     env.dump_result(result_file=f"match_best_known_result.txt")
                     found_best = True
                     # Don't stop, try to improve more!
                     env.best_known = env.key_value # Update local best known to keep pushing
 
-                # Check best known
+            # Check best known
+            if env.key_value > env.best_known:
                 if env.is_complete_solution and env.is_valid_solution:
                     print(f"!!! NEW BEST FOUND: {env.key_value} > {env.best_known} !!!", flush=True)
                     print(env.current_solution, flush=True)
@@ -248,4 +250,3 @@ class PhasedSearchBestHyperHeuristic:
                     env.best_known = env.key_value # Update local best known to keep pushing
 
         return found_best
-    

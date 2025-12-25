@@ -1,4 +1,6 @@
 from src.problems.max_cut.components import *
+import random
+import numpy as np
 
 def multi_swap_2_dbfe(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[SwapOperator, dict]:
     """
@@ -20,13 +22,12 @@ The +2·w(i,j) term corrects the double subtraction of the edge (i,j) when summi
     current_solution = problem_state['current_solution']
     weight_matrix = problem_state['weight_matrix']
     best_increase = 0
-    best_pair = None
+    best_pairs = []
 
     set_a = current_solution.set_a
     set_b = current_solution.set_b
 
     # Precompute the sum of weights to and from each node
-    import numpy as np
     
     list_a = list(set_a)
     list_b = list(set_b)
@@ -55,14 +56,16 @@ The +2·w(i,j) term corrects the double subtraction of the edge (i,j) when summi
     delta_matrix = gain_a_vals[:, None] + gain_b_vals[None, :] + 2 * W_sub
     
     # Find max
-    best_idx_flat = np.argmax(delta_matrix)
-    best_idx_2d = np.unravel_index(best_idx_flat, delta_matrix.shape)
-    
-    max_delta = delta_matrix[best_idx_2d]
+    max_delta = np.max(delta_matrix)
     
     if max_delta > 0:
-        i = list_a[best_idx_2d[0]]
-        j = list_b[best_idx_2d[1]]
+        # Find all pairs with max_delta
+        best_indices = np.argwhere(delta_matrix == max_delta)
+        # Randomly choose one
+        chosen_idx = random.choice(best_indices)
+        
+        i = list_a[chosen_idx[0]]
+        j = list_b[chosen_idx[1]]
         return SwapOperator([i, j]), {}
     else:
         return None, {}

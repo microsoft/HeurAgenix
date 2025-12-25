@@ -75,6 +75,8 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     """
     node_num = instance_data["node_num"]
     weight_matrix = instance_data["weight_matrix"]
+    adj = instance_data.get("adj") # Use adjacency list if available
+
     current_solution = solution
     set_a_count = len(solution.set_a)
     set_b_count = len(solution.set_b)
@@ -82,21 +84,54 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     unselected_nodes = set(range(node_num)) - solution.set_a - solution.set_b
 
     # Calculate problem states
-    current_cut_value = 0
-    for node_a in solution.set_a:
-        for node_b in solution.set_b:
-            current_cut_value += instance_data["weight_matrix"][node_a][node_b]
+    # 1. Current Cut Value (Optimized)
+    if hasattr(solution, "cut_value") and solution.cut_value is not None:
+        current_cut_value = solution.cut_value
+    else:
+        current_cut_value = 0
+        if adj:
+            for node_a in solution.set_a:
+                for node_b, w in adj[node_a].items():
+                    if node_b in solution.set_b:
+                        current_cut_value += w
+        else:
+            for node_a in solution.set_a:
+                for node_b in solution.set_b:
+                    current_cut_value += instance_data["weight_matrix"][node_a][node_b]
+
     imbalance_ratio = abs(set_a_count - set_b_count) / node_num
     average_cut_edge_weight = current_cut_value / len(selected_nodes) if selected_nodes else 0
     selected_nodes_ratio = len(selected_nodes) / node_num
     unselected_nodes_ratio = len(unselected_nodes) / node_num
 
-    internal_edges = [weight_matrix[i][j] for i in current_solution.set_a for j in current_solution.set_a if i != j] + \
-                     [weight_matrix[i][j] for i in current_solution.set_b for j in current_solution.set_b if i != j]
+    # 2. Internal Edges Variance (Optimized)
+    internal_edges = []
+    if adj:
+        for u in current_solution.set_a:
+            for v, w in adj[u].items():
+                if v in current_solution.set_a:
+                    internal_edges.append(w)
+        for u in current_solution.set_b:
+            for v, w in adj[u].items():
+                if v in current_solution.set_b:
+                    internal_edges.append(w)
+    else:
+        internal_edges = [weight_matrix[i][j] for i in current_solution.set_a for j in current_solution.set_a if i != j] + \
+                         [weight_matrix[i][j] for i in current_solution.set_b for j in current_solution.set_b if i != j]
+    
     edge_weight_variance_within_sets = np.var(internal_edges) if internal_edges else 0
     
-    # Calculate boundary nodes (nodes in selected_nodes that have an edge to unselected_nodes)
-    boundary_nodes = len([node for node in selected_nodes if any(neighbor in unselected_nodes for neighbor in np.nonzero(weight_matrix[node])[0])])
+    # 3. Boundary Nodes (Optimized)
+    if adj:
+        boundary_nodes = 0
+        for node in selected_nodes:
+            for neighbor in adj[node]:
+                if neighbor in unselected_nodes:
+                    boundary_nodes += 1
+                    break
+    else:
+        boundary_nodes = len([node for node in selected_nodes if any(neighbor in unselected_nodes for neighbor in np.nonzero(weight_matrix[node])[0])])
+    
     boundary_node_ratio = boundary_nodes / node_num
 
     # Construct the feature dictionary

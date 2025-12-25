@@ -89,21 +89,21 @@ def main():
         paras += f"\ndata_path={env.data_path}"
         llm_config = open(llm_config_file, encoding="utf-8").read()
         paras += f"llm_config={llm_config}\n"
-        with open(os.path.join(env.output_dir, "parameters.txt"), 'w') as file:
-            file.write(paras)
+        # with open(os.path.join(env.output_dir, "parameters.txt"), 'w') as file:
+            # file.write(paras)
 
         if heuristic == "llm_hh":
             llm_client.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)
         if validation_result:
             env.dump_result()
-            finish_flag = open(os.path.join(env.output_dir, "finished.txt"), "w")
-            finish_flag.close()
+            # finish_flag = open(os.path.join(env.output_dir, "finished.txt"), "w")
+            # finish_flag.close()
             print(os.path.join(env.output_dir, "result.txt"), heuristic, data_name, env.key_item, env.key_value)
         else:
             print("Invalid solution", heuristic, data_name)
-            finish_flag = open(os.path.join(env.output_dir, "invalid.txt"), "w")
-            finish_flag.close()
+            # finish_flag = open(os.path.join(env.output_dir, "invalid.txt"), "w")
+            # finish_flag.close()
 
 
 if __name__ == "__main__":
