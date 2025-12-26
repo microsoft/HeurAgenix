@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import math
 from datetime import datetime
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
@@ -58,7 +59,7 @@ def get_dynamic_threshold(env, data_name):
     _GRAPH_THRESHOLD_CACHE[data_name] = threshold
     return threshold
 
-class PhasedSearchBestHyperHeuristic:
+class PhasedSearchUCBBestHyperHeuristic:
     def __init__(
         self,
         heuristic_pool: list[str],
@@ -218,6 +219,11 @@ class PhasedSearchBestHyperHeuristic:
             else:
                 print("Warning: No optimized improvement heuristics found! Using full pool.")
 
+        # === UCB Initialization ===
+        # Track usage and rewards for Multi-Armed Bandit strategy
+        heuristic_stats = {h.__name__: {'count': 0, 'reward': 0.0} for h in active_improvement_heuristics}
+        total_ucb_steps = 0
+        ucb_c = 1.0 # Exploration constant
 
         # Track stagnation
         no_improve_steps = 0
@@ -425,12 +431,41 @@ class PhasedSearchBestHyperHeuristic:
                             no_improve_steps += 1
                         continue # Skip normal improvement this step
 
-                heuristic = random.choice(active_improvement_heuristics)
-                env.run_heuristic(heuristic)
+                # === UCB Selection Strategy ===
+                selected_heuristic = None
+                
+                # 1. Try untried heuristics first (Cold Start)
+                untried = [h for h in active_improvement_heuristics if heuristic_stats[h.__name__]['count'] == 0]
+                if untried:
+                    selected_heuristic = random.choice(untried)
+                else:
+                    # 2. Calculate UCB values
+                    best_ucb = -float('inf')
+                    for h in active_improvement_heuristics:
+                        stats = heuristic_stats[h.__name__]
+                        avg_reward = stats['reward'] / stats['count']
+                        # UCB = Average Reward + Exploration Term
+                        exploration = ucb_c * math.sqrt(2 * math.log(total_ucb_steps) / stats['count'])
+                        ucb_val = avg_reward + exploration
+                        
+                        if ucb_val > best_ucb:
+                            best_ucb = ucb_val
+                            selected_heuristic = h
+                
+                if not selected_heuristic:
+                    selected_heuristic = random.choice(active_improvement_heuristics)
+
+                env.run_heuristic(selected_heuristic)
                 
                 current_steps += 1
+                total_ucb_steps += 1
                 
-                # Check improvement
+                # Check improvement and Update UCB
+                improvement = max(0, env.key_value - last_value)
+                h_name = selected_heuristic.__name__
+                heuristic_stats[h_name]['count'] += 1
+                heuristic_stats[h_name]['reward'] += improvement
+
                 if env.key_value > last_value:
                     last_value = env.key_value
                     no_improve_steps = 0

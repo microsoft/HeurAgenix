@@ -10,6 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from src.problems.max_cut.env import Env
 from src.pipeline.hyper_heuristics.random_search_best import RandomSearchBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best import PhasedSearchBestHyperHeuristic
+from src.pipeline.hyper_heuristics.phased_search_best_ucb import PhasedSearchUCBBestHyperHeuristic
 
 
 def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
@@ -80,7 +81,9 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
     
     if method == "phased":
         algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut")
-    else:
+    elif method == "ucb":
+        algorithm = PhasedSearchUCBBestHyperHeuristic(heuristic_pool, "max_cut")
+    elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
         
     algorithm.run(env)
@@ -128,8 +131,8 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
-    parser.add_argument("-m", "--method", type=str, default="phased", choices=["phased", "random"], 
-                        help="Search method: 'phased' or 'random' (default: phased)")
+    parser.add_argument("-m", "--method", type=str, default="ucb", choices=["phased", "random", "ucb"], 
+                        help="Search method: 'phased', 'random', or 'ucb' (default: phased)")
 
     args = parser.parse_args()
     main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method)
