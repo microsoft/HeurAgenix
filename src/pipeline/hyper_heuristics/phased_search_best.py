@@ -6,6 +6,58 @@ from src.problems.base.env import BaseEnv
 from src.util.util import load_function
 from src.problems.max_cut.components import InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator
 
+# Cache for graph properties to avoid re-calculation
+_GRAPH_THRESHOLD_CACHE = {}
+
+def get_dynamic_threshold(env, data_name):
+    """
+    Calculates a dynamic quality threshold based on graph properties.
+    - Positive graphs (NegRatio < 5%): High threshold (0.75)
+    - Signed graphs: Threshold decreases with density (Dense signed graphs are harder)
+    """
+    if data_name in _GRAPH_THRESHOLD_CACHE:
+        return _GRAPH_THRESHOLD_CACHE[data_name]
+    
+    node_num = env.instance_data["node_num"]
+    adj = env.instance_data["adj"]
+    
+    edge_count = 0
+    neg_edge_count = 0
+    
+    # Iterate adjacency list to count edges and negative weights
+    # adj is a list of dicts: adj[u][v] = w
+    for u in range(node_num):
+        for v, w in adj[u].items():
+            if u < v: # Count each undirected edge once
+                edge_count += 1
+                if w < 0:
+                    neg_edge_count += 1
+                    
+    if edge_count == 0:
+        threshold = 0.0
+    else:
+        neg_ratio = neg_edge_count / edge_count
+        # Density = 2|E| / (|V|(|V|-1))
+        density = 2 * edge_count / (node_num * (node_num - 1)) if node_num > 1 else 0
+        
+        if neg_ratio < 0.05:
+            # Mostly positive graph - easier to get good initial solution
+            threshold = 0.75
+        else:
+            # Signed graph - harder
+            # Formula derived from log analysis:
+            # G64 (Density ~0.0017) -> Needs ~0.48
+            # G81 (Density ~0.0002) -> Needs ~0.60
+            # Linear fit: Threshold = 0.62 - (Density * 80)
+            threshold = 0.62 - (density * 80)
+            
+            # Clamp values to reasonable range [0.40, 0.65] for signed graphs
+            threshold = max(0.40, min(0.65, threshold))
+            
+    print(f"Dynamic Threshold Analysis for {data_name}: Nodes={node_num}, Edges={edge_count}, NegRatio={neg_ratio:.2f}, Density={density:.5f} -> Threshold={threshold:.4f}")
+    _GRAPH_THRESHOLD_CACHE[data_name] = threshold
+    return threshold
+
 class PhasedSearchBestHyperHeuristic:
     def __init__(
         self,
@@ -241,11 +293,13 @@ class PhasedSearchBestHyperHeuristic:
                 if env.is_complete_solution and env.is_valid_solution and current_best == 0:
                     # === Quality Gate (Early Rejection) ===
                     # Strategy: "Kill Low Quality"
-                    # If the constructed solution is too far from the best known (e.g. < 75%),
+                    # If the constructed solution is too far from the best known,
                     # we assume it's in a bad basin of attraction and abort immediately.
-                    # This frees up the worker to try a new random seed.
-                    # UPDATE: Lowered to 0.4 for Signed Graphs (G64, G81) where construction is harder.
-                    quality_threshold = 0.4 
+                    
+                    # Dynamic thresholds based on log analysis (20th percentile of good runs)
+                    case_name = data.split('.')[0]
+                    quality_threshold = get_dynamic_threshold(env, case_name)
+                    
                     quality_ratio = env.key_value / env.best_known
 
                     if env.key_value > current_best:
