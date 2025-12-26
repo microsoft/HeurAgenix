@@ -144,6 +144,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
     def run(self, env: BaseEnv) -> bool:
+        near_95 = False
+        near_99 = False
         current_steps = 0
         
         data = env.output_dir.split(os.sep)[-3]
@@ -475,6 +477,16 @@ class PhasedSearchUCBBestHyperHeuristic:
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
                         print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tInit:{init_value}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
+                        if env.key_value >= env.best_known * 0.95 and not near_95:
+                            env.dump_result(result_file=f"near_95_best_known_result.{experiment}.{run_id}.txt")
+                            near_95 = True
+                            # Don't stop, try to improve more!
+                            env.best_known = env.key_value # Update local best known to keep pushing
+
+                        if env.key_value >= env.best_known * 0.99:
+                            env.dump_result(result_file=f"near_99_best_known_result.{experiment}.{run_id}.txt")
+                            # Don't stop, try to improve more!
+                            env.best_known = env.key_value # Update local best known to keep pushing
                 else:
                     no_improve_steps += 1
 
