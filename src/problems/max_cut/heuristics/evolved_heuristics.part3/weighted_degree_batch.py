@@ -34,7 +34,9 @@ def weighted_degree_batch(
     if "sorted_nodes_degree" not in algorithm_data:
         # Compute degrees for ALL nodes (static property of graph)
         # Sum of rows.
-        degrees = np.array(weight_matrix.sum(axis=1)).flatten()
+        # FIX: Use absolute value for sorting to handle negative weights correctly!
+        # This ensures nodes with strong connections (positive or negative) are prioritized.
+        degrees = np.array(abs(weight_matrix).sum(axis=1)).flatten()
         # Create list of (node, degree)
         all_nodes_sorted = sorted(
             [(i, degrees[i]) for i in range(len(degrees))],

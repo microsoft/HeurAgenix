@@ -139,15 +139,29 @@ class PhasedSearchBestHyperHeuristic:
 
             # Also filter IMPROVEMENT heuristics for large graphs
             # We keep 'cached_delta_flip' for speed (it replaces slow greedy swaps).
-            # We KEEP 'tabu_node_flip' because it is essential for breaking local optima, even if slow.
+            # We REMOVE 'tabu_node_flip' from the random pool because it is O(N^2) and too slow for frequent use.
+            # Instead, we will trigger it conditionally when stuck.
             fast_improvement_names = {
                 "cached_delta_flip_3cfd", # O(1) update, extremely fast greedy descent
                 "first_improvement_flip_7a32", # O(N) scan, good for diversity
-                "tabu_node_flip_cae6" # Essential for Gset record breaking. Slower (O(N^2) without cache), but worth it.
             }
             fast_imp_heuristics = [h for h in self.improvement_heuristics if h.__name__ in fast_improvement_names]
+            
+            # Extract Tabu for special use
+            self.tabu_heuristic = next((h for h in self.improvement_heuristics if h.__name__ == "tabu_node_flip_cae6"), None)
+            
             if fast_imp_heuristics:
-                print(f"Large graph detected. Using optimized improvement set (Speed + Tabu): {[h.__name__ for h in fast_imp_heuristics]}")
+                print(f"Large graph detected. Using optimized improvement set (Speed only): {[h.__name__ for h in fast_imp_heuristics]}")
+                print(f"Tabu heuristic '{self.tabu_heuristic.__name__ if self.tabu_heuristic else 'None'}' reserved for stagnation handling.")
+                active_improvement_heuristics = fast_imp_heuristics
+            else:
+                print("Warning: No optimized improvement heuristics found! Using full pool.")
+            self.tabu_heuristic = next((h for h in self.improvement_heuristics if h.__name__ == "tabu_node_flip_cae6"), None)
+            
+            if fast_imp_heuristics:
+                print(f"Large graph detected. Using optimized improvement set (Speed): {[h.__name__ for h in fast_imp_heuristics]}")
+                if self.tabu_heuristic:
+                    print("Tabu heuristic reserved for stagnation breaking.")
                 active_improvement_heuristics = fast_imp_heuristics
             else:
                 print("Warning: No optimized improvement heuristics found! Using full pool.")
@@ -230,7 +244,8 @@ class PhasedSearchBestHyperHeuristic:
                     # If the constructed solution is too far from the best known (e.g. < 75%),
                     # we assume it's in a bad basin of attraction and abort immediately.
                     # This frees up the worker to try a new random seed.
-                    quality_threshold = 0.75 # 75% of best known. For G81 (14060) -> 10545
+                    # UPDATE: Lowered to 0.4 for Signed Graphs (G64, G81) where construction is harder.
+                    quality_threshold = 0.4 
                     quality_ratio = env.key_value / env.best_known
 
                     if env.key_value > current_best:
@@ -329,6 +344,26 @@ class PhasedSearchBestHyperHeuristic:
                      # If no improvement heuristics, just stop or continue random construction (unlikely)
                      break
                 
+                # STRATEGIC TABU INJECTION for Large Graphs
+                # If we are stagnating but not yet ready for perturbation, try Tabu to break free.
+                # Trigger at 25%, 50%, 75% of max_no_improve
+                if node_num > 5000 and hasattr(self, 'tabu_heuristic') and self.tabu_heuristic:
+                    thresholds = [int(max_no_improve * 0.25), int(max_no_improve * 0.5), int(max_no_improve * 0.75)]
+                    if no_improve_steps in thresholds:
+                        # print(f"Run:{run_id} Stagnation detected ({no_improve_steps}/{max_no_improve}). Injecting Tabu Search.")
+                        env.run_heuristic(self.tabu_heuristic)
+                        current_steps += 1
+                        # Check if Tabu helped
+                        if env.key_value > last_value:
+                            last_value = env.key_value
+                            no_improve_steps = 0
+                            if env.is_valid_solution and env.key_value > current_best:
+                                current_best = env.key_value
+                                # Log update...
+                        else:
+                            no_improve_steps += 1
+                        continue # Skip normal improvement this step
+
                 heuristic = random.choice(active_improvement_heuristics)
                 env.run_heuristic(heuristic)
                 
@@ -352,7 +387,7 @@ class PhasedSearchBestHyperHeuristic:
 
                 if env.key_value == env.best_known:
                     if env.is_complete_solution and env.is_valid_solution:
-                        env.dump_result(result_file=f"match_best_known_result.txt")
+                        env.dump_result(result_file=f"match_best_known_result.{experiment}.{run_id}.txt")
                         found_best = True
                         # Don't stop, try to improve more!
                         env.best_known = env.key_value # Update local best known to keep pushing
@@ -362,7 +397,7 @@ class PhasedSearchBestHyperHeuristic:
                     if env.is_complete_solution and env.is_valid_solution:
                         print(f"!!! NEW BEST FOUND: {env.key_value} > {env.best_known} !!!", flush=True)
                         print(env.current_solution, flush=True)
-                        env.dump_result(result_file=f"break_best_known_result_test_only.txt")
+                        env.dump_result(result_file=f"break_best_known_result.{experiment}.{run_id}.txt")
                         found_best = True
                         # Don't stop, try to improve more!
                         env.best_known = env.key_value # Update local best known to keep pushing

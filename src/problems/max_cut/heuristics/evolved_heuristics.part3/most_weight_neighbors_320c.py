@@ -25,8 +25,9 @@ def most_weight_neighbors_320c(problem_state: dict, algorithm_data: dict, **kwar
     # Check if we already have a sorted list of nodes in algorithm_data
     if "sorted_nodes" not in algorithm_data or not algorithm_data["sorted_nodes"]:
         # Sort the unselected nodes based on their connected weights sum in descending order
+        # FIX: Use absolute value of weights to correctly prioritize nodes with strong connections (positive or negative)
         sorted_nodes = sorted(
-            [(node, sum(weight_matrix[node])) for node in unselected_nodes],
+            [(node, sum(abs(w) for w in weight_matrix[node])) for node in unselected_nodes],
             key=lambda x: x[1],
             reverse=True
         )
