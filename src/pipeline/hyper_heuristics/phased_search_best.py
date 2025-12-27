@@ -54,7 +54,7 @@ def get_dynamic_threshold(env, data_name):
             # Clamp values to reasonable range [0.40, 0.65] for signed graphs
             threshold = max(0.40, min(0.65, threshold))
             
-    print(f"Dynamic Threshold Analysis for {data_name}: Nodes={node_num}, Edges={edge_count}, NegRatio={neg_ratio:.2f}, Density={density:.5f} -> Threshold={threshold:.4f}")
+    print(f"Dynamic Threshold Analysis for {data_name}: Nodes={node_num}, Edges={edge_count}, NegRatio={neg_ratio:.2f}, Density={density:.5f} -> Threshold={threshold:.4f}", flush=True)
     _GRAPH_THRESHOLD_CACHE[data_name] = threshold
     return threshold
 
@@ -140,7 +140,7 @@ class PhasedSearchBestHyperHeuristic:
                 self.mutation_heuristics.append(func)
                 self.perturbation_heuristics.append(func)
             else:
-                print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
+                print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.", flush=True)
 
     def run(self, env: BaseEnv) -> bool:
         current_steps = 0
@@ -177,7 +177,7 @@ class PhasedSearchBestHyperHeuristic:
             fast_heuristics = [h for h in self.constructive_heuristics if h.__name__ in fast_constructive_names]
             
             if fast_heuristics:
-                print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.")
+                print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.", flush=True)
                 active_constructive_heuristics = fast_heuristics
                 
                 # Prioritize CMF if available
@@ -187,7 +187,7 @@ class PhasedSearchBestHyperHeuristic:
                     # We can just duplicate it in the list to increase probability
                     active_constructive_heuristics.extend(cmf_heuristic * 5)
             else:
-                print("Warning: Large graph detected but no fast heuristics found. Using default pool.")
+                print("Warning: Large graph detected but no fast heuristics found. Using default pool.", flush=True)
 
             # Also filter IMPROVEMENT heuristics for large graphs
             # We keep 'cached_delta_flip' for speed (it replaces slow greedy swaps).
@@ -203,20 +203,20 @@ class PhasedSearchBestHyperHeuristic:
             self.tabu_heuristic = next((h for h in self.improvement_heuristics if h.__name__ == "tabu_node_flip_cae6"), None)
             
             if fast_imp_heuristics:
-                print(f"Large graph detected. Using optimized improvement set (Speed only): {[h.__name__ for h in fast_imp_heuristics]}")
-                print(f"Tabu heuristic '{self.tabu_heuristic.__name__ if self.tabu_heuristic else 'None'}' reserved for stagnation handling.")
+                print(f"Large graph detected. Using optimized improvement set (Speed only): {[h.__name__ for h in fast_imp_heuristics]}", flush=True)
+                print(f"Tabu heuristic '{self.tabu_heuristic.__name__ if self.tabu_heuristic else 'None'}' reserved for stagnation handling.", flush=True)
                 active_improvement_heuristics = fast_imp_heuristics
             else:
-                print("Warning: No optimized improvement heuristics found! Using full pool.")
+                print("Warning: No optimized improvement heuristics found! Using full pool.", flush=True)
             self.tabu_heuristic = next((h for h in self.improvement_heuristics if h.__name__ == "tabu_node_flip_cae6"), None)
             
             if fast_imp_heuristics:
-                print(f"Large graph detected. Using optimized improvement set (Speed): {[h.__name__ for h in fast_imp_heuristics]}")
+                print(f"Large graph detected. Using optimized improvement set (Speed): {[h.__name__ for h in fast_imp_heuristics]}", flush=True)
                 if self.tabu_heuristic:
-                    print("Tabu heuristic reserved for stagnation breaking.")
+                    print("Tabu heuristic reserved for stagnation breaking.", flush=True)
                 active_improvement_heuristics = fast_imp_heuristics
             else:
-                print("Warning: No optimized improvement heuristics found! Using full pool.")
+                print("Warning: No optimized improvement heuristics found! Using full pool.", flush=True)
 
 
         # Track stagnation
@@ -248,7 +248,7 @@ class PhasedSearchBestHyperHeuristic:
             # Phase 1: Construction
             if not env.is_complete_solution:
                 if not active_constructive_heuristics:
-                    print("Error: No constructive heuristics available but solution is incomplete.")
+                    print("Error: No constructive heuristics available but solution is incomplete.", flush=True)
                     break
                 
                 # Hierarchical Hybrid Construction Strategy
@@ -308,7 +308,7 @@ class PhasedSearchBestHyperHeuristic:
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
                         init_value = env.key_value
-                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tConstruction completed")
+                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tConstruction completed", flush=True)
                         print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tInit:{init_value}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
                         if quality_ratio < quality_threshold:
                             print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t [Quality Gate] Initial score {env.key_value} ({quality_ratio:.1%}) < {quality_threshold:.0%}. Aborting run to restart.", flush=True)
@@ -328,14 +328,14 @@ class PhasedSearchBestHyperHeuristic:
                         # Adaptive Logic: Did we improve since the last ruin?
                         if current_best > best_at_last_ruin:
                             # Yes, we improved! Reset ruin intensity.
-                            print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.")
+                            print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.", flush=True)
                             current_ruin_percent = 0.2
                             best_at_last_ruin = current_best
                         else:
                             # No, we are stuck in the same basin. Increase intensity.
                             old_ruin = current_ruin_percent
                             current_ruin_percent = min(0.5, current_ruin_percent + 0.05)
-                            print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}")
+                            print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}", flush=True)
 
                         # EARLY STOPPING: If we are at 50% ruin and still stuck, abandon this run.
                         # The worker will pick up a new run (new seed) from the queue.
@@ -343,14 +343,14 @@ class PhasedSearchBestHyperHeuristic:
                             # If we have reached the best known solution, we should not give up.
                             # Instead, we reset the ruin intensity to continue searching (Extended Mode).
                             if current_best >= env.best_known:
-                                print(f"Run:{run_id} Reached Best Known ({current_best}). Extending search resources (Resetting Ruin).")
+                                print(f"Run:{run_id} Reached Best Known ({current_best}). Extending search resources (Resetting Ruin).", flush=True)
                                 current_ruin_percent = 0.2
                                 best_at_last_ruin = current_best
                             else:
-                                print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.")
+                                print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.", flush=True)
                                 break
 
-                        print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.")
+                        print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.", flush=True)
                         
                         # Determine how many nodes to remove
                         nodes_to_remove = max(10, int(node_num * current_ruin_percent))
@@ -369,10 +369,10 @@ class PhasedSearchBestHyperHeuristic:
                                 removed_count += 1
                                 current_steps += 1
                             else:
-                                print("Error: No ruin heuristics available for massive ruin!")
+                                print("Error: No ruin heuristics available for massive ruin!", flush=True)
                                 break
                         
-                        print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...")
+                        print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...", flush=True)
                         perturbation_count = 0
                         no_improve_steps = 0
                         last_value = env.key_value 

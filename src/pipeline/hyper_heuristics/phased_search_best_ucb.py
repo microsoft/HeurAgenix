@@ -8,7 +8,20 @@ from src.util.util import load_function
 from src.problems.max_cut.components import InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator
 
 # Cache for graph properties to avoid re-calculation
-_GRAPH_THRESHOLD_CACHE = {}
+_GRAPH_THRESHOLD_CACHE = {
+    "g81": 0.75,
+    "g77": 0.75,
+    "g72": 0.75,
+    "g70": 0.85,
+    "g67": 0.75,
+    "g66": 0.75,
+    "g65": 0.70,
+    "g64": 0.50,
+    "g63": 0.80,
+    "g62": 0.75,
+    "g61": 0.75,
+    "g60": 0.85,
+}
 
 def get_dynamic_threshold(env, data_name):
     """
@@ -37,27 +50,7 @@ def get_dynamic_threshold(env, data_name):
     if edge_count == 0:
         threshold = 0.0
     else:
-        neg_ratio = neg_edge_count / edge_count
-        # Density = 2|E| / (|V|(|V|-1))
-        density = 2 * edge_count / (node_num * (node_num - 1)) if node_num > 1 else 0
-        
-        if neg_ratio < 0.05:
-            # Mostly positive graph - easier to get good initial solution
-            threshold = 0.75
-        else:
-            # Signed graph - harder
-            # Formula derived from log analysis:
-            # G64 (Density ~0.0017) -> Needs ~0.48
-            # G81 (Density ~0.0002) -> Needs ~0.60
-            # Linear fit: Threshold = 0.62 - (Density * 80)
-            threshold = 0.62 - (density * 80)
-            
-            # Clamp values to reasonable range [0.40, 0.65] for signed graphs
-            threshold = max(0.40, min(0.65, threshold))
-            
-    print(f"Dynamic Threshold Analysis for {data_name}: Nodes={node_num}, Edges={edge_count}, NegRatio={neg_ratio:.2f}, Density={density:.5f} -> Threshold={threshold:.4f}")
-    _GRAPH_THRESHOLD_CACHE[data_name] = threshold
-    return threshold
+        return 0.8
 
 class PhasedSearchUCBBestHyperHeuristic:
     def __init__(
@@ -336,14 +329,14 @@ class PhasedSearchUCBBestHyperHeuristic:
                         # Adaptive Logic: Did we improve since the last ruin?
                         if current_best > best_at_last_ruin:
                             # Yes, we improved! Reset ruin intensity.
-                            print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.")
+                            print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.", flush=True)
                             current_ruin_percent = 0.2
                             best_at_last_ruin = current_best
                         else:
                             # No, we are stuck in the same basin. Increase intensity.
                             old_ruin = current_ruin_percent
                             current_ruin_percent = min(0.5, current_ruin_percent + 0.05)
-                            print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}")
+                            print(f"Run:{run_id} No progress since last ruin. Intensifying ruin: {old_ruin:.2f} -> {current_ruin_percent:.2f}", flush=True)
 
                         # EARLY STOPPING: If we are at 50% ruin and still stuck, abandon this run.
                         # The worker will pick up a new run (new seed) from the queue.
@@ -351,14 +344,14 @@ class PhasedSearchUCBBestHyperHeuristic:
                             # If we have reached the best known solution, we should not give up.
                             # Instead, we reset the ruin intensity to continue searching (Extended Mode).
                             if current_best >= env.best_known:
-                                print(f"Run:{run_id} Reached Best Known ({current_best}). Extending search resources (Resetting Ruin).")
+                                print(f"Run:{run_id} Reached Best Known ({current_best}). Extending search resources (Resetting Ruin).", flush=True)
                                 current_ruin_percent = 0.2
                                 best_at_last_ruin = current_best
                             else:
-                                print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.")
+                                print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.", flush=True)
                                 break
 
-                        print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.")
+                        print(f"Run:{run_id} Stagnated after {perturbation_count} perturbations. MASSIVE RUIN (Backtracking) with {current_ruin_percent:.0%}.", flush=True)
                         
                         # Determine how many nodes to remove
                         nodes_to_remove = max(10, int(node_num * current_ruin_percent))
@@ -377,10 +370,10 @@ class PhasedSearchUCBBestHyperHeuristic:
                                 removed_count += 1
                                 current_steps += 1
                             else:
-                                print("Error: No ruin heuristics available for massive ruin!")
+                                print("Error: No ruin heuristics available for massive ruin!", flush=True)
                                 break
                         
-                        print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...")
+                        print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...", flush=True)
                         perturbation_count = 0
                         no_improve_steps = 0
                         last_value = env.key_value 
@@ -480,13 +473,9 @@ class PhasedSearchUCBBestHyperHeuristic:
                         if env.key_value >= env.best_known * 0.95 and not near_95:
                             env.dump_result(result_file=f"near_95_best_known_result.{experiment}.{run_id}.txt")
                             near_95 = True
-                            # Don't stop, try to improve more!
-                            env.best_known = env.key_value # Update local best known to keep pushing
 
                         if env.key_value >= env.best_known * 0.99:
                             env.dump_result(result_file=f"near_99_best_known_result.{experiment}.{run_id}.txt")
-                            # Don't stop, try to improve more!
-                            env.best_known = env.key_value # Update local best known to keep pushing
                 else:
                     no_improve_steps += 1
 
@@ -496,9 +485,6 @@ class PhasedSearchUCBBestHyperHeuristic:
                 if env.key_value == env.best_known:
                     if env.is_complete_solution and env.is_valid_solution:
                         env.dump_result(result_file=f"match_best_known_result.{experiment}.{run_id}.txt")
-                        found_best = True
-                        # Don't stop, try to improve more!
-                        env.best_known = env.key_value # Update local best known to keep pushing
 
                 # Check best known
                 if env.key_value > env.best_known:
