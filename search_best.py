@@ -61,7 +61,7 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
 
     return workers
 
-def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int, method: str = "phased") -> float:
+def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int, method: str = "phased", high_quality_solution_dir: str = None, top_k: int = 5, load_ratio: float = 0.8) -> float:
     try:
         seed = time.time_ns() ^ os.getpid() ^ int.from_bytes(os.urandom(8), 'little')
     except Exception:
@@ -82,14 +82,20 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
     if method == "phased":
         algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut")
     elif method == "ucb":
-        algorithm = PhasedSearchUCBBestHyperHeuristic(heuristic_pool, "max_cut")
+        algorithm = PhasedSearchUCBBestHyperHeuristic(
+            heuristic_pool, 
+            "max_cut", 
+            high_quality_solution_dir=high_quality_solution_dir,
+            top_k=top_k,
+            load_ratio=load_ratio
+        )
     elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
         
     algorithm.run(env)
     return 
 
-def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phased"):
+def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phased", top_k: int = 5, load_ratio: float = 0.8):
     workers = pick_safe_workers(data_name, heuristic_dir)
         
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
@@ -100,13 +106,27 @@ def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phase
     experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, experiment_name)
     
+    high_quality_solution_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, "high_quality_solution")
+    os.makedirs(high_quality_solution_dir, exist_ok=True)
+    
     print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
+    print(f"High Quality Solution Pool: {high_quality_solution_dir}")
+    print(f"Cooperative Search: Top-K={top_k}, Load Ratio={load_ratio}")
 
     while remaining:
         print(f"Start batch with workers={workers}, remaining tasks={len(remaining)}", flush=True)
         with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
-            fut_map = {executor.submit(run_once, data_name, heuristic_dir, experiment_dir, run_id, method=method): run_id
-                       for run_id in remaining}
+            fut_map = {executor.submit(
+                run_once, 
+                data_name, 
+                heuristic_dir, 
+                experiment_dir, 
+                run_id, 
+                method=method, 
+                high_quality_solution_dir=high_quality_solution_dir,
+                top_k=top_k,
+                load_ratio=load_ratio
+            ): run_id for run_id in remaining}
 
             for fut in as_completed(fut_map):
                 run_id = fut_map[fut]
@@ -133,6 +153,8 @@ if __name__ == '__main__':
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
     parser.add_argument("-m", "--method", type=str, default="ucb", choices=["phased", "random", "ucb"], 
                         help="Search method: 'phased', 'random', or 'ucb' (default: phased)")
+    parser.add_argument("--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
+    parser.add_argument("--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
 
     args = parser.parse_args()
-    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method)
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio)

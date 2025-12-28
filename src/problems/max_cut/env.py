@@ -200,3 +200,97 @@ class Env(BaseEnv):
             return False
 
         return True
+
+    def dump_best_solution(self, path: str) -> None:
+        """Dump the current best solution to a file."""
+        # Temporarily swap output_dir to dump to the specific path
+        original_output_dir = self.output_dir
+        
+        try:
+            # path is like ".../high_quality_solution/current_best.12345.exp.runid"
+            # dump_result expects a directory and a filename
+            target_dir = os.path.dirname(path)
+            target_file = os.path.basename(path)
+            
+            self.output_dir = target_dir
+            
+            # Use dump_result to get full info (trajectory, etc.)
+            # We use a temp file first for atomic write safety
+            temp_file = target_file + ".tmp"
+            self.dump_result(result_file=temp_file)
+            
+            # Atomic rename
+            temp_path = os.path.join(target_dir, temp_file)
+            final_path = os.path.join(target_dir, target_file)
+            os.replace(temp_path, final_path)
+            
+        except Exception as e:
+            print(f"Error dumping solution to {path}: {e}")
+        finally:
+            # Restore original output_dir
+            self.output_dir = original_output_dir
+
+    def load_solution(self, path: str) -> bool:
+        """Load a solution from a file."""
+        try:
+            set_a = set()
+            set_b = set()
+            cut_value = 0.0
+            loaded_recordings = []
+            headers = []
+            reading_trajectory = False
+            
+            with open(path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line: continue
+                    
+                    # Check for section headers
+                    if line.startswith("-"):
+                        if line.startswith("-trajectory:") or line.startswith("-parent_trajectory:"):
+                            reading_trajectory = True
+                            headers = []
+                            continue
+                        else:
+                            # Other sections (e.g. -data, -current_solution)
+                            reading_trajectory = False
+                            # Fall through to check specific fields if needed, 
+                            # but usually fields like set_a don't start with -
+                            pass
+
+                    if reading_trajectory:
+                        if not headers:
+                            headers = line.split("\t")
+                        else:
+                            values = line.split("\t")
+                            if len(values) == len(headers):
+                                record = dict(zip(headers, values))
+                                loaded_recordings.append(record)
+                        continue
+
+                    if line.startswith("set_a:"):
+                        content = line.split(":", 1)[1].strip()
+                        if content:
+                            set_a = set(map(int, content.split(",")))
+                    elif line.startswith("set_b:"):
+                        content = line.split(":", 1)[1].strip()
+                        if content:
+                            set_b = set(map(int, content.split(",")))
+                    elif line.startswith("cut_value:"):
+                        cut_value = float(line.split(":", 1)[1].strip())
+            
+            self.current_solution = Solution(set_a=set_a, set_b=set_b, cut_value=cut_value)
+            
+            # Append loaded recordings to self.recordings
+            if self.recordings is None:
+                self.recordings = []
+            # Prepend loaded recordings to maintain history
+            self.recordings = loaded_recordings + self.recordings
+            
+            # Update problem state
+            self.problem_state = self.get_problem_state()
+            
+            return True
+        except Exception as e:
+            print(f"Error loading solution from {path}: {e}")
+            return False

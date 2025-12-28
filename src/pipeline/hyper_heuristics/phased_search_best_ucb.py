@@ -57,9 +57,15 @@ class PhasedSearchUCBBestHyperHeuristic:
         self,
         heuristic_pool: list[str],
         problem: str,
+        high_quality_solution_dir: str = None,
+        top_k: int = 5,
+        load_ratio: float = 0.8,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem
+        self.high_quality_solution_dir = high_quality_solution_dir
+        self.top_k = top_k
+        self.load_ratio = load_ratio
         
         self.constructive_heuristics = []
         self.improvement_heuristics = []
@@ -139,9 +145,87 @@ class PhasedSearchUCBBestHyperHeuristic:
             else:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
+    def _get_pool_best_value(self) -> float:
+        if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
+            return 0.0
+        
+        best_val = 0.0
+        try:
+            files = os.listdir(self.high_quality_solution_dir)
+            for f in files:
+                if f.startswith("current_best."):
+                    try:
+                        # Format: current_best.{cut_value}.{exp_id}.{run_id}
+                        parts = f.split(".")
+                        if len(parts) >= 2:
+                            val = float(parts[1])
+                            if val > best_val:
+                                best_val = val
+                    except:
+                        pass
+        except Exception:
+            pass
+        return best_val
+
+    def _try_load_initial_solution(self, env: BaseEnv) -> bool:
+        if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
+            return False
+            
+        # Use load_ratio to decide whether to load or start from scratch
+        if random.random() > self.load_ratio:
+            return False
+            
+        try:
+            files = [f for f in os.listdir(self.high_quality_solution_dir) if f.startswith("current_best.")]
+            if not files:
+                return False
+            
+            # Group by run_id to ensure diversity (one vote per run)
+            # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
+            best_by_run = {} # key: (exp_id, run_id), value: (filename, cut_value)
+            
+            for f in files:
+                try:
+                    parts = f.split(".")
+                    # parts: ['current_best', '12345', '0', 'exp_id', 'run_id'] (if value has decimal)
+                    # We parse from the right to be safe
+                    if len(parts) < 4:
+                        continue
+                        
+                    run_id = parts[-1]
+                    exp_id = parts[-2]
+                    
+                    # Value is everything between 'current_best.' and '.exp_id.run_id'
+                    # e.g. current_best.12345.0.exp1.run1 -> 12345.0
+                    val_str = ".".join(parts[1:-2])
+                    val = float(val_str)
+                    
+                    key = (exp_id, run_id)
+                    if key not in best_by_run or val > best_by_run[key][1]:
+                        best_by_run[key] = (f, val)
+                except:
+                    continue
+            
+            if not best_by_run:
+                return False
+
+            # Sort runs by their best value (descending)
+            sorted_runs = sorted(best_by_run.values(), key=lambda x: x[1], reverse=True)
+            
+            # Pick from top K runs
+            k = min(len(sorted_runs), self.top_k)
+            chosen_file, chosen_val = random.choice(sorted_runs[:k])
+            
+            path = os.path.join(self.high_quality_solution_dir, chosen_file)
+            if env.load_solution(path):
+                print(f"Successfully loaded initial solution from {chosen_file} (Value: {env.key_value})")
+                return True
+        except Exception as e:
+            print(f"Failed to load initial solution: {e}")
+            
+        return False
+
     def run(self, env: BaseEnv) -> bool:
-        near_95 = False
-        near_99 = False
         current_steps = 0
         
         data = env.output_dir.split(os.sep)[-3]
@@ -153,6 +237,15 @@ class PhasedSearchUCBBestHyperHeuristic:
         found_best = False
         node_num = env.instance_data["node_num"]
         print(f"Start running phased search. Data:{data}\tExp\t{experiment}\tID:{run_id}\tStart:{begin.strftime('%Y-%m-%d %H:%M:%S')}\t", flush=True)
+        
+        # Try to load initial solution
+        if self._try_load_initial_solution(env):
+            current_best = env.key_value
+            last_value = env.key_value
+            init_value = env.key_value
+            print(f"Run:{run_id} Loaded initial solution with value {current_best}. Skipping construction.")
+        else:
+            current_best = 0
         
         # Optimization for Large Graphs (> 5000 nodes):
         # Use only O(1) or O(N) constructive heuristics to avoid O(N^2) bottlenecks.
@@ -335,6 +428,21 @@ class PhasedSearchUCBBestHyperHeuristic:
 
                     if env.key_value > current_best:
                         current_best = env.key_value
+                        
+                        # === Cooperative Search: Share Best Solution ===
+                        if self.high_quality_solution_dir:
+                            try:
+                                # Check if we should dump (is it better than or equal to the pool's best?)
+                                # We use >= to allow diversity (multiple runs reaching the same best score)
+                                pool_best = self._get_pool_best_value()
+                                if current_best >= pool_best:
+                                    # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
+                                    filename = f"current_best.{current_best:.5f}.{experiment}.{run_id}"
+                                    dump_path = os.path.join(self.high_quality_solution_dir, filename)
+                                    env.dump_best_solution(dump_path)
+                            except Exception as e:
+                                print(f"Failed to dump best solution to pool: {e}")
+
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
@@ -558,12 +666,14 @@ class PhasedSearchUCBBestHyperHeuristic:
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
                         print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tInit:{init_value}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
-                        if env.key_value >= env.best_known * 0.95 and not near_95:
-                            env.dump_result(result_file=f"near_95_best_known_result.{experiment}.{run_id}.txt")
-                            near_95 = True
-
-                        if env.key_value >= env.best_known * 0.99:
-                            env.dump_result(result_file=f"near_99_best_known_result.{experiment}.{run_id}.txt")
+                        
+                        # === High Quality Solution Pool Logic ===
+                        pool_best = self._get_pool_best_value()
+                        if env.key_value >= pool_best and current_steps > 1:
+                             fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
+                             path = os.path.join(self.high_quality_solution_dir, fname)
+                             env.dump_best_solution(path)
+                             print(f"Run:{run_id} Saved new pool best: {env.key_value} to {fname}", flush=True)
                 else:
                     no_improve_steps += 1
 
