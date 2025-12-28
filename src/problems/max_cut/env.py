@@ -2,7 +2,7 @@ import os
 import numpy as np
 from src.problems.base.env import BaseEnv
 from src.problems.base.components import BaseOperator
-from src.problems.max_cut.components import Solution, InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator, BatchInsertNodeOperator
+from src.problems.max_cut.components import Solution, InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator, BatchInsertNodeOperator, BatchDeleteOperator
 from src.problems.max_cut.best_known import best_known
 
 
@@ -149,6 +149,17 @@ class Env(BaseEnv):
                 for v, w in adj[u].items():
                     if v in set_nodes_to_b:
                         delta += w
+
+        elif isinstance(operator, BatchDeleteOperator):
+            for u in operator.nodes:
+                if u in solution.set_a:
+                    for v, w in adj[u].items():
+                        if v in solution.set_b:
+                            delta -= w
+                elif u in solution.set_b:
+                    for v, w in adj[u].items():
+                        if v in solution.set_a:
+                            delta -= w
                 
         return delta
 

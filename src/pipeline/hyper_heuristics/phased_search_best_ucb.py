@@ -110,6 +110,9 @@ class PhasedSearchUCBBestHyperHeuristic:
             "low_contribution_delete_worst_0b60",
             "random_delete_node_0b5f",
             "cluster_expansion_delete_bfs4",
+            "batch_ruin",
+            "batch_worst_ruin",
+            "batch_cluster_ruin",
         }
 
         mutation_names = {
@@ -205,14 +208,6 @@ class PhasedSearchUCBBestHyperHeuristic:
             else:
                 print("Warning: No optimized improvement heuristics found! Using full pool.")
             self.tabu_heuristic = next((h for h in self.improvement_heuristics if h.__name__ == "tabu_node_flip_cae6"), None)
-            
-            if fast_imp_heuristics:
-                print(f"Large graph detected. Using optimized improvement set (Speed): {[h.__name__ for h in fast_imp_heuristics]}")
-                if self.tabu_heuristic:
-                    print("Tabu heuristic reserved for stagnation breaking.")
-                active_improvement_heuristics = fast_imp_heuristics
-            else:
-                print("Warning: No optimized improvement heuristics found! Using full pool.")
 
         # === UCB Initialization ===
         # Track usage and rewards for Multi-Armed Bandit strategy
@@ -229,7 +224,9 @@ class PhasedSearchUCBBestHyperHeuristic:
             # Increase patience for large graphs as operators might be slower but more impactful
             # Or decrease it if we want more frequent perturbations. 
             # For Tabu-like behavior, we want to explore local optima fully.
-            max_no_improve = int(node_num * 4) 
+            # FIX: 4*N is too long for 20k nodes (80k steps ~ 40 hours). 
+            # We need to fail fast and ruin often.
+            max_no_improve = 2000 
 
         
         # Track perturbation cycles for massive ruin (Large Neighborhood Search)
@@ -239,6 +236,9 @@ class PhasedSearchUCBBestHyperHeuristic:
         # Adaptive Ruin Parameters
         current_ruin_percent = 0.2
         best_at_last_ruin = 0
+        
+        # Polishing State
+        polishing_attempted = False
 
         current_best = 0
         
@@ -267,12 +267,42 @@ class PhasedSearchUCBBestHyperHeuristic:
                 if batch_heuristics and (not single_heuristics or random.random() < 0.5):
                     use_batch = True
                 
+                # SMART REBUILDING: If we are rebuilding (current_best > 0), avoid random heuristics.
+                # We want to repair the solution with high-quality moves, not random noise.
+                is_rebuilding = current_best > 0
+                if is_rebuilding:
+                    # Filter out random heuristics
+                    # Keep: CMF, Weighted Degree, Softmax Gain, etc.
+                    # Remove: Balanced Random, Random
+                    smart_batch = [h for h in batch_heuristics if "random" not in h.__name__]
+                    smart_single = [h for h in single_heuristics if "random" not in h.__name__]
+                    
+                    # For small graphs, we might need some randomness to escape local optima
+                    if node_num < 2000:
+                         # Keep some random heuristics but prioritize smart ones?
+                         # Or just disable this filter for small graphs.
+                         # Let's disable the filter for small graphs to allow diversity.
+                         pass
+                    else:
+                        if smart_batch:
+                            batch_heuristics = smart_batch
+                            use_batch = True # Prefer batch for speed if smart ones exist
+                        elif smart_single:
+                            single_heuristics = smart_single
+                            use_batch = False
+                    # If no smart heuristics found (unlikely), fall back to whatever we have
+                
                 # 3. Execute
                 if use_batch:
                     heuristic = random.choice(batch_heuristics)
                     # Use ratio instead of fixed batch size
                     # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
-                    env.run_heuristic(heuristic, parameters={"batch_ratio": 0.05})
+                    # Adaptive Batch Size: Smaller batches for small graphs or rebuilding
+                    batch_ratio = 0.05
+                    if node_num < 2000 or is_rebuilding:
+                        batch_ratio = 0.01 # More precise construction
+                        
+                    env.run_heuristic(heuristic, parameters={"batch_ratio": batch_ratio})
                 else:
                     # Single Insertion (Precision)
                     if single_heuristics:
@@ -319,6 +349,24 @@ class PhasedSearchUCBBestHyperHeuristic:
                 
             # Phase 2: Improvement (and Perturbation)
             else:
+                # POLISHING PHASE: If we are close to best known and stagnating, try all heuristics
+                # This is the "Last Mile" optimization.
+                if not polishing_attempted and no_improve_steps > max_no_improve * 0.8 and current_best >= env.best_known * 0.99:
+                     # print(f"Run:{run_id} Close to optimum ({current_best}/{env.best_known}). Triggering Polishing Phase.", flush=True)
+                     # Try all improvement heuristics once (VND style)
+                     for h in self.improvement_heuristics:
+                         env.run_heuristic(h)
+                         if env.key_value > last_value:
+                             print(f"Run:{run_id} Polishing successful with {h.__name__}!", flush=True)
+                             last_value = env.key_value
+                             no_improve_steps = 0
+                             polishing_attempted = False # Reset to allow future polishing
+                             break # Go back to main loop to update best etc.
+                     
+                     if no_improve_steps > 0:
+                         polishing_attempted = True # Mark as done for this stagnation cycle
+                     continue
+
                 # Check if we need perturbation
                 if no_improve_steps > max_no_improve:
                     perturbation_count += 1
@@ -356,22 +404,54 @@ class PhasedSearchUCBBestHyperHeuristic:
                         # Determine how many nodes to remove
                         nodes_to_remove = max(10, int(node_num * current_ruin_percent))
                         
-                        removed_count = 0
-                        # Continuous deletion loop
-                        for _ in range(nodes_to_remove * 2): # Safety factor 2x attempts
-                            if removed_count >= nodes_to_remove:
-                                break
-                            
-                            # FIX: Only use RUIN heuristics (DeleteOperator) for massive ruin
-                            # Previously, mutation heuristics (SwapOperator) were mixed in, causing "fake ruin"
-                            if self.ruin_heuristics:
-                                heuristic = random.choice(self.ruin_heuristics)
-                                env.run_heuristic(heuristic)
-                                removed_count += 1
-                                current_steps += 1
-                            else:
-                                print("Error: No ruin heuristics available for massive ruin!", flush=True)
-                                break
+                        # Select Ruin Strategy
+                        # 1. Random Batch Ruin (Default, good for general escape)
+                        # 2. Worst Contribution Ruin (Greedy, good for fixing bad decisions)
+                        # 3. Cluster Ruin (Spatial, good for escaping local optima traps)
+                        
+                        ruin_strategy = "random"
+                        rand_val = random.random()
+                        if rand_val < 0.4:
+                            ruin_strategy = "worst"
+                        elif rand_val < 0.7:
+                            ruin_strategy = "cluster"
+                        
+                        batch_heuristic = None
+                        if ruin_strategy == "worst":
+                            batch_heuristic = next((h for h in self.ruin_heuristics if h.__name__ == "batch_worst_ruin"), None)
+                        elif ruin_strategy == "cluster":
+                            batch_heuristic = next((h for h in self.ruin_heuristics if h.__name__ == "batch_cluster_ruin"), None)
+                        
+                        # Fallback to random batch ruin
+                        if not batch_heuristic:
+                             batch_heuristic = next((h for h in self.ruin_heuristics if h.__name__ == "batch_ruin"), None)
+                        
+                        if batch_heuristic:
+                             print(f"  -> Executing Massive Ruin using '{batch_heuristic.__name__}' (Strategy: {ruin_strategy})", flush=True)
+                             env.run_heuristic(batch_heuristic, parameters={"count": nodes_to_remove})
+                             current_steps += 1
+                             removed_count = nodes_to_remove
+                        else:
+                            removed_count = 0
+                            # Continuous deletion loop
+                            for _ in range(nodes_to_remove * 2): # Safety factor 2x attempts
+                                if removed_count >= nodes_to_remove:
+                                    break
+                                
+                                # FIX: Only use RUIN heuristics (DeleteOperator) for massive ruin
+                                # Previously, mutation heuristics (SwapOperator) were mixed in, causing "fake ruin"
+                                if self.ruin_heuristics:
+                                    heuristic = random.choice(self.ruin_heuristics)
+                                    # Avoid batch ruin in loop if it exists in the list but we are here for some reason
+                                    if "batch" in heuristic.__name__:
+                                         continue
+                                         
+                                    env.run_heuristic(heuristic)
+                                    removed_count += 1
+                                    current_steps += 1
+                                else:
+                                    print("Error: No ruin heuristics available for massive ruin!", flush=True)
+                                    break
                         
                         print(f"  -> Removed {removed_count} nodes. Rebuilding (Randomized Mode)...", flush=True)
                         perturbation_count = 0
@@ -406,12 +486,19 @@ class PhasedSearchUCBBestHyperHeuristic:
                      # If no improvement heuristics, just stop or continue random construction (unlikely)
                      break
                 
-                # STRATEGIC TABU INJECTION for Large Graphs
+                # STRATEGIC TABU INJECTION
                 # If we are stagnating but not yet ready for perturbation, try Tabu to break free.
-                # Trigger at 25%, 50%, 75% of max_no_improve
-                if node_num > 5000 and hasattr(self, 'tabu_heuristic') and self.tabu_heuristic:
-                    thresholds = [int(max_no_improve * 0.25), int(max_no_improve * 0.5), int(max_no_improve * 0.75)]
-                    if no_improve_steps in thresholds:
+                # Trigger frequently to escape local optima
+                if hasattr(self, 'tabu_heuristic') and self.tabu_heuristic:
+                    # Dynamic frequency based on graph size
+                    # Small graph (< 2000): Aggressive Tabu (every 100 steps)
+                    # Large graph (> 5000): Conservative Tabu (every 500 steps)
+                    tabu_interval = 500
+                    if node_num < 2000:
+                        tabu_interval = 100
+                    
+                    # Inject Tabu every 'tabu_interval' steps of stagnation
+                    if no_improve_steps > 0 and no_improve_steps % tabu_interval == 0:
                         # print(f"Run:{run_id} Stagnation detected ({no_improve_steps}/{max_no_improve}). Injecting Tabu Search.")
                         env.run_heuristic(self.tabu_heuristic)
                         current_steps += 1
@@ -464,6 +551,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                 if env.key_value > last_value:
                     last_value = env.key_value
                     no_improve_steps = 0
+                    polishing_attempted = False # Reset polishing state on any improvement
                     if env.is_valid_solution and env.key_value > current_best:
                         current_best = env.key_value
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)

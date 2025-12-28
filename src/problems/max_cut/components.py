@@ -90,6 +90,27 @@ class DeleteOperator(BaseOperator):
         return Solution(new_set_a, new_set_b, solution.cut_value)
 
 
+class BatchDeleteOperator(BaseOperator):
+    """Delete multiple nodes from the MaxCut solution in one go."""
+    def __init__(self, nodes: list[int]):
+        self.nodes = nodes
+
+    def __str__(self):
+        return f"BatchDeleteOperator(nodes_count={len(self.nodes)})"
+
+    def run(self, solution: Solution) -> Solution:
+        new_set_a = set(solution.set_a)
+        new_set_b = set(solution.set_b)
+        
+        for node in self.nodes:
+            if node in new_set_a:
+                new_set_a.remove(node)
+            elif node in new_set_b:
+                new_set_b.remove(node)
+                
+        return Solution(new_set_a, new_set_b, solution.cut_value)
+
+
 class BatchInsertNodeOperator(BaseOperator):
     """Insert multiple nodes into the MaxCut solution."""
     def __init__(self, nodes_to_a: list[int], nodes_to_b: list[int]):
