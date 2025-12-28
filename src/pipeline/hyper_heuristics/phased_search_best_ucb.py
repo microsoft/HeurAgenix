@@ -453,7 +453,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                             try:
                                 # Check if we should dump (is it better than or equal to the pool's best?)
                                 # We use >= to allow diversity (multiple runs reaching the same best score)
-                                pool_best = self._get_pool_best_value()
+                                pool_best, _ = self._get_pool_best_value()
                                 if current_best >= pool_best:
                                     # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
                                     filename = f"current_best.{current_best:.5f}.{experiment}.{run_id}"
