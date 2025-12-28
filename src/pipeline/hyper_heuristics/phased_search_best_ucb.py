@@ -191,41 +191,33 @@ class PhasedSearchUCBBestHyperHeuristic:
             if not files:
                 return False
             
-            # Group by run_id to ensure diversity (one vote per run)
-            # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
-            best_by_run = {} # key: (exp_id, run_id), value: (filename, cut_value)
+            # Simplified logic: Just pick from top K solutions found in the folder
+            # No need to group by run_id, as random reconstruction will provide diversity
+            solution_files = []
             
             for f in files:
                 try:
                     parts = f.split(".")
-                    # parts: ['current_best', '12345', '0', 'exp_id', 'run_id'] (if value has decimal)
-                    # We parse from the right to be safe
+                    # Format: current_best.{cut_value}.{exp_id}.{run_id}
+                    # Value is everything between 'current_best.' and '.exp_id.run_id'
                     if len(parts) < 4:
                         continue
                         
-                    run_id = parts[-1]
-                    exp_id = parts[-2]
-                    
-                    # Value is everything between 'current_best.' and '.exp_id.run_id'
-                    # e.g. current_best.12345.0.exp1.run1 -> 12345.0
                     val_str = ".".join(parts[1:-2])
                     val = float(val_str)
-                    
-                    key = (exp_id, run_id)
-                    if key not in best_by_run or val > best_by_run[key][1]:
-                        best_by_run[key] = (f, val)
+                    solution_files.append((f, val))
                 except:
                     continue
             
-            if not best_by_run:
+            if not solution_files:
                 return False
 
-            # Sort runs by their best value (descending)
-            sorted_runs = sorted(best_by_run.values(), key=lambda x: x[1], reverse=True)
+            # Sort solutions by value (descending)
+            sorted_solutions = sorted(solution_files, key=lambda x: x[1], reverse=True)
             
-            # Pick from top K runs
-            k = min(len(sorted_runs), self.top_k)
-            chosen_file, chosen_val = random.choice(sorted_runs[:k])
+            # Pick from top K solutions
+            k = min(len(sorted_solutions), self.top_k)
+            chosen_file, chosen_val = random.choice(sorted_solutions[:k])
             
             path = os.path.join(self.high_quality_solution_dir, chosen_file)
             if env.load_solution(path):
