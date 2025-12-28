@@ -145,9 +145,9 @@ class PhasedSearchUCBBestHyperHeuristic:
             else:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
-    def _get_pool_best_value(self) -> float:
+    def _get_pool_best_value(self) -> tuple[float, set]:
         if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
-            return 0.0
+            return 0.0, None
         
         # Cache strategy: Only check disk if cache is expired (e.g. every 60 seconds)
         current_time = time.time()
@@ -156,6 +156,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                 return self._pool_best_cache
         
         best_val = 0.0
+        best_file = None
         try:
             files = os.listdir(self.high_quality_solution_dir)
             for f in files:
@@ -167,16 +168,31 @@ class PhasedSearchUCBBestHyperHeuristic:
                             val = float(parts[1])
                             if val > best_val:
                                 best_val = val
+                                best_file = f
                     except:
                         pass
             
+            best_set_a = None
+            if best_file:
+                try:
+                    path = os.path.join(self.high_quality_solution_dir, best_file)
+                    with open(path, "r") as f:
+                        for line in f:
+                            if line.startswith("set_a:"):
+                                content = line.split(":", 1)[1].strip()
+                                if content:
+                                    best_set_a = set(map(int, content.split(",")))
+                                break
+                except:
+                    pass
+
             # Update cache
-            self._pool_best_cache = best_val
+            self._pool_best_cache = (best_val, best_set_a)
             self._pool_best_time = current_time
             
         except Exception:
             pass
-        return best_val
+        return best_val, getattr(self, '_pool_best_cache', (0.0, None))[1]
 
     def _try_load_initial_solution(self, env: BaseEnv) -> bool:
         if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
@@ -675,15 +691,24 @@ class PhasedSearchUCBBestHyperHeuristic:
                         # Only if we exceed the CACHED pool best do we check the real disk (or just write)
                         # Actually, we can just trust the cache for 60s. If we are better than cache, we try to write.
                         # Writing is safe because dump_best_solution handles atomic writes.
-                        pool_best = self._get_pool_best_value()
+                        pool_best, pool_best_set_a = self._get_pool_best_value()
                         
                         # Throttle writes: Don't write if we just wrote recently (e.g. < 30s) unless it's a massive jump
                         current_time = time.time()
                         last_write_time = getattr(self, '_last_pool_write_time', 0)
                         write_interval = 30 # seconds
                         
-                        # Condition: Better than pool AND (Enough time passed OR Significant improvement)
-                        if env.key_value >= pool_best and current_steps > 1:
+                        # Condition: Better than pool OR (Equal to pool AND Different solution)
+                        # AND (Enough time passed OR Significant improvement)
+                        should_save = False
+                        if env.key_value > pool_best:
+                            should_save = True
+                        elif env.key_value == pool_best and pool_best > 0:
+                            # Check if solution is different
+                            if pool_best_set_a is not None and env.current_solution.set_a != pool_best_set_a and env.current_solution.set_b != pool_best_set_a:
+                                should_save = True
+                        
+                        if should_save and current_steps > 1:
                              if (current_time - last_write_time > write_interval) or (env.key_value > pool_best):
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
                                  path = os.path.join(self.high_quality_solution_dir, fname)
@@ -691,7 +716,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                                  print(f"Run:{run_id} Saved new pool best: {env.key_value} to {fname}", flush=True)
                                  self._last_pool_write_time = current_time
                                  # Update local cache immediately to prevent self-spamming
-                                 self._pool_best_cache = max(getattr(self, '_pool_best_cache', 0), env.key_value)
+                                 # We update the set_a as well so we don't save the same solution again immediately
+                                 self._pool_best_cache = (max(getattr(self, '_pool_best_cache', (0, None))[0], env.key_value), env.current_solution.set_a)
                                  self._pool_best_time = current_time
                 else:
                     no_improve_steps += 1
