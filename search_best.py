@@ -4,6 +4,7 @@ import psutil
 import multiprocessing
 import random
 import time
+import platform
 import numpy as np
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -11,6 +12,22 @@ from src.problems.max_cut.env import Env
 from src.pipeline.hyper_heuristics.random_search_best import RandomSearchBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best import PhasedSearchBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best_ucb import PhasedSearchUCBBestHyperHeuristic
+
+
+def log_system_status(context: str):
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_io_counters()
+        disk_info = f"Disk R/W: {disk.read_bytes>>20}MB/{disk.write_bytes>>20}MB" if disk else "Disk: N/A"
+        load_avg = "N/A"
+        if hasattr(os, 'getloadavg'):
+            load_avg = f"{os.getloadavg()}"
+            
+        print(f"[System Status - {context}] Host: {platform.node()} | CPU: {cpu_percent}% | Load: {load_avg} | "
+              f"Mem: {mem.percent}% (Used: {mem.used>>20}MB, Avail: {mem.available>>20}MB) | {disk_info}", flush=True)
+    except Exception as e:
+        print(f"Failed to log system status: {e}", flush=True)
 
 
 def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
@@ -76,6 +93,8 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
 
     env.reset(output_dir=output_dir)
     
+    log_system_status(f"Worker-{run_id} Start")
+    
     # Use absolute paths for heuristics to avoid ambiguity
     heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
     
@@ -113,8 +132,11 @@ def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phase
     print(f"High Quality Solution Pool: {high_quality_solution_dir}")
     print(f"Cooperative Search: Top-K={top_k}, Load Ratio={load_ratio}")
 
+    log_system_status("Main Start")
+
     while remaining:
         print(f"Start batch with workers={workers}, remaining tasks={len(remaining)}", flush=True)
+        log_system_status(f"Batch Start (Remaining: {len(remaining)})")
         with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
             fut_map = {executor.submit(
                 run_once, 
@@ -153,8 +175,8 @@ if __name__ == '__main__':
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
     parser.add_argument("-m", "--method", type=str, default="ucb", choices=["phased", "random", "ucb"], 
                         help="Search method: 'phased', 'random', or 'ucb' (default: phased)")
-    parser.add_argument("--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
-    parser.add_argument("--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
+    parser.add_argument("-k", "--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
+    parser.add_argument("-r", "--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
 
     args = parser.parse_args()
     main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio)
