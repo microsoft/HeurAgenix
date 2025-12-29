@@ -5,7 +5,7 @@ import math
 from datetime import datetime
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
-from src.problems.max_cut.components import InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator
+from src.problems.max_cut.components import InsertNodeOperator, InsertEdgeOperator, SwapOperator, DeleteOperator, Solution
 
 # Cache for graph properties to avoid re-calculation
 _GRAPH_THRESHOLD_CACHE = {
@@ -58,8 +58,8 @@ class PhasedSearchUCBBestHyperHeuristic:
         heuristic_pool: list[str],
         problem: str,
         high_quality_solution_dir: str = None,
-        top_k: int = 5,
-        load_ratio: float = 0.8,
+        top_k: int = 10,
+        load_ratio: float = 0.4,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem
@@ -82,12 +82,17 @@ class PhasedSearchUCBBestHyperHeuristic:
         constructive_names = {
             "balance_biased_edge_placement_9f22",
             "balanced_cut_21d5",
+            "balanced_cut_c0e6",
             "balanced_random_7f42",
             "heaviest_edge_seed_eb0d",
             "heavy_edge_matching_seed_edd5",
             "highest_delta_node_b31b",
+            "highest_delta_edge_9f66",
             "highest_weight_edge_eb0d",
+            "highest_weight_edge_eb0c",
+            "highest_weight_edge_ca02",
             "most_weight_neighbors_320c",
+            "most_weight_neighbors_d31b",
             "random_5c59",
             "semi_greedy_node_grasp_bf9a",
             "softmax_gain_insertion_76de",
@@ -101,6 +106,7 @@ class PhasedSearchUCBBestHyperHeuristic:
             "cached_delta_flip_3cfd",
             "first_improvement_flip_7a32",
             "greedy_swap_5bb6",
+            "greedy_swap_5bb5",
             "k_block_swap_topk_589e",
             "majority_neighbor_flip_67a0",
             "multi_flip_threshold_fd21",
@@ -192,7 +198,26 @@ class PhasedSearchUCBBestHyperHeuristic:
             
         except Exception:
             pass
-        return best_val, getattr(self, '_pool_best_cache', (0.0, None))[1]
+        return best_val
+
+    def _read_solution_sets(self, path: str) -> tuple[set, set]:
+        set_a = set()
+        set_b = set()
+        try:
+            with open(path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("set_a:"):
+                        content = line.split(":", 1)[1].strip()
+                        if content:
+                            set_a = set(map(int, content.split(",")))
+                    elif line.startswith("set_b:"):
+                        content = line.split(":", 1)[1].strip()
+                        if content:
+                            set_b = set(map(int, content.split(",")))
+        except Exception:
+            pass
+        return set_a, set_b
 
     def _try_load_initial_solution(self, env: BaseEnv) -> bool:
         if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
@@ -231,9 +256,75 @@ class PhasedSearchUCBBestHyperHeuristic:
             # Sort solutions by value (descending)
             sorted_solutions = sorted(solution_files, key=lambda x: x[1], reverse=True)
             
-            # Pick from top K solutions
-            k = min(len(sorted_solutions), self.top_k)
-            chosen_file, chosen_val = random.choice(sorted_solutions[:k])
+            # CROSSOVER STRATEGY (Hybridization)
+            # With 50% probability, if we have enough parents, create a hybrid child.
+            # This combines traits from two high-quality solutions to explore new basins.
+            if len(sorted_solutions) >= 2 and random.random() < 0.5:
+                # Select two distinct parents from Top K
+                k = min(len(sorted_solutions), self.top_k)
+                parent1_file, _ = random.choice(sorted_solutions[:k])
+                parent2_file, _ = random.choice(sorted_solutions[:k])
+                
+                # Try to get a different second parent
+                attempts = 0
+                while parent1_file == parent2_file and attempts < 5:
+                    parent2_file, _ = random.choice(sorted_solutions[:k])
+                    attempts += 1
+                
+                if parent1_file != parent2_file:
+                    path1 = os.path.join(self.high_quality_solution_dir, parent1_file)
+                    path2 = os.path.join(self.high_quality_solution_dir, parent2_file)
+                    
+                    set_a1, set_b1 = self._read_solution_sets(path1)
+                    set_a2, set_b2 = self._read_solution_sets(path2)
+                    
+                    if set_a1 and set_a2:
+                        # Crossover Logic:
+                        # 1. Intersection: Keep nodes that agree
+                        # 2. Disagreement: Randomly assign
+                        new_set_a = set()
+                        new_set_b = set()
+                        
+                        # Union of all nodes involved (should be all nodes if complete)
+                        all_nodes = set_a1 | set_b1 | set_a2 | set_b2
+                        
+                        for node in all_nodes:
+                            in_a1 = node in set_a1
+                            in_a2 = node in set_a2
+                            
+                            if in_a1 and in_a2:
+                                new_set_a.add(node)
+                            elif not in_a1 and not in_a2:
+                                new_set_b.add(node)
+                            else:
+                                # Disagreement
+                                if random.random() < 0.5:
+                                    new_set_a.add(node)
+                                else:
+                                    new_set_b.add(node)
+                        
+                        # Create and set solution
+                        new_sol = Solution(new_set_a, new_set_b)
+                        env.current_solution = new_sol
+                        # Recalculate value
+                        env.current_solution.cut_value = env.get_key_value(new_sol)
+                        env.problem_state = env.get_problem_state()
+                        
+                        print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
+                        return True
+
+            # DIVERSITY INJECTION:
+            # Instead of always picking the absolute best, we pick from a wider range (Top 20)
+            # to avoid getting stuck in the same local optimum basin.
+            # We also give a small chance to pick a random "good" solution from the pool.
+            
+            if random.random() < 0.3:
+                # 30% chance to pick completely random from the pool (Exploration)
+                chosen_file, chosen_val = random.choice(sorted_solutions)
+            else:
+                # 70% chance to pick from Top K (Exploitation)
+                k = min(len(sorted_solutions), self.top_k)
+                chosen_file, chosen_val = random.choice(sorted_solutions[:k])
             
             path = os.path.join(self.high_quality_solution_dir, chosen_file)
             if env.load_solution(path):
@@ -351,8 +442,6 @@ class PhasedSearchUCBBestHyperHeuristic:
         
         # Polishing State
         polishing_attempted = False
-
-        current_best = 0
         
         # We rely on the Early Stopping mechanism (stagnation at max ruin) to terminate the run.
         # This allows the search to continue as long as it is making progress.
@@ -390,7 +479,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                     smart_single = [h for h in single_heuristics if "random" not in h.__name__]
                     
                     # For small graphs, we might need some randomness to escape local optima
-                    if node_num < 2000:
+                    # FIX: Allow randomness with 30% probability even for large graphs to avoid "Ruin & Recreate Trap"
+                    if node_num < 2000 or random.random() < 0.3:
                          # Keep some random heuristics but prioritize smart ones?
                          # Or just disable this filter for small graphs.
                          # Let's disable the filter for small graphs to allow diversity.
@@ -444,6 +534,9 @@ class PhasedSearchUCBBestHyperHeuristic:
                     quality_threshold = get_dynamic_threshold(env, case_name)
                     
                     quality_ratio = env.key_value / env.best_known
+
+                    if env.key_value == 12780:
+                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t{env.current_solution.set_a}", flush=True)
 
                     if env.key_value > current_best:
                         current_best = env.key_value
@@ -691,26 +784,39 @@ class PhasedSearchUCBBestHyperHeuristic:
                         # Only if we exceed the CACHED pool best do we check the real disk (or just write)
                         # Actually, we can just trust the cache for 60s. If we are better than cache, we try to write.
                         # Writing is safe because dump_best_solution handles atomic writes.
-                        pool_best, pool_best_set_a = self._get_pool_best_value()
+                        pool_best = self._get_pool_best_value()
                         
                         # Throttle writes: Don't write if we just wrote recently (e.g. < 30s) unless it's a massive jump
                         current_time = time.time()
                         last_write_time = getattr(self, '_last_pool_write_time', 0)
                         write_interval = 30 # seconds
                         
-                        # Condition: Better than pool OR (Equal to pool AND Different solution)
-                        # AND (Enough time passed OR Significant improvement)
+                        # Condition: High quality enough (e.g. > 99.5% of pool best) to maintain diversity
+                        # We don't want to only save the absolute best, but a population of good seeds.
+                        # STRATEGY:
+                        # 1. New Global Best: Always save immediately.
+                        # 2. Diversity Solution (>= 99.5%): Save probabilistically to avoid flooding.
+                        #    - Probability increases as score gets closer to best.
+                        #    - Base probability 5% for 99.5% score, up to 100% for best.
+                        
                         should_save = False
-                        if env.key_value > pool_best:
+                        if pool_best == 0:
                             should_save = True
-                        elif env.key_value == pool_best and pool_best > 0:
-                            # Check if solution is different
-                            if pool_best_set_a is not None and env.current_solution.set_a != pool_best_set_a and env.current_solution.set_b != pool_best_set_a:
+                        elif env.key_value >= pool_best:
+                            should_save = True
+                        elif env.key_value >= pool_best * 0.995:
+                            # Probabilistic acceptance for sub-optimal solutions
+                            # Linear interpolation: 
+                            # Score = 0.995 * Best -> Prob = 0.05
+                            # Score = 1.000 * Best -> Prob = 1.00
+                            ratio = env.key_value / pool_best
+                            acceptance_prob = 0.05 + (ratio - 0.995) / (1.0 - 0.995) * 0.95
+                            if random.random() < acceptance_prob:
                                 should_save = True
                         
                         if should_save and current_steps > 1:
                              if (current_time - last_write_time > write_interval) or (env.key_value > pool_best):
-                                 fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
+                                 fname = f"current_best.{env.key_value}.{experiment}.{run_id}"
                                  path = os.path.join(self.high_quality_solution_dir, fname)
                                  env.dump_best_solution(path)
                                  print(f"Run:{run_id} Saved new pool best: {env.key_value} to {fname}", flush=True)
