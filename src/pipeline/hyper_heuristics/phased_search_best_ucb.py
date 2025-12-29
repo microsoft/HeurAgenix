@@ -533,9 +533,9 @@ class PhasedSearchUCBBestHyperHeuristic:
                                 pool_best, _ = self._get_pool_best_value()
                                 if current_best >= pool_best:
                                     # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
-                                    filename = f"current_best.{current_best:.5f}.{experiment}.{run_id}"
-                                    dump_path = os.path.join(self.high_quality_solution_dir, filename)
-                                    env.dump_best_solution(dump_path)
+                                 fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
+                                 path = os.path.join(self.high_quality_solution_dir, fname)
+                                 env.dump_best_solution(path)
                             except Exception as e:
                                 print(f"Failed to dump best solution to pool: {e}")
 
@@ -800,7 +800,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                         
                         if should_save and current_steps > 1:
                              if (current_time - last_write_time > write_interval) or (env.key_value > pool_best):
-                                 fname = f"current_best.{env.key_value}.{experiment}.{run_id}"
+                                 fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
                                  path = os.path.join(self.high_quality_solution_dir, fname)
                                  env.dump_best_solution(path)
                                  print(f"Run:{run_id} Saved new pool best: {env.key_value} to {fname}", flush=True)
