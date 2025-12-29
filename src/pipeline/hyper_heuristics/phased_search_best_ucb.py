@@ -151,9 +151,9 @@ class PhasedSearchUCBBestHyperHeuristic:
             else:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
-    def _get_pool_best_value(self) -> tuple[float, set]:
+    def _get_pool_best_value(self) -> float:
         if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
-            return 0.0, None
+            return 0.0
         
         # Cache strategy: Only check disk if cache is expired (e.g. every 60 seconds)
         current_time = time.time()
@@ -162,7 +162,6 @@ class PhasedSearchUCBBestHyperHeuristic:
                 return self._pool_best_cache
         
         best_val = 0.0
-        best_file = None
         try:
             files = os.listdir(self.high_quality_solution_dir)
             for f in files:
@@ -174,26 +173,11 @@ class PhasedSearchUCBBestHyperHeuristic:
                             val = float(parts[1])
                             if val > best_val:
                                 best_val = val
-                                best_file = f
                     except:
                         pass
             
-            best_set_a = None
-            if best_file:
-                try:
-                    path = os.path.join(self.high_quality_solution_dir, best_file)
-                    with open(path, "r") as f:
-                        for line in f:
-                            if line.startswith("set_a:"):
-                                content = line.split(":", 1)[1].strip()
-                                if content:
-                                    best_set_a = set(map(int, content.split(",")))
-                                break
-                except:
-                    pass
-
             # Update cache
-            self._pool_best_cache = (best_val, best_set_a)
+            self._pool_best_cache = best_val
             self._pool_best_time = current_time
             
         except Exception:
@@ -823,7 +807,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                                  self._last_pool_write_time = current_time
                                  # Update local cache immediately to prevent self-spamming
                                  # We update the set_a as well so we don't save the same solution again immediately
-                                 self._pool_best_cache = (max(getattr(self, '_pool_best_cache', (0, None))[0], env.key_value), env.current_solution.set_a)
+                                 self._pool_best_cache = max(getattr(self, '_pool_best_cache', 0), env.key_value)
                                  self._pool_best_time = current_time
                 else:
                     no_improve_steps += 1
