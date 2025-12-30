@@ -203,6 +203,92 @@ class PhasedSearchUCBBestHyperHeuristic:
             pass
         return set_a, set_b
 
+    def _generate_backbone_solution(self, env: BaseEnv, top_k_files: list) -> bool:
+        """
+        Generates a solution based on the 'Backbone' of the population.
+        Nodes with high consensus are fixed; uncertain nodes are randomized.
+        """
+        try:
+            # 1. Load all top solutions
+            solutions = []
+            for f, val in top_k_files:
+                path = os.path.join(self.high_quality_solution_dir, f)
+                set_a, set_b = self._read_solution_sets(path)
+                if set_a and set_b:
+                    solutions.append({'a': set_a, 'b': set_b, 'val': val})
+            
+            if not solutions:
+                return False
+
+            # 2. Alignment (Handle Symmetry)
+            # Reference is the best solution (first one)
+            ref = solutions[0]
+            aligned_solutions = [ref]
+            
+            for sol in solutions[1:]:
+                # Calculate overlap with reference
+                # Direct: A matches A, B matches B
+                direct_match = len(sol['a'] & ref['a']) + len(sol['b'] & ref['b'])
+                # Flipped: A matches B, B matches A
+                flipped_match = len(sol['a'] & ref['b']) + len(sol['b'] & ref['a'])
+                
+                if flipped_match > direct_match:
+                    # Flip this solution to align with reference
+                    aligned_solutions.append({'a': sol['b'], 'b': sol['a'], 'val': sol['val']})
+                else:
+                    aligned_solutions.append(sol)
+            
+            # 3. Calculate Consensus
+            node_num = env.instance_data["node_num"]
+            counts_a = {i: 0 for i in range(node_num)}
+            
+            k = len(aligned_solutions)
+            for sol in aligned_solutions:
+                for node in sol['a']:
+                    counts_a[node] += 1
+            
+            # 4. Construct Backbone
+            new_set_a = set()
+            new_set_b = set()
+            
+            # Thresholds for fixing
+            # Strict backbone: 90% consensus
+            # We can be slightly looser to encourage structure: 80%
+            threshold_high = 0.8
+            threshold_low = 0.2
+            
+            fixed_count = 0
+            
+            for node in range(node_num):
+                prob_a = counts_a[node] / k
+                
+                if prob_a >= threshold_high:
+                    new_set_a.add(node)
+                    fixed_count += 1
+                elif prob_a <= threshold_low:
+                    new_set_b.add(node)
+                    fixed_count += 1
+                else:
+                    # Uncertain / Unstable area -> Randomize
+                    if random.random() < 0.5:
+                        new_set_a.add(node)
+                    else:
+                        new_set_b.add(node)
+            
+            print(f"Backbone Construction: Fixed {fixed_count}/{node_num} nodes ({fixed_count/node_num:.1%}). Randomizing rest.")
+            
+            # 5. Apply
+            new_sol = Solution(new_set_a, new_set_b)
+            env.current_solution = new_sol
+            env.current_solution.cut_value = env.get_key_value(new_sol)
+            env.problem_state = env.get_problem_state()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Backbone generation failed: {e}")
+            return False
+
     def _try_load_initial_solution(self, env: BaseEnv) -> bool:
         if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
             return False
@@ -240,8 +326,19 @@ class PhasedSearchUCBBestHyperHeuristic:
             # Sort solutions by value (descending)
             sorted_solutions = sorted(solution_files, key=lambda x: x[1], reverse=True)
             
-            # CROSSOVER STRATEGY (Hybridization)
-            # With 50% probability, if we have enough parents, create a hybrid child.
+            # === STRATEGY 1: BACKBONE EXTRACTION (Consensus) ===
+            # If we have enough good solutions, try to extract the common structure
+            # and randomize the unstable parts. This is very effective for large graphs.
+            # Probability: 40%
+            if len(sorted_solutions) >= 5 and random.random() < 0.4:
+                # Use Top 10 for backbone
+                top_k_files = sorted_solutions[:10]
+                if self._generate_backbone_solution(env, top_k_files):
+                    print(f"Successfully generated Backbone Solution from Top {len(top_k_files)} (Value: {env.key_value})")
+                    return True
+
+            # === STRATEGY 2: CROSSOVER (Hybridization) ===
+            # With 50% probability (of the remaining 60%), if we have enough parents, create a hybrid child.
             # This combines traits from two high-quality solutions to explore new basins.
             if len(sorted_solutions) >= 2 and random.random() < 0.5:
                 # Select two distinct parents from Top K
@@ -297,7 +394,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                         print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
                         return True
 
-            # DIVERSITY INJECTION:
+            # === STRATEGY 3: DIVERSITY INJECTION (Selection) ===
             # Instead of always picking the absolute best, we pick from a wider range (Top 20)
             # to avoid getting stuck in the same local optimum basin.
             # We also give a small chance to pick a random "good" solution from the pool.
@@ -413,15 +510,16 @@ class PhasedSearchUCBBestHyperHeuristic:
             # For Tabu-like behavior, we want to explore local optima fully.
             # FIX: 4*N is too long for 20k nodes (80k steps ~ 40 hours). 
             # We need to fail fast and ruin often.
-            max_no_improve = 2000 
+            # UPDATE: Aggressive Fail Fast Strategy (300 steps ~ 20 mins stagnation)
+            max_no_improve = 300 
 
         
         # Track perturbation cycles for massive ruin (Large Neighborhood Search)
         perturbation_count = 0
-        max_perturbations_before_ruin = 5 # More patience before triggering massive ruin
+        max_perturbations_before_ruin = 3 # Fail fast: Trigger massive ruin sooner
         
         # Adaptive Ruin Parameters
-        current_ruin_percent = 0.2
+        current_ruin_percent = 0.3 # Start with stronger ruin (30%) to escape deep valleys
         best_at_last_ruin = 0
         
         # Polishing State
@@ -463,8 +561,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                     smart_single = [h for h in single_heuristics if "random" not in h.__name__]
                     
                     # For small graphs, we might need some randomness to escape local optima
-                    # FIX: Allow randomness with 30% probability even for large graphs to avoid "Ruin & Recreate Trap"
-                    if node_num < 2000 or random.random() < 0.3:
+                    # FIX: Allow randomness with 50% probability even for large graphs to avoid "Ruin & Recreate Trap"
+                    if node_num < 2000 or random.random() < 0.5:
                          # Keep some random heuristics but prioritize smart ones?
                          # Or just disable this filter for small graphs.
                          # Let's disable the filter for small graphs to allow diversity.
@@ -518,9 +616,6 @@ class PhasedSearchUCBBestHyperHeuristic:
                     quality_threshold = get_dynamic_threshold(env, case_name)
                     
                     quality_ratio = env.key_value / env.best_known
-
-                    if env.key_value == 12780:
-                        print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\t{env.current_solution.set_a}", flush=True)
 
                     if env.key_value > current_best:
                         current_best = env.key_value
@@ -582,7 +677,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                         if current_best > best_at_last_ruin:
                             # Yes, we improved! Reset ruin intensity.
                             print(f"Run:{run_id} Progress made ({best_at_last_ruin} -> {current_best}). Resetting ruin intensity.", flush=True)
-                            current_ruin_percent = 0.2
+                            current_ruin_percent = 0.3
                             best_at_last_ruin = current_best
                         else:
                             # No, we are stuck in the same basin. Increase intensity.
@@ -592,12 +687,13 @@ class PhasedSearchUCBBestHyperHeuristic:
 
                         # EARLY STOPPING: If we are at 50% ruin and still stuck, abandon this run.
                         # The worker will pick up a new run (new seed) from the queue.
-                        if current_ruin_percent >= 0.5:
+                        # Strategy: Fail Fast & Restart with new seed/hybridization
+                        if current_ruin_percent >= 0.55:
                             # If we have reached the best known solution, we should not give up.
                             # Instead, we reset the ruin intensity to continue searching (Extended Mode).
                             if current_best >= env.best_known:
                                 print(f"Run:{run_id} Reached Best Known ({current_best}). Extending search resources (Resetting Ruin).", flush=True)
-                                current_ruin_percent = 0.2
+                                current_ruin_percent = 0.3
                                 best_at_last_ruin = current_best
                             else:
                                 print(f"Run:{run_id} STUCK at {current_best} despite max ruin. EARLY STOPPING to change seed.", flush=True)
@@ -669,6 +765,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                     base_perturb = max(20, int(node_num * 0.005)) # 0.5% of nodes (e.g. 100 for G81)
                     perturb_size = random.randint(base_perturb, base_perturb * 2)
                     
+                    print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}).", flush=True)
+
                     for _ in range(perturb_size):
                         # For small perturbation, we can mix mutation and ruin
                         if self.mutation_heuristics and random.random() < 0.5:

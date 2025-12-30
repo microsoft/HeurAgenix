@@ -312,6 +312,151 @@ def compare_heuristics(heuristic1_path, heuristic2_path, data_name, steps=100):
     else:
         print("Result: Solutions differ.")
 
+def get_solution_set(filepath):
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+            # Look for set_a: ...
+            if "set_a:" in content:
+                line = [l for l in content.split('\n') if l.startswith("set_a:")][0]
+                # set_a: 0,1,2...
+                nodes_str = line.split(":")[1].strip()
+                if not nodes_str:
+                    return set()
+                return set(map(int, nodes_str.split(",")))
+    except Exception as e:
+        print(f"Error reading {filepath}: {e}")
+    return None
+
+def clean_solution_pool(directory):
+    if not os.path.exists(directory):
+        print(f"Directory not found: {directory}")
+        return
+
+    files = [f for f in os.listdir(directory) if f.startswith("current_best.")]
+    
+    # Group by (exp_id, run_id)
+    # Key: (exp_id, run_id)
+    # Value: list of (value, filename)
+    groups = {}
+    
+    print(f"Scanning {len(files)} files in {directory}...")
+    
+    for f in files:
+        try:
+            parts = f.split(".")
+            if len(parts) < 4:
+                continue
+            
+            # Format: current_best.{cut_value}.{exp_id}.{run_id}
+            # Value is everything between 'current_best.' and '.exp_id.run_id'
+            run_id = parts[-1]
+            exp_id = parts[-2]
+            val_str = ".".join(parts[1:-2])
+            val = float(val_str)
+            
+            key = (exp_id, run_id)
+            if key not in groups:
+                groups[key] = []
+            groups[key].append((val, f))
+            
+        except Exception as e:
+            print(f"Skipping malformed file {f}: {e}")
+            continue
+
+    deleted_count = 0
+    kept_count = 0
+    
+    # 1. First pass: Keep only the best solution for each (exp_id, run_id)
+    candidates = [] # List of (val, filename)
+    
+    for key, file_list in groups.items():
+        # Sort by value descending
+        file_list.sort(key=lambda x: x[0], reverse=True)
+        
+        best_val, best_file = file_list[0]
+        candidates.append((best_val, best_file))
+        
+        # Delete the redundant ones (same run, worse score)
+        for val, f in file_list[1:]:
+            path = os.path.join(directory, f)
+            try:
+                os.remove(path)
+                deleted_count += 1
+            except Exception as e:
+                print(f"Error deleting {f}: {e}")
+
+    # 2. Second pass: Deduplicate by Content (Exact Set Match) and Prune to Top-100
+    # Sort candidates by value descending
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    
+    unique_solutions = [] # List of (val, filename, solution_set)
+    
+    print("Performing content-based deduplication...")
+    for val, f in candidates:
+        path = os.path.join(directory, f)
+        sol_set = get_solution_set(path)
+        
+        if sol_set is None:
+            # Keep it if we can't read it (safety)
+            unique_solutions.append((val, f, None))
+            continue
+            
+        is_duplicate = False
+        for _, _, existing_set in unique_solutions:
+            if existing_set is not None:
+                # Check for exact match
+                # Note: We don't easily check for complement here without knowing N, 
+                # but usually the solver is consistent. 
+                # If we wanted to be stricter, we'd need N.
+                # For now, exact match of set_a is a good proxy for "same solution file content"
+                if sol_set == existing_set:
+                    is_duplicate = True
+                    break
+        
+        if is_duplicate:
+            try:
+                os.remove(path)
+                deleted_count += 1
+                # print(f"Deleted duplicate content: {f}")
+            except Exception as e:
+                print(f"Error deleting {f}: {e}")
+        else:
+            unique_solutions.append((val, f, sol_set))
+
+    # 3. Third pass: Keep only global Top-100
+    top_n = 100
+    if len(unique_solutions) > top_n:
+        print(f"Pool size {len(unique_solutions)} > {top_n}. Trimming worst solutions...")
+        
+        # Keep top N
+        kept_solutions = unique_solutions[:top_n]
+        # Delete the rest
+        solutions_to_delete = unique_solutions[top_n:]
+        
+        for val, f, _ in solutions_to_delete:
+            path = os.path.join(directory, f)
+            try:
+                os.remove(path)
+                deleted_count += 1
+                print(f"Deleted low-rank solution: {f} (Value: {val})")
+            except Exception as e:
+                print(f"Error deleting {f}: {e}")
+        
+        kept_count = len(kept_solutions)
+    else:
+        kept_count = len(unique_solutions)
+                
+    print(f"Cleanup complete.")
+    print(f"Total files deleted: {deleted_count}")
+    print(f"Final pool size: {kept_count}")
+
+def clean_all_pools():
+    for target_dir in os.listdir("output/max_cut/search_best_result.ucb"):
+        if not target_dir.endswith(".mc"):
+            continue
+        target_dir = os.path.join("output/max_cut/search_best_result.ucb", target_dir, "high_quality_solution")
+        clean_solution_pool(target_dir)
 
 def work():
     # test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")
@@ -332,4 +477,4 @@ def work():
     compare_heuristics(h1, h2, "g1.mc")
 
 if __name__ == "__main__":
-    work()
+    clean_all_pools()
