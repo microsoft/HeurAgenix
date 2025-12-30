@@ -10,8 +10,9 @@ class Solution(BaseSolution):
         self.cut_value = cut_value
 
     def __str__(self) -> str:
-        set_a_str = ",".join([str(i) for i in self.set_a])
-        set_b_str = ",".join([str(i) for i in self.set_b])
+        # Output 1-based indexing for external compatibility
+        set_a_str = ",".join([str(i + 1) for i in sorted(list(self.set_a))])
+        set_b_str = ",".join([str(i + 1) for i in sorted(list(self.set_b))])
         set_strings = f"set_a: {set_a_str}\nset_b: {set_b_str}\ncut_value: {self.cut_value}\n"
         return set_strings
 
