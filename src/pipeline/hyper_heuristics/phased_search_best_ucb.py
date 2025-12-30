@@ -100,6 +100,8 @@ class PhasedSearchUCBBestHyperHeuristic:
             "continuous_mean_field_batch", # Part 3: Batch CMF
             "balanced_random_batch", # Part 3: Batch Random
             "weighted_degree_batch", # Part 3: Batch Weighted Degree
+            "cosm_heuristic_quick",
+            "cosm_heuristic_detailed",
         }
         
         improvement_names = {
@@ -194,11 +196,11 @@ class PhasedSearchUCBBestHyperHeuristic:
                     if line.startswith("set_a:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_a = set(map(int, content.split(",")))
+                            set_a = {int(x) - 1 for x in content.split(",")}
                     elif line.startswith("set_b:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_b = set(map(int, content.split(",")))
+                            set_b = {int(x) - 1 for x in content.split(",")}
         except Exception:
             pass
         return set_a, set_b

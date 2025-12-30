@@ -271,11 +271,11 @@ class Env(BaseEnv):
                     if line.startswith("set_a:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_a = {int(x) - 1 for x in content.split(",")}
+                            set_a = set(map(int, content.split(",")))
                     elif line.startswith("set_b:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_b = {int(x) - 1 for x in content.split(",")}
+                            set_b = set(map(int, content.split(",")))
                     elif line.startswith("cut_value:"):
                         cut_value = float(line.split(":", 1)[1].strip())
             

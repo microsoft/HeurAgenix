@@ -102,6 +102,8 @@ class PhasedSearchFastStopBestHyperHeuristic:
             "continuous_mean_field_batch", # Part 3: Batch CMF
             "balanced_random_batch", # Part 3: Batch Random
             "weighted_degree_batch", # Part 3: Batch Weighted Degree
+            "cosm_heuristic_quick",
+            "cosm_heuristic_detailed",
         }
         
         improvement_names = {
@@ -196,11 +198,11 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     if line.startswith("set_a:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_a = set(map(int, content.split(",")))
+                            set_a = {int(x) - 1 for x in content.split(",")}
                     elif line.startswith("set_b:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_b = set(map(int, content.split(",")))
+                            set_b = {int(x) - 1 for x in content.split(",")}
         except Exception:
             pass
         return set_a, set_b
@@ -452,6 +454,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 "balanced_random_7f42",
                 "balanced_cut_21d5",
                 "continuous_mean_field_batch", # New physics-inspired heuristic
+                "cosm_heuristic", # CPU Optimized Cosm
                 "balanced_random_batch",
                 "weighted_degree_batch",
                 "highest_delta_node_b31b", # Include slow ones for hybrid strategy?
@@ -465,11 +468,14 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.")
                 active_constructive_heuristics = fast_heuristics
                 
-                # Prioritize CMF if available
+                # Prioritize Cosm/CMF if available
+                cosm_heuristic = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic"]
                 cmf_heuristic = [h for h in fast_heuristics if h.__name__ == "continuous_mean_field_batch"]
-                if cmf_heuristic:
-                    # Give CMF a higher weight or make it the primary choice
-                    # We can just duplicate it in the list to increase probability
+                
+                if cosm_heuristic:
+                    # Give Cosm a much higher weight (Primary Choice)
+                    active_constructive_heuristics.extend(cosm_heuristic * 10)
+                elif cmf_heuristic:
                     active_constructive_heuristics.extend(cmf_heuristic * 5)
             else:
                 print("Warning: Large graph detected but no fast heuristics found. Using default pool.")
@@ -581,14 +587,22 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 # 3. Execute
                 if use_batch:
                     heuristic = random.choice(batch_heuristics)
-                    # Use ratio instead of fixed batch size
-                    # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
-                    # Adaptive Batch Size: Smaller batches for small graphs or rebuilding
-                    batch_ratio = 0.05
-                    if node_num < 2000 or is_rebuilding:
-                        batch_ratio = 0.01 # More precise construction
-                        
-                    env.run_heuristic(heuristic, parameters={"batch_ratio": batch_ratio})
+                    
+                    # Special handling for Cosm Heuristic (Quick vs Slow)
+                    if heuristic.__name__ == "cosm_heuristic":
+                        # Randomize steps for diversity: 100 (fast) to 500 (precise)
+                        # This creates diverse starting points in different basins
+                        steps = random.randint(100, 500)
+                        env.run_heuristic(heuristic, parameters={"steps": steps})
+                    else:
+                        # Use ratio instead of fixed batch size
+                        # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
+                        # Adaptive Batch Size: Smaller batches for small graphs or rebuilding
+                        batch_ratio = 0.01
+                        if node_num < 2000 or is_rebuilding:
+                            batch_ratio = 0.01 # More precise construction
+                            
+                        env.run_heuristic(heuristic, parameters={"batch_ratio": batch_ratio})
                 else:
                     # Single Insertion (Precision)
                     if single_heuristics:
