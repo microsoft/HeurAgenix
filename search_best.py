@@ -12,6 +12,7 @@ from src.problems.max_cut.env import Env
 from src.pipeline.hyper_heuristics.random_search_best import RandomSearchBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best import PhasedSearchBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best_ucb import PhasedSearchUCBBestHyperHeuristic
+from src.pipeline.hyper_heuristics.phased_search_best_fast_stop import PhasedSearchFastStopBestHyperHeuristic
 
 
 def log_system_status(context: str):
@@ -78,7 +79,7 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
 
     return workers
 
-def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int, method: str = "phased", high_quality_solution_dir: str = None, top_k: int = 5, load_ratio: float = 0.8) -> float:
+def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int, method: str = "phased", high_quality_solution_dir: str = None, top_k: int = 5, load_ratio: float = 0.8, fail_fast_threshold: float = 0.02) -> float:
     try:
         seed = time.time_ns() ^ os.getpid() ^ int.from_bytes(os.urandom(8), 'little')
     except Exception:
@@ -108,13 +109,30 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
             top_k=top_k,
             load_ratio=load_ratio
         )
+    elif method == "fast_stop":
+        algorithm = PhasedSearchFastStopBestHyperHeuristic(
+            heuristic_pool, 
+            "max_cut", 
+            high_quality_solution_dir=high_quality_solution_dir,
+            top_k=top_k,
+            load_ratio=load_ratio,
+            fail_fast_threshold=fail_fast_threshold
+        )
     elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
         
     algorithm.run(env)
     return 
 
-def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phased", top_k: int = 5, load_ratio: float = 0.8):
+def main(
+        data_name: str,
+        heuristic_dir: str,
+        num_runs: int,
+        method: str = "phased",
+        top_k: int = 5,
+        load_ratio: float = 0.8,
+        fail_fast_threshold: float = 0.02
+    ):
     workers = pick_safe_workers(data_name, heuristic_dir)
         
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
@@ -147,7 +165,8 @@ def main(data_name: str, heuristic_dir: str, num_runs: int, method: str = "phase
                 method=method, 
                 high_quality_solution_dir=high_quality_solution_dir,
                 top_k=top_k,
-                load_ratio=load_ratio
+                load_ratio=load_ratio,
+                fail_fast_threshold=fail_fast_threshold
             ): run_id for run_id in remaining}
 
             for fut in as_completed(fut_map):
@@ -177,6 +196,8 @@ if __name__ == '__main__':
                         help="Search method: 'phased', 'random', or 'ucb' (default: phased)")
     parser.add_argument("-k", "--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
     parser.add_argument("-r", "--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
+    parser.add_argument("-f", "--fail_fast_threshold", type=float, default=0.02, help="Fail fast threshold (default: 0.02)")
+
 
     args = parser.parse_args()
-    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio)
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio, fail_fast_threshold=args.fail_fast_threshold)
