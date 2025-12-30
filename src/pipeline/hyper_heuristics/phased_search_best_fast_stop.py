@@ -781,8 +781,22 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     # For large graphs, we need stronger perturbation
                     base_perturb = max(20, int(node_num * 0.005)) # 0.5% of nodes (e.g. 100 for G81)
                     perturb_size = random.randint(base_perturb, base_perturb * 2)
+                    # === FAIL FAST STRATEGY (Dynamic Restart) ===
+                    # Calculate gap to best known
+                    gap = 1.0
+                    if env.best_known > 0:
+                        gap = (env.best_known - current_best) / env.best_known
                     
-                    print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}).", flush=True)
+                    # Threshold for "Close Enough to Dig Deep"
+                    # If we are more than the threshold away, we are likely in a bad basin.
+                    # Instead of spending hours trying to fix it with Massive Ruin, 
+                    # we just FAIL FAST and let the worker pick a new seed.
+                    
+                    if gap > self.fail_fast_threshold:
+                        print(f"Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). Threshold {self.fail_fast_threshold:.2%}. FAIL FAST triggered -> Next Task.", flush=True)
+                        return False        
+                    else:            
+                        print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}).", flush=True)
 
                     for _ in range(perturb_size):
                         # For small perturbation, we can mix mutation and ruin

@@ -452,11 +452,21 @@ def clean_solution_pool(directory):
     print(f"Final pool size: {kept_count}")
 
 def clean_all_pools():
-    for target_dir in os.listdir("output/max_cut/search_best_result.ucb"):
-        if not target_dir.endswith(".mc"):
+    search_dirs = [
+        "output/max_cut/search_best_result.ucb",
+        "output/max_cut/search_best_result.fast_stop"
+    ]
+    
+    for search_dir in search_dirs:
+        if not os.path.exists(search_dir):
             continue
-        target_dir = os.path.join("output/max_cut/search_best_result.ucb", target_dir, "high_quality_solution")
-        clean_solution_pool(target_dir)
+
+        print(f"Cleaning pools in {search_dir}...")
+        for target_dir in os.listdir(search_dir):
+            if not target_dir.endswith(".mc"):
+                continue
+            pool_dir = os.path.join(search_dir, target_dir, "high_quality_solution")
+            clean_solution_pool(pool_dir)
 
 def work():
     # test_dir = os.path.join("src", "problems", "max_cut", "heuristics", "evolved_heuristics.part2")

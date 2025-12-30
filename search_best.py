@@ -192,8 +192,8 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
-    parser.add_argument("-m", "--method", type=str, default="ucb", choices=["phased", "random", "ucb"], 
-                        help="Search method: 'phased', 'random', or 'ucb' (default: phased)")
+    parser.add_argument("-m", "--method", type=str, default="ucb", choices=["phased", "random", "ucb", "fast_stop"], 
+                        help="Search method: 'phased', 'random', 'ucb', or 'fast_stop' (default: fast_stop)")
     parser.add_argument("-k", "--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
     parser.add_argument("-r", "--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
     parser.add_argument("-f", "--fail_fast_threshold", type=float, default=0.02, help="Fail fast threshold (default: 0.02)")
