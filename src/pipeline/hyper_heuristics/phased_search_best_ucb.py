@@ -452,6 +452,9 @@ class PhasedSearchUCBBestHyperHeuristic:
                 "balanced_random_7f42",
                 "balanced_cut_21d5",
                 "continuous_mean_field_batch", # New physics-inspired heuristic
+                "cosm_heuristic", # CPU Optimized Cosm
+                "cosm_heuristic_quick",
+                "cosm_heuristic_detailed",
                 "balanced_random_batch",
                 "weighted_degree_batch",
                 "highest_delta_node_b31b", # Include slow ones for hybrid strategy?
@@ -627,7 +630,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                             try:
                                 # Check if we should dump (is it better than or equal to the pool's best?)
                                 # We use >= to allow diversity (multiple runs reaching the same best score)
-                                pool_best, _ = self._get_pool_best_value()
+                                pool_best = self._get_pool_best_value()
                                 if current_best >= pool_best:
                                     # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"

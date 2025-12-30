@@ -364,6 +364,15 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     set_a2, set_b2 = self._read_solution_sets(path2)
                     
                     if set_a1 and set_a2:
+                        # SYMMETRY FIX: MaxCut solutions are symmetric (A, B) == (B, A).
+                        # Align Parent 2 to Parent 1 to maximize overlap.
+                        overlap_direct = len(set_a1 & set_a2)
+                        overlap_flipped = len(set_a1 & set_b2)
+                        
+                        if overlap_flipped > overlap_direct:
+                            # Flip Parent 2
+                            set_a2, set_b2 = set_b2, set_a2
+
                         # Crossover Logic:
                         # 1. Intersection: Keep nodes that agree
                         # 2. Disagreement: Randomly assign
@@ -455,6 +464,8 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 "balanced_cut_21d5",
                 "continuous_mean_field_batch", # New physics-inspired heuristic
                 "cosm_heuristic", # CPU Optimized Cosm
+                "cosm_heuristic_quick",
+                "cosm_heuristic_detailed",
                 "balanced_random_batch",
                 "weighted_degree_batch",
                 "highest_delta_node_b31b", # Include slow ones for hybrid strategy?
@@ -470,9 +481,17 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 
                 # Prioritize Cosm/CMF if available
                 cosm_heuristic = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic"]
+                cosm_quick = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic_quick"]
+                cosm_detailed = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic_detailed"]
                 cmf_heuristic = [h for h in fast_heuristics if h.__name__ == "continuous_mean_field_batch"]
                 
-                if cosm_heuristic:
+                if cosm_quick or cosm_detailed:
+                    # Prioritize the new split heuristics
+                    if cosm_quick:
+                        active_constructive_heuristics.extend(cosm_quick * 2)
+                    if cosm_detailed:
+                        active_constructive_heuristics.extend(cosm_detailed * 20)
+                elif cosm_heuristic:
                     # Give Cosm a much higher weight (Primary Choice)
                     active_constructive_heuristics.extend(cosm_heuristic * 10)
                 elif cmf_heuristic:
@@ -549,6 +568,12 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 # 1. Identify Batch vs Single Heuristics
                 # We want to use it sparingly (20% prob), not frequently (80% prob).
                 batch_heuristics = [h for h in active_constructive_heuristics if "batch" in h.__name__]
+                
+                # Treat Cosm Detailed as a batch heuristic because it constructs the full solution efficiently
+                cosm_detailed_list = [h for h in active_constructive_heuristics if h.__name__ == "cosm_heuristic_detailed"]
+                if cosm_detailed_list:
+                    batch_heuristics.extend(cosm_detailed_list)
+
                 single_heuristics = [h for h in active_constructive_heuristics if h not in batch_heuristics]
                 
                 # 2. Determine Strategy
@@ -594,6 +619,9 @@ class PhasedSearchFastStopBestHyperHeuristic:
                         # This creates diverse starting points in different basins
                         steps = random.randint(100, 500)
                         env.run_heuristic(heuristic, parameters={"steps": steps})
+                    elif heuristic.__name__ in ["cosm_heuristic_quick", "cosm_heuristic_detailed"]:
+                        # New split heuristics handle steps internally (dynamic based on graph size)
+                        env.run_heuristic(heuristic)
                     else:
                         # Use ratio instead of fixed batch size
                         # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
@@ -641,7 +669,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                             try:
                                 # Check if we should dump (is it better than or equal to the pool's best?)
                                 # We use >= to allow diversity (multiple runs reaching the same best score)
-                                pool_best, _ = self._get_pool_best_value()
+                                pool_best = self._get_pool_best_value()
                                 if current_best >= pool_best:
                                     # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
@@ -929,7 +957,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                         should_save = False
                         if pool_best == 0:
                             should_save = True
-                        elif env.key_value >= pool_best:
+                        elif env.key_value >= pool_best * 0.99:
                             should_save = True
                         elif env.key_value >= pool_best * 0.995:
                             # Probabilistic acceptance for sub-optimal solutions

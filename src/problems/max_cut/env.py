@@ -271,11 +271,11 @@ class Env(BaseEnv):
                     if line.startswith("set_a:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_a = set(map(int, content.split(",")))
+                            set_a = {int(x) - 1 for x in content.split(",")}
                     elif line.startswith("set_b:"):
                         content = line.split(":", 1)[1].strip()
                         if content:
-                            set_b = set(map(int, content.split(",")))
+                            set_b = {int(x) - 1 for x in content.split(",")}
                     elif line.startswith("cut_value:"):
                         cut_value = float(line.split(":", 1)[1].strip())
             
@@ -292,5 +292,7 @@ class Env(BaseEnv):
             
             return True
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Error loading solution from {path}: {e}")
             return False
