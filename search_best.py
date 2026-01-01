@@ -13,6 +13,8 @@ from src.pipeline.hyper_heuristics.random_search_best import RandomSearchBestHyp
 from src.pipeline.hyper_heuristics.phased_search_best import PhasedSearchBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best_ucb import PhasedSearchUCBBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best_fast_stop import PhasedSearchFastStopBestHyperHeuristic
+from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
+from src.pipeline.hyper_heuristics.phased_search_best_known_start import PhasedSearchBestKnownStartHyperHeuristic
 
 
 def log_system_status(context: str):
@@ -118,6 +120,24 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
             load_ratio=load_ratio,
             fail_fast_threshold=fail_fast_threshold
         )
+    elif method == "adaptive_polishing":
+        algorithm = PhasedSearchAdaptivePolishingHyperHeuristic(
+            heuristic_pool, 
+            "max_cut", 
+            high_quality_solution_dir=high_quality_solution_dir,
+            top_k=top_k,
+            load_ratio=load_ratio,
+            fail_fast_threshold=fail_fast_threshold
+        )
+    elif method == "best_known_start":
+        algorithm = PhasedSearchBestKnownStartHyperHeuristic(
+            heuristic_pool, 
+            "max_cut", 
+            high_quality_solution_dir=high_quality_solution_dir,
+            top_k=top_k,
+            load_ratio=load_ratio,
+            fail_fast_threshold=fail_fast_threshold
+        )
     elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
         
@@ -131,7 +151,8 @@ def main(
         method: str = "phased",
         top_k: int = 5,
         load_ratio: float = 0.8,
-        fail_fast_threshold: float = 0.02
+        fail_fast_threshold: float = 0.02,
+        high_quality_solution_dir: str=None
     ):
     workers = pick_safe_workers(data_name, heuristic_dir)
         
@@ -143,7 +164,7 @@ def main(
     experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, experiment_name)
     
-    high_quality_solution_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, "high_quality_solution")
+    high_quality_solution_dir = os.path.join(base_output_dir, "max_cut", high_quality_solution_dir, data_name, "high_quality_solution")
     os.makedirs(high_quality_solution_dir, exist_ok=True)
     
     print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
@@ -192,12 +213,13 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
-    parser.add_argument("-m", "--method", type=str, default="fast_stop", choices=["phased", "random", "ucb", "fast_stop"], 
-                        help="Search method: 'phased', 'random', 'ucb', or 'fast_stop' (default: fast_stop)")
+    parser.add_argument("-m", "--method", type=str, default="fast_stop", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "best_known_start"], 
+                        help="Search method: 'phased', 'random', 'ucb', 'fast_stop', 'adaptive_polishing', or 'best_known_start' (default: fast_stop)")
     parser.add_argument("-k", "--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
     parser.add_argument("-r", "--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
     parser.add_argument("-f", "--fail_fast_threshold", type=float, default=0.02, help="Fail fast threshold (default: 0.02)")
+    parser.add_argument("-q", "--high_quality_solution_dir", type=str, default=None, help="Directory of high-quality solutions for UCB-based methods")
 
 
     args = parser.parse_args()
-    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio, fail_fast_threshold=args.fail_fast_threshold)
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio, fail_fast_threshold=args.fail_fast_threshold, high_quality_solution_dir=args.high_quality_solution_dir)

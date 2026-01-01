@@ -279,6 +279,13 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     else:
                         new_set_b.add(node)
             
+            # Quality Gate: If consensus is too low, the backbone is essentially random.
+            # We reject it to force a proper construction phase.
+            consensus_ratio = fixed_count / node_num
+            if consensus_ratio < 0.6:
+                print(f"Backbone generation rejected: Consensus too low ({consensus_ratio:.1%}). Need > 60%.")
+                return False
+
             print(f"Backbone Construction: Fixed {fixed_count}/{node_num} nodes ({fixed_count/node_num:.1%}). Randomizing rest.")
             
             # 5. Apply
@@ -304,6 +311,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
         try:
             files = [f for f in os.listdir(self.high_quality_solution_dir) if f.startswith("current_best.")]
             if not files:
+                print(f"Warning: No files found in {self.high_quality_solution_dir}", flush=True)
                 return False
             
             # Simplified logic: Just pick from top K solutions found in the folder
@@ -325,6 +333,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     continue
             
             if not solution_files:
+                print(f"Warning: Files found but none matched format 'current_best.VAL.EXP.ID' in {self.high_quality_solution_dir}. Example: {files[0]}", flush=True)
                 return False
 
             # Sort solutions by value (descending)
@@ -372,40 +381,52 @@ class PhasedSearchFastStopBestHyperHeuristic:
                         if overlap_flipped > overlap_direct:
                             # Flip Parent 2
                             set_a2, set_b2 = set_b2, set_a2
-
-                        # Crossover Logic:
-                        # 1. Intersection: Keep nodes that agree
-                        # 2. Disagreement: Randomly assign
-                        new_set_a = set()
-                        new_set_b = set()
+                            max_overlap = overlap_flipped
+                        else:
+                            max_overlap = overlap_direct
                         
-                        # Union of all nodes involved (should be all nodes if complete)
-                        all_nodes = set_a1 | set_b1 | set_a2 | set_b2
-                        
-                        for node in all_nodes:
-                            in_a1 = node in set_a1
-                            in_a2 = node in set_a2
+                        # Quality Gate for Crossover:
+                        # If parents are too different (low overlap), the child will be mostly random noise.
+                        # We reject such pairs to avoid polluting the search with bad seeds.
+                        node_num = env.instance_data["node_num"]
+                        overlap_ratio = max_overlap / node_num
+                        if overlap_ratio < 0.6:
+                            # print(f"Crossover rejected: Parents too different (Overlap: {overlap_ratio:.1%}). Need > 60%.")
+                            pass # Silently skip to try other strategies
+                        else:
+                            # Crossover Logic:
+                            # 1. Intersection: Keep nodes that agree
+                            # 2. Disagreement: Randomly assign
+                            new_set_a = set()
+                            new_set_b = set()
                             
-                            if in_a1 and in_a2:
-                                new_set_a.add(node)
-                            elif not in_a1 and not in_a2:
-                                new_set_b.add(node)
-                            else:
-                                # Disagreement
-                                if random.random() < 0.5:
+                            # Union of all nodes involved (should be all nodes if complete)
+                            all_nodes = set_a1 | set_b1 | set_a2 | set_b2
+                            
+                            for node in all_nodes:
+                                in_a1 = node in set_a1
+                                in_a2 = node in set_a2
+                                
+                                if in_a1 and in_a2:
                                     new_set_a.add(node)
-                                else:
+                                elif not in_a1 and not in_a2:
                                     new_set_b.add(node)
-                        
-                        # Create and set solution
-                        new_sol = Solution(new_set_a, new_set_b)
-                        env.current_solution = new_sol
-                        # Recalculate value
-                        env.current_solution.cut_value = env.get_key_value(new_sol)
-                        env.problem_state = env.get_problem_state()
-                        
-                        print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
-                        return True
+                                else:
+                                    # Disagreement
+                                    if random.random() < 0.5:
+                                        new_set_a.add(node)
+                                    else:
+                                        new_set_b.add(node)
+                            
+                            # Create and set solution
+                            new_sol = Solution(new_set_a, new_set_b)
+                            env.current_solution = new_sol
+                            # Recalculate value
+                            env.current_solution.cut_value = env.get_key_value(new_sol)
+                            env.problem_state = env.get_problem_state()
+                            
+                            print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
+                            return True
 
             # === STRATEGY 3: DIVERSITY INJECTION (Selection) ===
             # Instead of always picking the absolute best, we pick from a wider range (Top 20)
@@ -443,11 +464,24 @@ class PhasedSearchFastStopBestHyperHeuristic:
         print(f"Start running phased search. Data:{data}\tExp\t{experiment}\tID:{run_id}\tStart:{begin.strftime('%Y-%m-%d %H:%M:%S')}\t", flush=True)
         
         # Try to load initial solution
-        if self._try_load_initial_solution(env):
+        loaded_init = self._try_load_initial_solution(env)
+        quality_threshold = get_dynamic_threshold(env, data.split('.')[0])
+        
+        # Quality Gate for Initial Solution
+        # If the loaded solution is significantly worse than best known (e.g. < 60%), discard it.
+        # This prevents starting from "random-like" backbones or bad seeds.
+        if loaded_init and env.best_known and env.best_known > 0:
+            ratio = env.key_value / env.best_known
+            if ratio < quality_threshold:
+                print(f"Run:{run_id} Loaded solution quality too low ({env.key_value}/{env.best_known} = {ratio:.1%}). Discarding and restarting construction.", flush=True)
+                loaded_init = False
+                env.reset(output_dir=env.output_dir)
+
+        if loaded_init:
             current_best = env.key_value
             last_value = env.key_value
             init_value = env.key_value
-            print(f"Run:{run_id} Loaded initial solution with value {current_best}. Skipping construction.")
+            print(f"Run:{run_id} Loaded initial solution with value {current_best}. Skipping construction.", flush=True)
         else:
             current_best = 0
         
@@ -476,7 +510,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
             fast_heuristics = [h for h in self.constructive_heuristics if h.__name__ in fast_constructive_names]
             
             if fast_heuristics:
-                print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.")
+                print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.", flush=True)
                 active_constructive_heuristics = fast_heuristics
                 
                 # Prioritize Cosm/CMF if available
@@ -657,7 +691,6 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     
                     # Dynamic thresholds based on log analysis (20th percentile of good runs)
                     case_name = data.split('.')[0]
-                    quality_threshold = get_dynamic_threshold(env, case_name)
                     
                     quality_ratio = env.key_value / env.best_known
 
@@ -694,8 +727,9 @@ class PhasedSearchFastStopBestHyperHeuristic:
             else:
                 # POLISHING PHASE: If we are close to best known and stagnating, try all heuristics
                 # This is the "Last Mile" optimization.
-                if not polishing_attempted and no_improve_steps > max_no_improve * 0.8 and current_best >= env.best_known * 0.99:
-                     # print(f"Run:{run_id} Close to optimum ({current_best}/{env.best_known}). Triggering Polishing Phase.", flush=True)
+                # Trigger earlier (50% of stagnation) to catch local optima before ruin
+                if not polishing_attempted and no_improve_steps > max_no_improve * 0.5 and current_best >= env.best_known * 0.99:
+                     print(f"Run:{run_id} Close to optimum ({current_best}/{env.best_known}). Triggering Polishing Phase.", flush=True)
                      # Try all improvement heuristics once (VND style)
                      for h in self.improvement_heuristics:
                          env.run_heuristic(h)
@@ -821,7 +855,18 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     # Normal (Small) Perturbation
                     # Delete a few nodes (5-20) instead of just 1 to shake it up more
                     # For large graphs, we need stronger perturbation
+                    # Adaptive Perturbation: Increase size if we keep stagnating (perturbation_count)
                     base_perturb = max(20, int(node_num * 0.005)) # 0.5% of nodes (e.g. 100 for G81)
+                    
+                    # Scale up with repeated failures
+                    multiplier = 1.0 + (perturbation_count * 0.5)
+                    base_perturb = int(base_perturb * multiplier)
+
+                    # REMOVED: High quality protection logic. 
+                    # We need strong perturbation to escape local optima, even if we are close to best known.
+                    # if current_best > env.best_known * 0.9 and perturbation_count == 0:
+                    #    base_perturb = max(10, int(node_num * 0.001)) 
+                        
                     perturb_size = random.randint(base_perturb, base_perturb * 2)
                     # === FAIL FAST STRATEGY (Dynamic Restart) ===
                     # Calculate gap to best known
@@ -834,20 +879,34 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     # Instead of spending hours trying to fix it with Massive Ruin, 
                     # we just FAIL FAST and let the worker pick a new seed.
                     
-                    if gap > self.fail_fast_threshold:
-                        print(f"Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). Threshold {self.fail_fast_threshold:.2%}. FAIL FAST triggered -> Next Task.", flush=True)
-                        return False        
-                    else:            
-                        print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}).", flush=True)
+                    # FIX: Do NOT Fail Fast on small perturbations. Only on Massive Ruin.
+                    # Small perturbation is part of the local search process.
+                    # if gap > self.fail_fast_threshold:
+                    #    print(f"Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). Threshold {self.fail_fast_threshold:.2%}. FAIL FAST triggered -> Next Task.", flush=True)
+                    #    return False        
+                    # else:            
+                    print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}). Gap: {gap:.2%}", flush=True)
 
                     for _ in range(perturb_size):
-                        # For small perturbation, we can mix mutation and ruin
-                        if self.mutation_heuristics and random.random() < 0.5:
-                             heuristic = random.choice(self.mutation_heuristics)
-                        elif self.ruin_heuristics:
+                        # FIX: Do NOT use mutation_heuristics (like Simulated Annealing) in a loop!
+                        # SA is a process, not an atomic operator. Running it 200 times is extremely slow.
+                        # Only use atomic Ruin (Delete) or Perturbation (Flip) operators here.
+                        
+                        if self.ruin_heuristics and random.random() < 0.7:
                              heuristic = random.choice(self.ruin_heuristics)
+                             # Avoid batch ruin in loop
+                             while "batch" in heuristic.__name__ and len(self.ruin_heuristics) > 1:
+                                 heuristic = random.choice(self.ruin_heuristics)
                         else:
-                             heuristic = random.choice(self.perturbation_heuristics)
+                             # Fallback to perturbation (random flip)
+                             # Filter out SA from perturbation_heuristics if present
+                             valid_perturb = [h for h in self.perturbation_heuristics if "simulated_annealing" not in h.__name__]
+                             if valid_perturb:
+                                 heuristic = random.choice(valid_perturb)
+                             elif self.ruin_heuristics:
+                                 heuristic = random.choice(self.ruin_heuristics)
+                             else:
+                                 break # Nothing to do
                              
                         env.run_heuristic(heuristic)
                     
@@ -872,9 +931,13 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     if node_num < 2000:
                         tabu_interval = 100
                     
+                    # FIX: Ensure Tabu triggers BEFORE max_no_improve (which is 300 for large graphs)
+                    if node_num > 5000:
+                        tabu_interval = 100
+
                     # Inject Tabu every 'tabu_interval' steps of stagnation
                     if no_improve_steps > 0 and no_improve_steps % tabu_interval == 0:
-                        # print(f"Run:{run_id} Stagnation detected ({no_improve_steps}/{max_no_improve}). Injecting Tabu Search.")
+                        print(f"Run:{run_id} Stagnation detected ({no_improve_steps}/{max_no_improve}). Injecting Tabu Search.", flush=True)
                         env.run_heuristic(self.tabu_heuristic)
                         current_steps += 1
                         # Check if Tabu helped
@@ -917,6 +980,10 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 current_steps += 1
                 total_ucb_steps += 1
                 
+                # Heartbeat logging for debugging speed
+                if current_steps % 100 == 0:
+                     print(f"Run:{run_id} Step:{current_steps} NoImprove:{no_improve_steps} Val:{env.key_value} Best:{current_best}", flush=True)
+                
                 # Check improvement and Update UCB
                 improvement = max(0, env.key_value - last_value)
                 h_name = selected_heuristic.__name__
@@ -927,6 +994,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     last_value = env.key_value
                     no_improve_steps = 0
                     polishing_attempted = False # Reset polishing state on any improvement
+                    perturbation_count = 0 # Reset perturbation escalation on any improvement
                     if env.is_valid_solution and env.key_value > current_best:
                         current_best = env.key_value
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
