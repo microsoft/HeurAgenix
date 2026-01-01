@@ -164,8 +164,9 @@ def main(
     experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, experiment_name)
     
-    high_quality_solution_dir = os.path.join(base_output_dir, "max_cut", high_quality_solution_dir, data_name, "high_quality_solution")
-    os.makedirs(high_quality_solution_dir, exist_ok=True)
+    if high_quality_solution_dir:
+        high_quality_solution_dir = os.path.join(base_output_dir, "max_cut", high_quality_solution_dir, data_name, "high_quality_solution")
+        os.makedirs(high_quality_solution_dir, exist_ok=True)
     
     print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
     print(f"High Quality Solution Pool: {high_quality_solution_dir}")

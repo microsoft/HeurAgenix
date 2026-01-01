@@ -7,6 +7,7 @@ from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import Phase
 class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
     def __init__(self, heuristic_pool, problem, high_quality_solution_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02):
         # Force load_ratio to 1.0 to ensure we always try to load
+        self.high_quality_solution_dir = high_quality_solution_dir
         super().__init__(heuristic_pool, problem, high_quality_solution_dir, top_k, 1.0, fail_fast_threshold)
         
     def _try_load_initial_solution(self, env: BaseEnv) -> tuple[bool, bool]:
@@ -19,27 +20,8 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             base_name = data_name.split(".")[0]
         else:
             base_name = data_name
-            
-        # Construct path to best known file
-        # Assuming the structure is output/max_cut/best_kwown/best_known_{name}.txt
-        # We check multiple possible locations
         
-        possible_paths = [
-            f"output/max_cut/best_kwown/best_known_{base_name}.txt",
-            f"output/max_cut/best_known/best_known_{base_name}.txt",
-            f"/Data/xianliang/max_cut/output/max_cut/best_kwown/best_known_{base_name}.txt",
-            f"/Data/xianliang/max_cut/output/max_cut/best_known/best_known_{base_name}.txt"
-        ]
-        
-        target_path = None
-        for p in possible_paths:
-            if os.path.exists(p):
-                target_path = p
-                break
-        
-        if not target_path:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Best known file for {base_name} not found in expected locations.", flush=True)
-            return False, False
+        target_path = os.path.join(self.high_quality_solution_dir, f"best_known.txt")
             
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading Best Known from {target_path}...", flush=True)
         
