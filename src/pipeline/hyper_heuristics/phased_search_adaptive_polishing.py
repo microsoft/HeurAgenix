@@ -492,9 +492,20 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                                     no_improve_steps = 0 
                                     continue
                             
-                            # Fallback: Very soft ruin (1%)
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Fragile Elite Stagnation (Level {perturbation_count}). Tabu Failed. Triggering Soft Ruin (1%).", flush=True)
-                            current_ruin_percent = 0.01 
+                            # Fallback: Very soft ruin (0.3% for signed graphs, 1% for others)
+                            # Check graph type for adaptive ruin
+                            has_negative_edges = any(
+                                any(w < 0 for w in env.instance_data["adj"][u].values())
+                                for u in range(min(10, node_num))
+                                if u in env.instance_data["adj"]
+                            )
+                            
+                            if has_negative_edges:
+                                current_ruin_percent = 0.003  # 0.3% for signed graphs
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Fragile Elite Stagnation (Level {perturbation_count}). Tabu Failed. Triggering Ultra-Soft Ruin (0.3% - Signed Graph).", flush=True)
+                            else:
+                                current_ruin_percent = 0.01   # 1% for pure graphs
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Fragile Elite Stagnation (Level {perturbation_count}). Tabu Failed. Triggering Soft Ruin (1%).", flush=True) 
                         
                         # Normal Massive Ruin Logic
                         if not is_fragile_elite:
@@ -530,12 +541,25 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
 
                     # === SMALL PERTURBATION ===
                     # For Fragile Elite, keep it very small (0.1% - 0.5%)
+                    # Adjust based on graph size and sign (negative edges indicate higher ruggedness)
                     if is_fragile_elite:
-                        base_perturb = max(5, int(node_num * 0.001))
+                        # Check if graph has negative edges (signed graph)
+                        has_negative_edges = any(
+                            any(w < 0 for w in adj[u].values())
+                            for u in range(min(10, node_num))  # Sample check
+                            if u in env.instance_data["adj"]
+                        )
+                        
+                        if has_negative_edges:
+                            # Signed graphs (G72/G77/G81): even smaller perturbation
+                            base_perturb = max(3, int(node_num * 0.0003))  # 0.03%
+                        else:
+                            # Pure graphs (G63): standard small perturbation
+                            base_perturb = max(5, int(node_num * 0.001))   # 0.1%
                     else:
                         base_perturb = max(20, int(node_num * 0.005))
                     
-                    multiplier = 1.0 + (perturbation_count * 0.5)
+                    multiplier = 1.0 + (perturbation_count * 0.3)  # Reduce escalation rate
                     base_perturb = int(base_perturb * multiplier)
                     
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Small Perturbation (Size: {base_perturb}).", flush=True)
@@ -557,13 +581,20 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                 
                 # TABU INJECTION
                 if hasattr(self, 'tabu_heuristic') and self.tabu_heuristic:
+                    # Adaptive Tabu interval based on graph characteristics
                     tabu_interval = 500
                     if node_num < 2000: tabu_interval = 100
                     if node_num > 5000: tabu_interval = 100 # Aggressive for large graphs
                     
                     # For Fragile Elite, Tabu is our best friend. Use it more often.
+                    # Signed graphs benefit from more frequent Tabu (harder landscape)
                     if is_fragile_elite:
-                        tabu_interval = 50
+                        has_negative_edges = any(
+                            any(w < 0 for w in env.instance_data["adj"][u].values())
+                            for u in range(min(10, node_num))
+                            if u in env.instance_data["adj"]
+                        )
+                        tabu_interval = 30 if has_negative_edges else 50
 
                     if no_improve_steps > 0 and no_improve_steps % tabu_interval == 0:
                         # print(f"Run:{run_id} Injecting Tabu Search.", flush=True)
