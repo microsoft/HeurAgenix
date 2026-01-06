@@ -5,6 +5,7 @@ import glob
 import uuid
 import time
 import hashlib
+import copy
 from datetime import datetime, timedelta
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
@@ -334,6 +335,47 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                  # Fallback if no static nodes found
                  self._apply_breakout(env, "heavy_ruin")
 
+        elif strategy == "active_pool_relinking":
+            # [NEW] Active strategy: Force path relinking between distant elites
+            if len(self.elite_pool) < 2:
+                 return
+            
+            # 1. Find Best Known
+            best_sol = max(self.elite_pool, key=lambda s: s.cut_value)
+            
+            # 2. Find a "Distant" High-Quality Elite (Score > 99.5% BK)
+            candidates = [s for s in self.elite_pool if s.cut_value > env.best_known * 0.995]
+            if not candidates: 
+                 return
+                 
+            # Helper for distance
+            def calc_dist(s1, s2):
+                d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
+                d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
+                return min(d1, d2)
+            
+            # Find candidate farthest from best_sol
+            distant_elite = max(candidates, key=lambda s: calc_dist(s, best_sol))
+            dist = calc_dist(best_sol, distant_elite)
+            
+            if dist < 50: 
+                 # Too close, just ruin
+                 self._apply_breakout(env, "heavy_ruin")
+                 return
+
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] *** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***", flush=True)
+
+            # 3. Reset to Best, Target = Distant
+            env.current_solution = copy.deepcopy(best_sol)
+            env.current_solution.cut_value = best_sol.cut_value
+            
+            env.algorithm_data["elite_pool"] = [distant_elite] 
+            
+            if "path_relinking" in self.breakout_heuristics:
+                h = self.breakout_heuristics["path_relinking"]
+                # Move 40% towards the other peak
+                env.run_heuristic(h, parameters={"intensity": 0.4})
+
         elif strategy == "path_relinking_to_best" and "path_relinking" in self.breakout_heuristics:
              # Targeted PR: Force link towards the absolute Best Known in the pool
              h = self.breakout_heuristics["path_relinking"]
@@ -502,6 +544,12 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             if total_steps % 100 == 0:
                  print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known})", flush=True)
             
+            # [NEW] Periodic Active Path Relinking to bridge peaks
+            if total_steps % 300 == 0 and len(self.elite_pool) >= 2:
+                 self._apply_breakout(env, "active_pool_relinking")
+                 no_improve_steps = 0
+                 continue
+
             # Sync Distributed Elite Pool periodically
             if total_steps % 50 == 0:
                 self._sync_shared_pool()
