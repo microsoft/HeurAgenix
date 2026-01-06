@@ -35,6 +35,10 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         if self.high_quality_solution_dir:
             # User request: Store elite pool in output/max_cut/elite_pool/{instance}
             # Extract instance name from path (assumed .../g63.mc/high_quality_solution)
+            
+            # Determine base output dir consistent with instructions
+            base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+
             try:
                 path_parts = self.high_quality_solution_dir.split(os.sep)
                 # Find the part that looks like an instance name (e.g. g63.mc)
@@ -44,13 +48,21 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                     instance_name = path_parts[idx-1] # e.g. g63.mc
 
                     # Construct new path: output/max_cut/elite_pool/{instance_name}
-                    # We assume 'output' is at the root level relative to execution
-                    self.shared_pool_dir = os.path.join("output", "max_cut", "elite_pool", instance_name)
+                    self.shared_pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", instance_name)
                 else:
-                    # Fallback
-                    self.shared_pool_dir = os.path.join(self.high_quality_solution_dir, 'elite_pool')
+                    # Fallback: If path starts with "output", replace it with base_output_dir
+                    if self.high_quality_solution_dir.startswith("output"):
+                         rel_path = os.path.relpath(self.high_quality_solution_dir, "output")
+                         self.shared_pool_dir = os.path.join(base_output_dir, rel_path, 'elite_pool')
+                    else:
+                         self.shared_pool_dir = os.path.join(self.high_quality_solution_dir, 'elite_pool')
             except:
-                 self.shared_pool_dir = os.path.join(self.high_quality_solution_dir, 'elite_pool')
+                 # Exception Fallback
+                 if self.high_quality_solution_dir.startswith("output"):
+                     rel_path = os.path.relpath(self.high_quality_solution_dir, "output")
+                     self.shared_pool_dir = os.path.join(base_output_dir, rel_path, 'elite_pool')
+                 else:
+                     self.shared_pool_dir = os.path.join(self.high_quality_solution_dir, 'elite_pool')
 
             # Base dir created once
             try:
