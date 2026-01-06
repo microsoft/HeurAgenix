@@ -26,12 +26,20 @@ def run_consensus_evaluation(
     model_config_paths: List[str],
     task_name: str,
     subset: str = "test",
-    output_dir: str = "results_consensus"
+    output_base_dir: str = "output",
+    exp_name: str = ""
 ):
     # 1. Setup
+    if not exp_name:
+        exp_name = time.strftime("%Y%m%d_%H%M%S")
+    
+    output_dir = os.path.join(output_base_dir, exp_name)
+    os.makedirs(output_dir, exist_ok=True)
+    
     print(f"--- Consensus Evaluation ---")
     print(f"Model Configs: {model_config_paths}")
     print(f"Task: {task_name} ({subset})")
+    print(f"Output Directory: {output_dir}")
 
     # Load Configs
     configs = []
@@ -46,6 +54,7 @@ def run_consensus_evaluation(
     # Initialize Engine
     try:
         # Pass configs to the engine, it will instantiate clients
+        # Logs go to output_dir/logs
         engine = ConsensusEngine(configs, output_dir=os.path.join(output_dir, "logs"))
     except Exception as e:
         print(f"Failed to initialize engine: {e}")
@@ -110,7 +119,6 @@ def run_consensus_evaluation(
     print(f"\n--- Evaluation Complete ---")
     print(f"Final Accuracy: {final_acc:.2f}%")
     
-    os.makedirs(output_dir, exist_ok=True)
     # Generate a run name based on number of models
     run_name = f"consensus_{len(configs)}models"
     result_file = os.path.join(output_dir, f"{run_name}_{task_name}_results.json")
@@ -134,12 +142,14 @@ if __name__ == "__main__":
     # Allow multiple config files
     parser.add_argument("-c", "--configs", type=str, nargs='+', required=True, help="Paths to LLM config jsons (space separated)")
     parser.add_argument("-t", "--task", type=str, default="math500", help="Task name")
-    parser.add_argument("-o", "--output", type=str, default="results_consensus", help="Output directory")
-    
+    parser.add_argument("-o", "--output", type=str, default="output", help="Base output directory")
+    parser.add_argument("-e", "--exp_name", type=str, default="", help="Experiment name (default: timestamp)")
+
     args = parser.parse_args()
     
     run_consensus_evaluation(
         args.configs,
         args.task,
-        output_dir=args.output
+        output_base_dir=args.output,
+        exp_name=args.exp_name
     )
