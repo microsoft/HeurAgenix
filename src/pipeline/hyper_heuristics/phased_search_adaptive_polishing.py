@@ -545,7 +545,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                     if is_fragile_elite:
                         # Check if graph has negative edges (signed graph)
                         has_negative_edges = any(
-                            any(w < 0 for w in adj[u].values())
+                            any(w < 0 for w in env.instance_data["adj"][u].values())
                             for u in range(min(10, node_num))  # Sample check
                             if u in env.instance_data["adj"]
                         )
@@ -556,6 +556,13 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                         else:
                             # Pure graphs (G63): standard small perturbation
                             base_perturb = max(5, int(node_num * 0.001))   # 0.1%
+                        
+                        # Scale based on Worker Type
+                        if worker_type == 1: # Moderate
+                            base_perturb *= 5
+                        elif worker_type == 2: # Aggressive
+                            base_perturb *= 20
+                            
                     else:
                         base_perturb = max(20, int(node_num * 0.005))
                     
