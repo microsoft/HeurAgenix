@@ -71,16 +71,6 @@ class BaseLLMClient:
     def chat_once(self) -> str:
         raise NotImplemented
 
-    def chat_with_logprobs(self) -> Tuple[str, List[Dict]]:
-        """
-        Chat with the LLM and return the response content and logprobs.
-        Returns:
-            response_content: The generated text.
-            logprobs: A list of logprob dictionaries for each token.
-        """
-        raise NotImplementedError("chat_with_logprobs is not implemented for this client.")
-
-
     def get_sequence_score(self, conversation: List[Dict], response: str) -> float:
         """
         Calculate the average NLL of the response given the conversation context.

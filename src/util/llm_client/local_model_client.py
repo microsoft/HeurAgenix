@@ -64,59 +64,6 @@ class LocalModelClient(BaseLLMClient):
         response_content = response[0]["generated_text"].strip()
         return response_content
 
-    def chat_with_logprobs(self) -> Tuple[str, List[Dict[str, float]], List[str]]:
-        format_messages = self._format_messages(self.messages)
-
-        text = self.pipeline.tokenizer.apply_chat_template(
-            format_messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=self.think,
-        )
-        
-        inputs = self.pipeline.tokenizer(text, return_tensors="pt")
-        if hasattr(self.pipeline.model, "device"):
-            inputs = {k: v.to(self.pipeline.model.device) for k, v in inputs.items()}
-
-        outputs = self.pipeline.model.generate(
-            **inputs,
-            max_new_tokens=self.max_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            do_sample=True,
-            return_dict_in_generate=True,
-            output_scores=True,
-            pad_token_id=self.pipeline.tokenizer.eos_token_id
-        )
-        
-        generated_tokens_ids = outputs.sequences[:, inputs["input_ids"].shape[-1]:]
-        response_content = self.pipeline.tokenizer.decode(generated_tokens_ids[0], skip_special_tokens=True)
-
-        logprobs_data = []
-        generated_tokens_list = []
-        
-        # Iterate over each generation step
-        for i, score_tensor in enumerate(outputs.scores):
-            # Get the token id that was actually generated at this step
-            # Note: generated_tokens_ids[0][i] is the token id
-            if i < len(generated_tokens_ids[0]):
-                token_id = generated_tokens_ids[0][i]
-                token_str = self.pipeline.tokenizer.decode([token_id.item()])
-                generated_tokens_list.append(token_str)
-            
-            probs = torch.nn.functional.softmax(score_tensor[0], dim=-1)
-            top_probs, top_indices = torch.topk(probs, k=20)
-            
-            step_logprobs = {}
-            for prob, idx in zip(top_probs, top_indices):
-                token = self.pipeline.tokenizer.decode([idx.item()])
-                step_logprobs[token] = torch.log(prob).item()
-            logprobs_data.append(step_logprobs)
-            
-        self.messages.append({"role": "assistant", "content": [{"type": "text", "text": response_content}]})
-            
-        return response_content, logprobs_data, generated_tokens_list
-
     def get_sequence_score(self, conversation: List[Dict], response: str) -> float:
         format_messages = self._format_messages(conversation)
 
