@@ -226,7 +226,12 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 else:
                     # If same quality but different structure? Keep diversity
                     # If value equals min_val, but it's different structure, replace one with prob
-                    if new_sol.cut_value == min_val and random.random() < 0.3:
+                    # [FIX] If it's a Top Tier solution (equal to max/BK), accept it with high probability (1.0) to encourage "Parallel Peak" drift
+                    # Otherwise use low probability
+                    is_top_tier = (new_sol.cut_value == min_val and min_val == max(s.cut_value for s in self.elite_pool))
+                    accept_prob = 1.0 if is_top_tier else 0.3
+                    
+                    if new_sol.cut_value == min_val and random.random() < accept_prob:
                          for i, s in enumerate(self.elite_pool):
                             if s.cut_value == min_val:
                                 self.elite_pool[i] = new_sol
@@ -359,7 +364,12 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 return min(d1, d2)
             
             # Find candidate farthest from best_sol
-            distant_elite = max(candidates, key=lambda s: calc_dist(s, best_sol))
+            # [FIX] Use weighted random choice to avoid "Groundhog Day" repeating the same link
+            # Pick from top 3 farthest
+            candidates.sort(key=lambda s: calc_dist(s, best_sol), reverse=True)
+            top_candidates = candidates[:min(3, len(candidates))]
+            distant_elite = random.choice(top_candidates)
+            
             dist = calc_dist(best_sol, distant_elite)
             
             if dist < 50: 
@@ -524,7 +534,8 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 # If we are stuck but the solution is still decent (e.g. > 99% of BK)
                 # we add it to the pool to provide diversity for path relinking.
                 # Don't add every step, maybe every 10 steps to avoid flooding with identical copies
-                if env.key_value >= env.best_known * 0.99 and total_steps % 10 == 0:
+                is_best_known = env.key_value >= env.best_known
+                if is_best_known or (env.key_value >= env.best_known * 0.99 and total_steps % 10 == 0):
                     self._update_elite_pool(env.current_solution)
 
             # --- Phase C: Breakout / Ruin Strategies ---
