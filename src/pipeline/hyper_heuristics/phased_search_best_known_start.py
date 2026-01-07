@@ -71,6 +71,10 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 os.makedirs(self.shared_pool_dir, exist_ok=True)
             except OSError:
                 pass 
+        
+        # [NEW] Initial Load Logic for Merged Pools
+        # If we are starting fresh but a merged pool exists, load it.
+        self._load_initial_pool_from_disk()
 
     def _get_time_bucket_path(self, timestamp=None):
         if timestamp is None:
@@ -545,7 +549,7 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                  print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known})", flush=True)
             
             # [NEW] Periodic Active Path Relinking to bridge peaks
-            if total_steps % 300 == 0 and len(self.elite_pool) >= 2:
+            if total_steps % 300 <= 1 and len(self.elite_pool) >= 2:
                  self._apply_breakout(env, "active_pool_relinking")
                  no_improve_steps = 0
                  continue
@@ -600,3 +604,35 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         except Exception as e:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Error loading best known: {e}", flush=True)
             return False, False
+    
+    def _load_initial_pool_from_disk(self):
+        if not self.shared_pool_dir: return
+        
+        # Look specifically for the merged folder 'merged_peak' or similar recent ones
+        # Or just scan recursively. 
+        # Given the instruction was to "merge to merged_peak", we should ensure we look there.
+        # But self.shared_pool_dir usually points to .../elite_pool/g81.mc
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Initializing Elite Pool from disk (scanning {self.shared_pool_dir})...", flush=True)
+        
+        # Determine files to load. 
+        # We prefer loading the consolidated high quality ones first.
+        target_merged = os.path.join(self.shared_pool_dir, "merged_peak")
+        if os.path.exists(target_merged):
+             pkl_files = glob.glob(os.path.join(target_merged, "**", "*.pkl"), recursive=True)
+        else:
+             pkl_files = glob.glob(os.path.join(self.shared_pool_dir, "**", "*.pkl"), recursive=True)
+
+        random.shuffle(pkl_files)
+        
+        loaded_count = 0
+        for fpath in pkl_files[:1000]: # Load max 1000 to start
+            try:
+                with open(fpath, 'rb') as f:
+                    sol = pickle.load(f)
+                    self._add_to_local_pool(sol, share=False)
+                    loaded_count += 1
+            except:
+                pass
+            
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {loaded_count} solutions from disk.", flush=True)
