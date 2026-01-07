@@ -379,6 +379,13 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 h = self.breakout_heuristics["path_relinking"]
                 # Move 40% towards the other peak
                 env.run_heuristic(h, parameters={"intensity": 0.4})
+                
+                # [FIX]: Immediate Local Optimization in the Valley
+                if self.improvement_heuristics:
+                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Rapid Mining in Valley...", flush=True)
+                     # Execute 2 rounds of improvement to settle into a local optimum
+                     self._run_improvement_phase(env)
+                     self._run_improvement_phase(env)
 
         elif strategy == "path_relinking_to_best" and "path_relinking" in self.breakout_heuristics:
              # Targeted PR: Force link towards the absolute Best Known in the pool
@@ -396,6 +403,12 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
              # But here we temporarily overwrote algorithm_data entry, which is fine.
              print(f"[{datetime.now().strftime('%H:%M:%S')}] Targeted Path Relinking -> Best Known ({best_val})", flush=True)
 
+             # [FIX] Dig deeper around the path
+             if self.improvement_heuristics:
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Mining Path to Best...", flush=True)
+                 self._run_improvement_phase(env)
+                 self._run_improvement_phase(env)
+
         elif strategy == "path_relinking" and "path_relinking" in self.breakout_heuristics:
             # Parameters: intensity
             h = self.breakout_heuristics["path_relinking"]
@@ -406,7 +419,7 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             env.run_heuristic(h, parameters={"intensity": 0.3})
             
         elif strategy == "jump_to_secondary_peak":
-             # Strategy: Teleport to a high-quality local optimum that is NOT the current best known
+             # Strategy: Teleport to a high-quality local optimum
              if not self.elite_pool:
                  self._apply_breakout(env, "supernova_ruin")
                  return
@@ -415,6 +428,19 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
              # Candidates: High quality but strictly less than Best Known (to find secondary peaks)
              # We want to revisit peaks like 26992 to see if we can sharpen them
              candidates = [s for s in self.elite_pool if s.cut_value >= env.best_known - 150 and s.cut_value < best_val]
+             
+             desc = "SECONDARY PEAK"
+
+             # [FIX] If no secondary peak, jump to a DISTANT parallel peak (same best value)
+             if not candidates:
+                 def calc_dist_j(s1, s2):
+                    d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
+                    d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
+                    return min(d1, d2)
+                 
+                 # Look for solutions with SAME best value but Distance > 400
+                 candidates = [s for s in self.elite_pool if s.cut_value == best_val and calc_dist_j(s, env.current_solution) > 400]
+                 desc = "PARALLEL UNIVERSE PEAK"
              
              if candidates:
                  target = random.choice(candidates)
@@ -426,7 +452,7 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                  env.current_solution.cut_value = env.get_key_value(env.current_solution)
                  # Sync problem state
                  env.problem_state = env.get_problem_state()
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] *** JUMPED TO SECONDARY PEAK: {env.current_solution.cut_value} (from pool of {len(candidates)}) ***", flush=True)
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] *** JUMPED TO {desc}: {env.current_solution.cut_value} (from pool of {len(candidates)}) ***", flush=True)
              else:
                  # If no secondary peak found, try Supernova
                  self._apply_breakout(env, "supernova_ruin")
