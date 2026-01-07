@@ -315,14 +315,62 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
 
 
     def _run_improvement_phase(self, env):
-        # Run UCB or Random selection from improvement_heuristics
+        # [VND Implementation with Strict Hill Climbing]
+        # Iterate through all available heuristics until no improvement is found.
+        # This converts "relaxed" search into "intensive polishing".
         if not self.improvement_heuristics: return False
         
-        heuristic = random.choice(self.improvement_heuristics)
-        start_val = env.key_value
-        env.run_heuristic(heuristic)
+        # Limit max VND iterations to prevent infinite loops (though strict ascent prevents cycling, costs time)
+        max_vnd_loops = 10 
+        total_improved = False
         
-        return env.key_value > start_val
+        # Pre-shuffle heuristics to improve robustness
+        # We work on a copy of the list to shuffle it
+        heuristics_queue = list(self.improvement_heuristics)
+        
+        for loop_idx in range(max_vnd_loops):
+            improved_in_this_loop = False
+            random.shuffle(heuristics_queue)
+            
+            for heuristic in heuristics_queue:
+                # 1. Snapshot State
+                # Deep copy is needed for components.Solution
+                from src.problems.max_cut.components import Solution
+                backup_sol = Solution(set(env.current_solution.set_a), 
+                                      set(env.current_solution.set_b), 
+                                      env.current_solution.cut_value)
+                start_val = backup_sol.cut_value
+                
+                # 2. Run Heuristic (In-Place Modification)
+                try:
+                    env.run_heuristic(heuristic)
+                except Exception as e:
+                    print(f"Error running heuristic: {e}", flush=True)
+                    env.current_solution = backup_sol
+                    continue
+
+                # 3. Acceptance Criteria: Strict Ascent
+                # If Score Dropped or Equal -> Revert (We want to find peaks, not drift)
+                if env.key_value <= start_val:
+                    # Revert
+                    env.current_solution = backup_sol
+                    # Restore env properties just in case
+                    env.current_solution.cut_value = start_val
+                    env.problem_state = env.get_problem_state() 
+                    # Note: We assume env.problem_state is derived from current_solution, 
+                    # but heuristic might modify algorithm_data too. Usually negligible for basic heuristics.
+                else:
+                    # Accepted
+                    improved_in_this_loop = True
+                    total_improved = True
+                    # Optimization: If we found a gain, we might want to stick with this heuristic or continue?
+                    # Standard VND continues to next heuristic.
+            
+            # If a full pass through all heuristics yielded no gain, we are at a local optimum for ALL neighborhoods.
+            if not improved_in_this_loop:
+                break
+                
+        return total_improved
 
     def _apply_breakout(self, env, strategy):
         node_num = env.instance_data["node_num"]
