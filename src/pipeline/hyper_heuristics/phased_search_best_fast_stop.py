@@ -536,7 +536,6 @@ class PhasedSearchFastStopBestHyperHeuristic:
             # Also filter IMPROVEMENT heuristics for large graphs
             # We keep 'cached_delta_flip' for speed (it replaces slow greedy swaps).
             # We REMOVE 'tabu_node_flip' from the random pool because it is O(N^2) and too slow for frequent use.
-            # Instead, we will trigger it conditionally when stuck.
             fast_improvement_names = {
                 "cached_delta_flip_3cfd", # O(1) update, extremely fast greedy descent
                 "first_improvement_flip_7a32", # O(N) scan, good for diversity
@@ -764,6 +763,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                         
                         if gap > self.fail_fast_threshold:
                             print(f"Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). Threshold {self.fail_fast_threshold:.2%}. FAIL FAST triggered -> Next Task.", flush=True)
+                            env.dump_result(result_file=f"final_result.{experiment}.{run_id}.txt")
                             return False
 
                         # Adaptive Logic: Did we improve since the last ruin?
@@ -997,6 +997,9 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     perturbation_count = 0 # Reset perturbation escalation on any improvement
                     if env.is_valid_solution and env.key_value > current_best:
                         current_best = env.key_value
+                        # Save intermediate result immediately
+                        env.dump_result(result_file=f"intermediate_result.{int(current_best)}.{experiment}.{run_id}.txt")
+                        
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
@@ -1052,7 +1055,11 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     no_improve_steps += 1
 
                 # Logging
-                current_best = max(current_best, env.key_value)
+                    if env.key_value > current_best:
+                        pass # Moved intermediate dump logic upstream to avoid redundancy bugs
+                        # current_best = env.key_value
+                        # # Save intermediate result to allow resuming/analysis if interrupted
+                        # env.dump_result(result_file=f"intermediate_result.{int(current_best)}.{experiment}.{run_id}.txt")
 
                 if env.key_value == env.best_known:
                     if env.is_complete_solution and env.is_valid_solution:
@@ -1067,5 +1074,8 @@ class PhasedSearchFastStopBestHyperHeuristic:
                         found_best = True
                         # Don't stop, try to improve more!
                         env.best_known = env.key_value # Update local best known to keep pushing
+
+        # Save the final result regardless of whether it broke the record
+        env.dump_result(result_file=f"final_result.{experiment}.{run_id}.txt")
 
         return found_best

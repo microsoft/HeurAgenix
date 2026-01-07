@@ -570,6 +570,9 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 self._update_elite_pool(env.current_solution)
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} NEW LOCAL BEST: {current_best}", flush=True)
                 
+                # Always dump intermediate improvements as TXT for easy reuse
+                env.dump_result(result_file=f"intermediate_result.{current_best}.txt")
+
                 if current_best > env.best_known:
                      print(f"[{datetime.now().strftime('%H:%M:%S')}] !!! BREAKTHROUGH: {current_best} > {env.best_known} !!!", flush=True)
                      env.best_known = current_best
