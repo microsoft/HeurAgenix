@@ -18,22 +18,18 @@ TASK_REGISTRY = {
     "math500": Math500Task
 }
 
-def load_model_config(config_path: str) -> Dict:
-    with open(config_path, 'r') as f:
-        return json.load(f)
-
 def run_consensus_evaluation(
     model_config_paths: List[str],
     task_name: str,
     subset: str = "test",
-    output_base_dir: str = "output",
     exp_name: str = ""
 ):
     # 1. Setup
     if not exp_name:
         exp_name = time.strftime("%Y%m%d_%H%M%S")
     
-    output_dir = os.path.join(output_base_dir, exp_name)
+    base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "..", "ccdm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
+    output_dir = os.path.join(base_output_dir, exp_name)
     os.makedirs(output_dir, exist_ok=True)
     
     print(f"--- Consensus Evaluation ---")
@@ -41,58 +37,35 @@ def run_consensus_evaluation(
     print(f"Task: {task_name} ({subset})")
     print(f"Output Directory: {output_dir}")
 
-    # Load Configs
-    configs = []
-    for path in model_config_paths:
-        try:
-            cfg = load_model_config(path)
-            configs.append(cfg)
-        except Exception as e:
-            print(f"Failed to load config {path}: {e}")
-            return
-
-    # Initialize Engine
-    try:
-        # Pass configs to the engine, it will instantiate clients
-        # Logs go to output_dir/logs
-        engine = ConsensusEngine(configs, output_dir=os.path.join(output_dir, "logs"))
-    except Exception as e:
-        print(f"Failed to initialize engine: {e}")
-        return
-
-    # Load Task
-    if task_name not in TASK_REGISTRY:
-        print(f"Error: Task '{task_name}' not found. Available: {list(TASK_REGISTRY.keys())}")
-        return
-    
     task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
     task = task_class(subset=subset)
     dataset = task.get_dataset()
+
+    # Initialize Engine
+    engine = ConsensusEngine(model_config_paths, system_prompt=task.system_prompt)
+
 
     # 2. Evaluation Loop
     correct_count = 0
     total_count = 0
     results = []
-
     pbar = tqdm(dataset)
-    for i, item in enumerate(pbar):
+
+    for item in pbar:
         # Format Prompt
-        messages = task.format_prompt(item)
+        
+        problem = item["problem"]
+        ground_truth = item["ground_truth"]
         
         # Engine Decision
         # The engine is responsible for coordinating multiple models
-        try:
-            start_time = time.time()
-            best_response, best_idx = engine.decide(messages) 
-            elapsed = time.time() - start_time
-        except Exception as e:
-            print(f"\nError processing sample {i}: {e}")
-            best_response = ""
-            elapsed = 0
+        start_time = time.time()
+        best_response = engine.decide(problem) 
+        elapsed = time.time() - start_time
         
         # Extract & Verify
         prediction = task.extract_answer(best_response)
-        ground_truth = item["ground_truth"]
+        
         is_correct = task.verify_answer(prediction, ground_truth)
         
         if is_correct:
@@ -101,12 +74,11 @@ def run_consensus_evaluation(
         
         # Log Result
         results.append({
-            "problem": item.get('problem', ''),
+            "system_prompt": task.system_prompt,
+            "problem": problem,
             "ground_truth": ground_truth,
-            "messages": messages, # Log inputs/system prompt for debug
             "response": best_response,
             "prediction": prediction,
-            "model": model_config_paths[best_idx] if best_idx != -1 else None,
             "is_correct": is_correct,
             "time_taken": elapsed
         })
@@ -133,16 +105,18 @@ def run_consensus_evaluation(
     print(f"\n--- Evaluation Complete ---")
     print(f"Final Accuracy: {final_acc:.2f}%")
     
-    # Generate a run name based on number of models
-    run_name = f"consensus_{len(configs)}models"
-    result_file = os.path.join(output_dir, f"{run_name}_{task_name}_results.json")
+    # Get configs from engine clients for logging
+    configs = [client.config for client in engine.clients]
     
-    # Save a simplified version of configs to avoid clutter
-    simple_configs = [{"name": c.get("name"), "model_path": c.get("model_path")} for c in configs]
+    # Generate a run name based on number of models
+    result_file = os.path.join(output_dir, f"results.json")
+    
+    # Generate a run name based on number of models - using len(configs)
+    # result_file = os.path.join(output_dir, f"consensus_{len(configs)}models_{task_name}_results.json")
 
     with open(result_file, 'w') as f:
         json.dump({
-            "configs": simple_configs,
+            "configs": configs,
             "task": task_name,
             "accuracy": final_acc,
             "total": total_count,
@@ -156,7 +130,6 @@ if __name__ == "__main__":
     # Allow multiple config files
     parser.add_argument("-c", "--configs", type=str, nargs='+', required=True, help="Paths to LLM config jsons (space separated)")
     parser.add_argument("-t", "--task", type=str, default="math500", help="Task name")
-    parser.add_argument("-o", "--output", type=str, default="output", help="Base output directory")
     parser.add_argument("-e", "--exp_name", type=str, default="", help="Experiment name (default: timestamp)")
 
     args = parser.parse_args()
@@ -164,6 +137,5 @@ if __name__ == "__main__":
     run_consensus_evaluation(
         args.configs,
         args.task,
-        output_base_dir=args.output,
         exp_name=args.exp_name
     )

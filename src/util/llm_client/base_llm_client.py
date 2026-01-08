@@ -23,7 +23,7 @@ class BaseLLMClient:
         self.sleep_time = self.config.get("sleep_time", 60)
         if system_prompt:
             self.system_prompt = system_prompt
-            self.messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt}]}]
+            self.messages = [{"role": "system", "content": system_prompt}]
         else:
             self.messages = []
             self.system_prompt = None
@@ -39,7 +39,7 @@ class BaseLLMClient:
         for index in range(self.max_attempts):
             try:
                 response_content = self.chat_once()
-                self.messages.append({"role": "assistant", "content": [{"type": "text", "text": response_content}]})
+                self.messages.append({"role": "assistant", "content": response_content})
                 return response_content
             except Exception as e:
                 print(f"Try to chat {index + 1} time: {e}")
@@ -49,24 +49,23 @@ class BaseLLMClient:
         self.dump("error")
         return None
 
-    def dump(self, output_name: str=None) -> str:
-        if self.output_dir != None and output_name != None:
-            json_output_file = os.path.join(self.output_dir, f"{output_name}.json")
-            text_output_file = os.path.join(self.output_dir, f"{output_name}.txt")
-            print(f"Chat dumped to {text_output_file}")
-            with open(json_output_file, "w") as fp:
-                json.dump(self.messages, fp, indent=4)
+    def dump(self, output_path: str=None) -> str:
+        json_output_file = output_path.replace(".txt", ".json")
+        text_output_file = output_path.replace(".json", ".txt")
+        print(f"Chat dumped to {text_output_file}")
+        with open(json_output_file, "w") as fp:
+            json.dump(self.messages, fp, indent=4)
 
-            with open(text_output_file, "w", encoding="UTF-8") as file:
-                for message in self.messages:
-                    file.write(message["role"] + "\n")
-                    contents = ""
-                    for i, content in enumerate(message["content"]):
-                        if isinstance(content, dict) and content.get("type") == "text":
-                            contents += content["text"]
-                        elif isinstance(content, str):
-                            contents += content
-                    file.write(contents + "\n------------------------------------------------------------------------------------\n\n")
+        with open(text_output_file, "w", encoding="UTF-8") as file:
+            for message in self.messages:
+                file.write(message["role"] + "\n")
+                contents = ""
+                for i, content in enumerate(message["content"]):
+                    if isinstance(content, dict) and content.get("type") == "text":
+                        contents += content["text"]
+                    elif isinstance(content, str):
+                        contents += content
+                file.write(contents + "\n------------------------------------------------------------------------------------\n\n")
         return self.messages[-1]["content"][0]["text"]
 
     def chat_once(self) -> str:
@@ -83,25 +82,16 @@ class BaseLLMClient:
         self.messages = []
         self.system_prompt = system_prompt
         if self.system_prompt:
-            self.messages = [{"role": "system", "content": [{"type": "text", "text": self.system_prompt}]}]
+            self.messages = [{"role": "system", "content": self.system_prompt}]
 
     def add_message(self, content, role: str = "user") -> None:
         """Appends a single message to history."""
-        self.messages.append({"role": role, "content": [{"type": "text", "text": content}]})
+        self.messages.append({"role": role, "content": content})
 
     def set_history(self, messages: List[Dict]) -> None:
         """Replaces current history with provided messages."""
         # 1. Try to find system prompt in the new messages
-        # We need to extract the string content, handling the list-of-dicts format if present
-        sys_prompt = None
-        for m in messages:
-            if m["role"] == "system":
-                c = m["content"]
-                if isinstance(c, list) and len(c) > 0 and isinstance(c[0], dict):
-                    sys_prompt = c[0].get("text")
-                elif isinstance(c, str):
-                    sys_prompt = c
-                break
+        sys_prompt = next((m["content"] for m in messages if m["role"] == "system"), None)
         
         # 2. Reset with that prompt
         self.reset(sys_prompt)
@@ -109,14 +99,4 @@ class BaseLLMClient:
         # 3. Append non-system messages
         for m in messages:
             if m["role"] != "system":
-                # Extract content string
-                content_str = ""
-                c = m["content"]
-                if isinstance(c, list):
-                    for part in c:
-                        if isinstance(part, dict) and part.get("type") == "text":
-                            content_str += part.get("text", "")
-                elif isinstance(c, str):
-                    content_str = c
-                
-                self.add_message(content_str, m["role"])
+                self.add_message(m["content"], m["role"])

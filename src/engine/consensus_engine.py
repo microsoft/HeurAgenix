@@ -3,31 +3,26 @@ from src.util.llm_client.base_llm_client import BaseLLMClient
 from src.util.llm_client.local_model_client import LocalModelClient
 
 class ConsensusEngine:
-    def __init__(self, client_config_paths: List[str], output_dir: str = None):
+    def __init__(self, client_config_paths: List[str], system_prompt: str = None):
         self.clients: List[BaseLLMClient] = []
         for config_path in client_config_paths:
-            # Initialize clients based on config
-            # Currently defaults to LocalModelClient
-            # TODO: Add logic to choose different clients based on config['type']
-            client = LocalModelClient(config_path, output_dir=output_dir)
+            client = LocalModelClient(config_path, system_prompt=system_prompt)
             self.clients.append(client)
-        
-        print(f"Initialized ConsensusEngine with {len(self.clients)} clients.")
 
-    def decide(self, messages: List[Dict]) -> Tuple[str, int]:
+    def set_task(self, system_prompt: str):
+        for client in self.clients:
+            client.reset(system_prompt)
+
+    def decide(self, problem) -> str:
         """
         Main entry point for the consensus mechanism.
         
         Args:
-            messages: The context/prompt messages.
+            problem: The problem statement or question to be answered.
             
         Returns:
             The best response text selected by the engine with target client index.
         """
-        import copy
-
-        if not self.clients:
-            return "No clients available.", -1
         
         # 1. Generate responses from all agents
         responses = []
@@ -35,8 +30,9 @@ class ConsensusEngine:
         print(f"Starting consensus generation with {len(self.clients)} agents...")
 
         for i, client in enumerate(self.clients):
+            client.reset()
             # Use set_history to safely copy and set the context for the agent
-            client.set_history(messages)
+            client.add_message(problem, role="user")
             try:
                 # chat() returns the response content and appends to client.messages
                 # We use chat() to get retry logic handling
@@ -71,7 +67,7 @@ class ConsensusEngine:
                 try:
                     # We pass the ORIGINAL PROMPT (messages) and the CANDIDATE RESPONSE (response_i)
                     # get_sequence_score calculates NLL(response | context)
-                    nll = client.get_sequence_score(messages, response_i)
+                    nll = client.get_sequence_score(self.clients[0].messages, response_i)
                     nll_sum += nll
                     count += 1
                 except Exception as e:
@@ -95,6 +91,6 @@ class ConsensusEngine:
         if best_idx != -1:
             best_response = responses[best_idx]
             print(f"Selected Response {best_idx} with maximal NLL score {max_score:.4f}")
-            return best_response, best_idx
+            return best_response
         else:
-            return valid_responses[0], 0
+            return valid_responses[0]

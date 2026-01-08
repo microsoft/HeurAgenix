@@ -1,8 +1,8 @@
 import re
-from typing import Dict, List, Optional
-from datasets import load_dataset
+import os
+from typing import Dict, List
+from datasets import load_dataset, load_from_disk
 from src.tasks.base_task import BaseTask
-
 from src.util.math_grading import grade_answer
 
 class Math500Task(BaseTask):
@@ -15,20 +15,27 @@ class Math500Task(BaseTask):
         self.subset = subset
         self.data = None
         if system_prompt is None:
-            self.system_content = (
+            self.system_prompt = (
             "You are a helpful assistant who is good at mathematics. "
             "Please solve the problem step by step. "
             "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
             "For example: The answer is \\boxed{5}."
         )
         else:
-            self.system_content = system_prompt
+            self.system_prompt = system_prompt
 
     def get_dataset(self) -> List[Dict]:
         if self.data is None:
-            # MATH-500 usually has a 'test' split
+            # Check for AMLT environment to load dataset from disk
+            amlt_data_dir = os.getenv("AMLT_DATA_DIR")
+            if amlt_data_dir:
+                 dataset_path = os.path.join(amlt_data_dir, self.dataset_name)
+                 dataset = load_from_disk(dataset_path)[self.subset].select(range(5))
+            else:
+                 dataset = load_dataset(self.dataset_name, split=self.subset).select(range(5))  # For faster testing, limit to first 100 samples
+
             self.data = []
-            for item in ds:
+            for item in dataset:
                 # MATH-500 structure: 'problem', 'solution', 'answer', 'subject', 'level'
                 self.data.append({
                     "problem": item["problem"],
@@ -39,18 +46,6 @@ class Math500Task(BaseTask):
                 })
         return self.data
 
-    def format_prompt(self, problem_data: Dict) -> List[Dict]:
-        """
-        Modified to include a system prompt enforcing the output format.
-        Most modern math models (DeepSeek, Qwen, Llama3) perform better with a system prompt.
-        """
-
-        user_content = f"Problem:\n{problem_data['problem']}"
-        
-        return [
-            {"role": "system", "content": self.system_content},
-            {"role": "user", "content": user_content}
-        ]
 
     def extract_answer(self, response: str) -> str:
         """

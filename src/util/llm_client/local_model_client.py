@@ -14,17 +14,25 @@ class LocalModelClient(BaseLLMClient):
         ):
         super().__init__(config_path, system_prompt)
         
-
         if os.getenv("AMLT_DATA_DIR"):
-            self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(self.config['model_path']))
+            self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(self.config['model_name']))
         else:
-            self.model = os.path.normpath(self.config['model_path'])
+            self.model = os.path.normpath(self.config['model_name'])
+
+        # Determine device to avoid distributed init issues on multi-GPU nodes
+        device_map = "auto"
+        if torch.cuda.is_available():
+             # Force usage of the first GPU if available to prevent multi-gpu distributed init failures
+            device_map = "cuda:0"
 
         self.pipeline = transformers.pipeline(
             "text-generation",
             model=self.model,
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
+            model_kwargs={
+                "torch_dtype": torch.bfloat16,
+                "trust_remote_code": True,
+            },
+            device_map=device_map,
         )
 
     def _merge_system_role(self, messages: List[Dict]) -> List[Dict]:
@@ -58,21 +66,12 @@ class LocalModelClient(BaseLLMClient):
         return [{"role": "user", "content": system_text}] + new_messages
 
     def _format_messages(self, messages: List[Dict]) -> List[Dict]:
-        format_messages = []
-        for m in messages:
-            c = m.get("content", "")
-            if isinstance(c, list):
-                parts = []
-                for p in c:
-                    if isinstance(p, dict) and p.get("type") == "text":
-                        parts.append(p.get("text", ""))
-                    elif isinstance(p, str):
-                        parts.append(p)
-                c = "\n".join(parts)
-            elif not isinstance(c, str):
-                c = str(c)
-            format_messages.append({"role": m["role"], "content": c})
-        return format_messages
+        """
+        Since we now enforce string-only content in BaseLLMClient.
+        We can just pass messages through (or copy if needed),
+        because they are already in [{"role": ..., "content": "..."}] format.
+        """
+        return messages
 
     def chat_once(self) -> str:
         format_messages = self._format_messages(self.messages)

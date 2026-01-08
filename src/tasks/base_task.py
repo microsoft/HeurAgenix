@@ -16,15 +16,6 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    def format_prompt(self, problem_data: Dict) -> List[Dict]:
-        """
-        Convert a problem data item into a chat message list (system, user).
-        Returns:
-            List[Dict]: e.g. [{"role": "user", "content": "..."}]
-        """
-        pass
-
-    @abstractmethod
     def extract_answer(self, response: str) -> str:
         """
         Extract the core answer (e.g., content inside \boxed{}) from the model's full response.
