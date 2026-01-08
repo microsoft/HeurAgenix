@@ -53,14 +53,27 @@ class LocalModelClient(BaseLLMClient):
             add_generation_prompt=True,
             enable_thinking=self.think,
         )
-        response = self.pipeline(
-            text,
-            max_new_tokens=self.max_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            do_sample=True,
-            return_full_text=False,
-        )
+        
+        gen_kwargs = {
+            "max_new_tokens": self.max_tokens,
+            "return_full_text": False,
+        }
+        
+        # Prioritize 'do_sample' from config, otherwise infer from temperature
+        do_sample = self.config.get("do_sample")
+        if do_sample is None:
+            if self.temperature == 0:
+                do_sample = False
+            else:
+                do_sample = True
+                
+        gen_kwargs["do_sample"] = do_sample
+        
+        if do_sample:
+            gen_kwargs["temperature"] = self.temperature
+            gen_kwargs["top_p"] = self.top_p
+
+        response = self.pipeline(text, **gen_kwargs)
         response_content = response[0]["generated_text"].strip()
         return response_content
 

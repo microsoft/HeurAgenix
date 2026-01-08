@@ -31,13 +31,21 @@ class Math500Task(BaseTask):
 
     def format_prompt(self, problem_data: Dict) -> List[Dict]:
         """
-        Standard CoT prompt for Math problems.
+        Modified to include a system prompt enforcing the output format.
+        Most modern math models (DeepSeek, Qwen, Llama3) perform better with a system prompt.
         """
-        prompt_text = (
-            f"Problem:\n{problem_data['problem']}\n\n"
-            "Please solve the problem step by step and put your final answer within \\boxed{}."
+        system_content = (
+            "You are a helpful assistant who is good at mathematics. "
+            "Please solve the problem step by step. "
+            "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
+            "For example: The answer is \\boxed{5}."
         )
-        return [{"role": "user", "content": prompt_text}]
+        user_content = f"Problem:\n{problem_data['problem']}"
+        
+        return [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content}
+        ]
 
     def extract_answer(self, response: str) -> str:
         """

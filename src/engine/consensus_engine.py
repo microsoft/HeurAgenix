@@ -60,27 +60,19 @@ class ConsensusEngine:
         if not valid_responses:
             return "All agents failed to generate a response."
             
-        # Optimization: If we only have 1 client, return its response directly
-        if len(self.clients) == 1:
-            return valid_responses[0]
-
         # 2. Cross-Consistency Evaluation
         # Score(R_i) = Average NLL evaluated by peer agents
         
-        scores = []
-        print("\nStarting Cross-Consistency Evaluation...")
-        
+        scores = [0] * len(responses)
         for i, response_i in enumerate(responses):
-            if not response_i:
-                scores.append(float('inf'))
-                continue
+            scores[i] = float('-inf')  # Default to infinity for failed responses
             
             nll_sum = 0
             count = 0
             
             for j, client in enumerate(self.clients):
-                # Skip self-evaluation (Cross-Consistency)
-                if i == j:
+                # Skip self-evaluation (Cross-Consistency) unless only 1 agent exists (Self-Eval mode)
+                if i == j and len(self.clients) > 1:
                     continue
                 
                 try:
@@ -94,25 +86,22 @@ class ConsensusEngine:
             
             if count > 0:
                 avg_nll = nll_sum / count
-                scores.append(avg_nll)
-            else:
-                # Fallback if no peers evaluated (should not happen if len > 1 and no errors)
-                scores.append(float('inf'))
+                scores[i] = -avg_nll  # Lower NLL is better
 
         # 3. Consensus Aggregation
-        # Find the index with the minimum score (Lowest NLL = Best consistency)
+        # Find the index with the maximum score (Lowest NLL = Best consistency)
         best_idx = -1
-        min_score = float('inf')
+        max_score = float('-inf')
         
         for i, score in enumerate(scores):
             # print(f"Response {i}: Score (NLL) = {score:.4f}")
-            if score < min_score:
-                min_score = score
+            if score > max_score:
+                max_score = score
                 best_idx = i
         
         if best_idx != -1:
             best_response = responses[best_idx]
-            print(f"Selected Response {best_idx} with minimal NLL score {min_score:.4f}")
+            print(f"Selected Response {best_idx} with maximal NLL score {max_score:.4f}")
             return best_response
         else:
             return valid_responses[0] # Fallback

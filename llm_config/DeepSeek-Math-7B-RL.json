@@ -1,0 +1,12 @@
+{
+    "type": "local_model",
+    "name": "DeepSeek-Math-7B-RL",
+    "temperature": 0.0,
+    "do_sample": false,
+    "top-p": 1.0,
+    "max_tokens": 3072,
+    "model_path": "deepseek-ai/deepseek-math-7b-rl",
+    "think": false,
+    "max_attempts": 50,
+    "sleep_time": 10
+}

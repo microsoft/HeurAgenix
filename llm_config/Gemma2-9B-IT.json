@@ -1,0 +1,12 @@
+{
+    "type": "local_model",
+    "name": "Gemma2-9B-IT",
+    "temperature": 0.0,
+    "do_sample": false,
+    "top-p": 1.0,
+    "max_tokens": 4096,
+    "model_path": "google/gemma-2-9b-it",
+    "think": false,
+    "max_attempts": 50,
+    "sleep_time": 10
+}
