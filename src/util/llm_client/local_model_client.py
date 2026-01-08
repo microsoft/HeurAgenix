@@ -9,16 +9,16 @@ from src.util.llm_client.base_llm_client import BaseLLMClient
 class LocalModelClient(BaseLLMClient):
     def __init__(
             self,
-            config: dict,
-            prompt_dir: str=None,
-            output_dir: str=None,
+            config_path: str,
+            system_prompt: str = None,
         ):
-        super().__init__(config, prompt_dir, output_dir)
+        super().__init__(config_path, system_prompt)
+        
 
         if os.getenv("AMLT_DATA_DIR"):
-            self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(config['model_path']))
+            self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(self.config['model_path']))
         else:
-            self.model = os.path.normpath(config['model_path'])
+            self.model = os.path.normpath(self.config['model_path'])
 
         self.pipeline = transformers.pipeline(
             "text-generation",

@@ -27,9 +27,6 @@ class Math500Task(BaseTask):
     def get_dataset(self) -> List[Dict]:
         if self.data is None:
             # MATH-500 usually has a 'test' split
-            ds = load_dataset(self.dataset_name, split=self.subset)
-            ds = ds.filter(lambda x: x['level'] == 5)
-            ds = ds.select(range(10))  # Ensure we load all data
             self.data = []
             for item in ds:
                 # MATH-500 structure: 'problem', 'solution', 'answer', 'subject', 'level'

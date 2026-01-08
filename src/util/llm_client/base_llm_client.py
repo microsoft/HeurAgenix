@@ -7,29 +7,30 @@ from typing import Dict, List, Tuple
 class BaseLLMClient:
     def __init__(
             self,
-            config: dict,
-            prompt_dir: str=None,
-            output_dir: str=None,
+            config_path: str,
+            system_prompt: str = None
         ):
-        self.prompt_dir = prompt_dir
-        self.output_dir = output_dir
-        self.config = config
+        self.config = self.load_config(config_path)
         
-        self.name = config.get("name", "unknown_model")
-        self.top_p = config.get("top-p", 0.7)
-        self.temperature = config.get("temperature", 0.95)
-        self.max_tokens = config.get("max_tokens", 3200)
-        self.seed = config.get("seed", None)
-        self.think = config.get("think", False)
-        self.max_attempts = config.get("max_attempts", 50)
-        self.sleep_time = config.get("sleep_time", 60)
-        self.reset(output_dir)
+        
+        self.name = self.config.get("name", "unknown_model")
+        self.top_p = self.config.get("top-p", 0.7)
+        self.temperature = self.config.get("temperature", 0.95)
+        self.max_tokens = self.config.get("max_tokens", 3200)
+        self.seed = self.config.get("seed", None)
+        self.think = self.config.get("think", False)
+        self.max_attempts = self.config.get("max_attempts", 50)
+        self.sleep_time = self.config.get("sleep_time", 60)
+        if system_prompt:
+            self.system_prompt = system_prompt
+            self.messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt}]}]
+        else:
+            self.messages = []
+            self.system_prompt = None
 
-    def reset(self, output_dir:str=None) -> None:
-        self.messages = []
-        if output_dir is not None:
-            self.output_dir = output_dir
-            os.makedirs(output_dir, exist_ok=True)
+    def load_config(self, config_path: str) -> Dict:
+        with open(config_path, 'r') as f:
+            return json.load(f)
 
     def chat_once(self) -> str:
         pass
@@ -76,3 +77,46 @@ class BaseLLMClient:
         Calculate the average NLL of the response given the conversation context.
         """
         raise NotImplementedError("get_sequence_score is not implemented for this client.")
+
+    def reset(self, system_prompt: str = None) -> None:
+        """Clears history and optionally sets a new system prompt."""
+        self.messages = []
+        self.system_prompt = system_prompt
+        if self.system_prompt:
+            self.messages = [{"role": "system", "content": [{"type": "text", "text": self.system_prompt}]}]
+
+    def add_message(self, content, role: str = "user") -> None:
+        """Appends a single message to history."""
+        self.messages.append({"role": role, "content": [{"type": "text", "text": content}]})
+
+    def set_history(self, messages: List[Dict]) -> None:
+        """Replaces current history with provided messages."""
+        # 1. Try to find system prompt in the new messages
+        # We need to extract the string content, handling the list-of-dicts format if present
+        sys_prompt = None
+        for m in messages:
+            if m["role"] == "system":
+                c = m["content"]
+                if isinstance(c, list) and len(c) > 0 and isinstance(c[0], dict):
+                    sys_prompt = c[0].get("text")
+                elif isinstance(c, str):
+                    sys_prompt = c
+                break
+        
+        # 2. Reset with that prompt
+        self.reset(sys_prompt)
+        
+        # 3. Append non-system messages
+        for m in messages:
+            if m["role"] != "system":
+                # Extract content string
+                content_str = ""
+                c = m["content"]
+                if isinstance(c, list):
+                    for part in c:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            content_str += part.get("text", "")
+                elif isinstance(c, str):
+                    content_str = c
+                
+                self.add_message(content_str, m["role"])

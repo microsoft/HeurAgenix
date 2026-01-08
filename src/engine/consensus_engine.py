@@ -3,13 +3,13 @@ from src.util.llm_client.base_llm_client import BaseLLMClient
 from src.util.llm_client.local_model_client import LocalModelClient
 
 class ConsensusEngine:
-    def __init__(self, client_configs: List[Dict], output_dir: str = None):
+    def __init__(self, client_config_paths: List[str], output_dir: str = None):
         self.clients: List[BaseLLMClient] = []
-        for config in client_configs:
+        for config_path in client_config_paths:
             # Initialize clients based on config
             # Currently defaults to LocalModelClient
             # TODO: Add logic to choose different clients based on config['type']
-            client = LocalModelClient(config, output_dir=output_dir)
+            client = LocalModelClient(config_path, output_dir=output_dir)
             self.clients.append(client)
         
         print(f"Initialized ConsensusEngine with {len(self.clients)} clients.")
@@ -35,8 +35,8 @@ class ConsensusEngine:
         print(f"Starting consensus generation with {len(self.clients)} agents...")
 
         for i, client in enumerate(self.clients):
-            # Use deepcopy to avoid modifying the original messages list for other clients
-            client.messages = copy.deepcopy(messages)
+            # Use set_history to safely copy and set the context for the agent
+            client.set_history(messages)
             try:
                 # chat() returns the response content and appends to client.messages
                 # We use chat() to get retry logic handling
