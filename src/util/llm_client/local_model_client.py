@@ -30,9 +30,9 @@ class LocalModelClient(BaseLLMClient):
             model=self.model,
             model_kwargs={
                 "torch_dtype": torch.bfloat16,
-                "trust_remote_code": True,
             },
             device_map=device_map,
+            trust_remote_code=True,
         )
 
     def _merge_system_role(self, messages: List[Dict]) -> List[Dict]:

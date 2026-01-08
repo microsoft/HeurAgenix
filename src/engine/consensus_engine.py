@@ -27,8 +27,6 @@ class ConsensusEngine:
         # 1. Generate responses from all agents
         responses = []
 
-        print(f"Starting consensus generation with {len(self.clients)} agents...")
-
         for i, client in enumerate(self.clients):
             client.reset()
             # Use set_history to safely copy and set the context for the agent
@@ -40,10 +38,10 @@ class ConsensusEngine:
                 if response_content:
                     responses.append(response_content)
                 else:
-                    print(f"Agent {i} ({client.name}) returned no content.")
+                    print(f"Agent {i} ({client.name}) returned no content.", flush=True)
                     responses.append("")
             except Exception as e:
-                print(f"Agent {i} ({client.name}) failed to generate: {e}")
+                print(f"Agent {i} ({client.name}) failed to generate: {e}", flush=True)
                 responses.append("")
 
         # filter out empty responses for checking if we have any valid response
@@ -71,7 +69,7 @@ class ConsensusEngine:
                     nll_sum += nll
                     count += 1
                 except Exception as e:
-                    print(f"Agent {j} ({client.name}) failed to evaluate Response {i}: {e}")
+                    print(f"Agent {j} ({client.name}) failed to evaluate Response {i}: {e}", flush=True)
             
             if count > 0:
                 avg_nll = nll_sum / count
@@ -83,14 +81,13 @@ class ConsensusEngine:
         max_score = float('-inf')
         
         for i, score in enumerate(scores):
-            # print(f"Response {i}: Score (NLL) = {score:.4f}")
             if score > max_score:
                 max_score = score
                 best_idx = i
         
         if best_idx != -1:
             best_response = responses[best_idx]
-            print(f"Selected Response {best_idx} with maximal NLL score {max_score:.4f}")
+            print(f"Selected Response {best_idx} with maximal NLL score {max_score:.4f}", flush=True)
             return best_response
         else:
             return valid_responses[0]

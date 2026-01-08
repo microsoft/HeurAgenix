@@ -32,10 +32,10 @@ def run_consensus_evaluation(
     output_dir = os.path.join(base_output_dir, exp_name)
     os.makedirs(output_dir, exist_ok=True)
     
-    print(f"--- Consensus Evaluation ---")
-    print(f"Model Configs: {model_config_paths}")
-    print(f"Task: {task_name} ({subset})")
-    print(f"Output Directory: {output_dir}")
+    print(f"--- Consensus Evaluation ---", flush=True)
+    print(f"Model Configs: {model_config_paths}", flush=True)
+    print(f"Task: {task_name} ({subset})", flush=True)
+    print(f"Output Directory: {output_dir}", flush=True )
 
     task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
     task = task_class(subset=subset)
@@ -102,8 +102,8 @@ def run_consensus_evaluation(
 
     # 3. Summary & Save
     final_acc = (correct_count / total_count) * 100
-    print(f"\n--- Evaluation Complete ---")
-    print(f"Final Accuracy: {final_acc:.2f}%")
+    print(f"\n--- Evaluation Complete ---", flush=True)
+    print(f"Final Accuracy: {final_acc:.2f}%", flush=True)
     
     # Get configs from engine clients for logging
     configs = [client.config for client in engine.clients]
@@ -123,7 +123,7 @@ def run_consensus_evaluation(
             "details": results
         }, f, indent=2)
     
-    print(f"Results saved to {result_file}")
+    print(f"Results saved to {result_file}", flush=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")

@@ -42,7 +42,7 @@ class BaseLLMClient:
                 self.messages.append({"role": "assistant", "content": response_content})
                 return response_content
             except Exception as e:
-                print(f"Try to chat {index + 1} time: {e}")
+                print(f"Try to chat {index + 1} time: {e}", flush=True)
                 sleep_time = self.sleep_time
                 sleep(sleep_time)
         self.messages.append({"role": "assistant", "content": "Exceeded the maximum number of attempts"})
@@ -52,7 +52,7 @@ class BaseLLMClient:
     def dump(self, output_path: str=None) -> str:
         json_output_file = output_path.replace(".txt", ".json")
         text_output_file = output_path.replace(".json", ".txt")
-        print(f"Chat dumped to {text_output_file}")
+        print(f"Chat dumped to {text_output_file}", flush=True)
         with open(json_output_file, "w") as fp:
             json.dump(self.messages, fp, indent=4)
 
