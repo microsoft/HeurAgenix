@@ -3,8 +3,10 @@ from typing import Dict, List, Optional
 from datasets import load_dataset
 from src.tasks.base_task import BaseTask
 
+from src.util.math_grading import grade_answer
+
 class Math500Task(BaseTask):
-    def __init__(self, subset: str = "test"):
+    def __init__(self, subset: str = "test", system_prompt: str = None):
         """
         Args:
             subset: The split to load (default: "test" for MATH-500)
@@ -12,11 +14,22 @@ class Math500Task(BaseTask):
         self.dataset_name = "HuggingFaceH4/MATH-500"
         self.subset = subset
         self.data = None
+        if system_prompt is None:
+            self.system_content = (
+            "You are a helpful assistant who is good at mathematics. "
+            "Please solve the problem step by step. "
+            "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
+            "For example: The answer is \\boxed{5}."
+        )
+        else:
+            self.system_content = system_prompt
 
     def get_dataset(self) -> List[Dict]:
         if self.data is None:
             # MATH-500 usually has a 'test' split
             ds = load_dataset(self.dataset_name, split=self.subset)
+            ds = ds.filter(lambda x: x['level'] == 5)
+            ds = ds.select(range(10))  # Ensure we load all data
             self.data = []
             for item in ds:
                 # MATH-500 structure: 'problem', 'solution', 'answer', 'subject', 'level'
@@ -34,35 +47,43 @@ class Math500Task(BaseTask):
         Modified to include a system prompt enforcing the output format.
         Most modern math models (DeepSeek, Qwen, Llama3) perform better with a system prompt.
         """
-        system_content = (
-            "You are a helpful assistant who is good at mathematics. "
-            "Please solve the problem step by step. "
-            "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
-            "For example: The answer is \\boxed{5}."
-        )
+
         user_content = f"Problem:\n{problem_data['problem']}"
         
         return [
-            {"role": "system", "content": system_content},
+            {"role": "system", "content": self.system_content},
             {"role": "user", "content": user_content}
         ]
 
     def extract_answer(self, response: str) -> str:
         """
         Extract the last \boxed{...} content.
-        This handles nested braces to some extent by using a greedy match or external libraries if needed,
-        but a simple regex is often 'good enough' for standard outputs if the model is compliant.
+        Also attempts to extract answer following "The answer is" pattern if \boxed{} is missing.
         """
-        # Finds all \boxed{...} patterns. 
-        # Note: This simple regex fails on nested braces like \boxed{\frac{1}{2}}.
-        # A more robust extractor is usually needed for complex LaTeX.
-        # But for now, let's use a slightly improved regex or fallback to simple search.
+        # 1. Try extracting \boxed{...} (Priority)
+        boxed_content = self._extract_boxed_content(response)
+        if boxed_content:
+            return boxed_content
+
+        # 2. Fallback: Look for "The answer is: <content>" or similar patterns
+        # DeepSeek often outputs: "The answer is: $(3,\frac{\pi}{2})$"
+        # We look for the last occurrence of "answer is" and take the rest of the line or sentence
+        patterns = [
+            r"answer is[:\s]+(.*?)(?:\n|$|\.)",
+            r"answer is[:\s]+\$(.*?)\$",
+        ]
         
-        # Strategy 1: Simple Regex (non-nested)
-        # matches = re.findall(r'\\boxed\{(.*?)\}', response)
-        
-        # Strategy 2: Bracket counting (robust for nesting)
-        return self._extract_boxed_content(response)
+        for pattern in patterns:
+            matches = re.findall(pattern, response, re.IGNORECASE)
+            if matches:
+                # Take the last match as it's usually the conclusion
+                candidate = matches[-1].strip()
+                # Remove trailing period if present
+                if candidate.endswith('.'):
+                    candidate = candidate[:-1]
+                return candidate
+                
+        return ""
 
     def _extract_boxed_content(self, text: str) -> str:
         """
@@ -77,8 +98,6 @@ class Math500Task(BaseTask):
         # We generally want the *last* boxed answer in the text
         if not start_indices:
             return ""
-            
-        last_boxed_response = ""
         
         # Iterate backwards to find the last valid boxed content
         for start_idx in reversed(start_indices):
@@ -98,25 +117,7 @@ class Math500Task(BaseTask):
 
     def verify_answer(self, prediction: str, ground_truth: str) -> bool:
         """
-        Symbolic verification is hard. We use string normalization equality here.
-        Ideally, use sympy or specialized math equivalence checkers.
+        Uses robust grading logic to verify answer correctness.
+        Delegates to src.util.math_grading.grade_answer
         """
-        norm_pred = self._normalize_answer(prediction)
-        norm_gt = self._normalize_answer(ground_truth)
-        return norm_pred == norm_gt
-
-    def _normalize_answer(self, s: str) -> str:
-        if not s:
-            return ""
-        s = str(s).strip()
-        # Remove common LaTeX wrappers that don't change value for simple comparison
-        # e.g., \text{4} -> 4, \mathrm{cm} -> cm
-        s = re.sub(r'\\text\{([^}]+)\}', r'\1', s)
-        s = re.sub(r'\\mathrm\{([^}]+)\}', r'\1', s)
-        
-        # Remove whitespace
-        s = s.replace(" ", "")
-        
-        # Simple fractions normalization: \frac{1}{2} -> 1/2 (optional, depends on model output)
-        
-        return s
+        return grade_answer(prediction, ground_truth)

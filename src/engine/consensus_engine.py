@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from src.util.llm_client.base_llm_client import BaseLLMClient
 from src.util.llm_client.local_model_client import LocalModelClient
 
@@ -14,7 +14,7 @@ class ConsensusEngine:
         
         print(f"Initialized ConsensusEngine with {len(self.clients)} clients.")
 
-    def decide(self, messages: List[Dict]) -> str:
+    def decide(self, messages: List[Dict]) -> Tuple[str, int]:
         """
         Main entry point for the consensus mechanism.
         
@@ -22,17 +22,15 @@ class ConsensusEngine:
             messages: The context/prompt messages.
             
         Returns:
-            The best response text selected by the engine.
+            The best response text selected by the engine with target client index.
         """
         import copy
 
         if not self.clients:
-            return "No clients available."
+            return "No clients available.", -1
         
         # 1. Generate responses from all agents
         responses = []
-        # Store (client_index, response_text) tuples to track who generated what
-        generated_responses = [] 
 
         print(f"Starting consensus generation with {len(self.clients)} agents...")
 
@@ -45,15 +43,12 @@ class ConsensusEngine:
                 response_content = client.chat()
                 if response_content:
                     responses.append(response_content)
-                    generated_responses.append((i, response_content))
                 else:
                     print(f"Agent {i} ({client.name}) returned no content.")
                     responses.append("")
-                    generated_responses.append((i, ""))
             except Exception as e:
                 print(f"Agent {i} ({client.name}) failed to generate: {e}")
                 responses.append("")
-                generated_responses.append((i, ""))
 
         # filter out empty responses for checking if we have any valid response
         valid_responses = [r for r in responses if r]
@@ -65,16 +60,14 @@ class ConsensusEngine:
         
         scores = [0] * len(responses)
         for i, response_i in enumerate(responses):
-            scores[i] = float('-inf')  # Default to infinity for failed responses
-            
             nll_sum = 0
             count = 0
             
             for j, client in enumerate(self.clients):
-                # Skip self-evaluation (Cross-Consistency) unless only 1 agent exists (Self-Eval mode)
-                if i == j and len(self.clients) > 1:
+                # Skip self-evaluation (Cross-Consistency)
+                if i == j:
                     continue
-                
+
                 try:
                     # We pass the ORIGINAL PROMPT (messages) and the CANDIDATE RESPONSE (response_i)
                     # get_sequence_score calculates NLL(response | context)
@@ -102,6 +95,6 @@ class ConsensusEngine:
         if best_idx != -1:
             best_response = responses[best_idx]
             print(f"Selected Response {best_idx} with maximal NLL score {max_score:.4f}")
-            return best_response
+            return best_response, best_idx
         else:
-            return valid_responses[0] # Fallback
+            return valid_responses[0], 0

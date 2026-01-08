@@ -27,6 +27,36 @@ class LocalModelClient(BaseLLMClient):
             device_map="auto",
         )
 
+    def _merge_system_role(self, messages: List[Dict]) -> List[Dict]:
+        """
+        Merge system messages into the first user message.
+        """
+        new_messages = []
+        system_content_parts = []
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                system_content_parts.append(msg["content"])
+            else:
+                new_messages.append(msg)
+        
+        if not system_content_parts:
+            return messages
+            
+        system_text = "\n\n".join(system_content_parts)
+        
+        # Find first user message
+        for i, msg in enumerate(new_messages):
+            if msg["role"] == "user":
+                # Create a copy to avoid mutating original
+                new_msg = msg.copy()
+                new_msg["content"] = system_text + "\n\n" + msg["content"]
+                new_messages[i] = new_msg
+                return new_messages
+        
+        # If no user message found, prepend as user message (fallback)
+        return [{"role": "user", "content": system_text}] + new_messages
+
     def _format_messages(self, messages: List[Dict]) -> List[Dict]:
         format_messages = []
         for m in messages:
@@ -47,12 +77,25 @@ class LocalModelClient(BaseLLMClient):
     def chat_once(self) -> str:
         format_messages = self._format_messages(self.messages)
 
-        text = self.pipeline.tokenizer.apply_chat_template(
-            format_messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=self.think,
-        )
+        try:
+            text = self.pipeline.tokenizer.apply_chat_template(
+                format_messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=self.think,
+            )
+        except Exception as e:
+            # Fallback for models not supporting system role (e.g. Gemma)
+            if "system" in str(e).lower() and ("role" in str(e).lower() or "support" in str(e).lower()):
+                 format_messages = self._merge_system_role(format_messages)
+                 text = self.pipeline.tokenizer.apply_chat_template(
+                    format_messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=self.think,
+                )
+            else:
+                raise e
         
         gen_kwargs = {
             "max_new_tokens": self.max_tokens,
@@ -81,12 +124,25 @@ class LocalModelClient(BaseLLMClient):
         format_messages = self._format_messages(conversation)
 
         # Apply chat template to get the prompt part
-        prompt_text = self.pipeline.tokenizer.apply_chat_template(
-            format_messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=self.think,
-        )
+        try:
+            prompt_text = self.pipeline.tokenizer.apply_chat_template(
+                format_messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=self.think,
+            )
+        except Exception as e:
+            # Fallback for models not supporting system role
+            if "system" in str(e).lower() and ("role" in str(e).lower() or "support" in str(e).lower()):
+                format_messages = self._merge_system_role(format_messages)
+                prompt_text = self.pipeline.tokenizer.apply_chat_template(
+                    format_messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=self.think,
+                )
+            else:
+                raise e
         
         # Tokenize prompt and full text (prompt + choice)
         prompt_ids = self.pipeline.tokenizer(prompt_text, return_tensors="pt").input_ids

@@ -83,7 +83,7 @@ def run_consensus_evaluation(
         # The engine is responsible for coordinating multiple models
         try:
             start_time = time.time()
-            best_response = engine.decide(messages) 
+            best_response, best_idx = engine.decide(messages) 
             elapsed = time.time() - start_time
         except Exception as e:
             print(f"\nError processing sample {i}: {e}")
@@ -98,6 +98,20 @@ def run_consensus_evaluation(
         if is_correct:
             correct_count += 1
         total_count += 1
+        
+        # Log Result
+        results.append({
+            "problem": item.get('problem', ''),
+            "ground_truth": ground_truth,
+            "messages": messages, # Log inputs/system prompt for debug
+            "response": best_response,
+            "prediction": prediction,
+            "model": model_config_paths[best_idx] if best_idx != -1 else None,
+            "is_correct": is_correct,
+            "time_taken": elapsed
+        })
+        
+        pbar.set_description(f"Acc: {correct_count/total_count:.2%} ({correct_count}/{total_count})")
         
         # Record result
         result_entry = {
