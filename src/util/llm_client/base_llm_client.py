@@ -35,10 +35,10 @@ class BaseLLMClient:
     def chat_once(self) -> str:
         pass
 
-    def chat(self) -> str:
+    def chat(self, continue_prefix: str = None) -> str:
         for index in range(self.max_attempts):
             try:
-                response_content = self.chat_once()
+                response_content = self.chat_once(continue_prefix=continue_prefix)
                 self.messages.append({"role": "assistant", "content": response_content})
                 return response_content
             except Exception as e:
@@ -68,7 +68,7 @@ class BaseLLMClient:
                 file.write(contents + "\n------------------------------------------------------------------------------------\n\n")
         return self.messages[-1]["content"][0]["text"]
 
-    def chat_once(self) -> str:
+    def chat_once(self, continue_prefix: str = None) -> str:
         raise NotImplemented
 
     def get_sequence_score(self, conversation: List[Dict], response: str) -> float:

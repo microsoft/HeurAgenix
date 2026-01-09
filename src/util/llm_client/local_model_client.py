@@ -73,7 +73,12 @@ class LocalModelClient(BaseLLMClient):
         """
         return messages
 
-    def chat_once(self) -> str:
+    def chat_once(self, continue_prefix: str = None) -> str:
+        # Check if the last message is assistant. If so, and we want to continue, 
+        # we might need to handle it specially.
+        # But our agreed approach is: continue_prefix comes from outside, 
+        # unrelated to self.messages structure for flexibility.
+        
         format_messages = self._format_messages(self.messages)
 
         try:
@@ -96,6 +101,11 @@ class LocalModelClient(BaseLLMClient):
             else:
                 raise e
         
+        # KEY CHANGE: Append prefix manually if provided
+        # This bypasses the template's closing tokens for the previous turn
+        if continue_prefix:
+            text += continue_prefix
+        
         gen_kwargs = {
             "max_new_tokens": self.max_tokens,
             "return_full_text": False,
@@ -116,7 +126,17 @@ class LocalModelClient(BaseLLMClient):
             gen_kwargs["top_p"] = self.top_p
 
         response = self.pipeline(text, **gen_kwargs)
-        response_content = response[0]["generated_text"].strip()
+        if continue_prefix:
+             # If we manually appended a prefix, the pipeline output *might* not include it 
+             # (depends on return_full_text=False). 
+             # Usually return_full_text=False returns ONLY new tokens.
+             # So we should just return the new part.
+             pass
+             
+        response_content = response[0]["generated_text"]
+        # Don't strip immediately if we rely on whitespace continuity, but usually safe.
+        # Although for math, if prefix ends in "The", generated " answer" (with space).
+        # We'll leave it as is for now.
         return response_content
 
     def get_sequence_score(self, conversation: List[Dict], response: str) -> float:

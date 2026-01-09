@@ -4,10 +4,8 @@ import argparse
 import sys
 import time
 from tqdm import tqdm
-from typing import List, Dict, Type
+from typing import List, Type
 
-# Ensure src is in python path
-sys.path.append(os.getcwd())
 
 from src.engine.consensus_engine import ConsensusEngine
 from src.tasks.math500_task import Math500Task
@@ -60,7 +58,7 @@ def run_consensus_evaluation(
         # Engine Decision
         # The engine is responsible for coordinating multiple models
         start_time = time.time()
-        best_response = engine.decide(problem) 
+        best_response = engine.decide(problem, max_step=50) 
         elapsed = time.time() - start_time
         
         # Extract & Verify
@@ -131,14 +129,14 @@ def run_consensus_evaluation(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")
     # Allow multiple config files
-    parser.add_argument("-c", "--configs", type=str, nargs='+', required=True, help="Paths to LLM config jsons (space separated)")
+    parser.add_argument("-c", "--configs", type=str, required=True, help="Paths to LLM config jsons (comma separated)")
     parser.add_argument("-t", "--task", type=str, default="math500", help="Task name")
     parser.add_argument("-e", "--exp_name", type=str, default="", help="Experiment name (default: timestamp)")
 
     args = parser.parse_args()
     
     run_consensus_evaluation(
-        args.configs,
+        args.configs.split(","),
         args.task,
         exp_name=args.exp_name
     )

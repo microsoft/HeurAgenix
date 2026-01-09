@@ -16,11 +16,15 @@ class Math500Task(BaseTask):
         self.data = None
         if system_prompt is None:
             self.system_prompt = (
-            "You are a helpful assistant who is good at mathematics. "
-            "Please solve the problem step by step. "
-            "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
-            "For example: The answer is \\boxed{5}."
-        )
+                "You are a helpful assistant who is good at mathematics. "
+                "Please solve the problem step by step. "
+                "CRITICAL: You must enclose every individual logical step within <step> and </step> tags. "
+                "Do not output any text outside of these tags. "
+                "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
+                "For example: "
+                "<step>First, we calculate...</step>"
+                "<step>The answer is \\boxed{5}.</step>"
+            )
         else:
             self.system_prompt = system_prompt
 
