@@ -30,9 +30,9 @@ class Math500Task(BaseTask):
             amlt_data_dir = os.getenv("AMLT_DATA_DIR")
             if amlt_data_dir:
                  dataset_path = os.path.join(amlt_data_dir, self.dataset_name)
-                 dataset = load_from_disk(dataset_path)[self.subset].select(range(5))
+                 dataset = load_from_disk(dataset_path)[self.subset]
             else:
-                 dataset = load_dataset(self.dataset_name, split=self.subset).select(range(5))  # For faster testing, limit to first 100 samples
+                 dataset = load_dataset(self.dataset_name, split=self.subset)
 
             self.data = []
             for item in dataset:

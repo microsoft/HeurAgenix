@@ -87,7 +87,6 @@ class ConsensusEngine:
         
         if best_idx != -1:
             best_response = responses[best_idx]
-            print(f"Selected Response {best_idx} with maximal NLL score {max_score:.4f}", flush=True)
             return best_response
         else:
             return valid_responses[0]

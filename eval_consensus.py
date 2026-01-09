@@ -35,7 +35,7 @@ def run_consensus_evaluation(
     print(f"--- Consensus Evaluation ---", flush=True)
     print(f"Model Configs: {model_config_paths}", flush=True)
     print(f"Task: {task_name} ({subset})", flush=True)
-    print(f"Output Directory: {output_dir}", flush=True )
+    print(f"Output Directory: {output_dir}", flush=True)
 
     task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
     task = task_class(subset=subset)
