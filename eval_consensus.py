@@ -73,24 +73,12 @@ def run_consensus_evaluation(
         total_count += 1
         
         # Log Result
-        results.append({
+        result_entry = {
             "system_prompt": task.system_prompt,
             "problem": problem,
             "ground_truth": ground_truth,
             "response": best_response,
             "prediction": prediction,
-            "is_correct": is_correct,
-            "time_taken": elapsed
-        })
-        
-        pbar.set_description(f"Acc: {correct_count/total_count:.2%} ({correct_count}/{total_count})")
-        
-        # Record result
-        result_entry = {
-            "problem": item["problem"],
-            "ground_truth": ground_truth,
-            "prediction": prediction,
-            "response": best_response,
             "is_correct": is_correct,
             "time_taken": elapsed
         }
@@ -108,13 +96,20 @@ def run_consensus_evaluation(
     # Get configs from engine clients for logging
     configs = [client.config for client in engine.clients]
     
-    # Generate a run name based on number of models
-    result_file = os.path.join(output_dir, f"results.json")
+    # Generate filenames
+    metrics_file = os.path.join(output_dir, "metrics.json")
+    generations_file = os.path.join(output_dir, "generations.json")
     
-    # Generate a run name based on number of models - using len(configs)
-    # result_file = os.path.join(output_dir, f"consensus_{len(configs)}models_{task_name}_results.json")
+    generation_details = []
+    for item in results:
+        generation_details.append({
+            "system_prompt": item["system_prompt"],
+            "problem": item["problem"],
+            "response": item["response"],
+            "ground_truth": item["ground_truth"]
+        })
 
-    with open(result_file, 'w') as f:
+    with open(metrics_file, 'w') as f:
         json.dump({
             "configs": configs,
             "task": task_name,
@@ -122,8 +117,16 @@ def run_consensus_evaluation(
             "total": total_count,
             "details": results
         }, f, indent=2)
+        
+    with open(generations_file, 'w') as f:
+        json.dump({
+            "configs": configs,
+            "task": task_name,
+            "details": generation_details
+        }, f, indent=2)
     
-    print(f"Results saved to {result_file}", flush=True)
+    print(f"Generations saved to {generations_file}", flush=True)
+    print(f"Metrics saved to {metrics_file}", flush=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")
