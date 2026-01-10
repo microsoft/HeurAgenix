@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 from typing import List, Dict, Tuple
 from src.engine.strategy.base_strategy import BaseStrategy
 from src.engine.engine import SwarmEngine
@@ -40,6 +41,7 @@ class ConsensusValueStrategy(BaseStrategy):
 
         # --- Step 1: Broad Search (First Layer Generation) ---
         # Generate N candidates R_i
+        logging.info("  [ConsensusValue] Generating hypothetical next states...")
         layer1_candidates = engine.generate_candidates(problem, current_cot_text)
         
         if not layer1_candidates:
@@ -54,6 +56,8 @@ class ConsensusValueStrategy(BaseStrategy):
         # We should probably prioritize it or treat it specially.
         # For now, let's just evaluate it normally (generation might fail or return nothing, 
         # but scoring handles that).
+        
+        logging.info(f"  [ConsensusValue] Evaluating {len(layer1_candidates)} hypothetical states...")
 
         for i, cand_r in enumerate(layer1_candidates):
             # Hypothetical State S_i
@@ -72,7 +76,7 @@ class ConsensusValueStrategy(BaseStrategy):
                     # It's a terminal state, give it a high bonus if it's consistent?
                     # For simplicity, if terminal, we assign a heuristic score (0.0 implies perfect?)
                     # Let's treating it as "Perfect Consensus" if it terminates.
-                    print(f"    State {i} is terminal.", flush=True)
+                    logging.info(f"    State {i} is terminal.")
                     state_values.append(0.0) 
                     continue
                 else:
@@ -123,12 +127,10 @@ class ConsensusValueStrategy(BaseStrategy):
                 # If future is chaotic, mean NLL is high -> Bad state.
                 state_values.append(np.mean(layer2_step_scores))
 
-            # Debug Log per state
-            # print(f"    State {i} Value: {state_values[-1]:.4f} | '{cand_r[:30]}...'", flush=True)
 
         # --- Step 4: Selection ---
         if not state_values or min(state_values) == float('inf'):
-             print("  [ConsensusValue] No valid futures. Fallback to greedy/first.", flush=True)
+             logging.info("  [ConsensusValue] No valid futures. Fallback to greedy/first.")
              best_idx = 0
              # Fallback check
              if not layer1_candidates:
@@ -139,12 +141,12 @@ class ConsensusValueStrategy(BaseStrategy):
         best_step = layer1_candidates[best_idx]
         best_val = state_values[best_idx] if best_idx < len(state_values) else -1
         
-        print("Candidates (Values):", flush=True)
+        logging.info("Candidates (Values):")
         for i, cand in enumerate(layer1_candidates):
-            preview = cand.replace('\\n', ' ')[:100]
+            preview = cand.replace('\\n', ' ')
             marker = "*" if i == best_idx else " "
             val = state_values[i] if i < len(state_values) else -1
-            print(f"  [state={val:.4f}, {marker}] {preview}...", flush=True)
+            logging.info(f"  [state={val:.4f}, {marker}] {preview}")
 
         # 5. Update Real States
         new_history = history_parts + [best_step]

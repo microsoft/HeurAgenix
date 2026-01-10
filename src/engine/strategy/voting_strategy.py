@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 from typing import List, Dict, Tuple
 from src.engine.strategy.base_strategy import BaseStrategy
 from src.engine.engine import SwarmEngine
@@ -75,19 +76,19 @@ class VotingStrategy(BaseStrategy):
 
         # 4. Select
         if not final_scores or min(final_scores) == float('inf'):
-            print("  [Voting] No valid scores, picking first.", flush=True)
+            logging.info("  [Voting] No valid scores, picking first.")
             best_step = step_candidates[0]
             best_idx = 0
         else:
             best_idx = np.argmin(final_scores)
             best_step = step_candidates[best_idx]
         
-        print("Candidates:", flush=True)
+        logging.info("Candidates:")
         for i, cand in enumerate(step_candidates):
-            preview = cand.replace('\\n', ' ')[:100]
+            preview = cand.replace('\\n', ' ')
             marker = "*" if i == best_idx else " "
             sc = final_scores[i] if i < len(final_scores) else -1
-            print(f"  [avg_nll={sc:.4f}, {marker}] {preview}...", flush=True)
+            logging.info(f"  [avg_nll={sc:.4f}, {marker}] {preview}")
 
         # 5. Update States for the *chosen* path
         new_history = history_parts + [best_step]

@@ -3,6 +3,7 @@ import json
 import argparse
 import sys
 import time
+import logging
 from tqdm import tqdm
 from typing import List, Type
 
@@ -36,11 +37,30 @@ def run_consensus_evaluation(
     output_dir = os.path.join(base_output_dir, exp_name)
     os.makedirs(output_dir, exist_ok=True)
     
-    print(f"--- Consensus Evaluation ---", flush=True)
-    print(f"Model Configs: {model_config_paths}", flush=True)
-    print(f"Task: {task_name} ({subset})", flush=True)
-    print(f"Strategy: {strategy_name}", flush=True)
-    print(f"Output Directory: {output_dir}", flush=True)
+    # Setup Logging
+    log_file = os.path.join(output_dir, "run.log")
+    
+    # Remove existing handlers if any (to avoid duplicate logs if run multiple times in same session)
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+            
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(message)s',
+        handlers=[
+            logging.FileHandler(log_file, mode='w', encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"--- Evaluation ---")
+    logger.info(f"Model Configs: {model_config_paths}")
+    logger.info(f"Task: {task_name} ({subset})")
+    logger.info(f"Strategy: {strategy_name}")
+    logger.info(f"Output Directory: {output_dir}")
 
     task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
     task = task_class(subset=subset)
@@ -106,8 +126,8 @@ def run_consensus_evaluation(
 
     # 3. Summary & Save
     final_acc = (correct_count / total_count) * 100
-    print(f"\n--- Evaluation Complete ---", flush=True)
-    print(f"Final Accuracy: {final_acc:.2f}%", flush=True)
+    logger.info(f"\n--- Evaluation Complete ---")
+    logger.info(f"Final Accuracy: {final_acc:.2f}%")
     
     # Get configs from engine clients for logging
     configs = [client.config for client in engine.clients]
@@ -143,8 +163,9 @@ def run_consensus_evaluation(
             "details": generation_details
         }, f, indent=2)
     
-    print(f"Generations saved to {generations_file}", flush=True)
-    print(f"Metrics saved to {metrics_file}", flush=True)
+    logger.info(f"Generations saved to {generations_file}")
+    logger.info(f"Metrics saved to {metrics_file}")
+    logger.info(f"Log saved to {log_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")

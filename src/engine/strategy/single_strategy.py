@@ -1,3 +1,4 @@
+import logging
 from typing import List, Dict, Tuple
 from src.engine.strategy.base_strategy import BaseStrategy
 from src.engine.engine import SwarmEngine
@@ -43,8 +44,8 @@ class SingleStrategy(BaseStrategy):
         best_step = step_candidates[0]
         
         # Debug Log
-        preview = best_step.replace('\\n', ' ')[:100]
-        print(f"  [Single] {preview}...", flush=True)
+        preview = best_step.replace('\\n', ' ')
+        logging.info(f"  [Single] {preview}")
 
         # 2. Update States
         # We still need to update states to keep the 'token_len' correct 

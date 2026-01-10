@@ -1,4 +1,5 @@
 import time
+import logging
 from typing import List, Type
 from src.engine.engine import SwarmEngine
 from src.engine.strategy.base_strategy import BaseStrategy
@@ -17,7 +18,7 @@ class ValidatingSolver:
         """
         Main loop.
         """
-        print(f"\n[Solver] Problem: {problem[:50]}...", flush=True)
+        logging.info(f"\n[Solver] Problem: {problem}")
         
         # Init Client States
         # Should correspond to empty history
@@ -28,7 +29,7 @@ class ValidatingSolver:
         history_parts = []
         
         for step_idx in range(max_steps):
-            print(f"\n--- Step {step_idx + 1} ---", flush=True)
+            logging.info(f"\n--- Step {step_idx + 1} ---")
             
             # Strategy Decision
             best_step, new_states = self.strategy.select_next_step(
@@ -39,7 +40,7 @@ class ValidatingSolver:
             )
             
             if not best_step:
-                print("Strategy returned no step. Stopping.")
+                logging.info("Strategy returned no step. Stopping.")
                 break
                 
             history_parts.append(best_step)
@@ -47,7 +48,7 @@ class ValidatingSolver:
             
             # Termination Check
             if "\\boxed{" in best_step:
-                print("Termination condition (boxed) met.", flush=True)
+                logging.info("Termination condition (boxed) met.")
                 break
         
         return "\n\n".join(history_parts)

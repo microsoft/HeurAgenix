@@ -1,4 +1,5 @@
 import torch
+import logging
 import concurrent.futures
 from typing import List, Dict, Tuple, Optional, Any
 from src.engine.llm_client.local_model_client import LocalModelClient
@@ -14,11 +15,11 @@ class SwarmEngine:
         self.system_prompt = system_prompt
         
         num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
-        print(f"Detected {num_gpus} GPUs. Assigning clients round-robin.")
+        logging.info(f"Detected {num_gpus} GPUs. Assigning clients round-robin.")
 
         for i, config_path in enumerate(client_config_paths):
             device_id = i % num_gpus
-            print(f"Initializing Client {i} on device {device_id}")
+            logging.info(f"Initializing Client {i} on device {device_id}")
             client = LocalModelClient(config_path, system_prompt=system_prompt, device_id=device_id)
             self.clients.append(client)
 
@@ -49,7 +50,7 @@ class SwarmEngine:
                 else:
                     return full_response.strip()
             except Exception as e:
-                print(f"Agent {client_idx} failed to generate: {e}", flush=True)
+                logging.error(f"Agent {client_idx} failed to generate: {e}")
                 return None
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
