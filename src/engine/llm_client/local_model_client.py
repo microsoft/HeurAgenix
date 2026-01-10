@@ -3,7 +3,7 @@ import os
 import ast
 import transformers
 import torch
-from src.util.llm_client.base_llm_client import BaseLLMClient
+from src.engine.llm_client.base_llm_client import BaseLLMClient
 
 
 class LocalModelClient(BaseLLMClient):
