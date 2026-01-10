@@ -1,5 +1,7 @@
 import numpy as np
-from typing import List
+import concurrent.futures
+import torch
+from typing import List, Dict, Any
 from src.util.llm_client.local_model_client import LocalModelClient
 from src.util.text_utils import smart_split_steps
 
@@ -7,8 +9,14 @@ class ConsensusEngine:
     def __init__(self, client_config_paths: List[str], system_prompt: str = None):
         self.clients: List[LocalModelClient] = []
         self.system_prompt = system_prompt
-        for config_path in client_config_paths:
-            client = LocalModelClient(config_path, system_prompt=system_prompt)
+        
+        num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
+        print(f"Detected {num_gpus} GPUs. Assigning clients round-robin.")
+
+        for i, config_path in enumerate(client_config_paths):
+            device_id = i % num_gpus
+            print(f"Initializing Client {i} on device {device_id}")
+            client = LocalModelClient(config_path, system_prompt=system_prompt, device_id=device_id)
             self.clients.append(client)
 
     def decide(self, problem: str, max_step: int=20) -> str:
@@ -44,36 +52,37 @@ class ConsensusEngine:
             # Reconstruct current CoT text from parts
             current_cot_text = "\n\n".join(final_response_parts)
 
-            for i, client in enumerate(self.clients):
+            def _generate_candidate(client_idx, client_inst):
                 # Prepare context for the client
-                client.reset(self.system_prompt)
-                client.add_message(problem, role="user")
-                
-                # IMPORTANT: For generation, we DO NOT add history as a message.
-                # Instead, we pass it as a `continue_prefix`.
-                # This forces the model to treat it as "partially generated text" and continue flow.
+                client_inst.reset(self.system_prompt)
+                client_inst.add_message(problem, role="user")
                 
                 try:
                     # Generate completion
                     # We pass current_cot_text as prefix
                     prefix = current_cot_text + "\n\n" if current_cot_text else None
                     
-                    full_response = client.chat(continue_prefix=prefix)
+                    full_response = client_inst.chat(continue_prefix=prefix)
                     
                     if not full_response:
-                        continue
+                        return None
                         
                     # Extract the NEW part. 
                     new_steps = smart_split_steps(full_response)
                     if new_steps:
-                        # We only take the first step as the candidate
-                        candidate_step = new_steps[0]
-                        step_candidates.append(candidate_step)
+                        return new_steps[0]
                     else:
-                        step_candidates.append(full_response.strip())
-                         
+                        return full_response.strip()
                 except Exception as e:
-                    print(f"Agent {i} failed to generate: {e}", flush=True)
+                    print(f"Agent {client_idx} failed to generate: {e}", flush=True)
+                    return None
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
+                futures = [executor.submit(_generate_candidate, i, c) for i, c in enumerate(self.clients)]
+                for f in concurrent.futures.as_completed(futures):
+                    res = f.result()
+                    if res:
+                        step_candidates.append(res)
 
             if not step_candidates:
                 print("No candidates generated in this step. Aborting.", flush=True)
@@ -89,24 +98,23 @@ class ConsensusEngine:
                 candidate_parts = final_response_parts + [cand]
                 candidate_full_text = "\n\n".join(candidate_parts)
                 
-                total_step_nll = 0
-                valid_reviewers = 0
+                # We need to run evaluation on all reviewers in parallel
                 
-                for j, reviewer in enumerate(self.clients):
+                def _score_candidate(reviewer_idx, reviewer_inst):
                     try:
                         # 1. Get NLL of the WHOLE sequence (accumulated + new)
-                        avg_nll = reviewer.get_sequence_score(base_messages, candidate_full_text)
+                        avg_nll = reviewer_inst.get_sequence_score(base_messages, candidate_full_text)
                         
                         # 2. Get Length of the WHOLE sequence response
                         # add_special_tokens=False is important
-                        tokens = reviewer.pipeline.tokenizer(candidate_full_text, add_special_tokens=False, return_tensors="pt").input_ids
+                        tokens = reviewer_inst.pipeline.tokenizer(candidate_full_text, add_special_tokens=False, return_tensors="pt").input_ids
                         full_len = tokens.shape[1]
                         
                         full_nll_sum = avg_nll * full_len
                         
                         # 3. Subtract Previous Info to isolate Step NLL
-                        prev_nll_sum = client_states[j]['nll_sum']
-                        prev_len = client_states[j]['token_len']
+                        prev_nll_sum = client_states[reviewer_idx]['nll_sum']
+                        prev_len = client_states[reviewer_idx]['token_len']
                         
                         step_len = full_len - prev_len
                         
@@ -115,14 +123,24 @@ class ConsensusEngine:
                             step_nll = (full_nll_sum - prev_nll_sum) / step_len
                             # Clip negative NLL (precision errors)
                             step_nll = max(0.0, step_nll)
-                            
-                            total_step_nll += step_nll
-                            valid_reviewers += 1
+                            return step_nll
                         else:
-                            pass
-                            
+                            return None
                     except Exception as e:
-                        print(f"Reviewer {j} eval failed: {e}", flush=True)
+                        print(f"Reviewer {reviewer_idx} eval failed: {e}", flush=True)
+                        return None
+
+                # Execute scoring
+                total_step_nll = 0
+                valid_reviewers = 0
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
+                    futures = [executor.submit(_score_candidate, j, r) for j, r in enumerate(self.clients)]
+                    for f in concurrent.futures.as_completed(futures):
+                        res = f.result()
+                        if res is not None:
+                            total_step_nll += res
+                            valid_reviewers += 1
                 
                 final_score = total_step_nll / valid_reviewers if valid_reviewers > 0 else float('inf')
                 candidate_scores.append(final_score)
@@ -144,25 +162,33 @@ class ConsensusEngine:
                 for index, cand in enumerate(step_candidates):
                     preview = cand.replace('\\n', ' ')
                     if index == best_idx:
-                        print(f"  [{best_score:.4f}, *] {preview}", flush=True)
+                        print(f"  [{candidate_scores[index]:.4f}, *] {preview}", flush=True)
                     else:
-                        print(f"  [{best_score:.4f}] {preview}", flush=True)
+                        print(f"  [{candidate_scores[index]:.4f}] {preview}", flush=True)
 
             # --- Phase 4: Update State ---
             final_response_parts.append(best_step)
             current_cot_text = "\n\n".join(final_response_parts)
             
             # Update client_states for the *chosen* path
-            for j, reviewer in enumerate(self.clients):
-                try:
-                    avg_nll = reviewer.get_sequence_score(base_messages, current_cot_text)
-                    tokens = reviewer.pipeline.tokenizer(current_cot_text, add_special_tokens=False, return_tensors="pt").input_ids
+            # Also parallelize this update
+            def _update_state(reviewer_idx, reviewer_inst):
+                 try:
+                    avg_nll = reviewer_inst.get_sequence_score(base_messages, current_cot_text)
+                    tokens = reviewer_inst.pipeline.tokenizer(current_cot_text, add_special_tokens=False, return_tensors="pt").input_ids
                     full_len = tokens.shape[1]
-                    
-                    client_states[j]['nll_sum'] = avg_nll * full_len
-                    client_states[j]['token_len'] = full_len
-                except:
-                    pass
+                    return (reviewer_idx, avg_nll * full_len, full_len)
+                 except:
+                    return None
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
+                futures = [executor.submit(_update_state, j, r) for j, r in enumerate(self.clients)]
+                for f in concurrent.futures.as_completed(futures):
+                    res = f.result()
+                    if res:
+                        r_idx, nll_sum, t_len = res
+                        client_states[r_idx]['nll_sum'] = nll_sum
+                        client_states[r_idx]['token_len'] = t_len
 
             # --- Phase 5: Termination Check ---
             if "\\boxed{" in best_step:

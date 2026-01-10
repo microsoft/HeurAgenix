@@ -11,6 +11,7 @@ class LocalModelClient(BaseLLMClient):
             self,
             config_path: str,
             system_prompt: str = None,
+            device_id: int = 0,
         ):
         super().__init__(config_path, system_prompt)
         
@@ -20,16 +21,14 @@ class LocalModelClient(BaseLLMClient):
             self.model = os.path.normpath(self.config['model_name'])
 
         # Determine device to avoid distributed init issues on multi-GPU nodes
-        device_map = "auto"
-        if torch.cuda.is_available():
-             # Force usage of the first GPU if available to prevent multi-gpu distributed init failures
-            device_map = "cuda:0"
+        device_map = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
 
         self.pipeline = transformers.pipeline(
             "text-generation",
             model=self.model,
             model_kwargs={
                 "torch_dtype": torch.bfloat16,
+                "attn_implementation": "flash_attention_2",
             },
             device_map=device_map,
             trust_remote_code=True,
