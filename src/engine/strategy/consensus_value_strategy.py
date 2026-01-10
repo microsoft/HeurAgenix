@@ -41,7 +41,6 @@ class ConsensusValueStrategy(BaseStrategy):
 
         # --- Step 1: Broad Search (First Layer Generation) ---
         # Generate N candidates R_i
-        logging.info("  [ConsensusValue] Generating hypothetical next states...")
         layer1_candidates = engine.generate_candidates(problem, current_cot_text)
         
         if not layer1_candidates:
@@ -57,7 +56,6 @@ class ConsensusValueStrategy(BaseStrategy):
         # For now, let's just evaluate it normally (generation might fail or return nothing, 
         # but scoring handles that).
         
-        logging.info(f"  [ConsensusValue] Evaluating {len(layer1_candidates)} hypothetical states...")
 
         for i, cand_r in enumerate(layer1_candidates):
             # Hypothetical State S_i
@@ -130,7 +128,7 @@ class ConsensusValueStrategy(BaseStrategy):
 
         # --- Step 4: Selection ---
         if not state_values or min(state_values) == float('inf'):
-             logging.info("  [ConsensusValue] No valid futures. Fallback to greedy/first.")
+             logging.info(" No valid futures. Fallback to greedy/first.")
              best_idx = 0
              # Fallback check
              if not layer1_candidates:

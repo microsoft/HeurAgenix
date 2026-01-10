@@ -1,12 +1,11 @@
-from typing import Tuple, List, Dict
+from typing import List, Dict
 import os
-import ast
 import transformers
 import torch
 from src.engine.llm_client.base_llm_client import BaseLLMClient
 
 
-class LocalModelClient(BaseLLMClient):
+class TransformersClient(BaseLLMClient):
     def __init__(
             self,
             config_path: str,
@@ -138,7 +137,9 @@ class LocalModelClient(BaseLLMClient):
         # We'll leave it as is for now.
         return response_content
 
-    def get_sequence_score(self, conversation: List[Dict], response: str) -> float:
+    def get_token_len(self, text: str) -> int:
+        ids = self.pipeline.tokenizer(text, add_special_tokens=False, return_tensors="pt").input_ids
+        return ids.shape[1]
         format_messages = self._format_messages(conversation)
 
         # Apply chat template to get the prompt part

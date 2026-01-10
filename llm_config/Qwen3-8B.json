@@ -1,12 +1,11 @@
 {
-    "type": "local_model",
-    "name": "Qwen3-8B",
+   "model_name": "Qwen/Qwen3-8B",
+   "type": "TransformersClient",
 
     "temperature": 0.0,
     "do_sample": false,
     "top-p": 1.0,
     "max_tokens": 4800,
-    "model_name": "Qwen/Qwen3-8B",
     "think": false,
 
     "max_attempts": 50,

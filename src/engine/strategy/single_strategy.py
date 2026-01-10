@@ -45,7 +45,7 @@ class SingleStrategy(BaseStrategy):
         
         # Debug Log
         preview = best_step.replace('\\n', ' ')
-        logging.info(f"  [Single] {preview}")
+        logging.info(f"{preview}")
 
         # 2. Update States
         # We still need to update states to keep the 'token_len' correct 

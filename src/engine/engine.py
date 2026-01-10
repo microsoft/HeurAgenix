@@ -2,7 +2,8 @@ import torch
 import logging
 import concurrent.futures
 from typing import List, Dict, Tuple, Optional, Any
-from src.engine.llm_client.local_model_client import LocalModelClient
+from src.engine.llm_client.base_llm_client import BaseLLMClient
+from src.engine.llm_client.get_llm_client import get_llm_client
 from src.util.text_utils import smart_split_steps
 
 class SwarmEngine:
@@ -11,7 +12,7 @@ class SwarmEngine:
     Manages the swarm of LLM clients and provides parallelized atomic operations.
     """
     def __init__(self, client_config_paths: List[str], system_prompt: str = None):
-        self.clients: List[LocalModelClient] = []
+        self.clients: List[BaseLLMClient] = []
         self.system_prompt = system_prompt
         
         num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
@@ -20,7 +21,7 @@ class SwarmEngine:
         for i, config_path in enumerate(client_config_paths):
             device_id = i % num_gpus
             logging.info(f"Initializing Client {i} on device {device_id}")
-            client = LocalModelClient(config_path, system_prompt=system_prompt, device_id=device_id)
+            client = get_llm_client(config_path, system_prompt=system_prompt, device_id=device_id)
             self.clients.append(client)
 
     def generate_candidates(self, problem: str, current_cot_text: str) -> List[str]:

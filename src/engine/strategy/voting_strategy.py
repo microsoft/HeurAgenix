@@ -76,7 +76,7 @@ class VotingStrategy(BaseStrategy):
 
         # 4. Select
         if not final_scores or min(final_scores) == float('inf'):
-            logging.info("  [Voting] No valid scores, picking first.")
+            logging.info("No valid scores, picking first.")
             best_step = step_candidates[0]
             best_idx = 0
         else:
