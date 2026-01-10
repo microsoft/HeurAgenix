@@ -7,5 +7,7 @@ def get_llm_client(config_file: str, system_prompt: str = None, device_id: int =
     llm_type = config["type"]
     if llm_type == "TransformersClient":
         from src.engine.llm_client.transformers_client import TransformersClient
-        llm_client = TransformersClient(config=config, system_prompt=system_prompt, device_id=device_id)
+        llm_client = TransformersClient(config_path=config_file, system_prompt=system_prompt, device_id=device_id)
+    else:
+        raise ValueError(f"Unknown client type: {llm_type}")
     return llm_client
