@@ -48,7 +48,8 @@ def run_consensus_evaluation(
             
     logging.basicConfig(
         level=logging.INFO,
-        format='%(message)s',
+        format='%(asctime)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
         handlers=[
             logging.FileHandler(log_file, mode='w', encoding='utf-8'),
             logging.StreamHandler(sys.stdout)
@@ -88,6 +89,50 @@ def run_consensus_evaluation(
     results = []
     pbar = tqdm(dataset)
 
+    # Pre-calculate Paths
+    metrics_file = os.path.join(output_dir, "metrics.json")
+    generations_file = os.path.join(output_dir, "generations.json")
+
+    def save_results(is_final=False):
+        # Get configs from engine clients for logging
+        # We access this lazily as engine is init before loop
+        configs = [client.config for client in engine.clients]
+        
+        current_acc = (correct_count / total_count) * 100 if total_count > 0 else 0.0
+        
+        generation_details = []
+        for item in results:
+            generation_details.append({
+                "system_prompt": item["system_prompt"],
+                "problem": item["problem"],
+                "response": item["response"],
+                "ground_truth": item["ground_truth"],
+                "time_taken": item.get("time_taken", 0.0)
+            })
+
+        with open(metrics_file, 'w') as f:
+            json.dump({
+                "configs": configs,
+                "task": task_name,
+                "strategy": strategy_name,
+                "accuracy": current_acc,
+                "total": total_count,
+                "details": results
+            }, f, indent=2)
+            
+        with open(generations_file, 'w') as f:
+            json.dump({
+                "configs": configs,
+                "task": task_name,
+                "strategy": strategy_name,
+                "details": generation_details
+            }, f, indent=2)
+            
+        if is_final:
+            logger.info(f"Generations saved to {generations_file}")
+            logger.info(f"Metrics saved to {metrics_file}")
+            logger.info(f"Log saved to {log_file}")
+
     for item in pbar:
         # Format Prompt
         
@@ -123,49 +168,17 @@ def run_consensus_evaluation(
         # Update progress bar
         current_acc = (correct_count / total_count) * 100
         pbar.set_description(f"Acc: {current_acc:.2f}% ({correct_count}/{total_count})")
+        
+        # Checkpoint every 10 items
+        if total_count % 10 == 0:
+            save_results(is_final=False)
 
     # 3. Summary & Save
     final_acc = (correct_count / total_count) * 100
     logger.info(f"\n--- Evaluation Complete ---")
     logger.info(f"Final Accuracy: {final_acc:.2f}%")
     
-    # Get configs from engine clients for logging
-    configs = [client.config for client in engine.clients]
-    
-    # Generate filenames
-    metrics_file = os.path.join(output_dir, "metrics.json")
-    generations_file = os.path.join(output_dir, "generations.json")
-    
-    generation_details = []
-    for item in results:
-        generation_details.append({
-            "system_prompt": item["system_prompt"],
-            "problem": item["problem"],
-            "response": item["response"],
-            "ground_truth": item["ground_truth"]
-        })
-
-    with open(metrics_file, 'w') as f:
-        json.dump({
-            "configs": configs,
-            "task": task_name,
-            "strategy": strategy_name,
-            "accuracy": final_acc,
-            "total": total_count,
-            "details": results
-        }, f, indent=2)
-        
-    with open(generations_file, 'w') as f:
-        json.dump({
-            "configs": configs,
-            "task": task_name,
-            "strategy": strategy_name,
-            "details": generation_details
-        }, f, indent=2)
-    
-    logger.info(f"Generations saved to {generations_file}")
-    logger.info(f"Metrics saved to {metrics_file}")
-    logger.info(f"Log saved to {log_file}")
+    save_results(is_final=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")
