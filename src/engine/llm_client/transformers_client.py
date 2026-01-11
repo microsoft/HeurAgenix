@@ -140,6 +140,8 @@ class TransformersClient(BaseLLMClient):
     def get_token_len(self, text: str) -> int:
         ids = self.pipeline.tokenizer(text, add_special_tokens=False, return_tensors="pt").input_ids
         return ids.shape[1]
+
+    def get_sequence_score(self, conversation: List[Dict], response: str) -> float:
         format_messages = self._format_messages(conversation)
 
         # Apply chat template to get the prompt part

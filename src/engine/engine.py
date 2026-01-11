@@ -147,13 +147,10 @@ class SwarmEngine:
         new_states = [{'nll_sum': 0.0, 'token_len': 0} for _ in range(len(self.clients))]
         
         def _update(idx, client):
-            try:
-                avg_nll = client.get_sequence_score(base_messages, history_text)
-                tokens = client.pipeline.tokenizer(history_text, add_special_tokens=False, return_tensors="pt").input_ids
-                full_len = tokens.shape[1]
-                return (avg_nll * full_len, full_len)
-            except:
-                return (0.0, 0)
+            avg_nll = client.get_sequence_score(base_messages, history_text)
+            tokens = client.pipeline.tokenizer(history_text, add_special_tokens=False, return_tensors="pt").input_ids
+            full_len = tokens.shape[1]
+            return (avg_nll * full_len, full_len)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
             futures = {executor.submit(_update, i, c): i for i, c in enumerate(self.clients)}
