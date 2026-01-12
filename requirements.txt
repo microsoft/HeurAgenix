@@ -1,0 +1,17 @@
+torch>=2.5.0
+numpy==2.2.5
+pandas==2.3.2
+scikit-learn==1.7.1
+git+https://github.com/huggingface/transformers.git
+accelerate==1.11.0
+mistral_common==1.8.8
+datasets==4.0.0
+sympy==1.14.0
+sentencepiece==0.2.1
+protobuf==6.32.0
+wandb==0.21.3
+python-dotenv==1.2.1
+packaging
+ninja
+flash-attn==2.8.3
+tqdm==4.67.1
