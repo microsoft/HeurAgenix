@@ -7,6 +7,29 @@ import logging
 from tqdm import tqdm
 from typing import List, Type
 
+# Custom handler for BlobFuse synchronization
+class DirectFileHandler(logging.Handler):
+    def __init__(self, filename, mode='a', encoding='utf-8'):
+        super().__init__()
+        self.filename = filename
+        self.mode = mode
+        self.encoding = encoding
+        
+        # Initialize file (truncate if mode is 'w')
+        if mode == 'w':
+             with open(self.filename, 'w', encoding=self.encoding) as f:
+                pass
+             self.mode = 'a' # Switch to append for subsequent writes
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            # Force Open-Write-Close for every log to ensure BlobFuse sync
+            with open(self.filename, self.mode, encoding=self.encoding) as f:
+                f.write(msg + '\n')
+        except Exception:
+            self.handleError(record)
+
 
 # NEW Architecture Imports
 from src.engine.engine import SwarmEngine
@@ -31,8 +54,12 @@ def run_consensus_evaluation(
     exp_name: str = ""
 ):
     # 1. Setup
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
     if not exp_name:
-        exp_name = time.strftime("%Y%m%d_%H%M%S")
+        exp_name = timestamp
+    else:
+        # Append timestamp to user-provided name to prevent overwrites
+        exp_name = f"{exp_name}_{timestamp}"
     
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "..", "ccdm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     output_dir = os.path.join(base_output_dir, exp_name)
@@ -52,7 +79,7 @@ def run_consensus_evaluation(
         format='%(asctime)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         handlers=[
-            logging.FileHandler(log_file, mode='w', encoding='utf-8'),
+            DirectFileHandler(log_file, mode='a', encoding='utf-8'),
             logging.StreamHandler(sys.stdout)
         ]
     )
@@ -91,8 +118,8 @@ def run_consensus_evaluation(
     pbar = tqdm(dataset)
 
     # Pre-calculate Paths
-    metrics_file = os.path.join(output_dir, "metrics.json")
-    generations_file = os.path.join(output_dir, "generations.json")
+    # Consolidated results file
+    results_file = os.path.join(output_dir, "results.json")
 
     def save_results():
         # Get configs from engine clients for logging
@@ -101,36 +128,25 @@ def run_consensus_evaluation(
         
         current_acc = (correct_count / total_count) * 100 if total_count > 0 else 0.0
         
-        generation_details = []
-        for item in results:
-            generation_details.append({
-                "system_prompt": item["system_prompt"],
-                "problem": item["problem"],
-                "response": item["response"],
-                "ground_truth": item["ground_truth"],
-                "time_taken": item.get("time_taken", 0.0)
-            })
-
-        with open(metrics_file, 'w') as f:
+        # Consolidate everything into one JSON
+        with open(results_file, 'w') as f:
             json.dump({
-                "configs": configs,
-                "task": task_name,
-                "strategy": strategy_name,
-                "accuracy": current_acc,
-                "total": total_count,
-                "details": results
-            }, f, indent=2)
-            
-        with open(generations_file, 'w') as f:
-            json.dump({
-                "configs": configs,
-                "task": task_name,
-                "strategy": strategy_name,
-                "total_problems": len(dataset),
-                "processed_problems": total_count,
-                "details": generation_details
+                "meta": {
+                    "task": task_name,
+                    "strategy": strategy_name,
+                    "model_configs": configs # Full config content
+                },
+                "stats": {
+                    "accuracy": current_acc,
+                    "correct_count": correct_count,
+                    "total_count": total_count,
+                    "total_problems": len(dataset),
+                    "processed_problems": total_count,
+                },
+                "results": results # Full details including prompts, responses, pred, is_correct
             }, f, indent=2)
 
+    save_results()
     for item in pbar:
         # Format Prompt
         
@@ -169,10 +185,7 @@ def run_consensus_evaluation(
         
         # Checkpoint every item for real-time updates
         save_results()
-        # Flush logs manually to sync with cloud storage
-        for handler in logging.getLogger().handlers:
-            handler.flush()
-
+        
     # 3. Summary & Save
     final_acc = (correct_count / total_count) * 100
     logger.info(f"\n--- Evaluation Complete ---")
@@ -180,8 +193,7 @@ def run_consensus_evaluation(
     
     save_results()
     
-    logger.info(f"Generations saved to {generations_file}")
-    logger.info(f"Metrics saved to {metrics_file}")
+    logger.info(f"Results saved to {results_file}")
     logger.info(f"Log saved to {log_file}")
 
 if __name__ == "__main__":
