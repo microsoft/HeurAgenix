@@ -76,19 +76,20 @@ class VotingStrategy(BaseStrategy):
 
         # 4. Select
         if not final_scores or min(final_scores) == float('inf'):
-            logging.info("No valid scores, picking first.")
+            logging_str = "No valid scores, picking first."
             best_step = step_candidates[0]
             best_idx = 0
         else:
             best_idx = np.argmin(final_scores)
             best_step = step_candidates[best_idx]
+            logging_str = "Candidates:\n"
         
-        logging.info("Candidates:")
-        for i, cand in enumerate(step_candidates):
-            preview = cand.replace('\\n', ' ')
-            marker = "*" if i == best_idx else " "
-            sc = final_scores[i] if i < len(final_scores) else -1
-            logging.info(f"  [avg_nll={sc:.4f}, {marker}] {preview}")
+            for i, cand in enumerate(step_candidates):
+                preview = cand.replace('\\n', ' ')
+                marker = "*" if i == best_idx else " "
+                sc = final_scores[i] if i < len(final_scores) else -1
+                logging_str += f"  [avg_nll={sc:.4f}, {marker}] {preview}\n"
+        logging.info(logging_str)
 
         # 5. Update States for the *chosen* path
         new_history = history_parts + [best_step]

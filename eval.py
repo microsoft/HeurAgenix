@@ -141,7 +141,7 @@ def run_consensus_evaluation(
         
         # Solver Execution (Layer 4)
         start_time = time.time()
-        best_response = solver.solve(problem, max_steps=50) 
+        best_response = solver.solve(problem, max_steps=50, problem_index=total_count + 1) 
         elapsed = time.time() - start_time
         
         # Extract & Verify

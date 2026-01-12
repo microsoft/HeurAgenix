@@ -33,6 +33,12 @@ class TransformersClient(BaseLLMClient):
             trust_remote_code=True,
         )
 
+        # Ensure pad_token is set to suppress warnings and ensure correct behavior for open-end generation
+        if self.pipeline.tokenizer.pad_token_id is None:
+            self.pipeline.tokenizer.pad_token_id = self.pipeline.tokenizer.eos_token_id
+            if self.pipeline.tokenizer.padding_side != 'left':
+                self.pipeline.tokenizer.padding_side = 'left'
+
     def _merge_system_role(self, messages: List[Dict]) -> List[Dict]:
         """
         Merge system messages into the first user message.
@@ -123,9 +129,18 @@ class TransformersClient(BaseLLMClient):
             gen_kwargs["temperature"] = self.temperature
             gen_kwargs["top_p"] = self.top_p
 
+        # Add repetition penalty to prevent loops (Crucial for Llama-3)
+        # 1.1 - 1.2 is usually a safe range.
+        gen_kwargs["repetition_penalty"] = 1.15
+
         # Add stop condition to prevent long generation and ensure single step logic
         gen_kwargs["stop_strings"] = ["</step>"]
         gen_kwargs["tokenizer"] = self.pipeline.tokenizer 
+        
+        # Limit max tokens for a single step to prevent runaway loops
+        # Even if stop token is missed, this will cut it off.
+        # 1024 is generous for math steps but prevents infinite loops.
+        gen_kwargs["max_new_tokens"] = min(self.max_tokens, 1024)
 
         response = self.pipeline(text, **gen_kwargs)
         if continue_prefix:

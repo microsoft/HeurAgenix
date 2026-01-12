@@ -14,11 +14,16 @@ class ValidatingSolver:
         self.engine = engine
         self.strategy = strategy if strategy else VotingStrategy()
 
-    def solve(self, problem: str, max_steps: int = 50) -> str:
+    def solve(self, problem: str, max_steps: int = 50, problem_index: int = None) -> str:
         """
         Main loop.
         """
-        logging.info(f"\n[Solver] Problem: {problem}")
+        if problem_index:
+            problem_str = f"\n--------------------------Problem index[{problem_index}]--------------------------\n"
+        else:
+            problem_str = "\n--------------------------Problem--------------------------\n"
+        problem_str += f"\nProblem: {problem}\n"
+        logging.info(problem_str)
         
         # Init Client States
         # Should correspond to empty history
@@ -29,7 +34,7 @@ class ValidatingSolver:
         history_parts = []
         
         for step_idx in range(max_steps):
-            logging.info(f"\n--- Step {step_idx + 1} ---")
+            logging.info(f"--- Step {step_idx + 1} ---")
             
             # Strategy Decision
             best_step, new_states = self.strategy.select_next_step(
@@ -50,5 +55,5 @@ class ValidatingSolver:
             if "\\boxed{" in best_step:
                 logging.info("Termination condition (boxed) met.")
                 break
-        
+        logging.info(f"\n--------------------------Problem solved--------------------------\n")
         return "\n\n".join(history_parts)
