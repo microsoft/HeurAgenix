@@ -7,6 +7,7 @@ import logging
 from tqdm import tqdm
 from typing import List, Type
 
+
 # NEW Architecture Imports
 from src.engine.engine import SwarmEngine
 from src.engine.solver import ValidatingSolver
@@ -93,7 +94,7 @@ def run_consensus_evaluation(
     metrics_file = os.path.join(output_dir, "metrics.json")
     generations_file = os.path.join(output_dir, "generations.json")
 
-    def save_results(is_final=False):
+    def save_results():
         # Get configs from engine clients for logging
         # We access this lazily as engine is init before loop
         configs = [client.config for client in engine.clients]
@@ -125,13 +126,10 @@ def run_consensus_evaluation(
                 "configs": configs,
                 "task": task_name,
                 "strategy": strategy_name,
+                "total_problems": len(dataset),
+                "processed_problems": total_count,
                 "details": generation_details
             }, f, indent=2)
-            
-        if is_final:
-            logger.info(f"Generations saved to {generations_file}")
-            logger.info(f"Metrics saved to {metrics_file}")
-            logger.info(f"Log saved to {log_file}")
 
     for item in pbar:
         # Format Prompt
@@ -169,16 +167,22 @@ def run_consensus_evaluation(
         current_acc = (correct_count / total_count) * 100
         pbar.set_description(f"Acc: {current_acc:.2f}% ({correct_count}/{total_count})")
         
-        # Checkpoint every 10 items
-        if total_count % 10 == 0:
-            save_results(is_final=False)
+        # Checkpoint every item for real-time updates
+        save_results()
+        # Flush logs manually to sync with cloud storage
+        for handler in logging.getLogger().handlers:
+            handler.flush()
 
     # 3. Summary & Save
     final_acc = (correct_count / total_count) * 100
     logger.info(f"\n--- Evaluation Complete ---")
     logger.info(f"Final Accuracy: {final_acc:.2f}%")
     
-    save_results(is_final=True)
+    save_results()
+    
+    logger.info(f"Generations saved to {generations_file}")
+    logger.info(f"Metrics saved to {metrics_file}")
+    logger.info(f"Log saved to {log_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")
