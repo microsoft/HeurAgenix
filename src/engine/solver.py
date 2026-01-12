@@ -34,6 +34,13 @@ class ValidatingSolver:
         history_parts = []
         
         for step_idx in range(max_steps):
+            # Safety Check: Prevent OOM from infinite loops
+            # 25000 chars is roughly 6000-8000 tokens.
+            current_context_len = len(problem) + sum(len(p) for p in history_parts)
+            if current_context_len > 25000:
+                logging.warning(f"Context length {current_context_len} exceeds safety limit (25000). Terminating early.")
+                break
+
             logging.info(f"--- Step {step_idx + 1} ---")
             
             # Strategy Decision

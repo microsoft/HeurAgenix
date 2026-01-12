@@ -6,6 +6,13 @@ import time
 import logging
 from tqdm import tqdm
 from typing import List, Type
+from src.engine.engine import SwarmEngine
+from src.engine.solver import ValidatingSolver
+from src.engine.strategy.voting_strategy import VotingStrategy
+from src.engine.strategy.consensus_value_strategy import ConsensusValueStrategy
+from src.engine.strategy.single_strategy import SingleStrategy
+from src.tasks.math500_task import Math500Task
+from src.tasks.base_task import BaseTask
 
 # Custom handler for BlobFuse synchronization
 class DirectFileHandler(logging.Handler):
@@ -29,17 +36,6 @@ class DirectFileHandler(logging.Handler):
                 f.write(msg + '\n')
         except Exception:
             self.handleError(record)
-
-
-# NEW Architecture Imports
-from src.engine.engine import SwarmEngine
-from src.engine.solver import ValidatingSolver
-from src.engine.strategy.voting_strategy import VotingStrategy
-from src.engine.strategy.consensus_value_strategy import ConsensusValueStrategy
-from src.engine.strategy.single_strategy import SingleStrategy
-
-from src.tasks.math500_task import Math500Task
-from src.tasks.base_task import BaseTask
 
 # Registry for available tasks
 TASK_REGISTRY = {
