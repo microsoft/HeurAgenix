@@ -20,9 +20,12 @@ class Math500Task(BaseTask):
                 "Please solve the problem step by step. "
                 "CRITICAL: You must enclose every individual logical step within <step> and </step> tags. "
                 "Do not output any text outside of these tags. "
+                "CRITICAL: Each step must contain substantive mathematical reasoning or calculation. "
+                "Do NOT split a single logical step into multiple tags. "
+                "Specifically, do NOT put a meaningful introduction sentence (e.g. 'Now we solve for x:') in one step and the calculation in the next. Combine them. "
                 "At the end of your solution, you MUST put the final answer inside \\boxed{}. "
                 "For example: "
-                "<step>First, we calculate...</step>"
+                "<step>First, we calculate the discriminant of the quadratic equation: $\Delta = b^2 - 4ac = 4 - 4(1)(-1) = 8$.</step>"
                 "<step>The answer is \\boxed{5}.</step>"
             )
         else:
@@ -36,7 +39,7 @@ class Math500Task(BaseTask):
                  dataset_path = os.path.join(amlt_data_dir, self.dataset_name)
                  dataset = load_from_disk(dataset_path)[self.subset]
             else:
-                 dataset = load_dataset(self.dataset_name, split=self.subset)
+                 dataset = load_dataset(self.dataset_name, split=self.subset).select(range(96, 97))
 
             self.data = []
             for item in dataset:

@@ -19,7 +19,8 @@ def smart_split_steps(text: str) -> List[str]:
     # We use re.DOTALL to let . match newlines inside the tag
     # CHANGED: We now capture the full tag <step>...</step> so that the context 
     # passed back to the model (continue_prefix) preserves the tags.
-    step_tags = re.findall(r'(<step>.*?</step>)', text, re.DOTALL)
+    # ALSO CHANGED: Allow unclosed tag at the very end (in case of stop token truncation)
+    step_tags = re.findall(r'(<step>.*?(?:</step>|$))', text, re.DOTALL)
     if len(step_tags) > 0:
         # Found structured steps, verify they are not just empty
         valid_steps = [s.strip() for s in step_tags if s.strip()]

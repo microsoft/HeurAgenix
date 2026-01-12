@@ -47,7 +47,11 @@ class SwarmEngine:
                 # Extract the NEW part using smart split
                 new_steps = smart_split_steps(full_response)
                 if new_steps:
-                    return new_steps[0]
+                    best_step = new_steps[0]
+                    # Ensure closure if stop token truncated it
+                    if best_step.startswith("<step>") and not best_step.endswith("</step>"):
+                        best_step += "</step>"
+                    return best_step
                 else:
                     return full_response.strip()
             except Exception as e:

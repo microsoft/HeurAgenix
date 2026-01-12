@@ -123,6 +123,10 @@ class TransformersClient(BaseLLMClient):
             gen_kwargs["temperature"] = self.temperature
             gen_kwargs["top_p"] = self.top_p
 
+        # Add stop condition to prevent long generation and ensure single step logic
+        gen_kwargs["stop_strings"] = ["</step>"]
+        gen_kwargs["tokenizer"] = self.pipeline.tokenizer 
+
         response = self.pipeline(text, **gen_kwargs)
         if continue_prefix:
              # If we manually appended a prefix, the pipeline output *might* not include it 
