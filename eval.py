@@ -49,13 +49,7 @@ def run_consensus_evaluation(
     subset: str = "test",
     exp_name: str = ""
 ):
-    # 1. Setup
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    if not exp_name:
-        exp_name = timestamp
-    else:
-        # Append timestamp to user-provided name to prevent overwrites
-        exp_name = f"{exp_name}_{timestamp}"
+
     
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "..", "ccdm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     output_dir = os.path.join(base_output_dir, exp_name)
@@ -198,13 +192,20 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--configs", type=str, required=True, help="Paths to LLM config jsons (comma separated)")
     parser.add_argument("-t", "--task", type=str, default="math500", help="Task name")
     parser.add_argument("-s", "--strategy", type=str, default="single", choices=["single", "voting", "consensus_value"], help="Strategy name")
-    parser.add_argument("-e", "--exp_name", type=str, default="", help="Experiment name (default: timestamp)")
+    parser.add_argument("-e", "--exp_name", type=str, default=None, help="Experiment name (default: timestamp)")
 
     args = parser.parse_args()
     
+    # 1. Setup
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    if not args.exp_name:
+        exp_name = timestamp
+    else:
+        # Append timestamp to user-provided name to prevent overwrites
+        exp_name = f"{args.exp_name}.{timestamp}"
     run_consensus_evaluation(
         args.configs.split(","),
         args.task,
         strategy_name=args.strategy,
-        exp_name=args.exp_name
+        exp_name=exp_name
     )
