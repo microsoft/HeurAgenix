@@ -39,7 +39,7 @@ class Math500Task(BaseTask):
                  dataset_path = os.path.join(amlt_data_dir, self.dataset_name)
                  dataset = load_from_disk(dataset_path)[self.subset]
             else:
-                 dataset = load_dataset(self.dataset_name, split=self.subset).select(range(96, 97))
+                 dataset = load_dataset(self.dataset_name, split=self.subset)
 
             self.data = []
             for item in dataset:
