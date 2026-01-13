@@ -46,8 +46,9 @@ def run_consensus_evaluation(
     model_config_paths: List[str],
     task_name: str,
     strategy_name: str = "single",
-    subset: str = "test",
-    exp_name: str = ""
+    exp_name: str = "",
+    start_index: int = 0,
+    end_index: int = None
 ):
 
     
@@ -77,13 +78,25 @@ def run_consensus_evaluation(
     
     logger.info(f"--- Evaluation ---")
     logger.info(f"Model Configs: {model_config_paths}")
-    logger.info(f"Task: {task_name} ({subset})")
+    logger.info(f"Task: {task_name}")
     logger.info(f"Strategy: {strategy_name}")
     logger.info(f"Output Directory: {output_dir}")
 
     task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
-    task = task_class(subset=subset)
-    dataset = task.get_dataset()
+    task = task_class()
+
+    # Load Task Data
+    test_data = task.get_dataset()
+    
+    # Slice dataset if requested
+    if end_index is not None:
+        test_data = test_data[start_index:end_index]
+        logger.info(f"Running problems {start_index} to {end_index}")
+    else:
+        test_data = test_data[start_index:]
+        logger.info(f"Running problems {start_index} to end")
+
+    logger.info(f"Total problems to evaluate: {len(test_data)}")
 
     # Initialize Engine (Layer 2)
     engine = SwarmEngine(model_config_paths, system_prompt=task.system_prompt)
@@ -105,7 +118,7 @@ def run_consensus_evaluation(
     correct_count = 0
     total_count = 0
     results = []
-    pbar = tqdm(dataset)
+    pbar = tqdm(test_data)
 
     # Pre-calculate Paths
     # Consolidated results file
@@ -130,7 +143,7 @@ def run_consensus_evaluation(
                     "accuracy": current_acc,
                     "correct_count": correct_count,
                     "total_count": total_count,
-                    "total_problems": len(dataset),
+                    "total_problems": len(test_data),
                     "processed_problems": total_count,
                 },
                 "results": results # Full details including prompts, responses, pred, is_correct
@@ -193,19 +206,16 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--task", type=str, default="math500", help="Task name")
     parser.add_argument("-s", "--strategy", type=str, default="single", choices=["single", "voting", "consensus_value"], help="Strategy name")
     parser.add_argument("-e", "--exp_name", type=str, default=None, help="Experiment name (default: timestamp)")
+    parser.add_argument("--start", type=int, default=0, help="Start index of problems")
+    parser.add_argument("--end", type=int, default=None, help="End index of problems (exclusive)")
 
     args = parser.parse_args()
     
-    # 1. Setup
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    if not args.exp_name:
-        exp_name = timestamp
-    else:
-        # Append timestamp to user-provided name to prevent overwrites
-        exp_name = f"{args.exp_name}.{timestamp}"
     run_consensus_evaluation(
         args.configs.split(","),
         args.task,
         strategy_name=args.strategy,
-        exp_name=exp_name
+        exp_name=args.exp_name,
+        start_index=args.start,
+        end_index=args.end
     )

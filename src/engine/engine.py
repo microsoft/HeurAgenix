@@ -122,8 +122,14 @@ class SwarmEngine:
                     step_nll = (full_nll_sum - prev_nll_sum) / step_len
                     return max(0.0, step_nll)
                 return None
+            except torch.cuda.OutOfMemoryError:
+                logging.warning(f"Reviewer {reviewer_idx} OOM during scoring candidate {cand_idx}. Clearing cache.")
+                torch.cuda.empty_cache()
+                import gc
+                gc.collect()
+                return None
             except Exception as e:
-                # print(f"Reviewer {reviewer_idx} eval failed: {e}", flush=True)
+                logging.warning(f"Reviewer {reviewer_idx} eval failed: {e}")
                 return None
 
         # Execute
