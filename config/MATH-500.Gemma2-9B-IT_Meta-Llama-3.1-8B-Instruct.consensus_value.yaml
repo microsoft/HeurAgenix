@@ -1,4 +1,4 @@
-exp_name: "MATH-500.Gemma2-9B-IT_Meta-Llama-3.1-8B-Instruct.voting"
+exp_name: "MATH-500.Gemma2-9B-IT_Meta-Llama-3.1-8B-Instruct.consensus_value"
 
 engine:
   max_steps: 45
@@ -12,7 +12,7 @@ strategy:
 
 
 models:
-  - name: "Gemma/Gemma2-9B-IT"
+  - name: "google/gemma-2-9b-it"
     type: "TransformersClient"
     think: false
     max_tokens: 1024
@@ -23,7 +23,7 @@ models:
     top_p: 1.0
     repetition_penalty: 1.0
     
-  - name: "Meta/Meta-Llama-3.1-8B-Instruct"
+  - name: "meta-llama/Meta-Llama-3.1-8B-Instruct"
     type: "TransformersClient"
     think: false
     max_tokens: 1024

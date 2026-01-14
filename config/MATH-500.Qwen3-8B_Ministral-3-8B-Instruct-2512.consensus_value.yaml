@@ -1,4 +1,4 @@
-exp_name: "MATH-500.Qwen3-8B_Ministral-3-8B-Instruct-2512.voting"
+exp_name: "MATH-500.Qwen3-8B_Ministral-3-8B-Instruct-2512.consensus_value"
 
 engine:
   max_steps: 45

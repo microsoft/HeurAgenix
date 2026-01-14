@@ -18,7 +18,6 @@ models:
     max_attempts: 3
     sleep_time: 10
     temperature: 0.0
-    think: false
     do_sample: false
     top_p: 1.0
     repetition_penalty: 1.0
