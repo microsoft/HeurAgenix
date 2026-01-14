@@ -7,13 +7,13 @@ git+https://github.com/huggingface/transformers.git
 accelerate==1.11.0
 mistral_common==1.8.8
 datasets==4.0.0
-sympy==1.14.0
+sympy
 sentencepiece==0.2.1
 protobuf==6.32.0
 wandb==0.21.3
 python-dotenv==1.2.1
-packaging
-ninja
+packaging>=24.0
+ninja>=1.11.1
 flash-attn==2.8.3
 tqdm==4.67.1
 PyYAML==6.0.3
