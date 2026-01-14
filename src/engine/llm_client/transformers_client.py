@@ -20,18 +20,36 @@ class TransformersClient(BaseLLMClient):
             self.model = os.path.normpath(self.config['model_name'])
 
         # Determine device to avoid distributed init issues on multi-GPU nodes
-        device_map = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
+        # Use integer device for strict placement. device_map can sometimes be flaky in pipelines.
+        device = device_id if torch.cuda.is_available() else -1
 
-        self.pipeline = transformers.pipeline(
-            "text-generation",
-            model=self.model,
-            model_kwargs={
-                "torch_dtype": torch.bfloat16,
-                "attn_implementation": "flash_attention_2",
-            },
-            device_map=device_map,
-            trust_remote_code=True,
-        )
+        try:
+            self.pipeline = transformers.pipeline(
+                "text-generation",
+                model=self.model,
+                model_kwargs={
+                    "torch_dtype": torch.bfloat16,
+                    "attn_implementation": "flash_attention_2",
+                },
+                device=device,
+                trust_remote_code=True,
+            )
+        except Exception as e:
+            # Fallback if device argument fails (e.g. conflicts with accelerate auto-map)
+            print(f"Warning: Failed to init pipeline with device={device}, falling back to device_map. Error: {e}")
+            device_map = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
+            self.pipeline = transformers.pipeline(
+                "text-generation",
+                model=self.model,
+                model_kwargs={
+                    "torch_dtype": torch.bfloat16,
+                    "attn_implementation": "flash_attention_2",
+                },
+                device_map=device_map,
+                trust_remote_code=True,
+            )
+            
+        print(f"DEBUG: Model {self.config['model_name']} loaded on device: {self.pipeline.model.device}. Requested device_id: {device_id}")
 
         # Ensure pad_token is set to suppress warnings and ensure correct behavior for open-end generation
         if self.pipeline.tokenizer.pad_token_id is None:

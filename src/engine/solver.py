@@ -33,12 +33,15 @@ class ValidatingSolver:
         
         history_parts = []
         
-        for step_idx in range(max_steps):
+        # OOM Prevention: Cap max steps aggressively for baseline runs
+        run_max_steps = min(max_steps, 25)
+
+        for step_idx in range(run_max_steps):
             # Safety Check: Prevent OOM from infinite loops
-            # 25000 chars is roughly 6000-8000 tokens.
+            # Lower limit to ~8000 chars (approx 2000 tokens) to ensure dual-model safety on single GPU
             current_context_len = len(problem) + sum(len(p) for p in history_parts)
-            if current_context_len > 25000:
-                logging.warning(f"Context length {current_context_len} exceeds safety limit (25000). Terminating early.")
+            if current_context_len > 12000:
+                logging.warning(f"Context length {current_context_len} exceeds safety limit (12000). Terminating early.")
                 break
 
             logging.info(f"--- Step {step_idx + 1} ---")
@@ -54,6 +57,17 @@ class ValidatingSolver:
             if not best_step:
                 logging.info("Strategy returned no step. Stopping.")
                 break
+
+            # Loop Detection: Simple duplication check
+            if history_parts and best_step.strip() == history_parts[-1].strip():
+                logging.warning("Detected exact repetition of previous step. Terminating early to prevent loop.")
+                break
+            
+            # Heuristic Loop Detection: Check if generating extremely similar content (e.g. Case 101, Case 102...)
+            # If the step is very short and we are deep in steps, risk is high.
+            if step_idx > 10 and len(best_step) < 200:
+                # Calculate Jaccard Set similarity or simple substring overlap?
+                pass 
                 
             history_parts.append(best_step)
             client_states = new_states

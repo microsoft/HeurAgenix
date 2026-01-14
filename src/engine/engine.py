@@ -21,7 +21,7 @@ class SwarmEngine:
 
         for i, config_path in enumerate(client_config_paths):
             device_id = i % num_gpus
-            logging.info(f"Initializing Client {i} on device {device_id}")
+            logging.info(f"Initializing Client {i} on device_id={device_id} (logical index)")
             client = get_llm_client(config_path, system_prompt=system_prompt, device_id=device_id)
             self.clients.append(client)
 
