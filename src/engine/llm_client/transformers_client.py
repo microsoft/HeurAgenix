@@ -35,7 +35,7 @@ class TransformersClient(BaseLLMClient):
                 "text-generation",
                 model=self.model,
                 model_kwargs={
-                    "torch_dtype": torch.bfloat16,
+                    "dtype": torch.bfloat16,
                     "attn_implementation": "flash_attention_2",
                 },
                 device=device,
@@ -43,13 +43,17 @@ class TransformersClient(BaseLLMClient):
             )
         except Exception as e:
             # Fallback if device argument fails (e.g. conflicts with accelerate auto-map)
-            print(f"Warning: Failed to init pipeline with device={device}, falling back to device_map. Error: {e}")
+            if self.logger:
+                self.logger.warning(f"Failed to init pipeline with device={device}, falling back to device_map. Error: {e}")
+            else:
+                print(f"Warning: Failed to init pipeline with device={device}, falling back to device_map. Error: {e}")
+            
             device_map = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
             self.pipeline = transformers.pipeline(
                 "text-generation",
                 model=self.model,
                 model_kwargs={
-                    "torch_dtype": torch.bfloat16,
+                    "dtype": torch.bfloat16,
                     "attn_implementation": "flash_attention_2",
                 },
                 device_map=device_map,
