@@ -11,8 +11,9 @@ class TransformersClient(BaseLLMClient):
             config: Dict,
             system_prompt: str = None,
             device_id: int = 0,
+            logger=None,
         ):
-        super().__init__(config, system_prompt)
+        super().__init__(config, system_prompt, logger=logger)
         
         # In new config.yaml, the field is 'name' (e.g., "Qwen/Qwen3-8B")
         model_name = self.config.get('name')

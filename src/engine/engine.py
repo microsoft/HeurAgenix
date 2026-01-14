@@ -16,13 +16,16 @@ class SwarmEngine:
         self.clients: List[BaseLLMClient] = []
         self.system_prompt = system_prompt
         
+        # Get logger if not already configured, or utilize root logger
+        self.logger = logging.getLogger(__name__)
+        
         num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
         logging.info(f"Detected {num_gpus} GPUs. Assigning clients round-robin.")
 
         for i, model_config in enumerate(models_config):
             device_id = i % num_gpus
             logging.info(f"Initializing Client {i} ({model_config.get('name')}) on device_id={device_id} (logical index)")
-            client = get_llm_client(model_config, system_prompt=system_prompt, device_id=device_id)
+            client = get_llm_client(model_config, system_prompt=system_prompt, device_id=device_id, logger=self.logger)
             self.clients.append(client)
 
     def generate_candidates(self, problem: str, current_cot_text: str) -> List[str]:

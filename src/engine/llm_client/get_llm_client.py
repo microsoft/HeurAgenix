@@ -1,9 +1,8 @@
-import json
-from typing import Dict, Union
+from typing import Dict
 from src.engine.llm_client.base_llm_client import BaseLLMClient
 
 
-def get_llm_client(config: Dict, system_prompt: str = None, device_id: int = 0) -> BaseLLMClient:
+def get_llm_client(config: Dict, system_prompt: str = None, device_id: int = 0, logger=None) -> BaseLLMClient:
     # Strictly enforce Dict config (from YAML)
     if not isinstance(config, dict):
         raise ValueError(f"Expected config dict, got: {type(config)}")
@@ -12,7 +11,7 @@ def get_llm_client(config: Dict, system_prompt: str = None, device_id: int = 0) 
     
     if llm_type == "TransformersClient":
         from src.engine.llm_client.transformers_client import TransformersClient
-        llm_client = TransformersClient(config=config, system_prompt=system_prompt, device_id=device_id)
+        llm_client = TransformersClient(config=config, system_prompt=system_prompt, device_id=device_id, logger=logger)
     else:
         raise ValueError(f"Unknown client type: {llm_type}")
     return llm_client

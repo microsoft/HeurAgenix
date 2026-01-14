@@ -1,16 +1,19 @@
-import os
+import logging
+import traceback
 from time import sleep
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional
 
 
 class BaseLLMClient:
     def __init__(
             self,
             config: Dict,
-            system_prompt: str = None
+            system_prompt: str = None,
+            logger: Optional[logging.Logger] = None
         ):
         # Config is now passed directly as a Dict
         self.config = config
+        self.logger = logger
         
         self.name = self.config.get("name", "unknown_model")
         # Support both hyphen and underscore for compatibility
@@ -42,31 +45,18 @@ class BaseLLMClient:
                 self.messages.append({"role": "assistant", "content": response_content})
                 return response_content
             except Exception as e:
-                print(f"Try to chat {index + 1} time: {e}", flush=True)
-                sleep_time = self.sleep_time
-                sleep(sleep_time)
-        self.messages.append({"role": "assistant", "content": "Exceeded the maximum number of attempts"})
-        self.dump("error")
+                msg = f"Try to chat {index + 1} time: {e}"
+                if self.logger:
+                    self.logger.warning(msg)
+                    self.logger.warning(traceback.format_exc())
+                else:
+                    traceback.print_exc()
+                sleep(self.sleep_time)
+        error_msg = "Exceeded the maximum number of attempts"
+        if self.logger:
+            self.logger.error(error_msg)
+
         return None
-
-    def dump(self, output_path: str=None) -> str:
-        json_output_file = output_path.replace(".txt", ".json")
-        text_output_file = output_path.replace(".json", ".txt")
-        print(f"Chat dumped to {text_output_file}", flush=True)
-        with open(json_output_file, "w") as fp:
-            json.dump(self.messages, fp, indent=4)
-
-        with open(text_output_file, "w", encoding="UTF-8") as file:
-            for message in self.messages:
-                file.write(message["role"] + "\n")
-                contents = ""
-                for i, content in enumerate(message["content"]):
-                    if isinstance(content, dict) and content.get("type") == "text":
-                        contents += content["text"]
-                    elif isinstance(content, str):
-                        contents += content
-                file.write(contents + "\n------------------------------------------------------------------------------------\n\n")
-        return self.messages[-1]["content"][0]["text"]
 
     def chat_once(self, continue_prefix: str = None) -> str:
         raise NotImplemented
