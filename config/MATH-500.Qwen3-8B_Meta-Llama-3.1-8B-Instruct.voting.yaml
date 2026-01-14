@@ -1,0 +1,35 @@
+exp_name: "MATH-500.Qwen3-8B_Meta-Llama-3.1-8B-Instruct.voting"
+
+engine:
+  max_steps: 45
+  max_context_chars: 32000
+
+task:
+  name: "math500"
+
+strategy:
+  type: "voting"
+
+
+models:
+  - name: "Qwen/Qwen3-8B"
+    type: "TransformersClient"
+    think: false
+    max_tokens: 1024
+    max_attempts: 3
+    sleep_time: 10
+    temperature: 0
+    do_sample: false
+    top_p: 1.0
+    repetition_penalty: 1.0
+    
+  - name: "Meta/Meta-Llama-3.1-8B-Instruct"
+    type: "TransformersClient"
+    think: false
+    max_tokens: 1024
+    max_attempts: 3
+    sleep_time: 10
+    temperature: 0
+    do_sample: false
+    top_p: 1.0
+    repetition_penalty: 1.0

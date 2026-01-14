@@ -49,9 +49,7 @@ TASK_REGISTRY = {
 
 def run_consensus_evaluation(
     config_path: str,
-    exp_name_override: str = None,
-    start_index: int = 0,
-    end_index: int = None
+    exp_name: str = None
 ):
     # 1. Load Config
     with open(config_path, 'r') as f:
@@ -59,7 +57,7 @@ def run_consensus_evaluation(
 
     # 2. Determine Experiment Name & Output Dir
     # Priority: CLI Override > Config['exp_name'] > Default
-    exp_name = exp_name_override if exp_name_override else config.get('exp_name', f"experiment_{int(time.time())}")
+    exp_name = exp_name if exp_name else config.get('exp_name', f"experiment_{int(time.time())}")
     
     # Update config with final exp_name for logging
     config['exp_name'] = exp_name
@@ -109,23 +107,6 @@ def run_consensus_evaluation(
 
     # Load Task Data
     test_data = task.get_dataset()
-    
-    # Slice dataset if requested (CLI overrides config)
-    # Check config if CLI not provided
-    if start_index == 0 and end_index is None:
-         # Try reading from config
-         data_range = config.get('task', {}).get('dataset_range', None)
-         if data_range:
-             start_index = data_range[0]
-             if len(data_range) > 1:
-                 end_index = data_range[1]
-
-    if end_index is not None:
-        test_data = test_data[start_index:end_index]
-        logger.info(f"Running problems {start_index} to {end_index}")
-    else:
-        test_data = test_data[start_index:]
-        logger.info(f"Running problems {start_index} to end")
 
     logger.info(f"Total problems to evaluate: {len(test_data)}")
 
@@ -238,14 +219,10 @@ if __name__ == "__main__":
     
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to config.yaml")
     parser.add_argument("-e", "--exp_name", type=str, default=None, help="Override Experiment name")
-    parser.add_argument("--start", type=int, default=0, help="Start index of problems (overrides config)")
-    parser.add_argument("--end", type=int, default=None, help="End index of problems (overrides config)")
 
     args = parser.parse_args()
     
     run_consensus_evaluation(
         config_path=args.config,
-        exp_name_override=args.exp_name,
-        start_index=args.start,
-        end_index=args.end
+        exp_name=args.exp_name
     )
