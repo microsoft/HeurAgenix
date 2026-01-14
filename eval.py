@@ -1,4 +1,7 @@
 import os
+# Fix fragmentation issues for OOM
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import json
 import argparse
 import sys

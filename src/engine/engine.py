@@ -1,6 +1,7 @@
 import torch
 import logging
 import concurrent.futures
+import gc
 from typing import List, Dict, Tuple, Optional, Any
 from src.engine.llm_client.base_llm_client import BaseLLMClient
 from src.engine.llm_client.get_llm_client import get_llm_client
@@ -65,6 +66,10 @@ class SwarmEngine:
                 if res:
                     step_candidates.append(res)
         
+        # Cleanup
+        torch.cuda.empty_cache()
+        gc.collect()
+
         return step_candidates
 
     def score_candidates(
@@ -147,6 +152,10 @@ class SwarmEngine:
                 res = f.result()
                 scores_matrix[c_idx][r_idx] = res
 
+        # Cleanup
+        torch.cuda.empty_cache()
+        gc.collect()
+
         return scores_matrix
 
     def update_states(self, base_messages: List[Dict], history_text: str) -> List[Dict]:
@@ -169,5 +178,9 @@ class SwarmEngine:
                 nll_sum, t_len = f.result()
                 new_states[i]['nll_sum'] = nll_sum
                 new_states[i]['token_len'] = t_len
-                
+        
+        # Cleanup
+        torch.cuda.empty_cache()
+        gc.collect()
+
         return new_states
