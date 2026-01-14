@@ -8,16 +8,22 @@ from src.engine.llm_client.base_llm_client import BaseLLMClient
 class TransformersClient(BaseLLMClient):
     def __init__(
             self,
-            config_path: str,
+            config: Dict,
             system_prompt: str = None,
             device_id: int = 0,
         ):
-        super().__init__(config_path, system_prompt)
+        super().__init__(config, system_prompt)
         
+        # In new config.yaml, the field is 'name' (e.g., "Qwen/Qwen3-8B")
+        model_name = self.config.get('name')
+
+        if not model_name:
+             raise ValueError(f"Config missing 'name' field for model. Config: {self.config}")
+         
         if os.getenv("AMLT_DATA_DIR"):
-            self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(self.config['model_name']))
+            self.model = os.path.join(os.getenv("AMLT_DATA_DIR"), os.path.normpath(model_name))
         else:
-            self.model = os.path.normpath(self.config['model_name'])
+            self.model = os.path.normpath(model_name)
 
         # Determine device to avoid distributed init issues on multi-GPU nodes
         # Use integer device for strict placement. device_map can sometimes be flaky in pipelines.
@@ -49,7 +55,7 @@ class TransformersClient(BaseLLMClient):
                 trust_remote_code=True,
             )
             
-        print(f"DEBUG: Model {self.config['model_name']} loaded on device: {self.pipeline.model.device}. Requested device_id: {device_id}")
+        print(f"DEBUG: Model {self.model} loaded on device: {self.pipeline.model.device}. Requested device_id: {device_id}")
 
         # Ensure pad_token is set to suppress warnings and ensure correct behavior for open-end generation
         if self.pipeline.tokenizer.pad_token_id is None:
@@ -148,8 +154,8 @@ class TransformersClient(BaseLLMClient):
             gen_kwargs["top_p"] = self.top_p
 
         # Add repetition penalty to prevent loops (Crucial for Llama-3)
-        # 1.1 - 1.2 is usually a safe range.
-        gen_kwargs["repetition_penalty"] = 1.0
+        # Use config value if present, otherwise default to 1.0
+        gen_kwargs["repetition_penalty"] = self.config.get("repetition_penalty", 1.0)
 
         # Add stop condition to prevent long generation and ensure single step logic
         gen_kwargs["stop_strings"] = ["</step>"]
@@ -157,8 +163,8 @@ class TransformersClient(BaseLLMClient):
         
         # Limit max tokens for a single step to prevent runaway loops
         # Even if stop token is missed, this will cut it off.
-        # 1024 is generous for math steps but prevents infinite loops.
-        gen_kwargs["max_new_tokens"] = min(self.max_tokens, 1024)
+        # Use config value solely - no more hardcoded 1024 limit
+        gen_kwargs["max_new_tokens"] = self.max_tokens
 
         response = self.pipeline(text, **gen_kwargs)
         if continue_prefix:

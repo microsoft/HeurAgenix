@@ -1,0 +1,24 @@
+exp_name: "MATH-500.Qwen3-8B.single"
+
+engine:
+  max_steps: 45
+  max_context_chars: 32000
+
+task:
+  name: "math500"
+
+strategy:
+  type: "single"
+
+models:
+  - name: "Qwen/Qwen3-8B"
+    type: "TransformersClient"
+    think: false
+    max_tokens: 1024
+    max_attempts: 3
+    sleep_time: 10
+    temperature: 0.0
+    think: false
+    do_sample: false
+    top_p: 1.0
+    repetition_penalty: 1.0

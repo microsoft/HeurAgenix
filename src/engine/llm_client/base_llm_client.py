@@ -1,5 +1,4 @@
 import os
-import json
 from time import sleep
 from typing import Dict, List, Tuple
 
@@ -7,16 +6,17 @@ from typing import Dict, List, Tuple
 class BaseLLMClient:
     def __init__(
             self,
-            config_path: str,
+            config: Dict,
             system_prompt: str = None
         ):
-        self.config = self.load_config(config_path)
-        
+        # Config is now passed directly as a Dict
+        self.config = config
         
         self.name = self.config.get("name", "unknown_model")
-        self.top_p = self.config.get("top-p", 0.7)
-        self.temperature = self.config.get("temperature", 0.95)
-        self.max_tokens = self.config.get("max_tokens", 3200)
+        # Support both hyphen and underscore for compatibility
+        self.top_p = self.config.get("top_p", self.config.get("top-p", 1.0))
+        self.temperature = self.config.get("temperature", 1.0)
+        self.max_tokens = self.config.get("max_tokens", 32000)
         self.seed = self.config.get("seed", None)
         self.think = self.config.get("think", False)
         self.max_attempts = self.config.get("max_attempts", 50)
@@ -29,8 +29,8 @@ class BaseLLMClient:
             self.system_prompt = None
 
     def load_config(self, config_path: str) -> Dict:
-        with open(config_path, 'r') as f:
-            return json.load(f)
+        # Legacy method removed
+        raise NotImplementedError("Config loading from file is deprecated. Pass dict directly.")
 
     def chat_once(self) -> str:
         pass

@@ -10,11 +10,14 @@ class ValidatingSolver:
     Layer 4: Solver
     Orchestrates the solution process using Engine and Strategy.
     """
-    def __init__(self, engine: SwarmEngine, strategy: BaseStrategy = None):
+    def __init__(self, engine: SwarmEngine, strategy: BaseStrategy = None, config: dict = None):
         self.engine = engine
         self.strategy = strategy if strategy else VotingStrategy()
+        self.config = config if config else {}
+        self.max_steps = self.config.get('max_steps', 45)
+        self.max_context_chars = self.config.get('max_context_chars', 32000)
 
-    def solve(self, problem: str, max_steps: int = 50, problem_index: int = None) -> str:
+    def solve(self, problem: str, problem_index: int = None) -> str:
         """
         Main loop.
         """
@@ -34,14 +37,14 @@ class ValidatingSolver:
         history_parts = []
         
         # OOM Prevention: Cap max steps aggressively for baseline runs
-        run_max_steps = min(max_steps, 25)
+        run_max_steps = self.max_steps
 
         for step_idx in range(run_max_steps):
             # Safety Check: Prevent OOM from infinite loops
             # Lower limit to ~8000 chars (approx 2000 tokens) to ensure dual-model safety on single GPU
             current_context_len = len(problem) + sum(len(p) for p in history_parts)
-            if current_context_len > 12000:
-                logging.warning(f"Context length {current_context_len} exceeds safety limit (12000). Terminating early.")
+            if current_context_len > self.max_context_chars:
+                logging.warning(f"Context length {current_context_len} exceeds safety limit ({self.max_context_chars}). Terminating early.")
                 break
 
             logging.info(f"--- Step {step_idx + 1} ---")

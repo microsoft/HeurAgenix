@@ -16,3 +16,4 @@ packaging
 ninja
 flash-attn==2.8.3
 tqdm==4.67.1
+PyYAML==6.0.3

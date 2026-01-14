@@ -3,12 +3,14 @@ import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import json
+import yaml
+import shutil
 import argparse
 import sys
 import time
 import logging
 from tqdm import tqdm
-from typing import List, Type
+from typing import List, Type, Dict
 from src.engine.engine import SwarmEngine
 from src.engine.solver import ValidatingSolver
 from src.engine.strategy.voting_strategy import VotingStrategy
@@ -46,18 +48,28 @@ TASK_REGISTRY = {
 }
 
 def run_consensus_evaluation(
-    model_config_paths: List[str],
-    task_name: str,
-    strategy_name: str = "single",
-    exp_name: str = "",
+    config_path: str,
+    exp_name_override: str = None,
     start_index: int = 0,
     end_index: int = None
 ):
+    # 1. Load Config
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
 
+    # 2. Determine Experiment Name & Output Dir
+    # Priority: CLI Override > Config['exp_name'] > Default
+    exp_name = exp_name_override if exp_name_override else config.get('exp_name', f"experiment_{int(time.time())}")
+    
+    # Update config with final exp_name for logging
+    config['exp_name'] = exp_name
     
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "..", "ccdm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     output_dir = os.path.join(base_output_dir, exp_name)
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Copy config file to output dir for reproducibility
+    shutil.copy(config_path, os.path.join(output_dir, "config.yaml"))
     
     # Setup Logging
     log_file = os.path.join(output_dir, "run.log")
@@ -79,8 +91,15 @@ def run_consensus_evaluation(
     )
     logger = logging.getLogger(__name__)
     
+    # Extract Params
+    task_name = config.get('task', {}).get('name', 'math500')
+    strategy_name = config.get('strategy', {}).get('type', 'single')
+    models_config = config.get('models', [])
+    engine_config = config.get('engine', {})
+    
     logger.info(f"--- Evaluation ---")
-    logger.info(f"Model Configs: {model_config_paths}")
+    logger.info(f"Config File: {config_path}")
+    logger.info(f"Exp Name: {exp_name}")
     logger.info(f"Task: {task_name}")
     logger.info(f"Strategy: {strategy_name}")
     logger.info(f"Output Directory: {output_dir}")
@@ -91,7 +110,16 @@ def run_consensus_evaluation(
     # Load Task Data
     test_data = task.get_dataset()
     
-    # Slice dataset if requested
+    # Slice dataset if requested (CLI overrides config)
+    # Check config if CLI not provided
+    if start_index == 0 and end_index is None:
+         # Try reading from config
+         data_range = config.get('task', {}).get('dataset_range', None)
+         if data_range:
+             start_index = data_range[0]
+             if len(data_range) > 1:
+                 end_index = data_range[1]
+
     if end_index is not None:
         test_data = test_data[start_index:end_index]
         logger.info(f"Running problems {start_index} to {end_index}")
@@ -102,7 +130,8 @@ def run_consensus_evaluation(
     logger.info(f"Total problems to evaluate: {len(test_data)}")
 
     # Initialize Engine (Layer 2)
-    engine = SwarmEngine(model_config_paths, system_prompt=task.system_prompt)
+    # Pass model list dicts directly
+    engine = SwarmEngine(models_config, system_prompt=task.system_prompt)
     
     # Select Strategy (Layer 3)
     if strategy_name == "voting":
@@ -115,7 +144,16 @@ def run_consensus_evaluation(
         raise ValueError(f"Unknown strategy: {strategy_name}")
 
     # Initialize Solver (Layer 4)
-    solver = ValidatingSolver(engine, strategy)
+    # Pass engine config implicitly via solver params or modify init?
+    # Solver currently hardcodes max_steps in solve method signature,
+    # let's change solver initialization or pass it during solve call.
+    solver_config = {
+        'max_steps': engine_config.get('max_steps', 50),
+        'max_context_chars': engine_config.get('max_context_chars', 32000),
+        'loop_detection_window': engine_config.get('loop_detection_window', 3)
+    }
+    
+    solver = ValidatingSolver(engine, strategy, config=solver_config)
 
     # 2. Evaluation Loop
     correct_count = 0
@@ -130,26 +168,18 @@ def run_consensus_evaluation(
     def save_results():
         # Get configs from engine clients for logging
         # We access this lazily as engine is init before loop
-        configs = [client.config for client in engine.clients]
         
         current_acc = (correct_count / total_count) * 100 if total_count > 0 else 0.0
         
         # Consolidate everything into one JSON
         with open(results_file, 'w') as f:
             json.dump({
-                "meta": {
-                    "task": task_name,
-                    "strategy": strategy_name,
-                    "model_configs": configs # Full config content
-                },
-                "stats": {
-                    "accuracy": current_acc,
-                    "correct_count": correct_count,
-                    "total_count": total_count,
-                    "total_problems": len(test_data),
-                    "processed_problems": total_count,
-                },
-                "results": results # Full details including prompts, responses, pred, is_correct
+                "accuracy": current_acc,
+                "correct_count": correct_count,
+                "total_count": total_count,
+                "total_problems": len(test_data),
+                "processed_problems": total_count,
+                "results": results 
             }, f, indent=2)
 
     save_results()
@@ -161,7 +191,8 @@ def run_consensus_evaluation(
         
         # Solver Execution (Layer 4)
         start_time = time.time()
-        best_response = solver.solve(problem, max_steps=50, problem_index=total_count + 1) 
+        # Max steps is handled by solver internally using config now
+        best_response = solver.solve(problem, problem_index=total_count + 1) 
         elapsed = time.time() - start_time
         
         # Extract & Verify
@@ -203,22 +234,18 @@ def run_consensus_evaluation(
     logger.info(f"Log saved to {log_file}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run consensus evaluation on a task.")
-    # Allow multiple config files
-    parser.add_argument("-c", "--configs", type=str, required=True, help="Paths to LLM config jsons (comma separated)")
-    parser.add_argument("-t", "--task", type=str, default="math500", help="Task name")
-    parser.add_argument("-s", "--strategy", type=str, default="single", choices=["single", "voting", "consensus_value"], help="Strategy name")
-    parser.add_argument("-e", "--exp_name", type=str, default=None, help="Experiment name (default: timestamp)")
-    parser.add_argument("--start", type=int, default=0, help="Start index of problems")
-    parser.add_argument("--end", type=int, default=None, help="End index of problems (exclusive)")
+    parser = argparse.ArgumentParser(description="Run consensus evaluation via YAML config.")
+    
+    parser.add_argument("-c", "--config", type=str, required=True, help="Path to config.yaml")
+    parser.add_argument("-e", "--exp_name", type=str, default=None, help="Override Experiment name")
+    parser.add_argument("--start", type=int, default=0, help="Start index of problems (overrides config)")
+    parser.add_argument("--end", type=int, default=None, help="End index of problems (overrides config)")
 
     args = parser.parse_args()
     
     run_consensus_evaluation(
-        args.configs.split(","),
-        args.task,
-        strategy_name=args.strategy,
-        exp_name=args.exp_name,
+        config_path=args.config,
+        exp_name_override=args.exp_name,
         start_index=args.start,
         end_index=args.end
     )

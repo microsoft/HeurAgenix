@@ -12,17 +12,17 @@ class SwarmEngine:
     Layer 2: Compute Layer
     Manages the swarm of LLM clients and provides parallelized atomic operations.
     """
-    def __init__(self, client_config_paths: List[str], system_prompt: str = None):
+    def __init__(self, models_config: List[Dict], system_prompt: str = None):
         self.clients: List[BaseLLMClient] = []
         self.system_prompt = system_prompt
         
         num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
         logging.info(f"Detected {num_gpus} GPUs. Assigning clients round-robin.")
 
-        for i, config_path in enumerate(client_config_paths):
+        for i, model_config in enumerate(models_config):
             device_id = i % num_gpus
-            logging.info(f"Initializing Client {i} on device_id={device_id} (logical index)")
-            client = get_llm_client(config_path, system_prompt=system_prompt, device_id=device_id)
+            logging.info(f"Initializing Client {i} ({model_config.get('name')}) on device_id={device_id} (logical index)")
+            client = get_llm_client(model_config, system_prompt=system_prompt, device_id=device_id)
             self.clients.append(client)
 
     def generate_candidates(self, problem: str, current_cot_text: str) -> List[str]:
