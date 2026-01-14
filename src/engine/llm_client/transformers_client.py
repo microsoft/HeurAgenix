@@ -131,7 +131,7 @@ class TransformersClient(BaseLLMClient):
 
         # Add repetition penalty to prevent loops (Crucial for Llama-3)
         # 1.1 - 1.2 is usually a safe range.
-        gen_kwargs["repetition_penalty"] = 1.15
+        gen_kwargs["repetition_penalty"] = 1.0
 
         # Add stop condition to prevent long generation and ensure single step logic
         gen_kwargs["stop_strings"] = ["</step>"]
