@@ -103,130 +103,134 @@ def run_consensus_evaluation(
     logger.info(f"Strategy: {strategy_name}")
     logger.info(f"Output Directory: {output_dir}")
 
-    task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
-    task = task_class()
+    try:
+        task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
+        task = task_class()
 
-    # Load Task Data
-    test_data = task.get_dataset()
+        # Load Task Data
+        test_data = task.get_dataset()
 
-    logger.info(f"Total problems to evaluate: {len(test_data)}")
+        logger.info(f"Total problems to evaluate: {len(test_data)}")
 
-    # Initialize Engine (Layer 2)
-    # Pass model list dicts directly
-    engine = SwarmEngine(models_config, system_prompt=task.system_prompt, config=engine_config)
-    
-    # Select Strategy (Layer 3)
-    if strategy_name == "voting":
-        strategy = VotingStrategy()
-    elif strategy_name == "consensus_value":
-        strategy = ConsensusValueStrategy() # Using default mean aggregation
-    elif strategy_name == "single":
-        strategy = SingleStrategy()
-    else:
-        raise ValueError(f"Unknown strategy: {strategy_name}")
+        # Initialize Engine (Layer 2)
+        # Pass model list dicts directly
+        engine = SwarmEngine(models_config, system_prompt=task.system_prompt, config=engine_config)
+        
+        # Select Strategy (Layer 3)
+        if strategy_name == "voting":
+            strategy = VotingStrategy()
+        elif strategy_name == "consensus_value":
+            strategy = ConsensusValueStrategy() # Using default mean aggregation
+        elif strategy_name == "single":
+            strategy = SingleStrategy()
+        else:
+            raise ValueError(f"Unknown strategy: {strategy_name}")
 
-    # Initialize Solver (Layer 4)
-    # Pass engine config implicitly via solver params or modify init?
-    # Solver currently hardcodes max_steps in solve method signature,
-    # let's change solver initialization or pass it during solve call.
-    solver_config = {
-        'max_steps': engine_config.get('max_steps', 50),
-        'max_context_chars': engine_config.get('max_context_chars', 32000),
-        'loop_detection_window': engine_config.get('loop_detection_window', 3)
-    }
-    
-    solver = ValidatingSolver(engine, strategy, config=solver_config)
-
-    # 2. Evaluation Loop
-    correct_count = 0
-    total_count = 0
-    results = []
-    pbar = tqdm(test_data)
-
-    # Pre-calculate Paths
-    # Consolidated results file
-    results_file = os.path.join(output_dir, "results.json")
-
-    def save_results():
-        # Get configs from engine clients for logging
-        # We access this lazily as engine is init before loop
-        
-        current_acc = (correct_count / total_count) * 100 if total_count > 0 else 0.0
-        
-        # Consolidate everything into one JSON
-        with open(results_file, 'w') as f:
-            json.dump({
-                "accuracy": current_acc,
-                "correct_count": correct_count,
-                "total_count": total_count,
-                "total_problems": len(test_data),
-                "processed_problems": total_count,
-                "results": results 
-            }, f, indent=2)
-
-    save_results()
-    for item in pbar:
-        # Reset memory stats
-        if torch.cuda.is_available():
-            torch.cuda.reset_peak_memory_stats()
-
-        # Format Prompt
-        
-        problem = item["problem"]
-        ground_truth = item["ground_truth"]
-        
-        # Solver Execution (Layer 4)
-        start_time = time.time()
-        # Max steps is handled by solver internally using config now
-        best_response = solver.solve(problem, problem_index=total_count + 1) 
-        elapsed = time.time() - start_time
-        
-        # Record Memory
-        max_memory_gb = 0.0
-        if torch.cuda.is_available():
-            max_memory_bytes = torch.cuda.max_memory_allocated()
-            max_memory_gb = max_memory_bytes / (1024 ** 3)
-        
-        # Extract & Verify
-        prediction = task.extract_answer(best_response)
-        
-        is_correct = task.verify_answer(prediction, ground_truth)
-        
-        if is_correct:
-            correct_count += 1
-        total_count += 1
-        
-        # Log Result
-        logger.info(f"Problem {total_count} | Peak Memory: {max_memory_gb:.2f} GB | Time: {elapsed:.2f}s")
-        
-        result_entry = {
-            "system_prompt": task.system_prompt,
-            "problem": problem,
-            "ground_truth": ground_truth,
-            "response": best_response,
-            "prediction": prediction,
-            "is_correct": is_correct,
-            "time_taken": elapsed,
-            "peak_memory_gb": max_memory_gb
+        # Initialize Solver (Layer 4)
+        # Pass engine config implicitly via solver params or modify init?
+        # Solver currently hardcodes max_steps in solve method signature,
+        # let's change solver initialization or pass it during solve call.
+        solver_config = {
+            'max_steps': engine_config.get('max_steps', 50),
+            'max_context_chars': engine_config.get('max_context_chars', 32000),
+            'loop_detection_window': engine_config.get('loop_detection_window', 3)
         }
-        results.append(result_entry)
         
-        # Update progress bar
-        current_acc = (correct_count / total_count) * 100
-        pbar.set_description(f"Acc: {current_acc:.2f}% ({correct_count}/{total_count})")
+        solver = ValidatingSolver(engine, strategy, config=solver_config)
+
+        # 2. Evaluation Loop
+        correct_count = 0
+        total_count = 0
+        results = []
+        pbar = tqdm(test_data)
+
+        # Pre-calculate Paths
+        # Consolidated results file
+        results_file = os.path.join(output_dir, "results.json")
+
+        def save_results():
+            # Get configs from engine clients for logging
+            # We access this lazily as engine is init before loop
+            
+            current_acc = (correct_count / total_count) * 100 if total_count > 0 else 0.0
+            
+            # Consolidate everything into one JSON
+            with open(results_file, 'w') as f:
+                json.dump({
+                    "accuracy": current_acc,
+                    "correct_count": correct_count,
+                    "total_count": total_count,
+                    "total_problems": len(test_data),
+                    "processed_problems": total_count,
+                    "results": results 
+                }, f, indent=2)
+
+        save_results()
+
+        for item in pbar:
+            # Reset memory stats
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+
+            problem = item["problem"]
+            ground_truth = item["ground_truth"]
+            
+            # Solver Execution (Layer 4)
+            start_time = time.time()
+            # Max steps is handled by solver internally using config now
+            best_response = solver.solve(problem, problem_index=total_count + 1) 
+            elapsed = time.time() - start_time
+            
+            # Record Memory
+            max_memory_gb = 0.0
+            if torch.cuda.is_available():
+                max_memory_bytes = torch.cuda.max_memory_allocated()
+                max_memory_gb = max_memory_bytes / (1024 ** 3)
+            
+            # Extract & Verify
+            prediction = task.extract_answer(best_response)
+            
+            is_correct = task.verify_answer(prediction, ground_truth)
+            
+            if is_correct:
+                correct_count += 1
+            total_count += 1
+            
+            # Log Result
+            logger.info(f"Problem {total_count} | Peak Memory: {max_memory_gb:.2f} GB | Time: {elapsed:.2f}s")
+            
+            result_entry = {
+                "system_prompt": task.system_prompt,
+                "problem": problem,
+                "ground_truth": ground_truth,
+                "response": best_response,
+                "prediction": prediction,
+                "is_correct": is_correct,
+                "time_taken": elapsed,
+                "peak_memory_gb": max_memory_gb
+            }
+            results.append(result_entry)
+            
+            # Update progress bar
+            current_acc = (correct_count / total_count) * 100
+            pbar.set_description(f"Acc: {current_acc:.2f}% ({correct_count}/{total_count})")
+            
+            # Checkpoint every item for real-time updates
+            save_results()
+            
+        # 3. Summary & Save
+        final_acc = (correct_count / total_count) * 100
+        logger.info(f"\n--- Evaluation Complete ---")
+        logger.info(f"Final Accuracy: {final_acc:.2f}%")
         
-        # Checkpoint every item for real-time updates
         save_results()
         
-    # 3. Summary & Save
-    final_acc = (correct_count / total_count) * 100
-    logger.info(f"\n--- Evaluation Complete ---")
-    logger.info(f"Final Accuracy: {final_acc:.2f}%")
-    
-    save_results()
-    
-    logger.info(f"Results saved to {results_file}")
-    logger.info(f"Log saved to {log_file}")
+        logger.info(f"Results saved to {results_file}")
+        logger.info(f"Log saved to {log_file}")
+
+    except Exception:
+        logger.critical("Fatal error occurred during evaluation:", exc_info=True)
+        raise
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run consensus evaluation via YAML config.")
