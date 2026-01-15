@@ -106,7 +106,7 @@ class TransformersClient(BaseLLMClient):
         """
         return messages
 
-    def chat_once(self, continue_prefix: str = None) -> str:
+    def chat_once(self, continue_prefix: str = None, max_new_tokens: int = None) -> str:
         # Check if the last message is assistant. If so, and we want to continue, 
         # we might need to handle it specially.
         # But our agreed approach is: continue_prefix comes from outside, 
@@ -140,7 +140,7 @@ class TransformersClient(BaseLLMClient):
             text += continue_prefix
         
         gen_kwargs = {
-            "max_new_tokens": self.max_tokens,
+            "max_new_tokens":  max_new_tokens if max_new_tokens is not None else self.max_tokens,
             "return_full_text": False,
         }
         
@@ -165,11 +165,6 @@ class TransformersClient(BaseLLMClient):
         # Add stop condition to prevent long generation and ensure single step logic
         gen_kwargs["stop_strings"] = ["</step>"]
         gen_kwargs["tokenizer"] = self.pipeline.tokenizer 
-        
-        # Limit max tokens for a single step to prevent runaway loops
-        # Even if stop token is missed, this will cut it off.
-        # Use config value solely - no more hardcoded 1024 limit
-        gen_kwargs["max_new_tokens"] = self.max_tokens
 
         response = self.pipeline(text, **gen_kwargs)
         if continue_prefix:
@@ -190,6 +185,10 @@ class TransformersClient(BaseLLMClient):
         return ids.shape[1]
 
     def get_sequence_score(self, conversation: List[Dict], response: str) -> float:
+        # Mandatory cleanup to prevent OOM during scoring
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
         format_messages = self._format_messages(conversation)
 
         # Apply chat template to get the prompt part

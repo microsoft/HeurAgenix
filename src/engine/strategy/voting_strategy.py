@@ -28,8 +28,29 @@ class VotingStrategy(BaseStrategy):
         else:
             base_messages = [{"role": "user", "content": problem}]
 
+        # --- Dynamic Token Budget Calculation ---
+        hard_limit_chars = engine.config.get('max_context_chars_hard', 64000)
+        soft_limit_chars = engine.config.get('max_context_chars_soft', 48000)
+        
+        current_len_chars = len(problem) + len(current_cot_text)
+        
+        # 1. Hard Limit Check
+        if current_len_chars > hard_limit_chars:
+            logging.warning(f"Strategy Hard Limit Reached: {current_len_chars} > {hard_limit_chars}. Terminating.")
+            return "", client_states
+
+        # 2. Soft Limit Budgeting
+        remaining_chars = soft_limit_chars - current_len_chars
+        if remaining_chars <= 0:
+            logging.warning(f"Strategy Soft Limit Reached. Forcing generation stop.")
+            max_new_tokens_budget = 1
+        else:
+            # Safe estimate: 2.5 chars/token
+            budget_tokens = int(remaining_chars / 2.5)
+            max_new_tokens_budget = min(1024, budget_tokens)
+
         # 1. Generate Candidates (Parallel)
-        step_candidates = engine.generate_candidates(problem, current_cot_text)
+        step_candidates = engine.generate_candidates(problem, current_cot_text, max_new_tokens=max_new_tokens_budget)
         
         if not step_candidates:
             # Fallback? Return empty?

@@ -12,9 +12,10 @@ class SwarmEngine:
     Layer 2: Compute Layer
     Manages the swarm of LLM clients and provides parallelized atomic operations.
     """
-    def __init__(self, models_config: List[Dict], system_prompt: str = None):
+    def __init__(self, models_config: List[Dict], system_prompt: str = None, config: Dict = None):
         self.clients: List[BaseLLMClient] = []
         self.system_prompt = system_prompt
+        self.config = config if config else {}
         
         # Get logger if not already configured, or utilize root logger
         self.logger = logging.getLogger(__name__)
@@ -28,11 +29,14 @@ class SwarmEngine:
             client = get_llm_client(model_config, system_prompt=system_prompt, device_id=device_id, logger=self.logger)
             self.clients.append(client)
 
-    def generate_candidates(self, problem: str, current_cot_text: str) -> List[str]:
+    def generate_candidates(self, problem: str, current_cot_text: str, max_new_tokens: int = None) -> List[str]:
         """
         Phase 1: Diversified Generation
         Broadcasts the generation request to all clients.
         Returns a list of candidate steps (one per client).
+        
+        Args:
+            max_new_tokens: Optional override for generation length (e.g. for dynamic budget).
         """
         step_candidates = []
 
@@ -43,7 +47,7 @@ class SwarmEngine:
             try:
                 # We pass current_cot_text as prefix
                 prefix = current_cot_text + "\n\n" if current_cot_text else None
-                full_response = client_inst.chat(continue_prefix=prefix)
+                full_response = client_inst.chat(continue_prefix=prefix, max_new_tokens=max_new_tokens)
                 
                 if not full_response:
                     return None

@@ -1,8 +1,8 @@
 exp_name: "MATH-500.Ministral-3-8B-Instruct-2512.single"
 
 engine:
-  max_steps: 45
-  max_context_chars: 32000
+  max_context_chars_hard: 64000
+  max_context_chars_soft: 48000
 
 task:
   name: "math500"
@@ -14,7 +14,6 @@ models:
   - name: "mistralai/Ministral-3-8B-Instruct-2512"
     type: "TransformersClient"
     think: false
-    max_tokens: 1024
     max_attempts: 3
     sleep_time: 10
     temperature: 0.0

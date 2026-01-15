@@ -1,8 +1,8 @@
 exp_name: "MATH-500.Gemma2-9B-IT.single"
 
 engine:
-  max_steps: 45
-  max_context_chars: 32000
+  max_context_chars_hard: 64000
+  max_context_chars_soft: 48000
 
 task:
   name: "math500"
@@ -14,7 +14,6 @@ models:
   - name: "google/gemma-2-9b-it"
     type: "TransformersClient"
     think: false
-    max_tokens: 1024
     max_attempts: 3
     sleep_time: 10
     temperature: 0.0

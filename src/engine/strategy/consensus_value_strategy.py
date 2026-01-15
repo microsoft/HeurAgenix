@@ -39,9 +39,24 @@ class ConsensusValueStrategy(BaseStrategy):
         else:
             base_messages = [{"role": "user", "content": problem}]
 
+        # --- Dynamic Token Budget Calculation (Layer 1) ---
+        hard_limit_chars = engine.config.get('max_context_chars_hard', 64000)
+        soft_limit_chars = engine.config.get('max_context_chars_soft', 48000)
+        
+        current_len_chars = len(problem) + len(current_cot_text)
+        
+        if current_len_chars > hard_limit_chars:
+             return "", client_states
+             
+        remaining_chars = soft_limit_chars - current_len_chars
+        if remaining_chars <= 0:
+            max_new_tokens_budget = 1
+        else:
+            max_new_tokens_budget = min(1024, int(remaining_chars / 2.5))
+
         # --- Step 1: Broad Search (First Layer Generation) ---
         # Generate N candidates R_i
-        layer1_candidates = engine.generate_candidates(problem, current_cot_text)
+        layer1_candidates = engine.generate_candidates(problem, current_cot_text, max_new_tokens=max_new_tokens_budget)
         
         if not layer1_candidates:
             return "", client_states
@@ -62,10 +77,24 @@ class ConsensusValueStrategy(BaseStrategy):
             hypothetical_history = history_parts + [cand_r]
             hypothetical_text = "\n\n".join(hypothetical_history)
             
+            # --- Dynamic Token Budget Calculation (Layer 2) ---
+            # Re-check budget for the hypothetical state
+            curr_len_2 = len(problem) + len(hypothetical_text) # hypothetical_text contains full history? No, wait.
+            # history_parts is user text. hypothetical_text is joined history parts.
+            # We strictly need to check total length.
+            # Note: history_parts excludes problem usually? engine.generate_candidates takes problem+text separately.
+            # Let's trust hypothetical_text is the full 'assistant' history. 
+            
+            rem_chars_2 = soft_limit_chars - (len(problem) + len(hypothetical_text))
+            if rem_chars_2 <= 0:
+                budget_2 = 1
+            else:
+                 budget_2 = min(1024, int(rem_chars_2 / 2.5))
+
             # --- Step 2: Lookahead (Second Layer Generation) ---
             # Generate M responses based on S_i
             # Since we don't have KV cache efficient cloning yet, this will be slow (re-encoding S_i).
-            layer2_candidates = engine.generate_candidates(problem, hypothetical_text)
+            layer2_candidates = engine.generate_candidates(problem, hypothetical_text, max_new_tokens=budget_2)
             
             if not layer2_candidates:
                 # If no one can continue, this might be a bad state? 

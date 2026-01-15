@@ -1,8 +1,10 @@
 exp_name: "MATH-500.Meta-Llama-3.1-8B-Instruct.single"
 
 engine:
-  max_steps: 45
-  max_context_chars: 32000
+  # Using new dynamic budget system
+  # Safety limits for A100-40G
+  max_context_chars_hard: 64000
+  max_context_chars_soft: 48000
 
 task:
   name: "math500"
@@ -14,7 +16,6 @@ models:
   - name: "meta-llama/Meta-Llama-3.1-8B-Instruct"
     type: "TransformersClient"
     think: false
-    max_tokens: 1024
     max_attempts: 3
     sleep_time: 10
     temperature: 0.0

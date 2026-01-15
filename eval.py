@@ -9,6 +9,7 @@ import argparse
 import sys
 import time
 import logging
+import torch
 from tqdm import tqdm
 from typing import List, Type, Dict
 from src.engine.engine import SwarmEngine
@@ -112,7 +113,7 @@ def run_consensus_evaluation(
 
     # Initialize Engine (Layer 2)
     # Pass model list dicts directly
-    engine = SwarmEngine(models_config, system_prompt=task.system_prompt)
+    engine = SwarmEngine(models_config, system_prompt=task.system_prompt, config=engine_config)
     
     # Select Strategy (Layer 3)
     if strategy_name == "voting":
@@ -165,6 +166,10 @@ def run_consensus_evaluation(
 
     save_results()
     for item in pbar:
+        # Reset memory stats
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+
         # Format Prompt
         
         problem = item["problem"]
@@ -176,6 +181,12 @@ def run_consensus_evaluation(
         best_response = solver.solve(problem, problem_index=total_count + 1) 
         elapsed = time.time() - start_time
         
+        # Record Memory
+        max_memory_gb = 0.0
+        if torch.cuda.is_available():
+            max_memory_bytes = torch.cuda.max_memory_allocated()
+            max_memory_gb = max_memory_bytes / (1024 ** 3)
+        
         # Extract & Verify
         prediction = task.extract_answer(best_response)
         
@@ -186,6 +197,8 @@ def run_consensus_evaluation(
         total_count += 1
         
         # Log Result
+        logger.info(f"Problem {total_count} | Peak Memory: {max_memory_gb:.2f} GB | Time: {elapsed:.2f}s")
+        
         result_entry = {
             "system_prompt": task.system_prompt,
             "problem": problem,
@@ -193,7 +206,8 @@ def run_consensus_evaluation(
             "response": best_response,
             "prediction": prediction,
             "is_correct": is_correct,
-            "time_taken": elapsed
+            "time_taken": elapsed,
+            "peak_memory_gb": max_memory_gb
         }
         results.append(result_entry)
         

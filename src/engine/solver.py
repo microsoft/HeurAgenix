@@ -15,7 +15,9 @@ class ValidatingSolver:
         self.strategy = strategy if strategy else VotingStrategy()
         self.config = config if config else {}
         self.max_steps = self.config.get('max_steps', 45)
-        self.max_context_chars = self.config.get('max_context_chars', 32000)
+        # Fallback for Solver check: use hard limit if available, else default.
+        # If config removed 'max_context_chars', get hard limit.
+        self.max_context_chars = self.config.get('max_context_chars_hard', self.config.get('max_context_chars', 64000))
 
     def solve(self, problem: str, problem_index: int = None) -> str:
         """
