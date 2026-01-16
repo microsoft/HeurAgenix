@@ -23,36 +23,47 @@ class SingleStrategy(BaseStrategy):
         # base_messages removed as it is unused in SingleStrategy (no NLL calc)
 
         # --- Dynamic Token Budget Calculation ---
-        # Get limits from config (or use safe defaults for A100-40G)
-        # hard_limit: Absolute Red Line (approx 16k tokens / 64000 chars)
-        # soft_limit: Generation Warning Line (approx 12k tokens / 48000 chars)
-        hard_limit_chars = engine.config.get('max_context_chars_hard', 64000)
-        soft_limit_chars = engine.config.get('max_context_chars_soft', 48000)
-        
-        # Estimate current context length (approximated by chars)
-        # Includes System Prompt, Problem, and History. System prompt length is roughly constant/small, ignoring for simplified estimation.
-        current_len_chars = len(problem) + len(current_cot_text)
+        # Switch to Token-based limit for precision and VRAM safety
+        hard_limit_tokens = engine.config.get('max_context_tokens_hard', 16000)
+        soft_limit_tokens = engine.config.get('max_context_tokens_soft', 12000)
+
+        # Estimate usage properly using tokenizer from first available client
+        if engine.clients and hasattr(engine.clients[0], 'pipeline'):
+            tokenizer = engine.clients[0].pipeline.tokenizer
+            
+            # Reconstruct message structure for accurate token counting
+            if engine.system_prompt:
+                messages = [{"role": "system", "content": engine.system_prompt}, {"role": "user", "content": problem}]
+            else:
+                messages = [{"role": "user", "content": problem}]
+            
+            if current_cot_text:
+                messages.append({"role": "assistant", "content": current_cot_text})
+                
+            # Apply template to get real prompt length
+            prompt_str = tokenizer.apply_chat_template(messages, tokenize=False)
+            tokenized_ids = tokenizer(prompt_str, return_tensors='pt')['input_ids']
+            current_len_tokens = tokenized_ids.shape[1]
+        else:
+            # Fallback estimation if tokenizer not accessible (e.g. API client)
+            current_len_tokens = (len(problem) + len(current_cot_text)) // 3
+            logging.warning("Tokenizer not found, using char/3 estimation.")
         
         # 1. Hard Limit Check (Circuit Breaker)
-        if current_len_chars > hard_limit_chars:
-            logging.warning(f"Strategy Hard Limit Reached: {current_len_chars} > {hard_limit_chars}. Terminating to prevent OOM.")
+        if current_len_tokens > hard_limit_tokens:
+            logging.warning(f"Strategy Hard Limit Reached: {current_len_tokens} > {hard_limit_tokens} tokens. Terminating to prevent OOM.")
             return "", client_states
 
         # 2. Soft Limit Budgeting
-        # Calculate remaining budget
-        # We assume 1 token approx 3 chars (conservative). 
-        # But here we work in CHARS for the threshold, and convert to TOKENS for the generation parameter.
-        remaining_chars = soft_limit_chars - current_len_chars
-        if remaining_chars <= 0:
+        remaining_tokens = soft_limit_tokens - current_len_tokens
+        if remaining_tokens <= 0:
             logging.warning(f"Strategy Soft Limit Reached. Forcing generation stop.")
             # We allow 1 token just to let it try to finish or output EOS, but effectively stopping.
             max_new_tokens_budget = 1
         else:
-            # Convert chars to tokens usually div by 4, but div by 3 is safer buffer.
+            # Using token budget directly.
             # Ensure we don't exceed the standard single-step limit (e.g. 1024) even if we have budget.
-            # Using 2.5 chars/token estimate to be extra safe for "tokens" budget.
-            budget_tokens = int(remaining_chars / 2.5)
-            max_new_tokens_budget = min(1024, budget_tokens) # Default step limit is still 1024
+            max_new_tokens_budget = min(1024, int(remaining_tokens))
             
         if max_new_tokens_budget < 10:
              logging.warning(f"Low token budget remaining: {max_new_tokens_budget}. Finishing up.")

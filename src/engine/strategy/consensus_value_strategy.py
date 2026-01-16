@@ -40,19 +40,30 @@ class ConsensusValueStrategy(BaseStrategy):
             base_messages = [{"role": "user", "content": problem}]
 
         # --- Dynamic Token Budget Calculation (Layer 1) ---
-        hard_limit_chars = engine.config.get('max_context_chars_hard', 64000)
-        soft_limit_chars = engine.config.get('max_context_chars_soft', 48000)
+        # Switch to Token-based limit for precision and VRAM safety
+        hard_limit_tokens = engine.config.get('max_context_tokens_hard', 16000)
+        soft_limit_tokens = engine.config.get('max_context_tokens_soft', 12000)
         
-        current_len_chars = len(problem) + len(current_cot_text)
-        
-        if current_len_chars > hard_limit_chars:
-             return "", client_states
+        # Estimate usage properly using tokenizer from first available client
+        tokenizer = None
+        if engine.clients and hasattr(engine.clients[0], 'pipeline'):
+            tokenizer = engine.clients[0].pipeline.tokenizer
+            test_history = base_messages + [{"role": "assistant", "content": current_cot_text}]
+            prompt_str = tokenizer.apply_chat_template(test_history, tokenize=False)
+            tokenized_ids = tokenizer(prompt_str, return_tensors='pt')['input_ids']
+            current_len_tokens = tokenized_ids.shape[1]
+        else:
+            current_len_tokens = (len(problem) + len(current_cot_text)) // 3
+
+        if current_len_tokens > hard_limit_tokens:
+            logging.warning(f"Strategy Hard Limit Reached: {current_len_tokens} tokens. Terminating.")
+            return "", client_states
              
-        remaining_chars = soft_limit_chars - current_len_chars
-        if remaining_chars <= 0:
+        remaining_tokens = soft_limit_tokens - current_len_tokens
+        if remaining_tokens <= 0:
             max_new_tokens_budget = 1
         else:
-            max_new_tokens_budget = min(1024, int(remaining_chars / 2.5))
+            max_new_tokens_budget = min(1024, int(remaining_tokens))
 
         # --- Step 1: Broad Search (First Layer Generation) ---
         # Generate N candidates R_i
@@ -79,17 +90,20 @@ class ConsensusValueStrategy(BaseStrategy):
             
             # --- Dynamic Token Budget Calculation (Layer 2) ---
             # Re-check budget for the hypothetical state
-            curr_len_2 = len(problem) + len(hypothetical_text) # hypothetical_text contains full history? No, wait.
-            # history_parts is user text. hypothetical_text is joined history parts.
-            # We strictly need to check total length.
-            # Note: history_parts excludes problem usually? engine.generate_candidates takes problem+text separately.
-            # Let's trust hypothetical_text is the full 'assistant' history. 
-            
-            rem_chars_2 = soft_limit_chars - (len(problem) + len(hypothetical_text))
-            if rem_chars_2 <= 0:
+            curr_len_2_tokens = current_len_tokens # Base approximation
+            if tokenizer:
+                 # Approximate the added candidate length without full re-tokenize to save time
+                 # Or just re-tokenize if safety is paramount.
+                 cand_ids = tokenizer(cand_r, add_special_tokens=False)['input_ids']
+                 curr_len_2_tokens = current_len_tokens + len(cand_ids)
+            else:
+                 curr_len_2_tokens = current_len_tokens + (len(cand_r) // 3)
+
+            rem_tokens_2 = soft_limit_tokens - curr_len_2_tokens
+            if rem_tokens_2 <= 0:
                 budget_2 = 1
             else:
-                 budget_2 = min(1024, int(rem_chars_2 / 2.5))
+                 budget_2 = min(1024, int(rem_tokens_2))
 
             # --- Step 2: Lookahead (Second Layer Generation) ---
             # Generate M responses based on S_i

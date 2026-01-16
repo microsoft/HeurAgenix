@@ -14,10 +14,8 @@ class ValidatingSolver:
         self.engine = engine
         self.strategy = strategy if strategy else VotingStrategy()
         self.config = config if config else {}
-        self.max_steps = self.config.get('max_steps', 45)
-        # Fallback for Solver check: use hard limit if available, else default.
-        # If config removed 'max_context_chars', get hard limit.
-        self.max_context_chars = self.config.get('max_context_chars_hard', self.config.get('max_context_chars', 64000))
+        # Max steps from config, default to 50 if not specified.
+        self.max_steps = self.config.get('max_steps', 50) 
 
     def solve(self, problem: str, problem_index: int = None) -> str:
         """
@@ -31,24 +29,11 @@ class ValidatingSolver:
         logging.info(problem_str)
         
         # Init Client States
-        # Should correspond to empty history
-        # We can init them to 0 manually, or ask engine to init for empty string
-        # Manual 0 is fine for start.
         client_states = [{'nll_sum': 0.0, 'token_len': 0} for _ in self.engine.clients]
         
         history_parts = []
         
-        # OOM Prevention: Cap max steps aggressively for baseline runs
-        run_max_steps = self.max_steps
-
-        for step_idx in range(run_max_steps):
-            # Safety Check: Prevent OOM from infinite loops
-            # Lower limit to ~8000 chars (approx 2000 tokens) to ensure dual-model safety on single GPU
-            current_context_len = len(problem) + sum(len(p) for p in history_parts)
-            if current_context_len > self.max_context_chars:
-                logging.warning(f"Context length {current_context_len} exceeds safety limit ({self.max_context_chars}). Terminating early.")
-                break
-
+        for step_idx in range(self.max_steps):
             logging.info(f"--- Step {step_idx + 1} ---")
             
             # Strategy Decision

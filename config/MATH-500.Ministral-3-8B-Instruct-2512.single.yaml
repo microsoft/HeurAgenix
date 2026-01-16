@@ -1,8 +1,9 @@
 exp_name: "MATH-500.Ministral-3-8B-Instruct-2512.single"
 
 engine:
-  max_context_chars_hard: 64000
-  max_context_chars_soft: 48000
+  max_steps: 50
+  max_context_tokens_hard: 16000
+  max_context_tokens_soft: 12000
 
 task:
   name: "math500"

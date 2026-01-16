@@ -1,6 +1,9 @@
 import os
 # Fix fragmentation issues for OOM
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "1"
 
 import json
 import yaml
@@ -127,16 +130,9 @@ def run_consensus_evaluation(
             raise ValueError(f"Unknown strategy: {strategy_name}")
 
         # Initialize Solver (Layer 4)
-        # Pass engine config implicitly via solver params or modify init?
-        # Solver currently hardcodes max_steps in solve method signature,
-        # let's change solver initialization or pass it during solve call.
-        solver_config = {
-            'max_steps': engine_config.get('max_steps', 50),
-            'max_context_chars': engine_config.get('max_context_chars', 32000),
-            'loop_detection_window': engine_config.get('loop_detection_window', 3)
-        }
-        
-        solver = ValidatingSolver(engine, strategy, config=solver_config)
+        # Pass the full engine config directly.
+        # The Solver will extract 'max_steps' and other relevant parameters.
+        solver = ValidatingSolver(engine, strategy=strategy, config=engine_config)
 
         # 2. Evaluation Loop
         correct_count = 0

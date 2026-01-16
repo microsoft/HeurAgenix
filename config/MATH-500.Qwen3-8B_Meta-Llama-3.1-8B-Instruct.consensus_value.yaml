@@ -1,8 +1,9 @@
 exp_name: "MATH-500.Qwen3-8B_Meta-Llama-3.1-8B-Instruct.consensus_value"
 
 engine:
-  max_context_chars_hard: 64000
-  max_context_chars_soft: 48000
+  max_steps: 50
+  max_context_tokens_hard: 16000
+  max_context_tokens_soft: 12000
 
 task:
   name: "math500"
