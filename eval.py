@@ -95,7 +95,8 @@ def run_consensus_evaluation(
     
     # Extract Params
     task_name = config.get('task', {}).get('name', 'math500')
-    strategy_name = config.get('strategy', {}).get('type', 'single')
+    strategy_config = config.get('strategy', {})
+    strategy_name = strategy_config.get('type', 'single')
     models_config = config.get('models', [])
     engine_config = config.get('engine', {})
     
@@ -120,10 +121,13 @@ def run_consensus_evaluation(
         engine = SwarmEngine(models_config, system_prompt=task.system_prompt, config=engine_config)
         
         # Select Strategy (Layer 3)
+        agg_method = strategy_config.get('aggregation', 'mean')
+        exclude_self = strategy_config.get('exclude_self', False)
+
         if strategy_name == "voting":
-            strategy = VotingStrategy()
+            strategy = VotingStrategy(aggregation=agg_method, exclude_self=exclude_self)
         elif strategy_name == "consensus_value":
-            strategy = ConsensusValueStrategy() # Using default mean aggregation
+            strategy = ConsensusValueStrategy(aggregation=agg_method, exclude_self=exclude_self) 
         elif strategy_name == "single":
             strategy = SingleStrategy()
         else:

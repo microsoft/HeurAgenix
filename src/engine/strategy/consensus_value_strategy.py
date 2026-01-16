@@ -154,7 +154,16 @@ class ConsensusValueStrategy(BaseStrategy):
             layer2_step_scores = []
             for m_idx, _ in enumerate(layer2_candidates):
                 row_scores = scores_matrix[m_idx]
-                valid = [s for s in row_scores if s is not None]
+                
+                valid = []
+                for r_idx, score in enumerate(row_scores):
+                    if score is None:
+                        continue
+                    # Exclude self logic
+                    if self.exclude_self and r_idx == m_idx:
+                        continue
+                    valid.append(score)
+
                 if valid:
                     layer2_step_scores.append(np.mean(valid)) # Mean of reviewers per cand
             

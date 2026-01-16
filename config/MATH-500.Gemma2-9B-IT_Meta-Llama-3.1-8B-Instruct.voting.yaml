@@ -10,7 +10,8 @@ task:
 
 strategy:
   type: "voting"
-
+  aggregation: "mean"
+  exclude_self: true
 
 models:
   - name: "google/gemma-2-9b-it"
@@ -23,7 +24,6 @@ models:
     do_sample: false
     top_p: 1.0
     repetition_penalty: 1.0
-    
   - name: "meta-llama/Meta-Llama-3.1-8B-Instruct"
     type: "TransformersClient"
     think: false
