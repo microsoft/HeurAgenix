@@ -24,6 +24,7 @@ models:
     do_sample: false
     top_p: 1.0
     repetition_penalty: 1.0
+
   - name: "mistralai/Ministral-3-8B-Instruct-2512"
     type: "TransformersClient"
     think: false
