@@ -21,6 +21,7 @@ from src.engine.strategy.voting_strategy import VotingStrategy
 from src.engine.strategy.consensus_value_strategy import ConsensusValueStrategy
 from src.engine.strategy.single_strategy import SingleStrategy
 from src.tasks.math500_task import Math500Task
+from src.tasks.aime_task import AimeTask
 from src.tasks.base_task import BaseTask
 
 # Custom handler for BlobFuse synchronization
@@ -48,7 +49,8 @@ class DirectFileHandler(logging.Handler):
 
 # Registry for available tasks
 TASK_REGISTRY = {
-    "math500": Math500Task
+    "math500": Math500Task,
+    "aime": AimeTask
 }
 
 def run_consensus_evaluation(
@@ -109,7 +111,15 @@ def run_consensus_evaluation(
 
     try:
         task_class: Type[BaseTask] = TASK_REGISTRY[task_name]
-        task = task_class()
+        
+        # Instantiate task with subset/subset config if applicable
+        task_specific_config = config.get('task', {})
+        subset = task_specific_config.get('subset')
+        
+        if subset:
+            task = task_class(subset=subset)
+        else:
+            task = task_class()
 
         # Load Task Data
         test_data = task.get_dataset()

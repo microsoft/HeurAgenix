@@ -1,0 +1,25 @@
+exp_name: "AIME2024.Qwen3-8B.single"
+
+engine:
+  max_steps: 30
+  max_context_tokens_hard: 16000
+  max_context_tokens_soft: 12000
+
+task:
+  name: "aime"
+  subset: "2024"
+
+strategy:
+  type: "single"
+
+models:
+  - name: "Qwen/Qwen3-8B"
+    type: "TransformersClient"
+    attn_implementation: "flash_attention_2"
+    think: false
+    max_attempts: 3
+    sleep_time: 10
+    temperature: 0.0
+    do_sample: false
+    top_p: 1.0
+    repetition_penalty: 1.0
