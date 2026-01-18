@@ -14,6 +14,7 @@ strategy:
 models:
   - name: "mistralai/Ministral-3-8B-Instruct-2512"
     type: "TransformersClient"
+    attn_implementation: "flash_attention_2"
     think: false
     max_attempts: 3
     sleep_time: 10

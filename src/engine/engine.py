@@ -66,16 +66,15 @@ class SwarmEngine:
                 logging.error(f"Agent {client_idx} failed to generate: {e}")
                 return None
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
-            futures = [executor.submit(_generate, i, c) for i, c in enumerate(self.clients)]
-            for f in concurrent.futures.as_completed(futures):
-                res = f.result()
-                if res:
-                    step_candidates.append(res)
+        # Execute: Sequential (Fix for CUDA Illegal Memory Access in Threading)
+        for i, c in enumerate(self.clients):
+            res = _generate(i, c)
+            if res:
+                step_candidates.append(res)
         
         # Cleanup
-        torch.cuda.empty_cache()
-        gc.collect()
+        # torch.cuda.empty_cache() # Avoid frequent cache clearing
+        # gc.collect()
 
         return step_candidates
 
@@ -102,8 +101,8 @@ class SwarmEngine:
         
         # We process (Candidate, Reviewer) pairs.
         # To maximize throughput, we can flatten tasks or loop.
-        # Since we have N clients, usually N is small (2-4).
-        # We can iterate candidates and parallelize reviewers.
+        # FIX: Process by REVIEWER to avoid multi-threading conflicts on the same model instance.
+        # Each client thread handles all candidates sequentially.
 
         scores_matrix = [[None for _ in range(len(self.clients))] for _ in range(len(candidates))]
 
@@ -113,8 +112,7 @@ class SwarmEngine:
             parts = history_parts + [cand]
             candidate_full_texts.append("\n\n".join(parts))
 
-        # We define a single scoring task
-        def _score_task(reviewer_idx, reviewer_inst, cand_idx, full_text):
+        def _compute_single_score(reviewer_idx, reviewer_inst, full_text):
             try:
                 # 1. Get NLL of WHOLE sequence
                 avg_nll = reviewer_inst.get_sequence_score(base_messages, full_text)
@@ -135,7 +133,7 @@ class SwarmEngine:
                     return max(0.0, step_nll)
                 return None
             except torch.cuda.OutOfMemoryError:
-                logging.warning(f"Reviewer {reviewer_idx} OOM during scoring candidate {cand_idx}. Clearing cache.")
+                logging.warning(f"Reviewer {reviewer_idx} OOM during scoring. Clearing cache.")
                 torch.cuda.empty_cache()
                 import gc
                 gc.collect()
@@ -144,24 +142,25 @@ class SwarmEngine:
                 logging.warning(f"Reviewer {reviewer_idx} eval failed: {e}")
                 return None
 
-        # Execute
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
-            futures = {}
+        def _score_all_candidates_for_reviewer(reviewer_idx, reviewer_inst):
+            reviewer_scores = {} # cand_idx -> score
             for c_idx, text in enumerate(candidate_full_texts):
-                for r_idx, client in enumerate(self.clients):
-                    # Exclude self-score if needed? (Logic parameter, better handled in Strategy)
-                    # For Engine, we just compute all. Strategy filters.
-                    f = executor.submit(_score_task, r_idx, client, c_idx, text)
-                    futures[f] = (c_idx, r_idx)
-            
-            for f in concurrent.futures.as_completed(futures):
-                c_idx, r_idx = futures[f]
-                res = f.result()
-                scores_matrix[c_idx][r_idx] = res
+                score = _compute_single_score(reviewer_idx, reviewer_inst, text)
+                reviewer_scores[c_idx] = score
+            return reviewer_scores
+
+        # Execute: Sequential (Fix for CUDA Illegal Memory Access in Threading)
+        for i, c in enumerate(self.clients):
+            try:
+                res_dict = _score_all_candidates_for_reviewer(i, c)
+                for c_idx, score in res_dict.items():
+                    scores_matrix[c_idx][i] = score
+            except Exception as e:
+                logging.error(f"Reviewer {i} sequential execution failed: {e}")
 
         # Cleanup
-        torch.cuda.empty_cache()
-        gc.collect()
+        # torch.cuda.empty_cache()
+        # gc.collect()
 
         return scores_matrix
 
@@ -178,16 +177,17 @@ class SwarmEngine:
             full_len = tokens.shape[1]
             return (avg_nll * full_len, full_len)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
-            futures = {executor.submit(_update, i, c): i for i, c in enumerate(self.clients)}
-            for f in concurrent.futures.as_completed(futures):
-                i = futures[f]
-                nll_sum, t_len = f.result()
+        # Execute: Sequential (Fix for CUDA Illegal Memory Access in Threading)
+        for i, c in enumerate(self.clients):
+            try:
+                nll_sum, t_len = _update(i, c)
                 new_states[i]['nll_sum'] = nll_sum
                 new_states[i]['token_len'] = t_len
+            except Exception as e:
+                logging.error(f"Agent {i} update state failed: {e}")
         
         # Cleanup
-        torch.cuda.empty_cache()
-        gc.collect()
+        # torch.cuda.empty_cache()
+        # gc.collect()
 
         return new_states

@@ -16,6 +16,7 @@ strategy:
 models:
   - name: "Qwen/Qwen3-8B"
     type: "TransformersClient"
+    attn_implementation: "flash_attention_2"
     think: false
     # max_tokens replaced by dynamic calc
     max_attempts: 3
@@ -27,6 +28,7 @@ models:
 
   - name: "mistralai/Ministral-3-8B-Instruct-2512"
     type: "TransformersClient"
+    attn_implementation: "flash_attention_2"
     think: false
     # max_tokens replaced by dynamic calc
     max_attempts: 3
