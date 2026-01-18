@@ -91,11 +91,16 @@ class ConsensusValueStrategy(BaseStrategy):
             # --- Dynamic Token Budget Calculation (Layer 2) ---
             # Re-check budget for the hypothetical state
             curr_len_2_tokens = current_len_tokens # Base approximation
-            if tokenizer:
-                 # Approximate the added candidate length without full re-tokenize to save time
-                 # Or just re-tokenize if safety is paramount.
-                 cand_ids = tokenizer(cand_r, add_special_tokens=False)['input_ids']
-                 curr_len_2_tokens = current_len_tokens + len(cand_ids)
+            
+            # Use first client to estimate token length of the new candidate part
+            client_for_tokenization = engine.clients[0] if engine.clients else None
+            
+            if client_for_tokenization:
+                 try:
+                     cand_len = client_for_tokenization.get_token_len(cand_r)
+                     curr_len_2_tokens = current_len_tokens + cand_len
+                 except Exception:
+                     curr_len_2_tokens = current_len_tokens + (len(cand_r) // 3)
             else:
                  curr_len_2_tokens = current_len_tokens + (len(cand_r) // 3)
 
