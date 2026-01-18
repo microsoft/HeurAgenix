@@ -34,17 +34,14 @@ class VotingStrategy(BaseStrategy):
         soft_limit_tokens = engine.config.get('max_context_tokens_soft', 12000)
         
         # Estimate usage properly using tokenizer from first available client
-        if engine.clients and hasattr(engine.clients[0], 'pipeline'):
-            tokenizer = engine.clients[0].pipeline.tokenizer
-            test_history = base_messages + [{"role": "assistant", "content": current_cot_text}]
-            # Apply template to get real prompt length
-            prompt_str = tokenizer.apply_chat_template(test_history, tokenize=False)
-            tokenized_ids = tokenizer(prompt_str, return_tensors='pt')['input_ids']
-            current_len_tokens = tokenized_ids.shape[1]
-        else:
-            # Fallback estimation if tokenizer not accessible (e.g. API client)
-            current_len_tokens = (len(problem) + len(current_cot_text)) // 3
-            logging.warning("Tokenizer not found, using char/3 estimation.")
+        test_history = base_messages + [{"role": "assistant", "content": current_cot_text}]
+        current_len_tokens = (len(problem) + len(current_cot_text)) // 3
+        
+        if engine.clients:
+            try:
+                current_len_tokens = engine.clients[0].compute_token_count(test_history)
+            except Exception as e:
+                logging.warning(f"Token calculation failed: {e}. Using char/3 estimation.")
 
         # 1. Hard Limit Check
         if current_len_tokens > hard_limit_tokens:

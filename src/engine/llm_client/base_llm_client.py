@@ -38,6 +38,12 @@ class BaseLLMClient:
     def chat_once(self) -> str:
         pass
 
+    def compute_token_count(self, messages: List[Dict]) -> int:
+        """
+        Computes the number of tokens for the given messages.
+        """
+        raise NotImplementedError("compute_token_count is not implemented")
+
     def chat(self, continue_prefix: str = None, max_new_tokens: int = None) -> str:
         for index in range(self.max_attempts):
             try:

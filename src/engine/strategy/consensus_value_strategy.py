@@ -45,15 +45,15 @@ class ConsensusValueStrategy(BaseStrategy):
         soft_limit_tokens = engine.config.get('max_context_tokens_soft', 12000)
         
         # Estimate usage properly using tokenizer from first available client
-        tokenizer = None
-        if engine.clients and hasattr(engine.clients[0], 'pipeline'):
-            tokenizer = engine.clients[0].pipeline.tokenizer
-            test_history = base_messages + [{"role": "assistant", "content": current_cot_text}]
-            prompt_str = tokenizer.apply_chat_template(test_history, tokenize=False)
-            tokenized_ids = tokenizer(prompt_str, return_tensors='pt')['input_ids']
-            current_len_tokens = tokenized_ids.shape[1]
-        else:
-            current_len_tokens = (len(problem) + len(current_cot_text)) // 3
+        test_history = base_messages + [{"role": "assistant", "content": current_cot_text}]
+        current_len_tokens = (len(problem) + len(current_cot_text)) // 3
+        
+        if engine.clients:
+            try:
+                current_len_tokens = engine.clients[0].compute_token_count(test_history)
+            except Exception as e:
+                # Fallback estimation if calculation fails
+                pass
 
         if current_len_tokens > hard_limit_tokens:
             logging.warning(f"Strategy Hard Limit Reached: {current_len_tokens} tokens. Terminating.")

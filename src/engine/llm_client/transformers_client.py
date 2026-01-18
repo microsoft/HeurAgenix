@@ -106,6 +106,20 @@ class TransformersClient(BaseLLMClient):
         """
         return messages
 
+    def compute_token_count(self, messages: List[Dict]) -> int:
+        try:
+            prompt_str = self.pipeline.tokenizer.apply_chat_template(messages, tokenize=False)
+            tokenized_ids = self.pipeline.tokenizer(prompt_str, return_tensors='pt')['input_ids']
+            return tokenized_ids.shape[1]
+        except Exception as e:
+            # Handle Gemma/Other models that don't support system role
+            if "System role not supported" in str(e):
+                new_messages = self._merge_system_role(messages)
+                prompt_str = self.pipeline.tokenizer.apply_chat_template(new_messages, tokenize=False)
+                tokenized_ids = self.pipeline.tokenizer(prompt_str, return_tensors='pt')['input_ids']
+                return tokenized_ids.shape[1]
+            raise e
+
     def chat_once(self, continue_prefix: str = None, max_new_tokens: int = None) -> str:
         # Check if the last message is assistant. If so, and we want to continue, 
         # we might need to handle it specially.
