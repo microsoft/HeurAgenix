@@ -1,4 +1,4 @@
-exp_name: "AIME2024.Qwen3-8B_Ministral-3-8B-Instruct-2512.consensus_value"
+exp_name: "AIME2025.Qwen3-8B_Ministral-3-8B-Instruct-2512.consensus_value"
 
 engine:
   max_steps: 30

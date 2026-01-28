@@ -21,9 +21,11 @@ class ConsensusValueStrategy(BaseStrategy):
     Complexity: N * M generations + N * M * N evaluations.
     If M=N (all agents predict), then O(N^3) evals.
     """
-    def __init__(self, aggregation: str = "mean", exclude_self: bool = False):
+    def __init__(self, aggregation: str = "mean", exclude_self: bool = False, value_metric: str = "mean_nll"):
         self.aggregation = aggregation
         self.exclude_self = exclude_self
+        # value_metric: "mean_nll" (default) or "sum_nll" (Total Surprisal / MDL principle)
+        self.value_metric = value_metric
 
     def select_next_step(
         self, 
@@ -157,7 +159,7 @@ class ConsensusValueStrategy(BaseStrategy):
             # V(S_i) = Aggregation of scores of layer2.
             
             layer2_step_scores = []
-            for m_idx, _ in enumerate(layer2_candidates):
+            for m_idx, cand_lookahead in enumerate(layer2_candidates):
                 row_scores = scores_matrix[m_idx]
                 
                 valid = []
@@ -170,7 +172,15 @@ class ConsensusValueStrategy(BaseStrategy):
                     valid.append(score)
 
                 if valid:
-                    layer2_step_scores.append(np.mean(valid)) # Mean of reviewers per cand
+                    avg_nll = np.mean(valid) # Mean of reviewers per cand
+                    
+                    if self.value_metric == "sum_nll":
+                        # Convert Mean NLL to Total NLL (Total Surprisal)
+                        # Estimate tokens: approx 4 chars per token
+                        est_tokens = max(1, len(cand_lookahead) / 4.0)
+                        layer2_step_scores.append(avg_nll * est_tokens)
+                    else:
+                        layer2_step_scores.append(avg_nll)
             
             if not layer2_step_scores:
                 state_values.append(float('inf'))
