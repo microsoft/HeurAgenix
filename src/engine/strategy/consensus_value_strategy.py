@@ -21,13 +21,12 @@ class ConsensusValueStrategy(BaseStrategy):
     Complexity: N * M generations + N * M * N evaluations.
     If M=N (all agents predict), then O(N^3) evals.
     """
-    def __init__(self, aggregation: str = "mean", exclude_self: bool = False, value_metric: str = "mean_nll", alpha: float = 1.0, info_weight: float = 0.5):
+    def __init__(self, aggregation: str = "mean", exclude_self: bool = False, value_metric: str = "mean_nll", alpha: float = 1.0):
         self.aggregation = aggregation
         self.exclude_self = exclude_self
         # value_metric: "mean_nll" (default), "sum_nll", or "alpha_nll"
         self.value_metric = value_metric
         self.alpha = alpha
-        self.info_weight = info_weight
 
     def select_next_step(
         self, 
@@ -80,8 +79,7 @@ class ConsensusValueStrategy(BaseStrategy):
         # We need to evaluate V(S_i) for each.
         
         state_values = [] # (index, score)
-        state_details = [] # stats for logging
-
+        
         # Optimization: If a candidate contains \boxed{}, it's a terminal state.
         # We should probably prioritize it or treat it specially.
         # For now, let's just evaluate it normally (generation might fail or return nothing, 
@@ -135,69 +133,72 @@ class ConsensusValueStrategy(BaseStrategy):
                     state_values.append(float('inf'))
                     continue
 
-            # --- Step 3: Evaluation (Second Layer Scoring with Info Gain) ---
-            # Use the new score_candidates_with_gain method
-            layer2_metrics = engine.score_candidates_with_gain(
+            # --- Step 3: Evaluation (Second Layer Scoring) ---
+            # We need to score these layer2_candidates in the context of S_i.
+            # But wait, `score_candidates` expects `client_states` to calculate DELTA.
+            # The `client_states` we have passed in are for S_0.
+            # We CANNOT use them directly for S_i -> S_{i+1} delta.
+            # We first need the baseline stats for S_i to subtract.
+            
+            # This is an expensive update. N states * N models.
+            # To avoid N^2 forward passes just for state-baseline, maybe we can accept absolute NLL?
+            # NO, absolute NLL depends on length. We need Step NLL.
+            
+            # Compromise: We calculate the 'hypothetical state' stats for S_i.
+            hypo_states = engine.update_states(base_messages, hypothetical_text)
+            
+            # Now score layer2 candidates
+            scores_matrix = engine.score_candidates(
                 base_messages,
-                hypothetical_text,
-                layer2_candidates
+                hypothetical_history,
+                layer2_candidates,
+                hypo_states
             )
             
             # Aggregate scores for S_i
-            # V(S_i) = Aggregation of scores of layer2 steps.
+            # This represents "How coherent is the future of S_i?"
+            # V(S_i) = Aggregation of scores of layer2.
             
             layer2_step_scores = []
-            s_full_log = []
-            s_blind_log = []
-
-            for m_idx, metrics in enumerate(layer2_metrics):
-                full_nll = metrics['full']
-                blind_nll = metrics['blind']
-                lookahead_cand = layer2_candidates[m_idx]
+            for m_idx, cand_lookahead in enumerate(layer2_candidates):
+                row_scores = scores_matrix[m_idx]
                 
-                s_full_log.append(full_nll)
-                s_blind_log.append(blind_nll)
+                valid = []
+                for r_idx, score in enumerate(row_scores):
+                    if score is None:
+                        continue
+                    # Exclude self logic
+                    if self.exclude_self and r_idx == m_idx:
+                        continue
+                    valid.append(score)
 
-                # Formula: Score = NLL_Full - lambda * (NLL_Blind - NLL_Full)
-                # Lower score is better.
-                # If NLL_Blind is high (good info gain), score decreases (improves).
-                
-                # Apply Info Weight
-                # To prevent instability if blind NLL implies confusion (blind < full), 
-                # we can clamp gain to >= 0 or just trust the raw value.
-                # Raw value: (1+lambda)*full - lambda*blind
-                base_score = (1.0 + self.info_weight) * full_nll - self.info_weight * blind_nll
-
-                # Alpha-NLL / Length Penalty Logic
-                # value_metric now primarily controls how we handle LENGTH.
-                # If metric is "mean_nll", we just use base_score (which is mean).
-                
-                est_tokens = max(1, len(lookahead_cand) / 4.0)
-                
-                if self.value_metric == "sum_nll":
-                    final_score = base_score * est_tokens
-                elif self.value_metric == "alpha_nll":
-                    # Alpha-NLL: Score * Length^(1-alpha)
-                    penalty_factor = est_tokens ** (1.0 - self.alpha)
-                    final_score = base_score * penalty_factor
-                else:
-                    # Default mean_nll
-                    final_score = base_score
-
-                layer2_step_scores.append(final_score)
+                if valid:
+                    avg_nll = np.mean(valid) # Mean of reviewers per cand
+                    
+                    if self.value_metric == "sum_nll":
+                        # Convert Mean NLL to Total NLL (Total Surprisal)
+                        # Estimate tokens: approx 4 chars per token
+                        est_tokens = max(1, len(cand_lookahead) / 4.0)
+                        layer2_step_scores.append(avg_nll * est_tokens)
+                    elif self.value_metric == "alpha_nll":
+                        # Alpha-NLL: Sum NLL / (Length ^ Alpha)
+                        # = (Mean NLL * Length) / (Length ^ Alpha)
+                        # = Mean NLL * Length ^ (1 - Alpha)
+                        est_tokens = max(1, len(cand_lookahead) / 4.0)
+                        penalty_factor = est_tokens ** (1.0 - self.alpha)
+                        layer2_step_scores.append(avg_nll * penalty_factor)
+                    else:
+                        layer2_step_scores.append(avg_nll)
             
             if not layer2_step_scores:
                 state_values.append(float('inf'))
-                state_details.append({"full": -1, "blind": -1})
             else:
                 # The value of State S_i is the "easiness" of the best path forward, 
                 # OR the average "easiness" of all paths?
                 # "Easiness" = Low NLL.
+                # Let's take the mean difficulty of valid futures.
+                # If future is chaotic, mean NLL is high -> Bad state.
                 state_values.append(np.mean(layer2_step_scores))
-                state_details.append({
-                    "full": np.mean(s_full_log) if s_full_log else -1,
-                    "blind": np.mean(s_blind_log) if s_blind_log else -1
-                })
 
 
         # --- Step 4: Selection ---
@@ -218,14 +219,7 @@ class ConsensusValueStrategy(BaseStrategy):
             preview = cand.replace('\\n', ' ')
             marker = "*" if i == best_idx else " "
             val = state_values[i] if i < len(state_values) else -1
-            
-            # Detail log
-            det = state_details[i] if i < len(state_details) else {}
-            # Format: [V=1.23, F=1.5, B=2.0]
-            # V is the final score (lower is better), F is Full NLL, B is Blind NLL
-            detail_str = f"[V={val:.3f}, F={det.get('full',-1):.3f}, B={det.get('blind',-1):.3f}]"
-            
-            logging.info(f"  {detail_str} {marker} {preview}")
+            logging.info(f"  [state={val:.4f}, {marker}] {preview}")
 
         # 5. Update Real States
         new_history = history_parts + [best_step]
