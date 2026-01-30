@@ -80,7 +80,8 @@ class ConsensusValueStrategy(BaseStrategy):
         # We need to evaluate V(S_i) for each.
         
         state_values = [] # (index, score)
-        
+        state_details = [] # stats for logging
+
         # Optimization: If a candidate contains \boxed{}, it's a terminal state.
         # We should probably prioritize it or treat it specially.
         # For now, let's just evaluate it normally (generation might fail or return nothing, 
@@ -146,10 +147,16 @@ class ConsensusValueStrategy(BaseStrategy):
             # V(S_i) = Aggregation of scores of layer2 steps.
             
             layer2_step_scores = []
+            s_full_log = []
+            s_blind_log = []
+
             for m_idx, metrics in enumerate(layer2_metrics):
                 full_nll = metrics['full']
                 blind_nll = metrics['blind']
                 lookahead_cand = layer2_candidates[m_idx]
+                
+                s_full_log.append(full_nll)
+                s_blind_log.append(blind_nll)
 
                 # Formula: Score = NLL_Full - lambda * (NLL_Blind - NLL_Full)
                 # Lower score is better.
@@ -181,11 +188,16 @@ class ConsensusValueStrategy(BaseStrategy):
             
             if not layer2_step_scores:
                 state_values.append(float('inf'))
+                state_details.append({"full": -1, "blind": -1})
             else:
                 # The value of State S_i is the "easiness" of the best path forward, 
                 # OR the average "easiness" of all paths?
                 # "Easiness" = Low NLL.
                 state_values.append(np.mean(layer2_step_scores))
+                state_details.append({
+                    "full": np.mean(s_full_log) if s_full_log else -1,
+                    "blind": np.mean(s_blind_log) if s_blind_log else -1
+                })
 
 
         # --- Step 4: Selection ---
@@ -206,7 +218,14 @@ class ConsensusValueStrategy(BaseStrategy):
             preview = cand.replace('\\n', ' ')
             marker = "*" if i == best_idx else " "
             val = state_values[i] if i < len(state_values) else -1
-            logging.info(f"  [state={val:.4f}, {marker}] {preview}")
+            
+            # Detail log
+            det = state_details[i] if i < len(state_details) else {}
+            # Format: [V=1.23, F=1.5, B=2.0]
+            # V is the final score (lower is better), F is Full NLL, B is Blind NLL
+            detail_str = f"[V={val:.3f}, F={det.get('full',-1):.3f}, B={det.get('blind',-1):.3f}]"
+            
+            logging.info(f"  {detail_str} {marker} {preview}")
 
         # 5. Update Real States
         new_history = history_parts + [best_step]
