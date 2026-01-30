@@ -78,6 +78,73 @@ class SwarmEngine:
 
         return step_candidates
 
+    def score_candidates_with_gain(
+        self,
+        base_messages: List[Dict],
+        history_text: str,
+        candidates: List[str]
+    ) -> List[Dict[str, float]]:
+        """
+        Compute Full NLL and Blind NLL for candidates (Lookahead Steps).
+        Returns a list of dicts: {'full': float, 'blind': float} (averaged across reviewers).
+        """
+        results = []
+        
+        # 1. Prepare Contexts
+        # Full Context: System + User(Problem) + History
+        full_context_msgs = base_messages + [{"role": "assistant", "content": history_text}]
+        
+        # Blind Context: System + User(Hidden) + History
+        blind_base_messages = []
+        for msg in base_messages:
+            if msg["role"] == "user":
+                blind_base_messages.append({"role": "user", "content": "Problem Statement Hidden."})
+            else:
+                blind_base_messages.append(msg)
+        blind_context_msgs = blind_base_messages + [{"role": "assistant", "content": history_text}]
+        
+        # 2. Define Scoring Task
+        def _score_single(client_inst, candidate_step):
+            # Compute Full NLL
+            try:
+                full_nll = client_inst.get_sequence_score(full_context_msgs, candidate_step)
+            except Exception:
+                full_nll = None
+            
+            # Compute Blind NLL
+            try:
+                blind_nll = client_inst.get_sequence_score(blind_context_msgs, candidate_step)
+            except Exception:
+                blind_nll = None
+                
+            return full_nll, blind_nll
+
+        # 3. Iterate Candidates
+        # To optimize, we can pick a subset of reviewers. 
+        # For simplicity and speed in this "Value Estimate", we use the first K available clients.
+        # Using all clients might be too slow for lookahead. Let's use up to 3 reviewers.
+        reviewers = self.clients[:3] 
+        
+        for cand in candidates:
+            cand_full_nlls = []
+            cand_blind_nlls = []
+            
+            for reviewer in reviewers:
+                f_nll, b_nll = _score_single(reviewer, cand)
+                if f_nll is not None: cand_full_nlls.append(f_nll)
+                if b_nll is not None: cand_blind_nlls.append(b_nll)
+            
+            # Aggregate
+            avg_full = sum(cand_full_nlls)/len(cand_full_nlls) if cand_full_nlls else 999.9
+            avg_blind = sum(cand_blind_nlls)/len(cand_blind_nlls) if cand_blind_nlls else 0.0 # Caution with 0.0
+            
+            results.append({
+                "full": avg_full,
+                "blind": avg_blind
+            })
+            
+        return results
+
     def score_candidates(
         self, 
         base_messages: List[Dict], 

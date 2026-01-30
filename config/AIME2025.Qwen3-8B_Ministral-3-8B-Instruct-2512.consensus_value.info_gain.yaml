@@ -1,0 +1,40 @@
+exp_name: "AIME2025.Qwen3-8B_Ministral-3-8B-Instruct-2512.consensus_value.info_gain"
+
+engine:
+  max_steps: 30
+  max_context_tokens_hard: 16000
+  max_context_tokens_soft: 12000
+
+task:
+  name: "aime"
+  subset: "2025"
+
+strategy:
+  type: "consensus_value"
+  aggregation: "mean"
+  exclude_self: true
+  value_metric: "alpha_nll"
+  alpha: 0.7
+  info_weight: 0.5
+
+models:
+  - name: "Qwen/Qwen3-8B"
+    type: "TransformersClient"
+    attn_implementation: "flash_attention_2"
+    think: false
+    max_attempts: 3
+    sleep_time: 10
+    temperature: 0.0
+    do_sample: false
+    top_p: 1.0
+    repetition_penalty: 1.0
+  - name: "mistralai/Ministral-3-8B-Instruct-2512"
+    type: "TransformersClient"
+    attn_implementation: "flash_attention_2"
+    think: false
+    max_attempts: 3
+    sleep_time: 10
+    temperature: 0.0
+    do_sample: false
+    top_p: 1.0
+    repetition_penalty: 1.0

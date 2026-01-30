@@ -1,4 +1,5 @@
 import os
+
 # Fix fragmentation issues for OOM
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
@@ -20,9 +21,11 @@ from src.engine.solver import ValidatingSolver
 from src.engine.strategy.voting_strategy import VotingStrategy
 from src.engine.strategy.consensus_value_strategy import ConsensusValueStrategy
 from src.engine.strategy.single_strategy import SingleStrategy
+
+from src.tasks.base_task import BaseTask
 from src.tasks.math500_task import Math500Task
 from src.tasks.aime_task import AimeTask
-from src.tasks.base_task import BaseTask
+
 
 # Custom handler for BlobFuse synchronization
 class DirectFileHandler(logging.Handler):
@@ -47,7 +50,7 @@ class DirectFileHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-# Registry for available tasks
+# Registry for available tasks - MERGED
 TASK_REGISTRY = {
     "math500": Math500Task,
     "aime": AimeTask
@@ -133,11 +136,14 @@ def run_consensus_evaluation(
         # Select Strategy (Layer 3)
         agg_method = strategy_config.get('aggregation', 'mean')
         exclude_self = strategy_config.get('exclude_self', False)
+        value_metric = strategy_config.get('value_metric', 'mean_nll')
+        alpha = strategy_config.get('alpha', 1.0)
+        info_weight = strategy_config.get('info_weight', 0.5)
 
         if strategy_name == "voting":
             strategy = VotingStrategy(aggregation=agg_method, exclude_self=exclude_self)
         elif strategy_name == "consensus_value":
-            strategy = ConsensusValueStrategy(aggregation=agg_method, exclude_self=exclude_self) 
+            strategy = ConsensusValueStrategy(aggregation=agg_method, exclude_self=exclude_self, value_metric=value_metric, alpha=alpha, info_weight=info_weight) 
         elif strategy_name == "single":
             strategy = SingleStrategy()
         else:
