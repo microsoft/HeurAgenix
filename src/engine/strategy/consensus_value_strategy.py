@@ -203,6 +203,11 @@ class ConsensusValueStrategy(BaseStrategy):
 
 
         # --- Step 4: Selection ---
+        
+        # Prepare components for logging
+        f_scores = list(state_values) # Forward scores (Lookahead)
+        b_scores = [0.0] * len(state_values) # Backend/Penalty scores
+
         if not state_values or min(state_values) == float('inf'):
              logging.info(" No valid futures. Fallback to greedy/first.")
              best_idx = 0
@@ -221,26 +226,26 @@ class ConsensusValueStrategy(BaseStrategy):
                      
                      for i, cand in enumerate(layer1_candidates):
                          # Strict repetition check: 
-                         # Check if the stripped candidate is already in the history text
-                         # (Be careful not to match partial words, but usually steps are distinct)
                          if cand.strip() in current_cot_text:
                              # "Penalty Double" logic: Add 1x base value scaled by weight
-                             # If info_weight=1.0, we add 1x value -> Doubling the cost.
                              penalty = self.info_weight * penalty_base * 2.0
-                             logging.info(f"  [Penalty] Candidate {i} appears repetitive. Adding {penalty:.4f} to score.")
+                             b_scores[i] = penalty
                              state_values[i] += penalty
 
              best_idx = np.argmin(state_values)
         
         best_step = layer1_candidates[best_idx]
-        best_val = state_values[best_idx] if best_idx < len(state_values) else -1
         
         logging.info("Candidates (Values):")
         for i, cand in enumerate(layer1_candidates):
             preview = cand.replace('\\n', ' ')
             marker = "*" if i == best_idx else " "
-            val = state_values[i] if i < len(state_values) else -1
-            logging.info(f"  [state={val:.4f}, {marker}] {preview}")
+            
+            v_val = state_values[i] if i < len(state_values) else -1
+            f_val = f_scores[i] if i < len(f_scores) else -1
+            b_val = b_scores[i] if i < len(b_scores) else 0.0
+
+            logging.info(f"  [V={v_val:.3f}, F={f_val:.3f}, B={b_val:.3f}, {marker}] {preview}")
 
         # 5. Update Real States
         new_history = history_parts + [best_step]
