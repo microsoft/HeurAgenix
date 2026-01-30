@@ -21,12 +21,13 @@ class ConsensusValueStrategy(BaseStrategy):
     Complexity: N * M generations + N * M * N evaluations.
     If M=N (all agents predict), then O(N^3) evals.
     """
-    def __init__(self, aggregation: str = "mean", exclude_self: bool = False, value_metric: str = "mean_nll", alpha: float = 1.0):
+    def __init__(self, aggregation: str = "mean", exclude_self: bool = False, value_metric: str = "mean_nll", alpha: float = 1.0, info_weight: float = 0.0):
         self.aggregation = aggregation
         self.exclude_self = exclude_self
         # value_metric: "mean_nll" (default), "sum_nll", or "alpha_nll"
         self.value_metric = value_metric
         self.alpha = alpha
+        self.info_weight = info_weight
 
     def select_next_step(
         self, 
@@ -209,6 +210,26 @@ class ConsensusValueStrategy(BaseStrategy):
              if not layer1_candidates:
                  return "", client_states
         else:
+             # Apply InfoGain (Repetition Penalty)
+             if self.info_weight > 0.0:
+                 valid_vals = [v for v in state_values if v != float('inf')]
+                 if valid_vals:
+                     avg_val = np.mean(valid_vals)
+                     # Heuristic: If we are in 'alpha_nll', values are ~0.8. 
+                     # Penalty should be significant.
+                     penalty_base = max(0.5, avg_val) 
+                     
+                     for i, cand in enumerate(layer1_candidates):
+                         # Strict repetition check: 
+                         # Check if the stripped candidate is already in the history text
+                         # (Be careful not to match partial words, but usually steps are distinct)
+                         if cand.strip() in current_cot_text:
+                             # "Penalty Double" logic: Add 1x base value scaled by weight
+                             # If info_weight=1.0, we add 1x value -> Doubling the cost.
+                             penalty = self.info_weight * penalty_base * 2.0
+                             logging.info(f"  [Penalty] Candidate {i} appears repetitive. Adding {penalty:.4f} to score.")
+                             state_values[i] += penalty
+
              best_idx = np.argmin(state_values)
         
         best_step = layer1_candidates[best_idx]

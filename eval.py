@@ -138,7 +138,7 @@ def run_consensus_evaluation(
         exclude_self = strategy_config.get('exclude_self', False)
         value_metric = strategy_config.get('value_metric', 'mean_nll')
         alpha = strategy_config.get('alpha', 1.0)
-        info_weight = strategy_config.get('info_weight', 0.5)
+        info_weight = strategy_config.get('info_weight', 0.0)
 
         if strategy_name == "voting":
             strategy = VotingStrategy(aggregation=agg_method, exclude_self=exclude_self)
