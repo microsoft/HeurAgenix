@@ -101,8 +101,8 @@ best_known = {
     "sg3dl145000": 2446,
     "sg3dl146000": 2450,
     "sg3dl147000": 2444,
-    "sg3dl148000": 2446,
-    "sg3dl149000": 2424,
+    "sg3dl148000": 2448, # Updated to GES record (was 2446)
+    "sg3dl149000": 2426, # Updated to GES record (was 2424)
     "sg3dl1410000": 2458,
 
     # --- Ising Torus Instances ---
