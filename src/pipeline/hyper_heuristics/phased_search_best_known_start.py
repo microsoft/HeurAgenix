@@ -566,9 +566,14 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                     
                     # Prefer Cosm for first attempt as it is SOTA for these graphs
                     if retry == 0 and construction_steps == 0:
-                         cosm_heuristics = [h for h in self.constructive_heuristics if "cosm" in h.__name__ or "mean_field" in h.__name__]
-                         if cosm_heuristics:
-                             h = random.choice(cosm_heuristics)
+                         # Strict Priority: Detailed > Quick > Mean Field
+                         detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
+                         other_cosm = [h for h in self.constructive_heuristics if ("cosm" in h.__name__ or "mean_field" in h.__name__) and "detailed" not in h.__name__]
+                         
+                         if detailed_cosm:
+                             h = detailed_cosm[0] # Always pick detailed if available
+                         elif other_cosm:
+                             h = random.choice(other_cosm)
                          else:
                              h = random.choice(self.constructive_heuristics)
                     else:
@@ -683,7 +688,9 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             # Increase frequency from 300 to 100 to force more hybridization
             if total_steps % 100 <= 1 and len(self.elite_pool) >= 2:
                  self._apply_breakout(env, "active_pool_relinking")
-                 no_improve_steps = 0
+                 # Code Check Fix: Do NOT reset no_improve_steps here. 
+                 # We want the main stagnation logic (Heavy Ruin/Supernova) to still trigger if this fails.
+                 # no_improve_steps = 0 
                  continue
 
             # Sync Distributed Elite Pool periodically
