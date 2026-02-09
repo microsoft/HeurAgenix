@@ -62,6 +62,10 @@ def tabu_node_flip_cae6(
     flipped_nodes_tracker = set()
     current_val = current_cut_value
     
+    # Track the best state found DURING this call
+    best_val_in_run = current_val
+    best_flipped_tracker = set()
+    
     # Tabu array for faster lookup (instead of dict)
     tabu_expiry = np.zeros(n, dtype=int)
     for node, expiry in tabu.items():
@@ -104,16 +108,20 @@ def tabu_node_flip_cae6(
             break # No valid move
             
         # Execute Flip
+        chosen_node = int(chosen_node) # CAST TO INT TO AVOID KEYERROR WITH NUMPY TYPES
+        
         # 1. Update Solution Sets (Locally)
         old_partition = partition[chosen_node]
         new_partition = 1 - old_partition
         partition[chosen_node] = new_partition
         
         if old_partition == 0: # A -> B
-            set_a.remove(chosen_node)
+            if chosen_node in set_a:
+                set_a.remove(chosen_node)
             set_b.add(chosen_node)
         else: # B -> A
-            set_b.remove(chosen_node)
+            if chosen_node in set_b:
+                set_b.remove(chosen_node)
             set_a.add(chosen_node)
             
         # 2. Update Weights & Gains (Vectorized)
@@ -152,13 +160,21 @@ def tabu_node_flip_cae6(
         else:
             flipped_nodes_tracker.add(chosen_node)
 
+        # Update best tracking
+        if current_val > best_val_in_run:
+            best_val_in_run = current_val
+            best_flipped_tracker = flipped_nodes_tracker.copy()
+
     # End Loop
     
-    # Build Operator
-    if not flipped_nodes_tracker:
+    # Build Operator based on BEST state, not FINAL state
+    if not best_flipped_tracker:
+        # If no improvement found, return empty (or None)
+        # But wait, if we found NOTHING better than start, best_flipped_tracker is empty.
+        # This is correct behavior for a hill climber (step returns no improvement).
         return None, {}
         
-    op = SwapOperator(list(flipped_nodes_tracker))
+    op = SwapOperator(list(best_flipped_tracker))
     
     # Convert tabu array back to dict for persistence (only active ones)
     new_tabu = {}

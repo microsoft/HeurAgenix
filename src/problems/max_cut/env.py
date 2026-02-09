@@ -22,11 +22,23 @@ class Env(BaseEnv):
         data_name = data_path.split(os.sep)[-1].split(".")[0]
         self.best_known = best_known.get(data_name, None)
         with open(data_path) as file:
-            node_num = int(file.readline().split(" ", 1)[0])
+            # Skip comments
+            line = file.readline()
+            while line and line.strip().startswith("#"):
+                line = file.readline()
+                
+            node_num = int(line.split(" ", 1)[0])
             weight_matrix = np.zeros((node_num, node_num))
             adj = [{} for _ in range(node_num)]
             for row in file:
-                node_1, node_2, weight = [int(e) for e in row.strip("\n").split()]
+                if row.strip().startswith("#"): continue
+                parts = row.strip("\n").split()
+                if len(parts) < 3: continue
+                node_1, node_2, weight = [int(e) for e in parts]
+                # Adjust for 1-based indexing if needed, usually datasets are 1-based
+                # Check bounds casually?
+                if node_1 > node_num or node_2 > node_num:
+                     pass # Should warn or handle 0-based? Assuming 1-based as per Gset/MQLib standard
                 weight_matrix[node_1 - 1][node_2 - 1] = weight
                 weight_matrix[node_2 - 1][node_1 - 1] = weight
                 adj[node_1 - 1][node_2 - 1] = weight

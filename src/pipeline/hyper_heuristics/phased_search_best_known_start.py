@@ -321,7 +321,11 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         if not self.improvement_heuristics: return False
         
         # Limit max VND iterations to prevent infinite loops (though strict ascent prevents cycling, costs time)
-        max_vnd_loops = 10 
+        # CHANGED: Increased from 10 to 10000000. 
+        # Since strict ascent is enforced (env.key_value > start_val), infinite loops are impossible
+        # unless the score increases indefinitely, which is impossible for MaxCut.
+        # Convergence is guaranteed. We want FULL convergence.
+        max_vnd_loops = 10000000 
         total_improved = False
         
         # Pre-shuffle heuristics to improve robustness
@@ -543,8 +547,15 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         # 1. Load Initial (Best Known)
         loaded, _ = self._try_load_initial_solution(env)
         if not loaded: 
-            print("Failed to load best known. Aborting Strategy 2.", flush=True)
-            return False
+            print("Failed to load best known. Switching to Constructive Phase...", flush=True)
+            # Fallback: Construct New Solution if no Best Known file
+            if self.constructive_heuristics:
+                 h = random.choice(self.constructive_heuristics)
+                 env.run_heuristic(h)
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Construction completed. Value: {env.key_value}", flush=True)
+            else:
+                 print("No constructive heuristics available. Aborting.", flush=True)
+                 return False
             
         current_best = env.key_value
         self._update_elite_pool(env.current_solution)
@@ -653,6 +664,9 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         Overrides the loading logic to specifically look for the best known solution file.
         Returns: (loaded_success, is_fragile_elite)
         """
+        if not self.high_quality_solution_dir:
+             return False, False
+
         data_name = env.data_ref_name # e.g., "g81.mc"
         if data_name.endswith(".mc") or data_name.endswith(".vrp"):
             base_name = data_name.split(".")[0]
@@ -660,6 +674,10 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             base_name = data_name
         
         target_path = os.path.join(self.high_quality_solution_dir, f"best_known.txt")
+        
+        if not os.path.exists(target_path):
+             print(f"[{datetime.now().strftime('%H:%M:%S')}] No best known file found at {target_path}. Skipping load.", flush=True)
+             return False, False
             
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading Best Known from {target_path}...", flush=True)
         

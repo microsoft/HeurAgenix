@@ -459,7 +459,9 @@ class PhasedSearchFastStopBestHyperHeuristic:
         
         begin = datetime.now()
         last_value = 0
+        init_value = 0
         found_best = False
+        init_value = 0
         node_num = env.instance_data["node_num"]
         print(f"Start running phased search. Data:{data}\tExp\t{experiment}\tID:{run_id}\tStart:{begin.strftime('%Y-%m-%d %H:%M:%S')}\t", flush=True)
         
@@ -1040,8 +1042,8 @@ class PhasedSearchFastStopBestHyperHeuristic:
                             if random.random() < acceptance_prob:
                                 should_save = True
                         
-                        if should_save and current_steps > 1:
-                             if (current_time - last_write_time > write_interval) or (env.key_value > pool_best):
+                        if should_save and current_steps > 0:
+                             if self.high_quality_solution_dir and ((current_time - last_write_time > write_interval) or (env.key_value > pool_best)):
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
                                  path = os.path.join(self.high_quality_solution_dir, fname)
                                  env.dump_best_solution(path)

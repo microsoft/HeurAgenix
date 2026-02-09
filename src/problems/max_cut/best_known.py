@@ -74,6 +74,45 @@ best_known = {
     "g72": 7008,
     "g77": 9940,
     "g81": 14060,
+
+    # --- Spin Glass (3D Lattice) Instances ---
+    # Source [1]: Festa, P. et al. (2002). "Randomized heuristics for the MAX-CUT problem". 
+    # Source [2]: Myklebust, T. (2015). "SOLVING MAXIMUM CUT PROBLEMS BY SIMULATED ANNEALING".
+    # Source [3]: Boros, E. et al. (2008). "A max-flow approach to improved lower bounds for QUBO".
+    # Values updated to the best found in [3] (Discrete Optimization 5, Table 6) which are >= earlier benchmarks.
+    
+    # sg3dl 1000 Nodes (Boros 2008 Lower Bounds)
+    "sg3dl101000": 896,
+    "sg3dl102000": 900,
+    "sg3dl103000": 892,
+    "sg3dl104000": 898,
+    "sg3dl105000": 886,
+    "sg3dl106000": 888,
+    "sg3dl107000": 900,
+    "sg3dl108000": 882,
+    "sg3dl109000": 902,
+    "sg3dl1010000": 894, # Our best is 894, matching [2] and Boros [3]
+    
+    # sg3dl 2744 Nodes (Boros 2008 Lower Bounds)
+    "sg3dl141000": 2446,
+    "sg3dl142000": 2458,
+    "sg3dl143000": 2442,
+    "sg3dl144000": 2450,
+    "sg3dl145000": 2446,
+    "sg3dl146000": 2450,
+    "sg3dl147000": 2444,
+    "sg3dl148000": 2446,
+    "sg3dl149000": 2424,
+    "sg3dl1410000": 2458,
+
+    # --- Ising Torus Instances ---
+    # Source: 7th DIMACS Implementation Challenge.
+    # Referenced in Festa et al. (2002) Figure 10.
+    "Torusg_3_8": 458, # Mapped from pm3-8-50
+    "pm3-8-50": 458,   # Alias
+    
+    "g000985": 2800,
+    "g000035": 100,
 }
 import os
 def get_best(data:str) -> int:
