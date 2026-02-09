@@ -125,7 +125,14 @@ class BatchInsertNodeOperator(BaseOperator):
         new_set_a = set(solution.set_a)
         new_set_b = set(solution.set_b)
         
-        new_set_a.update(self.nodes_to_a)
-        new_set_b.update(self.nodes_to_b)
+        # Add to A, ensure removed from B
+        if self.nodes_to_a:
+            new_set_a.update(self.nodes_to_a)
+            new_set_b.difference_update(self.nodes_to_a)
+            
+        # Add to B, ensure removed from A
+        if self.nodes_to_b:
+            new_set_b.update(self.nodes_to_b)
+            new_set_a.difference_update(self.nodes_to_b)
         
         return Solution(new_set_a, new_set_b, solution.cut_value)

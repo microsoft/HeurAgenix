@@ -549,12 +549,40 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         if not loaded: 
             print("Failed to load best known. Switching to Constructive Phase...", flush=True)
             # Fallback: Construct New Solution if no Best Known file
-            if self.constructive_heuristics:
-                 h = random.choice(self.constructive_heuristics)
-                 env.run_heuristic(h)
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Construction completed. Value: {env.key_value}", flush=True)
-            else:
-                 print("No constructive heuristics available. Aborting.", flush=True)
+            # Loop until solution is COMPLETE and VALID
+            max_retries = 10
+            for retry in range(max_retries):
+                
+                # Reset environment for a fresh start
+                env.reset(output_dir=env.output_dir)
+                
+                # Keep constructing until complete
+                construction_steps = 0
+                while not env.is_complete_solution and construction_steps < 1000:
+                    if not self.constructive_heuristics:
+                        break
+                    
+                    # Prefer Cosm for first attempt as it is SOTA for these graphs
+                    if retry == 0 and construction_steps == 0:
+                         cosm_heuristics = [h for h in self.constructive_heuristics if "cosm" in h.__name__ or "mean_field" in h.__name__]
+                         if cosm_heuristics:
+                             h = random.choice(cosm_heuristics)
+                         else:
+                             h = random.choice(self.constructive_heuristics)
+                    else:
+                        h = random.choice(self.constructive_heuristics)
+                        
+                    env.run_heuristic(h)
+                    construction_steps += 1
+                
+                if env.is_complete_solution and env.key_value > 100:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Construction completed. Value: {env.key_value}", flush=True)
+                    break
+                else:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...", flush=True)
+            
+            if not env.is_complete_solution:
+                 print("Critical Failure: Unable to construct valid solution after retries.", flush=True)
                  return False
             
         current_best = env.key_value
@@ -605,7 +633,9 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             # If we are close to best known, be more patient with small moves.
             # If we are far (after ruin), be impatient.
             
-            patience = 50 
+            # Adaptive Patience based on problem size
+            # For 1000 nodes, 50-100 is okay. For 3000 nodes, we need 200-300.
+            patience = max(50, int(env.instance_data["node_num"] / 10))
             
             if no_improve_steps > patience:
                 # Escalation using stagnation_level
