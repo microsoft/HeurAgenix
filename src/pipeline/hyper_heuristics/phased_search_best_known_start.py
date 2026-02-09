@@ -404,8 +404,10 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             # 1. Find Best Known
             best_sol = max(self.elite_pool, key=lambda s: s.cut_value)
             
-            # 2. Find a "Distant" High-Quality Elite (Score > 99.5% BK)
-            candidates = [s for s in self.elite_pool if s.cut_value > env.best_known * 0.995]
+            # 2. Find a "Distant" High-Quality Elite
+            # [FIX] Lower threshold to 0.97 to ensure our current elites (2400-2406) can participate
+            # 2446 * 0.97 = 2372, so 2400+ are valid candidates
+            candidates = [s for s in self.elite_pool if s.cut_value > env.best_known * 0.97]
             if not candidates: 
                  return
                  
@@ -621,11 +623,11 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 no_improve_steps += 1
                 
                 # 2. Relaxed Elite Pool Update (Fix for Path Relinking)
-                # If we are stuck but the solution is still decent (e.g. > 99% of BK)
+                # If we are stuck but the solution is still decent (e.g. > 98% of BK)
                 # we add it to the pool to provide diversity for path relinking.
                 # Don't add every step, maybe every 10 steps to avoid flooding with identical copies
                 is_best_known = env.key_value >= env.best_known
-                if is_best_known or (env.key_value >= env.best_known * 0.99 and total_steps % 10 == 0):
+                if is_best_known or (env.key_value >= env.best_known * 0.98 and total_steps % 10 == 0):
                     self._update_elite_pool(env.current_solution)
 
             # --- Phase C: Breakout / Ruin Strategies ---
@@ -678,7 +680,8 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                  print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known})", flush=True)
             
             # [NEW] Periodic Active Path Relinking to bridge peaks
-            if total_steps % 300 <= 1 and len(self.elite_pool) >= 2:
+            # Increase frequency from 300 to 100 to force more hybridization
+            if total_steps % 100 <= 1 and len(self.elite_pool) >= 2:
                  self._apply_breakout(env, "active_pool_relinking")
                  no_improve_steps = 0
                  continue
@@ -705,15 +708,59 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         
         target_path = os.path.join(self.high_quality_solution_dir, f"best_known.txt")
         
-        if not os.path.exists(target_path):
-             print(f"[{datetime.now().strftime('%H:%M:%S')}] No best known file found at {target_path}. Skipping load.", flush=True)
+        found_solution_path = None
+        is_pickle = False
+
+        if os.path.exists(target_path):
+             found_solution_path = target_path
+        else:
+             # Check for any sol_*.pkl files and pick the best one
+             import glob
+             pkl_pattern = os.path.join(self.high_quality_solution_dir, "sol_*.pkl")
+             pkl_files = glob.glob(pkl_pattern)
+             
+             if pkl_files:
+                 # Helper to extract value from filename sol_{value}_{timestamp}_{worker}_{rand}.pkl
+                 # Randomly select one from the available solutions to ensure diversity if running multiple instances
+                 found_solution_path = random.choice(pkl_files)
+                 is_pickle = True
+        
+        if not found_solution_path:
+             print(f"[{datetime.now().strftime('%H:%M:%S')}] No best known file found at {target_path} or any sol_*.pkl in directory. Skipping load.", flush=True)
              return False, False
             
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading Best Known from {target_path}...", flush=True)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading Initial Solution from {found_solution_path}...", flush=True)
         
         try:
+            if is_pickle:
+                 import pickle
+                 with open(found_solution_path, 'rb') as f:
+                     sol = pickle.load(f)
+                 
+                 # Ensure it has set_b if missing (legacy check)
+                 # Depending on solution class object structure
+                 if not hasattr(sol, 'set_b') or len(sol.set_b) == 0:
+                     node_num = env.instance_data["node_num"]
+                     all_nodes = set(range(node_num))
+                     sol.set_b = all_nodes - sol.set_a
+                 
+                 env.current_solution = sol
+                 # Recalculate to be safe
+                 # env.key_value is a property, cannot set it directly. 
+                 # We ensure the solution object has the correct value so env.key_value (which calls get_key_value) returns it.
+                 calculated_val = env.get_key_value(env.current_solution)
+                 env.current_solution.cut_value = calculated_val
+                 env.problem_state = env.get_problem_state()
+                 
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully loaded Pickle solution! Value: {env.key_value}", flush=True)
+                 
+                 if env.key_value > env.best_known:
+                    env.best_known = env.key_value
+                 
+                 return True, True
+
             # Load using env.load_solution first
-            if env.load_solution(target_path):
+            elif env.load_solution(found_solution_path):
                 # Check if set_b is missing and fix it
                 node_num = env.instance_data["node_num"]
                 all_nodes = set(range(node_num))
