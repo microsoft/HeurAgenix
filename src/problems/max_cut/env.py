@@ -47,7 +47,29 @@ class Env(BaseEnv):
                 weight_matrix[node_2 - 1][node_1 - 1] = weight
                 adj[node_1 - 1][node_2 - 1] = weight
                 adj[node_2 - 1][node_1 - 1] = weight
+        
+        # Calculate data scale for adaptive algorithm parameters
+        nonzero_weights = weight_matrix[weight_matrix != 0]
+        if len(nonzero_weights) > 0:
+            self.mean_weight = float(np.mean(np.abs(nonzero_weights)))
+        else:
+            self.mean_weight = 1.0
+
         return {"node_num": node_num, "weight_matrix": weight_matrix, "adj": adj}
+    
+    def reset(self, output_dir: str=None):
+        super().reset(output_dir)
+        # Adaptive Temperature Initialization for Large Scale Weights (ImgSeg)
+        # Standard Gset (Weight~1) uses T=100. scaling_factor = 100.
+        # UPDATE: Increased to 1000.0 to break stagnation in large float graphs (2026-02-10)
+        base_scaling = 1000.0
+        adaptive_temp = self.mean_weight * base_scaling
+        
+        # Inject into algorithm_data so heuristics pick it up automatically
+        self.algorithm_data["temperature"] = adaptive_temp
+        self.algorithm_data["initial_temperature"] = adaptive_temp
+        # Also scale final_temperature if heuristics use it
+        self.algorithm_data["final_temperature"] = self.algorithm_data.get("final_temperature", 0.001) * self.mean_weight
 
     def init_solution(self) -> Solution:
         return Solution(set_a=set(), set_b=set(), cut_value=0)
