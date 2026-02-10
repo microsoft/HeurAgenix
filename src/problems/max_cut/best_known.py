@@ -108,9 +108,13 @@ best_known = {
     # --- Ising Torus Instances ---
     # Source: 7th DIMACS Implementation Challenge.
     # Referenced in Festa et al. (2002) Figure 10.
-    "Torusg_3_8": 458, # Mapped from pm3-8-50
-    "pm3-8-50": 458,   # Alias
-    
+    # Updated values from Myklebust (2015) "SOLVING MAXIMUM CUT PROBLEMS BY SIMULATED ANNEALING" (Figure 4)
+    # Further updated from Boros et al. (2008) "A max-flow approach to improved lower bounds for QUBO" (Table 7a)
+    "tourspm3-8-50": 458,    # Explicit filename
+    "tourspm3-15-50": 3016,  # Boros et al. (2008) Table 7a (listed as toruspm3-15-50)
+    "toursg3-8": 41684814,   # Boros et al. (2008) Table 7a (matches)
+    "toursg3-15": 285790637, # Boros et al. (2008) Table 7a (listed as torusg3-15)
+
     "g000985": 2800,
     "g000035": 100,
 }
