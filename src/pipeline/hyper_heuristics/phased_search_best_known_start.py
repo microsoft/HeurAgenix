@@ -491,7 +491,9 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
              best_val = max(s.cut_value for s in self.elite_pool)
              # Candidates: High quality but strictly less than Best Known (to find secondary peaks)
              # We want to revisit peaks like 26992 to see if we can sharpen them
-             candidates = [s for s in self.elite_pool if s.cut_value >= env.best_known - 150 and s.cut_value < best_val]
+             # [FIX] Use relative threshold for large-weight instances (imgseg)
+             threshold = max(150, env.best_known * 0.02)
+             candidates = [s for s in self.elite_pool if s.cut_value >= env.best_known - threshold and s.cut_value < best_val]
              
              desc = "SECONDARY PEAK"
 
@@ -503,7 +505,7 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                     return min(d1, d2)
                  
                  # Look for solutions with SAME best value but Distance > 400
-                 candidates = [s for s in self.elite_pool if s.cut_value == best_val and calc_dist_j(s, env.current_solution) > 400]
+                 candidates = [s for s in self.elite_pool if abs(s.cut_value - best_val) <= 1e-3 and calc_dist_j(s, env.current_solution) > 400]
                  desc = "PARALLEL UNIVERSE PEAK"
              
              if candidates:
