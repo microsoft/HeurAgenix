@@ -34,7 +34,11 @@ class Env(BaseEnv):
                 if row.strip().startswith("#"): continue
                 parts = row.strip("\n").split()
                 if len(parts) < 3: continue
-                node_1, node_2, weight = [int(e) for e in parts]
+                # Modified to support float weights for MQLib instances
+                node_1 = int(parts[0])
+                node_2 = int(parts[1])
+                weight = float(parts[2])
+                
                 # Adjust for 1-based indexing if needed, usually datasets are 1-based
                 # Check bounds casually?
                 if node_1 > node_num or node_2 > node_num:
