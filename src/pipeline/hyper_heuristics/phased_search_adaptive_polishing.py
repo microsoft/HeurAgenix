@@ -513,14 +513,14 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                                 current_ruin_percent = 0.3
                                 best_at_last_ruin = current_best
                             else:
-                                current_ruin_percent = min(0.5, current_ruin_percent + 0.05)
+                                # Increase max ruin to 0.7 (70%) to escape deep local optima
+                                current_ruin_percent = min(0.7, current_ruin_percent + 0.05)
 
-                            if current_ruin_percent >= 0.55:
-                                if current_best >= env.best_known:
-                                    current_ruin_percent = 0.3 # Extend run
-                                else:
-                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} STUCK. EARLY STOPPING.", flush=True)
-                                    break
+                            # Trigger reset at 0.75 (reached 0.7)
+                            if current_ruin_percent >= 0.75:
+                                # FORCE INFINITE CYCLING: Never stop, just reset intensity
+                                current_ruin_percent = 0.3 
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} MAX RUIN REHAP (Infinite Search). Cycling back to 0.3.", flush=True)
 
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Massive Ruin (Percent: {current_ruin_percent:.1%}).", flush=True)
                         nodes_to_remove = max(10, int(node_num * current_ruin_percent))

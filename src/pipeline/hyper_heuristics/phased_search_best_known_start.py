@@ -545,6 +545,23 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 count = max(200, int(node_num * 0.15))
                 env.run_heuristic(h, parameters={"count": count})
 
+        elif strategy == "massive_ruin":
+            # [NEW] 70% DESTRUCTION
+            # Used to escape extremely deep convergence basins (like sg3dl149000 at 2426)
+            if "batch_cluster_ruin" in self.breakout_heuristics:
+                h = self.breakout_heuristics["batch_cluster_ruin"]
+                count = int(node_num * 0.70) # 70% Ruin
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] MASSIVE RUIN TRIGGERED: Destroying {count} nodes (70%)...", flush=True)
+                env.run_heuristic(h, parameters={"count": count})
+            else:
+                 # Fallback: Random Flip 70%
+                 nodes = random.sample(range(node_num), int(node_num * 0.70))
+                 env.current_solution.set_a.symmetric_difference_update(nodes)
+                 all_nodes = set(range(node_num))
+                 env.current_solution.set_b = all_nodes - env.current_solution.set_a
+                 env.current_solution.cut_value = env.get_key_value(env.current_solution)
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] MASSIVE RUIN TRIGGERED: Random Flipped {len(nodes)} nodes (70%)...", flush=True)
+
     def run(self, env: BaseEnv) -> bool:
         # 1. Load Initial (Best Known)
         loaded, _ = self._try_load_initial_solution(env)
@@ -655,10 +672,11 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 is_high_quality_stagnation = env.key_value > env.best_known * 0.995
                 
                 if self.stagnation_level >= 5:
-                     # Ultimate Weapon: Supernova / Anti-Consensus
-                     strategy = "supernova_ruin"
-                     # Reset stagnation to give it time to recover
-                     self.stagnation_level = 3 
+                     # Ultimate Weapon: Massive Ruin (70%)
+                     # Replaces Supernova because 10-20% was not enough for sg3dl149000
+                     strategy = "massive_ruin"
+                     # Reset stagnation completely to allow reconstruction from the ashes
+                     self.stagnation_level = 0 
                 elif self.stagnation_level >= 4:
                      # Diversity Injection: Try jumping to a different peak or heavy ruin
                      if random.random() < 0.4:
