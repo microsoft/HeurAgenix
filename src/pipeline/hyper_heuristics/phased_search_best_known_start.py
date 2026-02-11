@@ -426,9 +426,11 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             
             dist = calc_dist(best_sol, distant_elite)
             
-            if dist < 50: 
-                 # Too close, just ruin
-                 self._apply_breakout(env, "heavy_ruin")
+            # [MODIFIED] Increased threshold from 50 to 200 to prevent in-breeding
+            if dist < 200: 
+                 # Too close, strictly force diversity via MASSIVE ruin (70% destruction)
+                 # This forces the search to abandon the current super-basin
+                 self._apply_breakout(env, "massive_ruin")
                  return
 
             print(f"[{datetime.now().strftime('%H:%M:%S')}] *** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***", flush=True)
@@ -548,13 +550,76 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                 env.run_heuristic(h, parameters={"count": count})
 
         elif strategy == "massive_ruin":
-            # [NEW] 70% DESTRUCTION
+            # [NEW STRATEGY] Diversified Deep Breakout
+            # Instead of just pure destruction (Massive Ruin), we now mix in:
+            # 1. Fresh Restart (Detailed Cosm) -> Inject "Paratroopers" to find new peaks
+            # 2. Anti-Consensus (Supernova) -> Systematically explore the opposite of current beliefs
+            # 3. Massive Ruin -> Deep excavation of current basin
+            
+            dice = random.random()
+            
+            # [Option 1: Fresh Restart / Injection] (34% chance)
+            # Use Detailed COSM to generate a completely new structure orthogonal to current pool
+            if dice < 0.34 and self.constructive_heuristics:
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] STRATEGY UPDATE: Triggering FRESH INJECTION (Detailed Cosm)...", flush=True)
+                 
+                 # Pick Detailed Cosm
+                 detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
+                 if detailed_cosm:
+                     h = detailed_cosm[0]
+                 else:
+                     h = random.choice(self.constructive_heuristics)
+                     
+                 try:
+                     # Create a temporary env-like or just run it. 
+                     env.current_solution.set_a = set() 
+                     env.current_solution.set_b = set(range(node_num)) # Reset to all B
+                     
+                     env.run_heuristic(h)
+                     
+                     # Recalculate
+                     env.current_solution.cut_value = env.get_key_value(env.current_solution)
+                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Fresh Injection Complete. New Start Value: {env.current_solution.cut_value}", flush=True)
+                     
+                     # [CRITICAL] Briefly run improvement here to stabilize the solution before returning to main loop?
+                     # No, let the main loop handle it.
+                     # Sleep to prevent spam
+                     time.sleep(1.0)
+
+                 except Exception as e:
+                     print(f"Injection failed: {e}. Falling back to Ruin.", flush=True)
+                     self._apply_breakout(env, "massive_ruin_fallback")
+            
+            # [Option 2: Anti-Consensus / Supernova] (33% chance)
+            elif dice < 0.67:
+                 print(f"[{datetime.now().strftime('%H:%M:%S')}] STRATEGY UPDATE: Triggering ANTI-CONSENSUS (Supernova)...", flush=True)
+                 # Apply Supernova with high intensity (Aggressive Anti-Consensus)
+                 # Flip 30-50% of static nodes
+                 ratio = random.uniform(0.30, 0.50)
+                 nodes_to_flip = self._calculate_consensus_flip(node_num, flip_ratio=ratio)
+                 if nodes_to_flip:
+                     env.current_solution.set_a.symmetric_difference_update(nodes_to_flip)
+                     all_nodes = set(range(node_num))
+                     env.current_solution.set_b = all_nodes - env.current_solution.set_a
+                     env.current_solution.cut_value = env.get_key_value(env.current_solution)
+                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Anti-Consensus Applied: Flipped {len(nodes_to_flip)} static nodes.", flush=True)
+                     time.sleep(1.0)
+                 else:
+                     self._apply_breakout(env, "massive_ruin_fallback")
+
+            # [Option 3: Classic Massive Ruin] (33% chance)
+            else:
+                 self._apply_breakout(env, "massive_ruin_fallback")
+
+        elif strategy == "massive_ruin_fallback":
+            # [Original Massive Ruin Logic]
             # Used to escape extremely deep convergence basins (like sg3dl149000 at 2426)
             if "batch_cluster_ruin" in self.breakout_heuristics:
                 h = self.breakout_heuristics["batch_cluster_ruin"]
                 count = int(node_num * 0.70) # 70% Ruin
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] MASSIVE RUIN TRIGGERED: Destroying {count} nodes (70%)...", flush=True)
                 env.run_heuristic(h, parameters={"count": count})
+                time.sleep(1.0)
             else:
                  # Fallback: Random Flip 70%
                  nodes = random.sample(range(node_num), int(node_num * 0.70))
@@ -563,6 +628,7 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                  env.current_solution.set_b = all_nodes - env.current_solution.set_a
                  env.current_solution.cut_value = env.get_key_value(env.current_solution)
                  print(f"[{datetime.now().strftime('%H:%M:%S')}] MASSIVE RUIN TRIGGERED: Random Flipped {len(nodes)} nodes (70%)...", flush=True)
+                 time.sleep(1.0)
 
     def run(self, env: BaseEnv) -> bool:
         # 1. Load Initial (Best Known)
@@ -743,8 +809,15 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         else:
              # Check for any sol_*.pkl files and pick the best one
              import glob
-             pkl_pattern = os.path.join(self.high_quality_solution_dir, "sol_*.pkl")
-             pkl_files = glob.glob(pkl_pattern)
+             # [FIX] Also check 'high_quality_solution' subdirectory if files are hidden there
+             search_paths = [
+                 os.path.join(self.high_quality_solution_dir, "sol_*.pkl"),
+                 os.path.join(self.high_quality_solution_dir, "high_quality_solution", "sol_*.pkl")
+             ]
+             
+             pkl_files = []
+             for p in search_paths:
+                 pkl_files.extend(glob.glob(p))
              
              if pkl_files:
                  # Helper to extract value from filename sol_{value}_{timestamp}_{worker}_{rand}.pkl
