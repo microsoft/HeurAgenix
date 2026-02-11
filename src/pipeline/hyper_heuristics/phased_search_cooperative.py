@@ -11,11 +11,11 @@ from src.problems.base.env import BaseEnv
 from src.util.util import load_function
 from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
 
-class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
-    def __init__(self, heuristic_pool, problem, high_quality_solution_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02):
+class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
+    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02, initial_solution_paths=None):
         # Force load_ratio to 1.0 to ensure we always try to load
-        self.high_quality_solution_dir = high_quality_solution_dir
-        super().__init__(heuristic_pool, problem, high_quality_solution_dir, top_k, 1.0, fail_fast_threshold)
+        self.shared_pool_dir = shared_pool_dir
+        super().__init__(heuristic_pool, problem, shared_pool_dir, top_k, 1.0, fail_fast_threshold)
         
         self.elite_pool = []
         self.breakout_heuristics = {}
@@ -26,14 +26,14 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
         self.worker_id = str(uuid.uuid4())[:8]
         # Hash worker_id to get a shard index (0-9)
         self.shard_id = int(hashlib.md5(self.worker_id.encode()).hexdigest(), 16) % 10
-        self.shared_pool_dir = None
+        # self.shared_pool_dir = None # REMOVED BUGGY LINE
         
         # Throttling
         self.last_upload_time = 0
         self.last_upload_value = 0
         self.last_sync_time = 0
         
-        if self.high_quality_solution_dir:
+        if self.shared_pool_dir:
             # User request: Store elite pool in output/max_cut/elite_pool/{instance}
             # Extract instance name from path (assumed .../g63.mc/high_quality_solution)
             
@@ -41,29 +41,30 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
 
             try:
-                path_parts = self.high_quality_solution_dir.split(os.sep)
-                # Find the part that looks like an instance name (e.g. g63.mc)
-                # It is usually the parent of 'high_quality_solution'
-                if 'high_quality_solution' in path_parts:
-                    idx = path_parts.index('high_quality_solution')
-                    instance_name = path_parts[idx-1] # e.g. g63.mc
-
-                    # Construct new path: output/max_cut/elite_pool/{instance_name}
-                    self.shared_pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", instance_name)
+                # If we passed a clean path from search_best.py (e.g. output/max_cut/elite_pool/xxx), just use it.
+                if "elite_pool" in self.shared_pool_dir:
+                     # Create directory if it doesn't exist
+                     pass
                 else:
-                    # Fallback: If path starts with "output", replace it with base_output_dir
-                    if self.high_quality_solution_dir.startswith("output"):
-                         rel_path = os.path.relpath(self.high_quality_solution_dir, "output")
-                         self.shared_pool_dir = os.path.join(base_output_dir, rel_path, 'elite_pool')
+                    path_parts = self.shared_pool_dir.split(os.sep)
+                    # Find the part that looks like an instance name (e.g. g63.mc)
+                    # It is usually the parent of 'high_quality_solution'
+                    if 'high_quality_solution' in path_parts:
+                        idx = path_parts.index('high_quality_solution')
+                        instance_name = path_parts[idx-1] # e.g. g63.mc
+
+                        # Construct new path: output/max_cut/elite_pool/{instance_name}
+                        self.shared_pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", instance_name)
                     else:
-                         self.shared_pool_dir = os.path.join(self.high_quality_solution_dir, 'elite_pool')
+                        # Fallback: If path starts with "output", replace it with base_output_dir
+                        if self.shared_pool_dir.startswith("output"):
+                             rel_path = os.path.relpath(self.shared_pool_dir, "output")
+                             self.shared_pool_dir = os.path.join(base_output_dir, rel_path, 'elite_pool')
+                        else:
+                             self.shared_pool_dir = os.path.join(self.shared_pool_dir, 'elite_pool')
             except:
                  # Exception Fallback
-                 if self.high_quality_solution_dir.startswith("output"):
-                     rel_path = os.path.relpath(self.high_quality_solution_dir, "output")
-                     self.shared_pool_dir = os.path.join(base_output_dir, rel_path, 'elite_pool')
-                 else:
-                     self.shared_pool_dir = os.path.join(self.high_quality_solution_dir, 'elite_pool')
+                 pass
 
             # Base dir created once
             try:
@@ -72,9 +73,31 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             except OSError:
                 pass 
         
-        # [NEW] Initial Load Logic for Merged Pools
-        # If we are starting fresh but a merged pool exists, load it.
-        self._load_initial_pool_from_disk()
+        # [NEW] Initial Load Logic from Main Process
+        # Use paths provided by the main process (which filtered them by diversity)
+        if initial_solution_paths:
+             self._load_initial_solutions_from_paths(initial_solution_paths)
+        else:
+            # Fallback legacy load
+            # self._load_initial_pool_from_disk()
+            pass
+
+    def _load_initial_solutions_from_paths(self, paths):
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading {len(paths)} initial diverse solutions from main process...", flush=True)
+        count = 0
+        for path in paths:
+            try:
+                if not os.path.exists(path):
+                    continue
+                with open(path, 'rb') as f:
+                    sol = pickle.load(f)
+                    # We use _add_to_local_pool but share=False because these are already known elites/breakthroughs
+                    # We do NOT share them back immediately to avoid storm
+                    self._add_to_local_pool(sol, share=False)
+                    count += 1
+            except Exception as e:
+                print(f"Warning: Failed to load {path}: {e}", flush=True)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully loaded {count} elites locally.", flush=True)
 
     def _get_time_bucket_path(self, timestamp=None):
         if timestamp is None:
@@ -119,6 +142,9 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             with open(temp_path, 'wb') as f:
                 pickle.dump(solution, f)
             os.rename(temp_path, filepath)
+            
+            # [LOGGING UPDATE] Print the path of the saved elite/breakthrough
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Saved elite solution to: {filepath}", flush=True)
             
             # Update throttle stats
             self.last_upload_time = current_time
@@ -631,10 +657,35 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
                  time.sleep(1.0)
 
     def run(self, env: BaseEnv) -> bool:
-        # 1. Load Initial (Best Known)
-        loaded, _ = self._try_load_initial_solution(env)
+        # [REFACTORED for Cooperative Search]
+        # 1. Try to load initial solution (Hot Start) from the Shared Pool
+        # We rely SOLELY on the shared pool (which might have been pre-populated or filled by other workers)
+        loaded = False
+        
+        # Explicitly maximize chances by syncing first
+        self._sync_shared_pool()
+
+        # Try to find the best available solution in our local view of the pool
+        if self.elite_pool:
+            best_sol = max(self.elite_pool, key=lambda s: s.cut_value)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Hot Start: Loaded best from Elite Pool (Val: {best_sol.cut_value})", flush=True)
+            
+            # Deep Copy to ensure safety
+            from src.problems.max_cut.components import Solution
+            env.current_solution = Solution(set(best_sol.set_a), set(best_sol.set_b), best_sol.cut_value)
+            
+            # Update Environment State
+            env.current_solution.cut_value = env.get_key_value(env.current_solution) # Recalculate to be safe
+            env.problem_state = env.get_problem_state()
+            
+            # Update Env Best Known if we accidentally loaded something better
+            if env.key_value > env.best_known:
+                env.best_known = env.key_value
+                
+            loaded = True
+        
         if not loaded: 
-            print("Failed to load best known. Switching to Constructive Phase...", flush=True)
+            print("No Elite Pool solutions found. Switching to Constructive Phase (Cold Start)...", flush=True)
             # Fallback: Construct New Solution if no Best Known file
             # Loop until solution is COMPLETE and VALID
             max_retries = 10
@@ -782,117 +833,35 @@ class PhasedSearchBestKnownStartHyperHeuristic(PhasedSearchAdaptivePolishingHype
             # Sync Distributed Elite Pool periodically
             if total_steps % 50 == 0:
                 self._sync_shared_pool()
+                
+                # [Optimization] Aggressive Catch-up
+                # If we are significantly behind the global elite pool, abandon local search and jump.
+                # This ensures no worker wastes time in a sub-optimal basin.
+                if self.elite_pool:
+                    pool_best = max(self.elite_pool, key=lambda s: s.cut_value)
+                    # If current is worse than 99.8% of pool best 
+                    # For 5.3M, threshold is ~10k difference. Sufficient to distinguish basins.
+                    if env.key_value < pool_best.cut_value * 0.998:
+                        from src.problems.max_cut.components import Solution
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value}...", flush=True)
+                        
+                        env.current_solution = Solution(set(pool_best.set_a), set(pool_best.set_b), pool_best.cut_value)
+                        env.current_solution.cut_value = env.get_key_value(env.current_solution)
+                        env.problem_state = env.get_problem_state()
+                        
+                        current_best = env.key_value
+                        no_improve_steps = 0
 
         return False
         
-    def _try_load_initial_solution(self, env: BaseEnv) -> tuple[bool, bool]:
-        """
-        Overrides the loading logic to specifically look for the best known solution file.
-        Returns: (loaded_success, is_fragile_elite)
-        """
-        if not self.high_quality_solution_dir:
-             return False, False
 
-        data_name = env.data_ref_name # e.g., "g81.mc"
-        if data_name.endswith(".mc") or data_name.endswith(".vrp"):
-            base_name = data_name.split(".")[0]
-        else:
-            base_name = data_name
-        
-        target_path = os.path.join(self.high_quality_solution_dir, f"best_known.txt")
-        
-        found_solution_path = None
-        is_pickle = False
+    # ---------------------------------------------------------
+    # Deprecated / Legacy Loading Methods (Removed for Clarity)
+    # ---------------------------------------------------------
+    # Since we purely rely on the Cooperative Pool (via _sync_shared_pool and self.elite_pool),
+    # the complex logic to search for local files, pickle/txt differentiation etc. is no longer needed 
+    # in the run() loop, as _load_initial_pool_from_disk() handles the initialization.
 
-        if os.path.exists(target_path):
-             found_solution_path = target_path
-        else:
-             # Check for any sol_*.pkl files and pick the best one
-             import glob
-             # [FIX] Also check 'high_quality_solution' subdirectory if files are hidden there
-             search_paths = [
-                 os.path.join(self.high_quality_solution_dir, "sol_*.pkl"),
-                 os.path.join(self.high_quality_solution_dir, "high_quality_solution", "sol_*.pkl")
-             ]
-             
-             pkl_files = []
-             for p in search_paths:
-                 pkl_files.extend(glob.glob(p))
-             
-             if pkl_files:
-                 # Helper to extract value from filename sol_{value}_{timestamp}_{worker}_{rand}.pkl
-                 # Randomly select one from the available solutions to ensure diversity if running multiple instances
-                 found_solution_path = random.choice(pkl_files)
-                 is_pickle = True
-        
-        if not found_solution_path:
-             print(f"[{datetime.now().strftime('%H:%M:%S')}] No best known file found at {target_path} or any sol_*.pkl in directory. Skipping load.", flush=True)
-             return False, False
-            
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading Initial Solution from {found_solution_path}...", flush=True)
-        
-        try:
-            if is_pickle:
-                 import pickle
-                 with open(found_solution_path, 'rb') as f:
-                     sol = pickle.load(f)
-                 
-                 # Ensure it has set_b if missing (legacy check)
-                 # Depending on solution class object structure
-                 if not hasattr(sol, 'set_b') or len(sol.set_b) == 0:
-                     node_num = env.instance_data["node_num"]
-                     all_nodes = set(range(node_num))
-                     sol.set_b = all_nodes - sol.set_a
-                 
-                 env.current_solution = sol
-                 # Recalculate to be safe
-                 # env.key_value is a property, cannot set it directly. 
-                 # We ensure the solution object has the correct value so env.key_value (which calls get_key_value) returns it.
-                 calculated_val = env.get_key_value(env.current_solution)
-                 env.current_solution.cut_value = calculated_val
-                 env.problem_state = env.get_problem_state()
-                 
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully loaded Pickle solution! Value: {env.key_value}", flush=True)
-                 
-                 if env.key_value > env.best_known:
-                    env.best_known = env.key_value
-                 
-                 return True, True
-
-            # Load using env.load_solution first
-            elif env.load_solution(found_solution_path):
-                # Check if set_b is missing and fix it
-                node_num = env.instance_data["node_num"]
-                all_nodes = set(range(node_num))
-                
-                if len(env.current_solution.set_b) == 0:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Inferring set_b from set_a...", flush=True)
-                    env.current_solution.set_b = all_nodes - env.current_solution.set_a
-                    
-                # Recalculate cut value just in case
-                env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                env.problem_state = env.get_problem_state()
-                
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully loaded Best Known solution! Value: {env.key_value}", flush=True)
-                
-                # Force update best_known in env if our loaded solution is better (or equal)
-                if env.key_value > env.best_known:
-                    env.best_known = env.key_value
-                    
-                return True, True # True, True -> Loaded, Fragile Elite Mode
-            else:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] env.load_solution returned False.", flush=True)
-                return False, False
-
-        except Exception as e:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Error loading best known: {e}", flush=True)
-            return False, False
-    
-    def _load_initial_pool_from_disk(self):
-        if not self.shared_pool_dir: return
-        
-        # Look specifically for the merged folder 'merged_peak' or similar recent ones
-        # Or just scan recursively. 
         # Given the instruction was to "merge to merged_peak", we should ensure we look there.
         # But self.shared_pool_dir usually points to .../elite_pool/g81.mc
         

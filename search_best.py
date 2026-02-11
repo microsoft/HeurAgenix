@@ -14,7 +14,8 @@ from src.pipeline.hyper_heuristics.phased_search_best import PhasedSearchBestHyp
 from src.pipeline.hyper_heuristics.phased_search_best_ucb import PhasedSearchUCBBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_best_fast_stop import PhasedSearchFastStopBestHyperHeuristic
 from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
-from src.pipeline.hyper_heuristics.phased_search_best_known_start import PhasedSearchBestKnownStartHyperHeuristic
+from src.pipeline.hyper_heuristics.phased_search_cooperative import PhasedSearchCooperativeHyperHeuristic
+from src.util.filter_diverse_elites import get_diverse_elites
 
 
 def log_system_status(context: str):
@@ -81,7 +82,18 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
 
     return workers
 
-def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: int, method: str = "phased", high_quality_solution_dir: str = None, top_k: int = 5, load_ratio: float = 0.8, fail_fast_threshold: float = 0.02) -> float:
+def run_once(
+        data_name: str,
+        heuristic_dir: str,
+        experiment_dir: str,
+        run_id: int,
+        method: str = "phased",
+        shared_pool_dir: str = None,
+        top_k: int = 5,
+        cold_start: bool = False,
+        fail_fast_threshold: float = 0.02,
+        initial_solution_paths: list = None
+) -> float:
     try:
         seed = time.time_ns() ^ os.getpid() ^ int.from_bytes(os.urandom(8), 'little')
     except Exception:
@@ -101,13 +113,18 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
     # Use absolute paths for heuristics to avoid ambiguity
     heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
     
+    # Map cold_start to legacy load_ratio for compatibility
+    # cold_start=True -> load_ratio=0.0
+    # cold_start=False -> load_ratio=1.0 (Hot Start)
+    load_ratio = 0.0 if cold_start else 1.0
+    
     if method == "phased":
         algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut")
     elif method == "ucb":
         algorithm = PhasedSearchUCBBestHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
-            high_quality_solution_dir=high_quality_solution_dir,
+            shared_pool_dir=shared_pool_dir,
             top_k=top_k,
             load_ratio=load_ratio
         )
@@ -115,7 +132,7 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
         algorithm = PhasedSearchFastStopBestHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
-            high_quality_solution_dir=high_quality_solution_dir,
+            shared_pool_dir=shared_pool_dir,
             top_k=top_k,
             load_ratio=load_ratio,
             fail_fast_threshold=fail_fast_threshold
@@ -124,19 +141,20 @@ def run_once(data_name: str, heuristic_dir: str, experiment_dir: str, run_id: in
         algorithm = PhasedSearchAdaptivePolishingHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
-            high_quality_solution_dir=high_quality_solution_dir,
+            shared_pool_dir=shared_pool_dir,
             top_k=top_k,
             load_ratio=load_ratio,
             fail_fast_threshold=fail_fast_threshold
         )
-    elif method == "best_known_start":
-        algorithm = PhasedSearchBestKnownStartHyperHeuristic(
+    elif method == "cooperative":
+        algorithm = PhasedSearchCooperativeHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
-            high_quality_solution_dir=high_quality_solution_dir,
+            shared_pool_dir=shared_pool_dir,
             top_k=top_k,
             load_ratio=load_ratio,
-            fail_fast_threshold=fail_fast_threshold
+            fail_fast_threshold=fail_fast_threshold,
+            initial_solution_paths=initial_solution_paths
         )
     elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
@@ -150,9 +168,8 @@ def main(
         num_runs: int,
         method: str = "phased",
         top_k: int = 5,
-        load_ratio: float = 0.8,
+        cold_start: bool = False,
         fail_fast_threshold: float = 0.02,
-        high_quality_solution_dir: str=None
     ):
     workers = pick_safe_workers(data_name, heuristic_dir)
         
@@ -163,14 +180,30 @@ def main(
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, experiment_name)
-    
-    if high_quality_solution_dir:
-        high_quality_solution_dir = os.path.join(base_output_dir, "max_cut", high_quality_solution_dir, data_name, "high_quality_solution")
-        os.makedirs(high_quality_solution_dir, exist_ok=True)
+
+    # Map cold_start to legacy load_ratio for display/logic
+    load_ratio = 0.0 if cold_start else 1.0
     
     print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
-    print(f"High Quality Solution Pool: {high_quality_solution_dir}")
-    print(f"Cooperative Search: Top-K={top_k}, Load Ratio={load_ratio}")
+    print(f"Cooperative Search: Top-K={top_k}, Cold Start={cold_start} (Load Ratio={load_ratio})")
+    
+    initial_solution_paths = []
+    if method == "cooperative":
+        # Auto-configure shared pool directory for cooperative methods (communication channel)
+        shared_pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", data_name)
+        os.makedirs(shared_pool_dir, exist_ok=True)
+        print(f"Shared Elite Pool: {shared_pool_dir}")
+
+        # Only retrieve elites if NOT cold_start
+        if not cold_start:
+            print(f"Retrieving diverse elites for {data_name}...", flush=True)
+            # Use base_output_dir as the root search directory
+            elites = get_diverse_elites(data_name, top_k=top_k, threshold=0.0, base_output_dir=base_output_dir)
+            # filter_diverse_elites now returns dict with 'path' key, not 'file_path'
+            initial_solution_paths = [e["path"] for e in elites]
+            print(f"Found {len(initial_solution_paths)} diverse elites.", flush=True)
+        else:
+             print(f"Cold Start enabled. Skipping elite retrieval.", flush=True)
 
     log_system_status("Main Start")
 
@@ -185,10 +218,11 @@ def main(
                 experiment_dir, 
                 run_id, 
                 method=method, 
-                high_quality_solution_dir=high_quality_solution_dir,
+                shared_pool_dir=shared_pool_dir, # Pass the auto-configured path
                 top_k=top_k,
-                load_ratio=load_ratio,
-                fail_fast_threshold=fail_fast_threshold
+                cold_start=cold_start,
+                fail_fast_threshold=fail_fast_threshold,
+                initial_solution_paths=initial_solution_paths
             ): run_id for run_id in remaining}
 
             for fut in as_completed(fut_map):
@@ -214,13 +248,12 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
-    parser.add_argument("-m", "--method", type=str, default="fast_stop", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "best_known_start"], 
-                        help="Search method: 'phased', 'random', 'ucb', 'fast_stop', 'adaptive_polishing', or 'best_known_start' (default: fast_stop)")
-    parser.add_argument("-k", "--top_k", type=int, default=10, help="Number of top solutions to consider for loading (default: 10)")
-    parser.add_argument("-r", "--load_ratio", type=float, default=0.8, help="Probability of loading an initial solution (default: 0.8)")
+    parser.add_argument("-m", "--method", type=str, default="fast_stop", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "cooperative"], 
+                        help="Search method: 'phased', 'random', 'ucb', 'fast_stop', 'adaptive_polishing', or 'cooperative' (default: fast_stop)")
+    parser.add_argument("-k", "--top_k", type=int, default=100, help="Number of top solutions to consider for loading (default: 100)")
+    parser.add_argument("-c", "--cold_start", action="store_true", help="Disable hot start. Default is Hot Start.")
     parser.add_argument("-f", "--fail_fast_threshold", type=float, default=0.02, help="Fail fast threshold (default: 0.02)")
-    parser.add_argument("-q", "--high_quality_solution_dir", type=str, default=None, help="Directory of high-quality solutions for UCB-based methods")
 
 
     args = parser.parse_args()
-    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, args.load_ratio, fail_fast_threshold=args.fail_fast_threshold, high_quality_solution_dir=args.high_quality_solution_dir)
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, cold_start=args.cold_start, fail_fast_threshold=args.fail_fast_threshold)

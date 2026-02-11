@@ -57,14 +57,14 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
         self,
         heuristic_pool: list[str],
         problem: str,
-        high_quality_solution_dir: str = None,
+        shared_pool_dir: str = None,
         top_k: int = 10,
         load_ratio: float = 0.4,
         fail_fast_threshold: float = 0.02,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem
-        self.high_quality_solution_dir = high_quality_solution_dir
+        self.shared_pool_dir = shared_pool_dir
         self.top_k = top_k
         self.load_ratio = load_ratio
         self.fail_fast_threshold = fail_fast_threshold
@@ -156,7 +156,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
     def _get_pool_best_value(self) -> float:
-        if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
+        if not self.shared_pool_dir or not os.path.exists(self.shared_pool_dir):
             return 0.0
         
         # Cache strategy: Only check disk if cache is expired (e.g. every 60 seconds)
@@ -167,7 +167,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
         
         best_val = 0.0
         try:
-            files = os.listdir(self.high_quality_solution_dir)
+            files = os.listdir(self.shared_pool_dir)
             for f in files:
                 if f.startswith("current_best."):
                     try:
@@ -219,7 +219,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
         """
         Returns: (loaded_success, is_fragile_elite)
         """
-        if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
+        if not self.shared_pool_dir or not os.path.exists(self.shared_pool_dir):
             return False, False
             
         # Use load_ratio to decide whether to load or start from scratch
@@ -227,7 +227,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
             return False, False
             
         try:
-            files = [f for f in os.listdir(self.high_quality_solution_dir) if f.startswith("current_best.")]
+            files = [f for f in os.listdir(self.shared_pool_dir) if f.startswith("current_best.")]
             if not files:
                 return False, False
             
@@ -257,8 +257,8 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
             
             if len(sorted_solutions) >= 2:
                 # Check overlap of Top 2
-                path1 = os.path.join(self.high_quality_solution_dir, sorted_solutions[0][0])
-                path2 = os.path.join(self.high_quality_solution_dir, sorted_solutions[1][0])
+                path1 = os.path.join(self.shared_pool_dir, sorted_solutions[0][0])
+                path2 = os.path.join(self.shared_pool_dir, sorted_solutions[1][0])
                 set_a1, set_b1 = self._read_solution_sets(path1)
                 set_a2, set_b2 = self._read_solution_sets(path2)
                 
@@ -276,7 +276,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                 k = min(len(sorted_solutions), 5)
                 chosen_file, chosen_val = random.choice(sorted_solutions[:k])
                 
-                path = os.path.join(self.high_quality_solution_dir, chosen_file)
+                path = os.path.join(self.shared_pool_dir, chosen_file)
                 if env.load_solution(path):
                     print(f"Loaded Fragile Elite Solution from {chosen_file} (Value: {env.key_value})")
                     return True, True
@@ -288,7 +288,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                 
                 k = min(len(sorted_solutions), self.top_k)
                 chosen_file, chosen_val = random.choice(sorted_solutions[:k])
-                path = os.path.join(self.high_quality_solution_dir, chosen_file)
+                path = os.path.join(self.shared_pool_dir, chosen_file)
                 if env.load_solution(path):
                     print(f"Loaded Standard Solution from {chosen_file} (Value: {env.key_value})")
                     return True, False
@@ -405,7 +405,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                     current_best = env.key_value
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Immediate Tabu Improvement! New Best: {current_best}", flush=True)
                     fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
-                    path = os.path.join(self.high_quality_solution_dir, fname)
+                    path = os.path.join(self.shared_pool_dir, fname)
                     env.dump_best_solution(path)
                     self._pool_best_cache = max(getattr(self, '_pool_best_cache', 0), env.key_value)
 
@@ -671,7 +671,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                         
                         if should_save:
                              fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
-                             path = os.path.join(self.high_quality_solution_dir, fname)
+                             path = os.path.join(self.shared_pool_dir, fname)
                              env.dump_best_solution(path)
                              self._pool_best_cache = max(getattr(self, '_pool_best_cache', 0), env.key_value)
                 else:

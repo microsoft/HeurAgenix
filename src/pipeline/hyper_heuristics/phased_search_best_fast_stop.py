@@ -57,14 +57,14 @@ class PhasedSearchFastStopBestHyperHeuristic:
         self,
         heuristic_pool: list[str],
         problem: str,
-        high_quality_solution_dir: str = None,
+        shared_pool_dir: str = None,
         top_k: int = 10,
         load_ratio: float = 0.4,
         fail_fast_threshold: float = 0.02,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem
-        self.high_quality_solution_dir = high_quality_solution_dir
+        self.shared_pool_dir = shared_pool_dir
         self.top_k = top_k
         self.load_ratio = load_ratio
         self.fail_fast_threshold = fail_fast_threshold
@@ -156,7 +156,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 print(f"Warning: Heuristic '{h_name}' not found in manual classification lists. Skipping.")
 
     def _get_pool_best_value(self) -> float:
-        if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
+        if not self.shared_pool_dir or not os.path.exists(self.shared_pool_dir):
             return 0.0
         
         # Cache strategy: Only check disk if cache is expired (e.g. every 60 seconds)
@@ -167,7 +167,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
         
         best_val = 0.0
         try:
-            files = os.listdir(self.high_quality_solution_dir)
+            files = os.listdir(self.shared_pool_dir)
             for f in files:
                 if f.startswith("current_best."):
                     try:
@@ -216,7 +216,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
             # 1. Load all top solutions
             solutions = []
             for f, val in top_k_files:
-                path = os.path.join(self.high_quality_solution_dir, f)
+                path = os.path.join(self.shared_pool_dir, f)
                 set_a, set_b = self._read_solution_sets(path)
                 if set_a and set_b:
                     solutions.append({'a': set_a, 'b': set_b, 'val': val})
@@ -301,7 +301,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
             return False
 
     def _try_load_initial_solution(self, env: BaseEnv) -> bool:
-        if not self.high_quality_solution_dir or not os.path.exists(self.high_quality_solution_dir):
+        if not self.shared_pool_dir or not os.path.exists(self.shared_pool_dir):
             return False
             
         # Use load_ratio to decide whether to load or start from scratch
@@ -309,9 +309,9 @@ class PhasedSearchFastStopBestHyperHeuristic:
             return False
             
         try:
-            files = [f for f in os.listdir(self.high_quality_solution_dir) if f.startswith("current_best.")]
+            files = [f for f in os.listdir(self.shared_pool_dir) if f.startswith("current_best.")]
             if not files:
-                print(f"Warning: No files found in {self.high_quality_solution_dir}", flush=True)
+                print(f"Warning: No files found in {self.shared_pool_dir}", flush=True)
                 return False
             
             # Simplified logic: Just pick from top K solutions found in the folder
@@ -333,7 +333,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     continue
             
             if not solution_files:
-                print(f"Warning: Files found but none matched format 'current_best.VAL.EXP.ID' in {self.high_quality_solution_dir}. Example: {files[0]}", flush=True)
+                print(f"Warning: Files found but none matched format 'current_best.VAL.EXP.ID' in {self.shared_pool_dir}. Example: {files[0]}", flush=True)
                 return False
 
             # Sort solutions by value (descending)
@@ -366,8 +366,8 @@ class PhasedSearchFastStopBestHyperHeuristic:
                     attempts += 1
                 
                 if parent1_file != parent2_file:
-                    path1 = os.path.join(self.high_quality_solution_dir, parent1_file)
-                    path2 = os.path.join(self.high_quality_solution_dir, parent2_file)
+                    path1 = os.path.join(self.shared_pool_dir, parent1_file)
+                    path2 = os.path.join(self.shared_pool_dir, parent2_file)
                     
                     set_a1, set_b1 = self._read_solution_sets(path1)
                     set_a2, set_b2 = self._read_solution_sets(path2)
@@ -441,7 +441,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                 k = min(len(sorted_solutions), self.top_k)
                 chosen_file, chosen_val = random.choice(sorted_solutions[:k])
             
-            path = os.path.join(self.high_quality_solution_dir, chosen_file)
+            path = os.path.join(self.shared_pool_dir, chosen_file)
             if env.load_solution(path):
                 print(f"Successfully loaded initial solution from {chosen_file} (Value: {env.key_value})")
                 return True
@@ -699,7 +699,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                         current_best = env.key_value
                         
                         # === Cooperative Search: Share Best Solution ===
-                        if self.high_quality_solution_dir:
+                        if self.shared_pool_dir:
                             try:
                                 # Check if we should dump (is it better than or equal to the pool's best?)
                                 # We use >= to allow diversity (multiple runs reaching the same best score)
@@ -707,7 +707,7 @@ class PhasedSearchFastStopBestHyperHeuristic:
                                 if current_best >= pool_best:
                                     # Filename format: current_best.{cut_value}.{exp_id}.{run_id}
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
-                                 path = os.path.join(self.high_quality_solution_dir, fname)
+                                 path = os.path.join(self.shared_pool_dir, fname)
                                  env.dump_best_solution(path)
                             except Exception as e:
                                 print(f"Failed to dump best solution to pool: {e}")
@@ -1043,9 +1043,9 @@ class PhasedSearchFastStopBestHyperHeuristic:
                                 should_save = True
                         
                         if should_save and current_steps > 0:
-                             if self.high_quality_solution_dir and ((current_time - last_write_time > write_interval) or (env.key_value > pool_best)):
+                             if self.shared_pool_dir and ((current_time - last_write_time > write_interval) or (env.key_value > pool_best)):
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
-                                 path = os.path.join(self.high_quality_solution_dir, fname)
+                                 path = os.path.join(self.shared_pool_dir, fname)
                                  env.dump_best_solution(path)
                                  print(f"Run:{run_id} Saved new pool best: {env.key_value} to {fname}", flush=True)
                                  self._last_pool_write_time = current_time
