@@ -179,7 +179,9 @@ def main(
     finished_ids = []
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
     experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    experiment_dir = os.path.join(base_output_dir, "max_cut", f"search_best_result.{method}", data_name, experiment_name)
+    # Old structure: output/max_cut/search_best_result.{method}/{data_name}/{experiment_name}
+    # New structure: output/max_cut/{data_name}/search_best_result.{method}/{experiment_name}
+    experiment_dir = os.path.join(base_output_dir, "max_cut", data_name, f"search_best_result.{method}", experiment_name)
 
     # Map cold_start to legacy load_ratio for display/logic
     load_ratio = 0.0 if cold_start else 1.0
@@ -190,7 +192,9 @@ def main(
     initial_solution_paths = []
     if method == "cooperative":
         # Auto-configure shared pool directory for cooperative methods (communication channel)
-        shared_pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", data_name)
+        # Old structure: output/max_cut/elite_pool/{data_name}
+        # New structure: output/max_cut/{data_name}/elite_pool
+        shared_pool_dir = os.path.join(base_output_dir, "max_cut", data_name, "elite_pool")
         os.makedirs(shared_pool_dir, exist_ok=True)
         print(f"Shared Elite Pool: {shared_pool_dir}")
 

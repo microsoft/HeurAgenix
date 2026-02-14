@@ -34,39 +34,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         self.last_sync_time = 0
         
         if self.shared_pool_dir:
-            # User request: Store elite pool in output/max_cut/elite_pool/{instance}
-            # Extract instance name from path (assumed .../g63.mc/high_quality_solution)
-            
-            # Determine base output dir consistent with instructions
-            base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
-
-            try:
-                # If we passed a clean path from search_best.py (e.g. output/max_cut/elite_pool/xxx), just use it.
-                if "elite_pool" in self.shared_pool_dir:
-                     # Create directory if it doesn't exist
-                     pass
-                else:
-                    path_parts = self.shared_pool_dir.split(os.sep)
-                    # Find the part that looks like an instance name (e.g. g63.mc)
-                    # It is usually the parent of 'high_quality_solution'
-                    if 'high_quality_solution' in path_parts:
-                        idx = path_parts.index('high_quality_solution')
-                        instance_name = path_parts[idx-1] # e.g. g63.mc
-
-                        # Construct new path: output/max_cut/elite_pool/{instance_name}
-                        self.shared_pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", instance_name)
-                    else:
-                        # Fallback: If path starts with "output", replace it with base_output_dir
-                        if self.shared_pool_dir.startswith("output"):
-                             rel_path = os.path.relpath(self.shared_pool_dir, "output")
-                             self.shared_pool_dir = os.path.join(base_output_dir, rel_path, 'elite_pool')
-                        else:
-                             self.shared_pool_dir = os.path.join(self.shared_pool_dir, 'elite_pool')
-            except:
-                 # Exception Fallback
-                 pass
-
-            # Base dir created once
+            # Use the path provided explicitly by search_best.py.
+            # No more complex inference or high_quality_solution logic.
             try:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Shared Elite Pool Directory: {self.shared_pool_dir}", flush=True)
                 os.makedirs(self.shared_pool_dir, exist_ok=True)

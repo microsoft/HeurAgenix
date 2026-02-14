@@ -55,7 +55,9 @@ def get_diverse_elites(instance_name, top_k=20, threshold=200, base_output_dir=N
         else:
              base_output_dir = "output"
              
-    pool_dir = os.path.join(base_output_dir, "max_cut", "elite_pool", instance_name)
+    # Old structure: output/max_cut/elite_pool/{instance_name}
+    # New structure: output/max_cut/{instance_name}/elite_pool
+    pool_dir = os.path.join(base_output_dir, "max_cut", instance_name, "elite_pool")
     
     if not os.path.exists(pool_dir):
         print(f"Warning: Directory {pool_dir} not found. Returning empty list.")
@@ -138,8 +140,8 @@ def main():
         print(f"Rank {i+1}: Val={item['val']} | {os.path.basename(item['path'])}")
         
     # Legacy Save Logic (Optional, kept for backward compatibility if running as script)
-    base_dir = "output/max_cut/elite_pool"
-    pool_dir = os.path.join(base_dir, args.instance_name)
+    base_dir = "output/max_cut"
+    pool_dir = os.path.join(base_dir, args.instance_name, "elite_pool")
     output_dir = os.path.join(pool_dir, "high_quality_solution")
     
     if os.path.exists(pool_dir): # Only save if pool_dir exists locally
