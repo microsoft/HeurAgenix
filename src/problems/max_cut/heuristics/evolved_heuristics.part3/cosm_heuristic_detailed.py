@@ -58,8 +58,10 @@ def cosm_heuristic_detailed(problem_state: dict, algorithm_data: dict, steps: in
         algorithm_data["cosm_J_matrix"] = J
 
     # 2. Initialization
-    # Start with small random noise around 0
-    x = np.random.normal(0, 0.1, node_num).astype(np.float32)
+    # Start with small random noise around 0. 
+    # [Optimization] Restored slightly higher noise (0.15) or dynamic value to avoid early convergence.
+    noise_scale = kwargs.get("noise_scale", 0.15)
+    x = np.random.normal(0, noise_scale, node_num).astype(np.float32)
     # Momentum vector
     v = np.zeros(node_num, dtype=np.float32)
     

@@ -74,10 +74,9 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
     max_by_mem = max(1, budget // int(mem_per_task * safety_factor))
 
     max_by_cpu = os.cpu_count() or 1
+    # Remove artificial cap of 24 workers. Let hardware decide.
     workers = max(1, min(max_by_cpu, max_by_mem))
 
-    if construction_steps > 5000:
-        workers = min(workers, 24)
     print(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, avail ~ {avail/1024/1024:.1f} MiB, choose workers={workers}", flush=True)
 
     return workers
@@ -108,7 +107,7 @@ def run_once(
 
     env.reset(output_dir=output_dir)
     
-    log_system_status(f"Worker-{run_id} Start")
+    log_system_status(f"Worker:{run_id} Start")
     
     # Use absolute paths for heuristics to avoid ambiguity
     heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
@@ -154,7 +153,8 @@ def run_once(
             top_k=top_k,
             load_ratio=load_ratio,
             fail_fast_threshold=fail_fast_threshold,
-            initial_solution_paths=initial_solution_paths
+            initial_solution_paths=initial_solution_paths,
+            worker_id=run_id
         )
     elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
@@ -174,6 +174,10 @@ def main(
     workers = pick_safe_workers(data_name, heuristic_dir)
         
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
+
+    if num_runs is None:
+        num_runs = workers
+        print(f"Num runs not specified. Defaulting to max capacity: {workers}", flush=True)
 
     remaining = list(range(num_runs))
     finished_ids = []
@@ -249,7 +253,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description="Run hyper-heuristic search for MaxCut")
     parser.add_argument("data_name", type=str, help="Name of the dataset (e.g., g1)")
-    parser.add_argument("-n", "--num_runs", type=int, default=100, help="Number of parallel runs (default: 100)")
+    parser.add_argument("-n", "--num_runs", type=int, default=None, help="Number of parallel runs (default: max capable)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
     parser.add_argument("-m", "--method", type=str, default="fast_stop", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "cooperative"], 

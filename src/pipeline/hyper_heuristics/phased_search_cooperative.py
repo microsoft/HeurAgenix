@@ -12,7 +12,7 @@ from src.util.util import load_function
 from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
 
 class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
-    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02, initial_solution_paths=None):
+    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02, initial_solution_paths=None, worker_id=None):
         # Force load_ratio to 1.0 to ensure we always try to load
         self.shared_pool_dir = shared_pool_dir
         super().__init__(heuristic_pool, problem, shared_pool_dir, top_k, 1.0, fail_fast_threshold)
@@ -23,7 +23,11 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         self.stagnation_level = 0 # Track escalation level
         
         # Distributed Cooperation Setup
-        self.worker_id = str(uuid.uuid4())[:8]
+        if worker_id is not None:
+            self.worker_id = str(worker_id)
+        else:
+            self.worker_id = str(uuid.uuid4())[:8]
+            
         # Hash worker_id to get a shard index (0-9)
         self.shard_id = int(hashlib.md5(self.worker_id.encode()).hexdigest(), 16) % 10
         # self.shared_pool_dir = None # REMOVED BUGGY LINE
@@ -37,7 +41,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             # Use the path provided explicitly by search_best.py.
             # No more complex inference or high_quality_solution logic.
             try:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Shared Elite Pool Directory: {self.shared_pool_dir}", flush=True)
+                self._log(f"Shared Elite Pool Directory: {self.shared_pool_dir}")
                 os.makedirs(self.shared_pool_dir, exist_ok=True)
             except OSError:
                 pass 
@@ -52,7 +56,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             pass
 
     def _load_initial_solutions_from_paths(self, paths):
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loading {len(paths)} initial diverse solutions from main process...", flush=True)
+        self._log(f"Loading {len(paths)} initial diverse solutions from main process...")
         count = 0
         for path in paths:
             try:
@@ -65,8 +69,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     self._add_to_local_pool(sol, share=False)
                     count += 1
             except Exception as e:
-                print(f"Warning: Failed to load {path}: {e}", flush=True)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully loaded {count} elites locally.", flush=True)
+                self._log(f"Warning: Failed to load {path}: {e}")
+        self._log(f"Successfully loaded {count} elites locally.")
 
     def _get_time_bucket_path(self, timestamp=None):
         if timestamp is None:
@@ -78,6 +82,9 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
 
     def _get_shard_path(self, bucket_path, shard_index):
         return os.path.join(bucket_path, f"shard_{shard_index}")
+
+    def _log(self, message):
+        print(f"[{datetime.now().strftime('%H:%M:%S')}, Worker:{self.worker_id}] {message}", flush=True)
 
     def _save_to_shared_pool(self, solution, is_keep_alive=False):
         if not self.shared_pool_dir: return
@@ -113,7 +120,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             os.rename(temp_path, filepath)
             
             # [LOGGING UPDATE] Print the path of the saved elite/breakthrough
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Saved elite solution to: {filepath}", flush=True)
+            self._log(f"Saved elite solution to: {filepath}")
             
             # Update throttle stats
             self.last_upload_time = current_time
@@ -304,9 +311,9 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     if os.path.exists(abs_path):
                         self.breakout_heuristics[key] = load_function(abs_path, problem=self.problem)
                     else:
-                        print(f"Warning: Could not find breakout heuristic {key} at {path}", flush=True)
+                        self._log(f"Warning: Could not find breakout heuristic {key} at {path}")
             except Exception as e:
-                print(f"Error loading {key}: {e}", flush=True)
+                self._log(f"Error loading {key}: {e}")
 
 
     def _run_improvement_phase(self, env):
@@ -344,7 +351,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 try:
                     env.run_heuristic(heuristic)
                 except Exception as e:
-                    print(f"Error running heuristic: {e}", flush=True)
+                    self._log(f"Error running heuristic: {e}")
                     env.current_solution = backup_sol
                     continue
 
@@ -386,7 +393,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  env.current_solution.set_b = all_nodes - env.current_solution.set_a
                  env.current_solution.cut_value = env.get_key_value(env.current_solution)
                  env.problem_state = env.get_problem_state()
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Supernova Ruin applied: Flipped {len(nodes_to_flip)} static nodes (Ratio: {ratio:.2f}).", flush=True)
+                 self._log(f"Supernova Ruin applied: Flipped {len(nodes_to_flip)} static nodes (Ratio: {ratio:.2f}).")
             else:
                  # Fallback if no static nodes found
                  self._apply_breakout(env, "heavy_ruin")
@@ -428,7 +435,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  self._apply_breakout(env, "massive_ruin")
                  return
 
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] *** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***", flush=True)
+            self._log(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
 
             # 3. Reset to Best, Target = Distant
             env.current_solution = copy.deepcopy(best_sol)
@@ -443,7 +450,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 
                 # [FIX]: Immediate Local Optimization in the Valley
                 if self.improvement_heuristics:
-                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Rapid Mining in Valley...", flush=True)
+                     self._log("Rapid Mining in Valley...")
                      # Execute 2 rounds of improvement to settle into a local optimum
                      self._run_improvement_phase(env)
                      self._run_improvement_phase(env)
@@ -462,11 +469,11 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
              # Restore full pool for other operations (though reference is passed, we shouldn't damage self.elite_pool)
              # NOTE: Since we pass list by ref, safest is to NOT modify self.elite_pool. 
              # But here we temporarily overwrote algorithm_data entry, which is fine.
-             print(f"[{datetime.now().strftime('%H:%M:%S')}] Targeted Path Relinking -> Best Known ({best_val})", flush=True)
+             self._log(f"Targeted Path Relinking -> Best Known ({best_val})")
 
              # [FIX] Dig deeper around the path
              if self.improvement_heuristics:
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Mining Path to Best...", flush=True)
+                 self._log("Mining Path to Best...")
                  self._run_improvement_phase(env)
                  self._run_improvement_phase(env)
 
@@ -515,7 +522,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  env.current_solution.cut_value = env.get_key_value(env.current_solution)
                  # Sync problem state
                  env.problem_state = env.get_problem_state()
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] *** JUMPED TO {desc}: {env.current_solution.cut_value} (from pool of {len(candidates)}) ***", flush=True)
+                 self._log(f"*** JUMPED TO {desc}: {env.current_solution.cut_value} (from pool of {len(candidates)}) ***")
              else:
                  # If no secondary peak found, try Supernova
                  self._apply_breakout(env, "supernova_ruin")
@@ -556,7 +563,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             # [Option 1: Fresh Restart / Injection] (34% chance)
             # Use Detailed COSM to generate a completely new structure orthogonal to current pool
             if dice < 0.34 and self.constructive_heuristics:
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] STRATEGY UPDATE: Triggering FRESH INJECTION (Detailed Cosm)...", flush=True)
+                 self._log("STRATEGY UPDATE: Triggering FRESH INJECTION (Detailed Cosm)...")
                  
                  # Pick Detailed Cosm
                  detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
@@ -574,7 +581,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      
                      # Recalculate
                      env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Fresh Injection Complete. New Start Value: {env.current_solution.cut_value}", flush=True)
+                     self._log(f"Fresh Injection Complete. New Start Value: {env.current_solution.cut_value}")
                      
                      # [CRITICAL] Briefly run improvement here to stabilize the solution before returning to main loop?
                      # No, let the main loop handle it.
@@ -582,12 +589,12 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      time.sleep(1.0)
 
                  except Exception as e:
-                     print(f"Injection failed: {e}. Falling back to Ruin.", flush=True)
+                     self._log(f"Injection failed: {e}. Falling back to Ruin.")
                      self._apply_breakout(env, "massive_ruin_fallback")
             
             # [Option 2: Anti-Consensus / Supernova] (33% chance)
             elif dice < 0.67:
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] STRATEGY UPDATE: Triggering ANTI-CONSENSUS (Supernova)...", flush=True)
+                 self._log("STRATEGY UPDATE: Triggering ANTI-CONSENSUS (Supernova)...")
                  # Apply Supernova with high intensity (Aggressive Anti-Consensus)
                  # Flip 30-50% of static nodes
                  ratio = random.uniform(0.30, 0.50)
@@ -597,7 +604,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      all_nodes = set(range(node_num))
                      env.current_solution.set_b = all_nodes - env.current_solution.set_a
                      env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Anti-Consensus Applied: Flipped {len(nodes_to_flip)} static nodes.", flush=True)
+                     self._log(f"Anti-Consensus Applied: Flipped {len(nodes_to_flip)} static nodes.")
                      time.sleep(1.0)
                  else:
                      self._apply_breakout(env, "massive_ruin_fallback")
@@ -612,7 +619,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             if "batch_cluster_ruin" in self.breakout_heuristics:
                 h = self.breakout_heuristics["batch_cluster_ruin"]
                 count = int(node_num * 0.70) # 70% Ruin
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] MASSIVE RUIN TRIGGERED: Destroying {count} nodes (70%)...", flush=True)
+                self._log(f"MASSIVE RUIN TRIGGERED: Destroying {count} nodes (70%)...")
                 env.run_heuristic(h, parameters={"count": count})
                 time.sleep(1.0)
             else:
@@ -622,7 +629,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  all_nodes = set(range(node_num))
                  env.current_solution.set_b = all_nodes - env.current_solution.set_a
                  env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] MASSIVE RUIN TRIGGERED: Random Flipped {len(nodes)} nodes (70%)...", flush=True)
+                 self._log(f"MASSIVE RUIN TRIGGERED: Random Flipped {len(nodes)} nodes (70%)...")
                  time.sleep(1.0)
 
     def run(self, env: BaseEnv) -> bool:
@@ -636,8 +643,26 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
 
         # Try to find the best available solution in our local view of the pool
         if self.elite_pool:
-            best_sol = max(self.elite_pool, key=lambda s: s.cut_value)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Hot Start: Loaded best from Elite Pool (Val: {best_sol.cut_value})", flush=True)
+            # Stochastic Hot Start: Pick randomly from Top K elite solutions
+            # This prevents all workers from greedily converging on the same local max (Black Hole Effect)
+            
+            # Filter for unique scores to ensure diversity
+            unique_pool = []
+            seen_scores = set()
+            for sol in sorted(self.elite_pool, key=lambda s: s.cut_value, reverse=True):
+                if sol.cut_value not in seen_scores:
+                    unique_pool.append(sol)
+                    seen_scores.add(sol.cut_value)
+            
+            # If we have enough unique solutions, pick from top 10. Otherwise, broaden search.
+            search_space = unique_pool[:min(len(unique_pool), 10)]
+            if len(search_space) < 3 and len(self.elite_pool) > 20:
+                 # Fallback: If pool is dominated by duplicates, broaden to raw top 50 to find *any* deviation
+                 search_space = sorted(self.elite_pool, key=lambda s: s.cut_value, reverse=True)[:50]
+            
+            best_sol = random.choice(search_space)
+            
+            self._log(f"Hot Start: Loaded stochastic best from Elite Pool (Val: {best_sol.cut_value} | Pool Max: {max(p.cut_value for p in self.elite_pool)})")
             
             # Deep Copy to ensure safety
             from src.problems.max_cut.components import Solution
@@ -654,7 +679,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             loaded = True
         
         if not loaded: 
-            print("No Elite Pool solutions found. Switching to Constructive Phase (Cold Start)...", flush=True)
+            self._log("No Elite Pool solutions found. Switching to Constructive Phase (Cold Start)...")
             # Fallback: Construct New Solution if no Best Known file
             # Loop until solution is COMPLETE and VALID
             max_retries = 10
@@ -688,13 +713,13 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     construction_steps += 1
                 
                 if env.is_complete_solution and env.key_value > 100:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Construction completed. Value: {env.key_value}", flush=True)
+                    self._log(f"Construction completed. Value: {env.key_value}")
                     break
                 else:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...", flush=True)
+                    self._log(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
             
             if not env.is_complete_solution:
-                 print("Critical Failure: Unable to construct valid solution after retries.", flush=True)
+                 self._log("Critical Failure: Unable to construct valid solution after retries.")
                  return False
             
         current_best = env.key_value
@@ -703,7 +728,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         no_improve_steps = 0
         total_steps = 0
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Starting Breakout Search from {current_best}...", flush=True)
+        self._log(f"Starting Breakout Search from {current_best}...")
 
         while env.continue_run:
             total_steps += 1
@@ -719,13 +744,13 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 no_improve_steps = 0
                 self.stagnation_level = 0
                 self._update_elite_pool(env.current_solution)
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} NEW LOCAL BEST: {current_best}", flush=True)
+                self._log(f"Step:{total_steps} NEW LOCAL BEST: {current_best}")
                 
                 # Always dump intermediate improvements as TXT for easy reuse
                 env.dump_result(result_file=f"intermediate_result.{current_best}.txt")
 
                 if current_best > env.best_known:
-                     print(f"[{datetime.now().strftime('%H:%M:%S')}] !!! BREAKTHROUGH: {current_best} > {env.best_known} !!!", flush=True)
+                     self._log(f"!!! BREAKTHROUGH: {current_best} > {env.best_known} !!!")
                      env.best_known = current_best
                      env.dump_result(result_file=f"breakthrough.{current_best}.txt")
                      return True
@@ -780,7 +805,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 elif self.stagnation_level >= 2:
                      strategy = "medium_ruin"
                 
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...", flush=True)
+                self._log(f"Step:{total_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
                 self._apply_breakout(env, strategy)
                 
                 # Reset counter to give the new candidate a chance
@@ -788,7 +813,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 
             # Log periodically
             if total_steps % 100 == 0:
-                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known})", flush=True)
+                 self._log(f"Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known})")
             
             # [NEW] Periodic Active Path Relinking to bridge peaks
             # Increase frequency from 300 to 100 to force more hybridization
@@ -803,16 +828,19 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             if total_steps % 50 == 0:
                 self._sync_shared_pool()
                 
-                # [Optimization] Aggressive Catch-up
-                # If we are significantly behind the global elite pool, abandon local search and jump.
-                # This ensures no worker wastes time in a sub-optimal basin.
+
+                # [Optimization-Tuned] Aggressive Catch-up Logic
                 if self.elite_pool:
                     pool_best = max(self.elite_pool, key=lambda s: s.cut_value)
-                    # If current is worse than 99.8% of pool best 
-                    # For 5.3M, threshold is ~10k difference. Sufficient to distinguish basins.
-                    if env.key_value < pool_best.cut_value * 0.998:
+                    
+                    # Original: 0.998 allowed 5321 (0.9989) to survive indefinitely.
+                    # User Issue: "Stuck at 5321 (worse place)".
+                    # Fix: Tighten to 0.9992 to force improvement past 5322, but still allow 5324+.
+                    catch_up_threshold = 0.9992 
+                    
+                    if env.key_value < pool_best.cut_value * catch_up_threshold:
                         from src.problems.max_cut.components import Solution
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value}...", flush=True)
+                        self._log(f"AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value} (Threshold: {catch_up_threshold})...")
                         
                         env.current_solution = Solution(set(pool_best.set_a), set(pool_best.set_b), pool_best.cut_value)
                         env.current_solution.cut_value = env.get_key_value(env.current_solution)
@@ -822,38 +850,3 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                         no_improve_steps = 0
 
         return False
-        
-
-    # ---------------------------------------------------------
-    # Deprecated / Legacy Loading Methods (Removed for Clarity)
-    # ---------------------------------------------------------
-    # Since we purely rely on the Cooperative Pool (via _sync_shared_pool and self.elite_pool),
-    # the complex logic to search for local files, pickle/txt differentiation etc. is no longer needed 
-    # in the run() loop, as _load_initial_pool_from_disk() handles the initialization.
-
-        # Given the instruction was to "merge to merged_peak", we should ensure we look there.
-        # But self.shared_pool_dir usually points to .../elite_pool/g81.mc
-        
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Initializing Elite Pool from disk (scanning {self.shared_pool_dir})...", flush=True)
-        
-        # Determine files to load. 
-        # We prefer loading the consolidated high quality ones first.
-        target_merged = os.path.join(self.shared_pool_dir, "merged_peak")
-        if os.path.exists(target_merged):
-             pkl_files = glob.glob(os.path.join(target_merged, "**", "*.pkl"), recursive=True)
-        else:
-             pkl_files = glob.glob(os.path.join(self.shared_pool_dir, "**", "*.pkl"), recursive=True)
-
-        random.shuffle(pkl_files)
-        
-        loaded_count = 0
-        for fpath in pkl_files[:1000]: # Load max 1000 to start
-            try:
-                with open(fpath, 'rb') as f:
-                    sol = pickle.load(f)
-                    self._add_to_local_pool(sol, share=False)
-                    loaded_count += 1
-            except:
-                pass
-            
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {loaded_count} solutions from disk.", flush=True)
