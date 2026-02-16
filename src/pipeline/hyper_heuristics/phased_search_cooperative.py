@@ -578,9 +578,11 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      # Replaced direct modification with Operator
                      # We must completely empty the solution so unselected_nodes is full
                      # This allows Constructive Heuristics (like Cosm) to run from scratch.
-                     all_nodes = list(range(node_num))
-                     op_reset = BatchDeleteOperator(all_nodes)
-                     env.run_operator(op_reset)
+                     
+                     # [FIX] Force hard reset using init_solution() to avoid delta drift issues with BatchDeleteOperator
+                     env.current_solution = env.init_solution()
+                     # Critical: Sync problem_state so the heuristic sees the clean solution
+                     env.problem_state = env.get_problem_state()
                      
                      env.run_heuristic(h)
                      

@@ -13,12 +13,16 @@ def batch_cluster_ruin(problem_state: dict, algorithm_data: dict, **kwargs) -> t
     This is effective for escaping local optima where a whole region is mis-configured.
     """
     current_solution = problem_state.get("current_solution")
-    instance_data = problem_state.get("instance_data")
     
-    if not current_solution or not instance_data:
-        return None, {}
+    # [FIX] instance_data is often flattened into problem_state by env.get_problem_state()
+    # So we should look for keys directly, or check instance_data fallback
+    adj = problem_state.get("adj")
+    if adj is None and "instance_data" in problem_state:
+        adj = problem_state["instance_data"].get("adj")
         
-    adj = instance_data.get("adj")
+    if not current_solution or not adj:
+        return None, {}
+    
     assigned_nodes = list(current_solution.set_a.union(current_solution.set_b))
     
     if not assigned_nodes:

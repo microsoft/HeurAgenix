@@ -11,18 +11,14 @@ def batch_worst_ruin(problem_state: dict, algorithm_data: dict, **kwargs) -> tup
     3. This is a greedy ruin strategy.
     """
     current_solution = problem_state.get("current_solution")
-    adj = problem_state.get("adj") # Assuming adj is available in problem_state or we need to get it from env
-    # Note: problem_state usually contains 'instance_data' which has 'adj'
+    # [FIX] adj is often flattened into problem_state by env.get_problem_state()
+    adj = problem_state.get("adj")
+    if adj is None and "instance_data" in problem_state:
+         adj = problem_state["instance_data"].get("adj")
     
-    if not current_solution:
+    if not current_solution or not adj:
         return None, {}
-    
-    instance_data = problem_state.get("instance_data")
-    if not instance_data:
-        return None, {}
-        
-    adj = instance_data.get("adj")
-    
+            
     assigned_nodes = list(current_solution.set_a.union(current_solution.set_b))
     if not assigned_nodes:
         return None, {}
