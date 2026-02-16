@@ -44,21 +44,31 @@ def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs
     # Select a random node to swap
     node = random.randint(0, problem_state['node_num'] - 1)
 
-    # Create a new solution with the node swapped
-    new_solution = SwapOperator([node]).run(current_solution)
+    # Calculate delta for single node flip manually (Avoid creating new Solution and full scan)
+    adj = problem_state["adj"] # Using adjacency list for fast delta calculation
+    current_solution = problem_state["current_solution"]
+    set_a = current_solution.set_a
+    set_b = current_solution.set_b
+    
+    delta = 0
+    # Logic: if node in A, moving to B means gaining edges to A, losing edges to B
+    if node in set_a:
+        for neighbor, weight in adj[node].items():
+            if neighbor in set_a:
+                delta += weight # Gain (now connected to new opposite)
+            elif neighbor in set_b:
+                delta -= weight # Loss (now connected to same side)
+    elif node in set_b:
+        for neighbor, weight in adj[node].items():
+            if neighbor in set_b:
+                delta += weight
+            elif neighbor in set_a:
+                delta -= weight
+    else:
+        # Node not assigned yet, cannot flip.
+        # But this is SA, usually working on complete solutions.
+        return None, {'temperature': temperature * cooling_rate}
 
-    # Get the state data for the new solution
-    new_problem_state = problem_state["get_problem_state"](new_solution)
-
-    # If the new solution is invalid, return no operation
-    if new_problem_state is None:
-        return None, {}
-
-    # Calculate the new cut value
-    new_cut_value = new_problem_state['current_cut_value']
-
-    # Calculate the change in cut value
-    delta = new_cut_value - current_cut_value
 
     # If the new solution is better or equal, accept it
     if delta >= 0:

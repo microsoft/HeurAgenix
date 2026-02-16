@@ -38,7 +38,7 @@ class BaseEnv:
 
     @property
     def is_valid_solution(self) -> bool:
-        return self.validation_solution(self.current_solution)
+        return self.validation_solution()
 
     @property
     def continue_run(self) -> bool:
@@ -47,7 +47,7 @@ class BaseEnv:
     @property
     def key_value(self) -> float:
         """Get the key value of the current solution."""
-        return self.get_key_value(self.current_solution)
+        return self.get_key_value()
 
     def get_key_value(self, solution: BaseSolution=None) -> float:
         """Get the key value of the solution."""

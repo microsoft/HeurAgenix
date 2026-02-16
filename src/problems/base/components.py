@@ -12,9 +12,6 @@ class BaseOperator:
     def __init__(self, **kwargs):
         pass
 
-    def run(self, solution: BaseSolution) -> BaseSolution:
-        pass
-
     def __str__(self) -> str:
         params = ', '.join(f"{key}={value}" for key, value in self.__dict__.items())
         return f"{self.__class__.__name__}({params})"

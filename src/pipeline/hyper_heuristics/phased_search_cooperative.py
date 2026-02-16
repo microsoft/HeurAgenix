@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
 from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
+from src.problems.max_cut.components import BatchInsertNodeOperator, Solution
 
 class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
     def __init__(self, heuristic_pool, problem, shared_pool_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02, initial_solution_paths=None, worker_id=None):
@@ -297,7 +298,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         h_map = {
             "batch_cluster_ruin": os.path.join(base_path, ruin_path, "batch_cluster_ruin.py"),
             "batch_worst_ruin": os.path.join(base_path, ruin_path, "batch_worst_ruin.py"),
-            "path_relinking": os.path.join(base_path, "path_relinking_guided_perturbation.py")
+            "path_relinking": os.path.join(base_path, "path_relinking_guided_perturbation.py"),
+            "anti_consensus": os.path.join(base_path, ruin_path, "anti_consensus_perturbation.py")
         }
         
         for key, path in h_map.items():
@@ -387,12 +389,12 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             ratio = random.uniform(0.10, 0.20)
             nodes_to_flip = self._calculate_consensus_flip(node_num, flip_ratio=ratio) 
             if nodes_to_flip:
-                 env.current_solution.set_a.symmetric_difference_update(nodes_to_flip)
-                 # Recalculate set_b and value
-                 all_nodes = set(range(node_num))
-                 env.current_solution.set_b = all_nodes - env.current_solution.set_a
-                 env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                 env.problem_state = env.get_problem_state()
+                 # Replaced direct modification with Operator
+                 to_a = [n for n in nodes_to_flip if n in env.current_solution.set_b]
+                 to_b = [n for n in nodes_to_flip if n in env.current_solution.set_a]
+                 op = BatchInsertNodeOperator(to_a, to_b)
+                 env.run_operator(op)
+                 
                  self._log(f"Supernova Ruin applied: Flipped {len(nodes_to_flip)} static nodes (Ratio: {ratio:.2f}).")
             else:
                  # Fallback if no static nodes found
@@ -573,15 +575,20 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      h = random.choice(self.constructive_heuristics)
                      
                  try:
-                     # Create a temporary env-like or just run it. 
-                     env.current_solution.set_a = set() 
-                     env.current_solution.set_b = set(range(node_num)) # Reset to all B
+                     # Replaced direct modification with Operator
+                     # Move all nodes from A to B
+                     nodes_in_a = list(env.current_solution.set_a)
+                     if nodes_in_a:
+                         op_reset = BatchInsertNodeOperator([], nodes_in_a)
+                         env.run_operator(op_reset)
                      
                      env.run_heuristic(h)
                      
-                     # Recalculate
-                     env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                     self._log(f"Fresh Injection Complete. New Start Value: {env.current_solution.cut_value}")
+                     # Force value check (Environment should handle this, but safe to verify)
+                     if env.current_solution.cut_value is None:
+                         env.current_solution.cut_value = env.get_key_value(env.current_solution)
+                     
+                     self._log(f"Fresh Injection Complete. New Start Value: {env.current_solution.cut_value[:5] if isinstance(env.current_solution.cut_value, str) else env.current_solution.cut_value}")
                      
                      # [CRITICAL] Briefly run improvement here to stabilize the solution before returning to main loop?
                      # No, let the main loop handle it.
@@ -593,21 +600,27 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      self._apply_breakout(env, "massive_ruin_fallback")
             
             # [Option 2: Anti-Consensus / Supernova] (33% chance)
-            elif dice < 0.67:
+            elif dice < 0.67 and "anti_consensus" in self.breakout_heuristics:
                  self._log("STRATEGY UPDATE: Triggering ANTI-CONSENSUS (Supernova)...")
-                 # Apply Supernova with high intensity (Aggressive Anti-Consensus)
-                 # Flip 30-50% of static nodes
+                 
+                 h = self.breakout_heuristics["anti_consensus"]
+                 
+                 # Inject elite_pool into algorithm_data for the heuristic to access
+                 env.algorithm_data["elite_pool"] = self.elite_pool
+                 
                  ratio = random.uniform(0.30, 0.50)
-                 nodes_to_flip = self._calculate_consensus_flip(node_num, flip_ratio=ratio)
-                 if nodes_to_flip:
-                     env.current_solution.set_a.symmetric_difference_update(nodes_to_flip)
-                     all_nodes = set(range(node_num))
-                     env.current_solution.set_b = all_nodes - env.current_solution.set_a
-                     env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                     self._log(f"Anti-Consensus Applied: Flipped {len(nodes_to_flip)} static nodes.")
+                 # Use the loaded function
+                 op = env.run_heuristic(h, parameters={"ratio": ratio})
+                 
+                 if op:
+                     self._log(f"Anti-Consensus Applied via Operator: {op}")
                      time.sleep(1.0)
                  else:
                      self._apply_breakout(env, "massive_ruin_fallback")
+            
+            # Fallback if heuristic missing but dice selected it
+            elif dice < 0.67:
+                 self._apply_breakout(env, "massive_ruin_fallback")
 
             # [Option 3: Classic Massive Ruin] (33% chance)
             else:
@@ -625,10 +638,13 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             else:
                  # Fallback: Random Flip 70%
                  nodes = random.sample(range(node_num), int(node_num * 0.70))
-                 env.current_solution.set_a.symmetric_difference_update(nodes)
-                 all_nodes = set(range(node_num))
-                 env.current_solution.set_b = all_nodes - env.current_solution.set_a
-                 env.current_solution.cut_value = env.get_key_value(env.current_solution)
+                 
+                 # Replaced direct modification with Operator
+                 to_a = [n for n in nodes if n in env.current_solution.set_b]
+                 to_b = [n for n in nodes if n in env.current_solution.set_a]
+                 op = BatchInsertNodeOperator(to_a, to_b)
+                 env.run_operator(op)
+                 
                  self._log(f"MASSIVE RUIN TRIGGERED: Random Flipped {len(nodes)} nodes (70%)...")
                  time.sleep(1.0)
 

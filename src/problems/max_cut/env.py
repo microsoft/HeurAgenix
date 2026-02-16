@@ -76,11 +76,15 @@ class Env(BaseEnv):
 
     def get_key_value(self, solution: Solution=None) -> float:
         """Get the key value of the current solution based on the key item."""
+        # Optimization: Trust self.current_solution.cut_value if available and no specific solution passed
         if solution is None:
+            if self.current_solution.cut_value is not None:
+                return self.current_solution.cut_value
             solution = self.current_solution
         
+        # If a specific solution is passed, or current solution has no cut_value, calculate it
         if solution.cut_value is not None:
-            return solution.cut_value
+             return solution.cut_value
 
         current_cut_value = 0
         for node_a in solution.set_a:
@@ -166,27 +170,72 @@ class Env(BaseEnv):
                             delta += 2 * w
                             
         elif isinstance(operator, BatchInsertNodeOperator):
-            nodes_to_a = operator.nodes_to_a
-            nodes_to_b = operator.nodes_to_b
+            # Check for potential overlap/re-assignment (Fix for Cosm/Batch heuristics on assigned nodes)
+            # If nodes are already assigned, we must use full recalculation or complex delta logic.
+            # We use full recalculation if any overlap is detected (safer).
+            overlap_detected = False
+            # Quick sample check (checking first 10 nodes)
+            check_nodes = (operator.nodes_to_a[:10] if operator.nodes_to_a else []) + \
+                        (operator.nodes_to_b[:10] if operator.nodes_to_b else [])
+            for u in check_nodes:
+                if u in solution.set_a or u in solution.set_b:
+                    overlap_detected = True
+                    break
             
-            # 1. Edges between New A and Existing B
-            for u in nodes_to_a:
-                for v, w in adj[u].items():
-                    if v in solution.set_b:
-                        delta += w
-                        
-            # 2. Edges between New B and Existing A
-            for u in nodes_to_b:
-                for v, w in adj[u].items():
-                    if v in solution.set_a:
-                        delta += w
-                        
-            # 3. Edges between New A and New B
-            set_nodes_to_b = set(nodes_to_b)
-            for u in nodes_to_a:
-                for v, w in adj[u].items():
-                    if v in set_nodes_to_b:
-                        delta += w
+            if overlap_detected:
+                # FULL DELTA CALCULATION (Robust Mode)
+                # Calculates delta = New_Cut - Old_Cut
+                
+                # Virtual Sets
+                temp_set_a = solution.set_a.copy()
+                temp_set_b = solution.set_b.copy()
+                
+                if operator.nodes_to_a:
+                    temp_set_a.update(operator.nodes_to_a)
+                    temp_set_b.difference_update(operator.nodes_to_a)
+                if operator.nodes_to_b:
+                    temp_set_b.update(operator.nodes_to_b)
+                    temp_set_a.difference_update(operator.nodes_to_b)
+                
+                new_cut_value = 0
+                wm = self.instance_data["weight_matrix"]
+                
+                # Calculate New Cut
+                # Optimization: Iterate smaller set
+                if len(temp_set_a) < len(temp_set_b):
+                    for u in temp_set_a:
+                        for v in temp_set_b:
+                             new_cut_value += wm[u][v]
+                else:
+                    for u in temp_set_b:
+                        for v in temp_set_a:
+                             new_cut_value += wm[u][v] # Symmetric
+                             
+                delta = new_cut_value - (solution.cut_value if solution.cut_value else 0)
+
+            else:
+                # FAST INCREMENTAL DELTA (Assumes Disjoint / New Nodes)
+                nodes_to_a = operator.nodes_to_a
+                nodes_to_b = operator.nodes_to_b
+                
+                # 1. Edges between New A and Existing B
+                for u in nodes_to_a:
+                    for v, w in adj[u].items():
+                        if v in solution.set_b:
+                            delta += w
+                            
+                # 2. Edges between New B and Existing A
+                for u in nodes_to_b:
+                    for v, w in adj[u].items():
+                        if v in solution.set_a:
+                            delta += w
+                            
+                # 3. Edges between New A and New B
+                set_nodes_to_b = set(nodes_to_b)
+                for u in nodes_to_a:
+                    for v, w in adj[u].items():
+                        if v in set_nodes_to_b:
+                            delta += w
 
         elif isinstance(operator, BatchDeleteOperator):
             for u in operator.nodes:
@@ -202,25 +251,75 @@ class Env(BaseEnv):
         return delta
 
     def run_operator(self, operator: BaseOperator) -> bool:
+        """
+        Apply the operator to the current solution In-Place.
+        This updates self.current_solution directly without creating a new Solution object.
+        """
         if isinstance(operator, BaseOperator):
             delta = self._calculate_delta(operator)
-            self.current_solution = operator.run(self.current_solution)
             
-            if self.current_solution.cut_value is None:
-                 # If previous solution had cut_value, we can update it.
-                 # But operator.run returns a new Solution with cut_value copied from old solution (based on my change to components.py)
-                 # Wait, I modified components.py to copy cut_value.
-                 # So self.current_solution.cut_value should be the OLD value.
-                 pass
+            # IN-PLACE UPDATE LOGIC
+            solution = self.current_solution
             
-            if self.current_solution.cut_value is not None:
-                self.current_solution.cut_value += delta
-            else:
-                # Fallback if somehow it's None (e.g. first run or something)
-                self.current_solution.cut_value = self.get_key_value(self.current_solution)
+            if isinstance(operator, InsertNodeOperator):
+                if operator.target_set == "A":
+                    solution.set_a.add(operator.node)
+                    # operator.run asserts node not in B, but for speed we might skip or trust input
+                    # If we want to be safe:
+                    if operator.node in solution.set_b: solution.set_b.remove(operator.node)
+                elif operator.target_set == "B":
+                    solution.set_b.add(operator.node)
+                    if operator.node in solution.set_a: solution.set_a.remove(operator.node)
+                    
+            elif isinstance(operator, InsertEdgeOperator):
+                # node_1 to A, node_2 to B
+                solution.set_a.add(operator.node_1)
+                if operator.node_1 in solution.set_b: solution.set_b.remove(operator.node_1)
+                
+                solution.set_b.add(operator.node_2)
+                if operator.node_2 in solution.set_a: solution.set_a.remove(operator.node_2)
+                
+            elif isinstance(operator, SwapOperator):
+                for node in operator.nodes:
+                    if node in solution.set_a:
+                        solution.set_a.remove(node)
+                        solution.set_b.add(node)
+                    elif node in solution.set_b:
+                        solution.set_b.remove(node)
+                        solution.set_a.add(node)
+
+            elif isinstance(operator, DeleteOperator):
+                u = operator.node
+                if u in solution.set_a: solution.set_a.remove(u)
+                if u in solution.set_b: solution.set_b.remove(u)
+            
+            elif isinstance(operator, BatchInsertNodeOperator):
+                # nodes_to_a
+                if operator.nodes_to_a:
+                    solution.set_a.update(operator.nodes_to_a)
+                    solution.set_b.difference_update(operator.nodes_to_a)
+                # nodes_to_b
+                if operator.nodes_to_b:
+                    solution.set_b.update(operator.nodes_to_b)
+                    solution.set_a.difference_update(operator.nodes_to_b)
+
+            elif isinstance(operator, BatchDeleteOperator):
+                if operator.nodes:
+                    solution.set_a.difference_update(operator.nodes)
+                    solution.set_b.difference_update(operator.nodes)
+            
+            # --- End In-Place Update ---
+
+            # Update cut_value
+            if solution.cut_value is not None and delta != 0:
+                solution.cut_value += delta
+            elif solution.cut_value is None:
+                # If delta calculation failed or it's a fresh start
+                solution.cut_value = self.get_key_value(solution)
 
             self.problem_state = self.get_problem_state()
-        return operator
+            return True # Indicate success
+        return False
 
     def validation_solution(self, solution: Solution=None) -> bool:
         """Check the validation of this solution in the following items:
