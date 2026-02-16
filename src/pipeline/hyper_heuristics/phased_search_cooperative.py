@@ -554,119 +554,51 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 env.run_heuristic(h, parameters={"count": count})
 
         elif strategy == "massive_ruin":
-            # [NEW STRATEGY] Diversified Deep Breakout
-            # Instead of just pure destruction (Massive Ruin), we now mix in:
-            # 1. Fresh Restart (Detailed Cosm) -> Inject "Paratroopers" to find new peaks
-            # 2. Anti-Consensus (Supernova) -> Systematically explore the opposite of current beliefs
-            # 3. Massive Ruin -> Deep excavation of current basin
+            # [OPTIMIZED 2026-02-16]
+            # Strategic Reconstructive Ruin (20%-50% Destruction + Cosm Repair)
+            # This balances Exploration (jumping out of basin) and Exploitation (using learned structure).
             
-            dice = random.random()
-            
-            # [Option 1: Fresh Restart / Injection] (34% chance)
-            # Use Detailed COSM to generate a completely new structure orthogonal to current pool
-            if dice < 0.34 and self.constructive_heuristics:
-                 self._log("STRATEGY UPDATE: Triggering FRESH INJECTION (Detailed Cosm)...")
-                 
-                 # Pick Detailed Cosm
-                 detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
-                 if detailed_cosm:
-                     h = detailed_cosm[0]
-                 else:
-                     h = random.choice(self.constructive_heuristics)
-                     
-                 try:
-                     # Replaced direct modification with Operator
-                     # We must completely empty the solution so unselected_nodes is full
-                     # This allows Constructive Heuristics (like Cosm) to run from scratch.
-                     
-                     # [FIX] Force hard reset using env.reset() to clear algorithm_data and re-init temperatures
-                     env.reset()
-                     
-                     env.run_heuristic(h)
-                     
-                     # Force value check (Environment should handle this, but safe to verify)
-                     if env.current_solution.cut_value is None:
-                         env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                     
-                     self._log(f"Fresh Injection Complete. New Start Value: {env.current_solution.cut_value}")
-                     
-                     # [CRITICAL] Briefly run improvement here to stabilize the solution before returning to main loop?
-                     # No, let the main loop handle it.
-                     # Sleep to prevent spam
-                     time.sleep(1.0)
-
-                 except Exception as e:
-                     self._log(f"Injection failed: {e}. Falling back to Ruin.")
-                     self._apply_breakout(env, "massive_ruin_fallback")
-            
-            # [Option 2: Anti-Consensus / Supernova] (33% chance)
-            elif dice < 0.67 and "anti_consensus" in self.breakout_heuristics:
-                 self._log("STRATEGY UPDATE: Triggering ANTI-CONSENSUS (Supernova)...")
-                 
-                 h = self.breakout_heuristics["anti_consensus"]
-                 
-                 # Inject elite_pool into algorithm_data for the heuristic to access
-                 env.algorithm_data["elite_pool"] = self.elite_pool
-                 
-                 ratio = random.uniform(0.30, 0.50)
-                 # Use the loaded function
-                 op = env.run_heuristic(h, parameters={"ratio": ratio})
-                 
-                 if op:
-                     flipped_count = len(op.nodes)
-                     
-                     # [FIX] Force recalibration of cut_value to prevent drift after massive swap
-                     # Must clear cached value first
-                     old_val = env.current_solution.cut_value
-                     env.current_solution.cut_value = None 
-                     real_val = env.get_key_value(env.current_solution)
-                     env.current_solution.cut_value = real_val
-                     
-                     self._log(f"Anti-Consensus Applied flips on {flipped_count} nodes. Val: {old_val} -> {real_val}")
-                     time.sleep(1.0)
-                 else:
-                     self._apply_breakout(env, "massive_ruin_fallback")
-            
-            # Fallback if heuristic missing but dice selected it
-            elif dice < 0.67:
-                 self._apply_breakout(env, "massive_ruin_fallback")
-
-            # [Option 3: Classic Massive Ruin] (33% chance)
-            else:
-                 self._apply_breakout(env, "massive_ruin_fallback")
-
-        elif strategy == "massive_ruin_fallback":
-            # [Original Massive Ruin Logic]
-            # Used to escape extremely deep convergence basins (like sg3dl149000 at 2426)
-            if "batch_cluster_ruin" in self.breakout_heuristics:
-                h_ruin = self.breakout_heuristics["batch_cluster_ruin"]
-                count = int(node_num * 0.70) # 70% Ruin
-                self._log(f"MASSIVE RUIN TRIGGERED: Destroying {count} nodes (70%)...")
+            if "batch_worst_ruin" in self.breakout_heuristics:
+                h_ruin = self.breakout_heuristics["batch_worst_ruin"]
+                
+                # Dynamic Ratio: 20% to 50%
+                # Lower bound (20%) allows "Large Step" optimization
+                # Upper bound (50%) allows "Basin Hopping"
+                ratio = random.uniform(0.20, 0.50)
+                count = int(node_num * ratio)
+                
+                self._log(f"RECONSTRUCTIVE RUIN: Removing {count} nodes ({ratio:.1%}) to trigger repair...")
                 env.run_heuristic(h_ruin, parameters={"count": count})
                 
-                # [Post-Ruin Repair]: Ensure we don't leave 70% empty
-                # Using Simplified Cosm to reconstruct the destroyed part
+                # [Repair Phase]
+                # Essential: Use Cosm to fill the holes intelligently
                 if self.constructive_heuristics:
-                    repair_h = [h for h in self.constructive_heuristics if "cosm" in h.__name__]
+                    repair_h = [h for h in self.constructive_heuristics if "cosm" in h.__name__ and "detailed" in h.__name__]
+                    if not repair_h:
+                        repair_h = [h for h in self.constructive_heuristics if "cosm" in h.__name__]
+                    
                     if repair_h:
-                         self._log(f"Repairing Ruined Solution with {repair_h[0].__name__}...")
-                         # We do NOT reset the solution, just run Cosm to fill the gaps
-                         # Cosm checks construction_steps and fills remaining unassigned nodes
+                         # self._log(f"Repairing with {repair_h[0].__name__}...")
+                         # Cosm checks solution state and fills unselected_nodes
                          env.run_heuristic(repair_h[0])
                 
-                time.sleep(1.0)
+                # Force update value
+                cur_val = env.get_key_value(env.current_solution)
+                if env.current_solution.cut_value != cur_val:
+                    env.current_solution.cut_value = cur_val
+
             else:
-                 # Fallback: Random Flip 70%
-                 nodes = random.sample(range(node_num), int(node_num * 0.70))
+                 # Fallback: Random Flip 40%
+                 nodes = random.sample(range(node_num), int(node_num * 0.40))
                  
-                 # Replaced direct modification with Operator
+                 from src.problems.max_cut.components import BatchInsertNodeOperator
                  to_a = [n for n in nodes if n in env.current_solution.set_b]
                  to_b = [n for n in nodes if n in env.current_solution.set_a]
                  op = BatchInsertNodeOperator(to_a, to_b)
                  env.run_operator(op)
                  
-                 self._log(f"MASSIVE RUIN TRIGGERED: Random Flipped {len(nodes)} nodes (70%)...")
-                 time.sleep(1.0)
+                 self._log(f"Fallback Ruin: Random Flipped {len(nodes)} nodes.")
+
 
     def run(self, env: BaseEnv) -> bool:
         # [REFACTORED for Cooperative Search]
@@ -873,9 +805,9 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     pool_best = max(self.elite_pool, key=lambda s: s.cut_value)
                     
                     # Original: 0.998 allowed 5321 (0.9989) to survive indefinitely.
-                    # User Issue: "Stuck at 5321 (worse place)".
-                    # Fix: Tighten to 0.9992 to force improvement past 5322, but still allow 5324+.
-                    catch_up_threshold = 0.9992 
+                    # Fix: 0.9992 was too strict and caused "Ruin -> Catch-up -> Reset" loop.
+                    # Relaxed to 0.90 to allow deep exploration/ruin strategies to work.
+                    catch_up_threshold = 0.90 
                     
                     if env.key_value < pool_best.cut_value * catch_up_threshold:
                         from src.problems.max_cut.components import Solution

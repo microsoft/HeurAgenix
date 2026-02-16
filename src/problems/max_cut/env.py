@@ -399,7 +399,7 @@ class Env(BaseEnv):
 
             # Performance Critical: Do NOT recalculate full problem state on every step.
             # Heuristics that need fresh problem_state must call get_problem_state() explicitly.
-            # self.problem_state = self.get_problem_state()
+            self.problem_state = self.get_problem_state()
             return True # Indicate success
         return False
 
