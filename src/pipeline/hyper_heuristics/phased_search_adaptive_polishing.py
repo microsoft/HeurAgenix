@@ -134,6 +134,7 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
         mutation_names = {
             "simulated_annealing_ed14",
             "simulated_annealing_ed15",
+            "anti_consensus_perturbation",
         }
 
         for h_name in self.heuristic_pool_names:

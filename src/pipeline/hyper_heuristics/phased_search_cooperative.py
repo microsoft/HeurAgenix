@@ -579,10 +579,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      # We must completely empty the solution so unselected_nodes is full
                      # This allows Constructive Heuristics (like Cosm) to run from scratch.
                      
-                     # [FIX] Force hard reset using init_solution() to avoid delta drift issues with BatchDeleteOperator
-                     env.current_solution = env.init_solution()
-                     # Critical: Sync problem_state so the heuristic sees the clean solution
-                     env.problem_state = env.get_problem_state()
+                     # [FIX] Force hard reset using env.reset() to clear algorithm_data and re-init temperatures
+                     env.reset()
                      
                      env.run_heuristic(h)
                      
@@ -615,7 +613,16 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  op = env.run_heuristic(h, parameters={"ratio": ratio})
                  
                  if op:
-                     self._log(f"Anti-Consensus Applied for {len(op.nodes)} nodes.")
+                     flipped_count = len(op.nodes)
+                     
+                     # [FIX] Force recalibration of cut_value to prevent drift after massive swap
+                     # Must clear cached value first
+                     old_val = env.current_solution.cut_value
+                     env.current_solution.cut_value = None 
+                     real_val = env.get_key_value(env.current_solution)
+                     env.current_solution.cut_value = real_val
+                     
+                     self._log(f"Anti-Consensus Applied flips on {flipped_count} nodes. Val: {old_val} -> {real_val}")
                      time.sleep(1.0)
                  else:
                      self._apply_breakout(env, "massive_ruin_fallback")
@@ -632,10 +639,21 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             # [Original Massive Ruin Logic]
             # Used to escape extremely deep convergence basins (like sg3dl149000 at 2426)
             if "batch_cluster_ruin" in self.breakout_heuristics:
-                h = self.breakout_heuristics["batch_cluster_ruin"]
+                h_ruin = self.breakout_heuristics["batch_cluster_ruin"]
                 count = int(node_num * 0.70) # 70% Ruin
                 self._log(f"MASSIVE RUIN TRIGGERED: Destroying {count} nodes (70%)...")
-                env.run_heuristic(h, parameters={"count": count})
+                env.run_heuristic(h_ruin, parameters={"count": count})
+                
+                # [Post-Ruin Repair]: Ensure we don't leave 70% empty
+                # Using Simplified Cosm to reconstruct the destroyed part
+                if self.constructive_heuristics:
+                    repair_h = [h for h in self.constructive_heuristics if "cosm" in h.__name__]
+                    if repair_h:
+                         self._log(f"Repairing Ruined Solution with {repair_h[0].__name__}...")
+                         # We do NOT reset the solution, just run Cosm to fill the gaps
+                         # Cosm checks construction_steps and fills remaining unassigned nodes
+                         env.run_heuristic(repair_h[0])
+                
                 time.sleep(1.0)
             else:
                  # Fallback: Random Flip 70%

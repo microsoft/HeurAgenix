@@ -76,20 +76,47 @@ class Env(BaseEnv):
 
     def get_key_value(self, solution: Solution=None) -> float:
         """Get the key value of the current solution based on the key item."""
-        # Optimization: Trust self.current_solution.cut_value if available and no specific solution passed
         if solution is None:
-            if self.current_solution.cut_value is not None:
-                return self.current_solution.cut_value
             solution = self.current_solution
+            if solution.cut_value is not None:
+                return solution.cut_value
         
-        # If a specific solution is passed, or current solution has no cut_value, calculate it
         if solution.cut_value is not None:
              return solution.cut_value
 
         current_cut_value = 0
-        for node_a in solution.set_a:
-            for node_b in solution.set_b:
-                current_cut_value += self.instance_data["weight_matrix"][node_a][node_b]
+        adj = self.instance_data["adj"]
+        
+        # DEBUG CHECK (Temp)
+        if hasattr(self, "_debug_first_run") and not self._debug_first_run:
+            pass # Skip check
+        else:
+            self._debug_first_run = False
+            # Check edge counts
+            edge_count = sum(len(neighbors) for neighbors in adj)
+            if edge_count == 0:
+                print("[ERROR] get_key_value: adj is empty! Data loading failed?")
+            elif len(solution.set_a) == 0:
+                print("[ERROR] get_key_value: set_a is empty!")
+            elif len(solution.set_b) == 0:
+                print("[ERROR] get_key_value: set_b is empty!")
+            
+        
+        if len(solution.set_a) < len(solution.set_b):
+            for u in solution.set_a:
+                # Safety: u must be valid index
+                if u < 0 or u >= len(adj): continue
+                
+                for v, w in adj[u].items():
+                    if v in solution.set_b:
+                        current_cut_value += w
+        else:
+            for u in solution.set_b:
+                if u < 0 or u >= len(adj): continue
+                for v, w in adj[u].items():
+                    if v in solution.set_a:
+                        current_cut_value += w # Symmetric
+                    
         return current_cut_value
 
     def _calculate_delta(self, operator: BaseOperator) -> float:
@@ -133,9 +160,10 @@ class Env(BaseEnv):
                     if v in solution.set_a:
                         delta -= w
 
-        elif isinstance(operator, SwapOperator):
+        elif isinstance(operator, SwapOperator): # Optimized batch delta calculation
             nodes = set(operator.nodes)
-            # 1. Individual contributions
+            adj = self.instance_data["adj"]
+            # 1. Individual contributions (assuming neighbors don't move)
             for u in nodes:
                 neighbors = adj[u]
                 if u in solution.set_a:
@@ -157,16 +185,31 @@ class Env(BaseEnv):
             sorted_nodes = sorted(list(nodes))
             for i in range(len(sorted_nodes)):
                 u = sorted_nodes[i]
+                neighbors = adj[u]
                 u_in_a = u in solution.set_a
-                for v, w in adj[u].items():
+                
+                # Iterate neighbors only to find those in 'nodes' to save time?
+                # But adj[u] is faster if degree is small compared to |nodes|
+                # However here we iterate neighbor v
+                for v, w in neighbors.items():
                     if v in nodes and v > u:
                         v_in_a = v in solution.set_a
                         
-                        if u_in_a and v_in_a:
-                            delta -= 2 * w
-                        elif not u_in_a and not v_in_a:
+                        # Interaction Effect:
+                        # Both move: Edge type doesn't change relative to each other (Same->Same or Diff->Diff)
+                        # But Step 1 assumed the other was stationary.
+                        
+                        if u_in_a == v_in_a:
+                            # Both in A (or Both in B). Edge was Internal.
+                            # Step 1 added +w for u, and +w for v. Total +2w.
+                            # Reality: Both swap. Edge remains Internal (in B or A). Net change 0.
+                            # Correction: -2w.
                             delta -= 2 * w
                         else:
+                            # One in A, One in B. Edge was Cut.
+                            # Step 1 subtracted -w for u, and -w for v. Total -2w.
+                            # Reality: Both swap. Edge remains Cut. Net change 0.
+                            # Correction: +2w.
                             delta += 2 * w
                             
         elif isinstance(operator, BatchInsertNodeOperator):
@@ -272,7 +315,27 @@ class Env(BaseEnv):
         This updates self.current_solution directly without creating a new Solution object.
         """
         if isinstance(operator, BaseOperator):
-            delta = self._calculate_delta(operator)
+            # STRATEGY: 
+            # 1. Single-node moves (InsertNode, Delete, Swap-1) -> Use Delta (Critical for speed)
+            # 2. Multi-node/Batch moves -> Use Full Recalculation (Critical for correctness)
+            
+            is_complex_batch = False
+            delta = 0
+            
+            # Determine complexity
+            if isinstance(operator, (BatchInsertNodeOperator, BatchDeleteOperator)):
+                is_complex_batch = True
+            elif isinstance(operator, SwapOperator):
+                if len(operator.nodes) > 1:
+                    is_complex_batch = True
+                else:
+                    # Single node swap is safe to use delta if logic is correct
+                    # [VERIFIED 2026-02-16] Delta logic for single swap is correct.
+                    delta = self._calculate_delta(operator)
+            else:
+                # InsertNode, InsertEdge, Delete
+                delta = self._calculate_delta(operator)
+
             
             # IN-PLACE UPDATE LOGIC
             solution = self.current_solution
@@ -280,15 +343,12 @@ class Env(BaseEnv):
             if isinstance(operator, InsertNodeOperator):
                 if operator.target_set == "A":
                     solution.set_a.add(operator.node)
-                    # operator.run asserts node not in B, but for speed we might skip or trust input
-                    # If we want to be safe:
                     if operator.node in solution.set_b: solution.set_b.remove(operator.node)
                 elif operator.target_set == "B":
                     solution.set_b.add(operator.node)
                     if operator.node in solution.set_a: solution.set_a.remove(operator.node)
                     
             elif isinstance(operator, InsertEdgeOperator):
-                # node_1 to A, node_2 to B
                 solution.set_a.add(operator.node_1)
                 if operator.node_1 in solution.set_b: solution.set_b.remove(operator.node_1)
                 
@@ -310,11 +370,9 @@ class Env(BaseEnv):
                 if u in solution.set_b: solution.set_b.remove(u)
             
             elif isinstance(operator, BatchInsertNodeOperator):
-                # nodes_to_a
                 if operator.nodes_to_a:
                     solution.set_a.update(operator.nodes_to_a)
                     solution.set_b.difference_update(operator.nodes_to_a)
-                # nodes_to_b
                 if operator.nodes_to_b:
                     solution.set_b.update(operator.nodes_to_b)
                     solution.set_a.difference_update(operator.nodes_to_b)
@@ -327,13 +385,21 @@ class Env(BaseEnv):
             # --- End In-Place Update ---
 
             # Update cut_value
-            if solution.cut_value is not None and delta != 0:
-                solution.cut_value += delta
-            elif solution.cut_value is None:
-                # If delta calculation failed or it's a fresh start
+            if is_complex_batch:
+                # [Optimization] Full Recalculation for Batch Ops
+                # This guarantees correctness for Massive Ruin / Anti-Consensus
+                solution.cut_value = None 
                 solution.cut_value = self.get_key_value(solution)
+            else:
+                # Incremental Update for Single Ops (Speed critical)
+                if solution.cut_value is not None:
+                    solution.cut_value += delta
+                else:
+                    solution.cut_value = self.get_key_value(solution)
 
-            self.problem_state = self.get_problem_state()
+            # Performance Critical: Do NOT recalculate full problem state on every step.
+            # Heuristics that need fresh problem_state must call get_problem_state() explicitly.
+            # self.problem_state = self.get_problem_state()
             return True # Indicate success
         return False
 
