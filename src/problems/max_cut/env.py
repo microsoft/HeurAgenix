@@ -238,15 +238,31 @@ class Env(BaseEnv):
                             delta += w
 
         elif isinstance(operator, BatchDeleteOperator):
+            deleted_nodes_set = set(operator.nodes)
+            # If we are deleting ALL nodes, we can just set delta = -current_cut
+            # Assuming solution.cut_value is accurate.
+            # But let's be consistent and calculate it.
+            
             for u in operator.nodes:
                 if u in solution.set_a:
                     for v, w in adj[u].items():
                         if v in solution.set_b:
-                            delta -= w
+                            # Edge (u, v) is in Cut.
+                            # If v is NOT being deleted, we lose this edge -> -w
+                            if v not in deleted_nodes_set:
+                                delta -= w
+                            # If v IS being deleted, we lose this edge.
+                            # But we will visit this edge again when processing v.
+                            # So count it only once (e.g. when u < v)
+                            elif v > u:
+                                delta -= w
                 elif u in solution.set_b:
-                    for v, w in adj[u].items():
+                     for v, w in adj[u].items():
                         if v in solution.set_a:
-                            delta -= w
+                            if v not in deleted_nodes_set:
+                                delta -= w
+                            elif v > u:
+                                delta -= w
                 
         return delta
 

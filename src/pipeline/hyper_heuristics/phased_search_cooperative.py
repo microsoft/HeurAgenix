@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
 from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
-from src.problems.max_cut.components import BatchInsertNodeOperator, Solution
+from src.problems.max_cut.components import BatchInsertNodeOperator, BatchDeleteOperator, Solution
 
 class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
     def __init__(self, heuristic_pool, problem, shared_pool_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02, initial_solution_paths=None, worker_id=None):
@@ -576,11 +576,11 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      
                  try:
                      # Replaced direct modification with Operator
-                     # Move all nodes from A to B
-                     nodes_in_a = list(env.current_solution.set_a)
-                     if nodes_in_a:
-                         op_reset = BatchInsertNodeOperator([], nodes_in_a)
-                         env.run_operator(op_reset)
+                     # We must completely empty the solution so unselected_nodes is full
+                     # This allows Constructive Heuristics (like Cosm) to run from scratch.
+                     all_nodes = list(range(node_num))
+                     op_reset = BatchDeleteOperator(all_nodes)
+                     env.run_operator(op_reset)
                      
                      env.run_heuristic(h)
                      
@@ -588,7 +588,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      if env.current_solution.cut_value is None:
                          env.current_solution.cut_value = env.get_key_value(env.current_solution)
                      
-                     self._log(f"Fresh Injection Complete. New Start Value: {env.current_solution.cut_value[:5] if isinstance(env.current_solution.cut_value, str) else env.current_solution.cut_value}")
+                     self._log(f"Fresh Injection Complete. New Start Value: {env.current_solution.cut_value}")
                      
                      # [CRITICAL] Briefly run improvement here to stabilize the solution before returning to main loop?
                      # No, let the main loop handle it.
@@ -613,7 +613,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  op = env.run_heuristic(h, parameters={"ratio": ratio})
                  
                  if op:
-                     self._log(f"Anti-Consensus Applied via Operator: {op}")
+                     self._log(f"Anti-Consensus Applied for {len(op.nodes)} nodes.")
                      time.sleep(1.0)
                  else:
                      self._apply_breakout(env, "massive_ruin_fallback")
@@ -829,7 +829,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 
             # Log periodically
             if total_steps % 100 == 0:
-                 self._log(f"Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known})")
+                 self._log(f"Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known}) Stagnation:{no_improve_steps}")
             
             # [NEW] Periodic Active Path Relinking to bridge peaks
             # Increase frequency from 300 to 100 to force more hybridization
@@ -844,9 +844,12 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             if total_steps % 50 == 0:
                 self._sync_shared_pool()
                 
-
-                # [Optimization-Tuned] Aggressive Catch-up Logic
-                if self.elite_pool:
+                # Check if we are currently in a "Recovery/Exploration" phase (high no_improve_steps)
+                # If we just performed a massive ruin/injection, we need time to climb back up.
+                # Don't kill promising young solutions too early.
+                # Only apply catch-up if we have been stagnant for a while OR if the current solution is truly abysmal for too long.
+                
+                if self.elite_pool and no_improve_steps > 300:
                     pool_best = max(self.elite_pool, key=lambda s: s.cut_value)
                     
                     # Original: 0.998 allowed 5321 (0.9989) to survive indefinitely.

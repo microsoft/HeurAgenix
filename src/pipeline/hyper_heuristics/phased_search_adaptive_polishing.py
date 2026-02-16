@@ -459,39 +459,34 @@ class PhasedSearchAdaptivePolishingHyperHeuristic:
                             print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). FAIL FAST.", flush=True)
                             return False
 
-                        # FRAGILE ELITE PROTECTION
-                        # If we are in Fragile Elite mode, we DO NOT want to destroy the structure with 30% ruin.
-                        # Instead, we do a "Soft Reset" -> Tabu Search or very small ruin.
+                        # FRAGILE ELITE PROTECTION & GENERAL STAGNATION RECOVERY
+                        # Try Tabu Search before Massive Ruin for ALL modes (Fragile or Normal)
+                        # This gives a chance to escape local optima via non-monotonic moves without destroying structure.
+                        
+                        # Trigger Tabu at the first level of "Massive Ruin" threshold (Count 4 and 5)
+                        if perturbation_count <= max_perturbations_before_ruin + 2:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Deep Stagnation (Level {perturbation_count}). Triggering Deep Polishing (Tabu).", flush=True)
+                            if self.tabu_heuristic:
+                                # Vary tenure to escape basins
+                                dynamic_tenure = int(math.sqrt(node_num))
+                                if perturbation_count % 2 == 0: dynamic_tenure *= 2 # Try stricter tabu
+                                
+                                # Deep polishing with more steps
+                                deep_steps = 2000
+                                if node_num > 5000:
+                                    deep_steps = 10000
+                                
+                                env.run_heuristic(self.tabu_heuristic, parameters={"steps": deep_steps, "tabu_tenure": dynamic_tenure})
+                                current_steps += 1
+                                
+                                # Reset no_improve_steps to give Tabu a chance to be recognized as "Action Taken"
+                                # If it improves, main loop resets perturbation_count.
+                                # If not, we come back here with higher perturbation_count.
+                                no_improve_steps = 0 
+                                continue
+                        
+                        # FRAGILE ELITE FALLBACK (If Tabu Fails)
                         if is_fragile_elite:
-                            # Allow escalation: If we tried Tabu and it failed (perturbation_count > max + 1), force Soft Ruin.
-                            # max_perturbations_before_ruin is 3.
-                            # Count 4: Try Tabu.
-                            # Count 5: Try Tabu again (maybe different tenure?).
-                            # Count 6: Soft Ruin.
-                            
-                            if perturbation_count <= max_perturbations_before_ruin + 2:
-                                print(f"[{datetime.now().strftime('%H:%M:%S')}] Run:{run_id} Fragile Elite Stagnation (Level {perturbation_count}). Triggering Deep Polishing (Tabu).", flush=True)
-                                if self.tabu_heuristic:
-                                    # Vary tenure to escape basins
-                                    dynamic_tenure = int(math.sqrt(node_num))
-                                    if perturbation_count % 2 == 0: dynamic_tenure *= 2 # Try stricter tabu
-                                    
-                                    # Deep polishing with more steps
-                                    deep_steps = 2000
-                                    if node_num > 5000:
-                                        deep_steps = 10000
-                                    
-                                    env.run_heuristic(self.tabu_heuristic, parameters={"steps": deep_steps, "tabu_tenure": dynamic_tenure})
-                                    current_steps += 1
-                                    # Do NOT reset perturbation_count here, let it escalate if this fails to improve (which resets no_improve_steps in main loop)
-                                    # But wait, if we don't reset no_improve_steps, we will come back here immediately.
-                                    # We MUST reset no_improve_steps to give it time to prove itself.
-                                    # But we want to remember that we tried Tabu.
-                                    # The main loop resets perturbation_count ONLY if env.key_value > last_value.
-                                    # So if Tabu fails, perturbation_count will remain high.
-                                    no_improve_steps = 0 
-                                    continue
-                            
                             # Fallback: Very soft ruin (0.3% for signed graphs, 1% for others)
                             # Check graph type for adaptive ruin
                             has_negative_edges = any(
