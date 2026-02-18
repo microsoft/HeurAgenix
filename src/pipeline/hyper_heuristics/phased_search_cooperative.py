@@ -430,11 +430,17 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             
             dist = calc_dist(best_sol, distant_elite)
             
-            # [MODIFIED] Increased threshold from 50 to 200 to prevent in-breeding
-            if dist < 200: 
-                 # Too close, strictly force diversity via MASSIVE ruin (70% destruction)
-                 # This forces the search to abandon the current super-basin
-                 self._apply_breakout(env, "massive_ruin")
+            # [IMPROVED 2026-02-18] Dynamic Threshold based on Graph Size
+            # Hardcoding 'dist < 40' or '200' is bad because it ignores problem scale.
+            # Use 1.5% of total nodes as the "too close" threshold.
+            
+            # CRITICAL FIX: node_num is not in self.problem, it is in env.instance_data
+            node_num = env.instance_data["node_num"]
+            threshold = max(10, int(node_num * 0.015))
+
+            if dist < threshold: 
+                 self.stagnation_level += 2
+                 self._log(f"Active Relinking: Target too close (Dist={dist} < Threshold={threshold}). Accelerating Stagnation Level +2.")
                  return
 
             self._log(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
@@ -581,6 +587,19 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                          # self._log(f"Repairing with {repair_h[0].__name__}...")
                          # Cosm checks solution state and fills unselected_nodes
                          env.run_heuristic(repair_h[0])
+                
+                # [MODIFIED 2026-02-18] Add Noise Injection to prevent Loop
+                # Even after ruin, COSM might reconstruct the exact same solution.
+                # We force a small random perturbation (5%) to ensure we land in a NEW basin.
+                ratio_noise = 0.05
+                noise_nodes = random.sample(range(node_num), int(node_num * ratio_noise))
+                # Flip them
+                from src.problems.max_cut.components import BatchInsertNodeOperator
+                to_a_noise = [n for n in noise_nodes if n in env.current_solution.set_b]
+                to_b_noise = [n for n in noise_nodes if n in env.current_solution.set_a]
+                op_noise = BatchInsertNodeOperator(to_a_noise, to_b_noise)
+                env.run_operator(op_noise)
+                self._log(f"Noise Injection: Flipped {len(noise_nodes)} nodes ({ratio_noise:.1%}) to escape basin.")
                 
                 # Force update value
                 cur_val = env.get_key_value(env.current_solution)
