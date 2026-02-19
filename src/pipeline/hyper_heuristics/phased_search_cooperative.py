@@ -688,7 +688,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  self._log(f"Fallback Ruin: Random Flipped {len(nodes)} nodes.")
 
         elif strategy == "soft_restart":
-             self._log("!!! SOFT RESTART TRIGGERED !!! Abandoning current solution.")
+             self._log("... Soft Restart Triggered ... Abandoning current solution.")
              
              # Option A: Jump to a random Elite (preferably one we haven't visited lately)
              force_constructive = False
@@ -918,6 +918,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      env.best_known = current_best
                      env.dump_result(result_file=f"breakthrough.{current_best}.txt")
                      return True
+                elif abs(current_best - env.best_known) < 1e-6:
+                     self._log(f"~~~ MATCHED BEST KNOWN: {current_best} ~~~")
             else:
                 no_improve_steps += 1
                 
