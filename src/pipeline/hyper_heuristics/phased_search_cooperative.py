@@ -22,6 +22,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         self.breakout_heuristics = {}
         self._load_breakout_heuristics()
         self.stagnation_level = 0 # Track escalation level
+        self.consecutive_massive_ruins = 0 # Track how many times we tried massive ruin in vain
         
         # Distributed Cooperation Setup
         if worker_id is not None:
@@ -37,6 +38,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         self.last_upload_time = 0
         self.last_upload_value = 0
         self.last_sync_time = 0
+        self.last_restart_step = -1000 # Initialize with safe margin
+
         
         if self.shared_pool_dir:
             # Use the path provided explicitly by search_best.py.
@@ -188,60 +191,106 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 self._save_to_shared_pool(elite, is_keep_alive=True)
 
     def _add_to_local_pool(self, solution_obj, share=True):
+        # [DYNAMIC TABU STRATEGY 2026-02-19]
+        # Check against dynamic tabu list
+        # If this solution belongs to an "Exhausted Basin", we reject it to prevent re-infection.
+        
+        # We need to access the dynamic visited_peaks from the instance.
+        # Initialize if not present (defensive programming)
+        if not hasattr(self, "visited_peaks"):
+             self.visited_peaks = {}
+             
+        TABU_TOLERANCE = 5.0
+        MAX_VISITS_PER_PEAK = 3
+        
+        for peak_val, count in self.visited_peaks.items():
+            if count >= MAX_VISITS_PER_PEAK and abs(solution_obj.cut_value - peak_val) < TABU_TOLERANCE:
+                # This peak is officially exhausted/tabu. Reject entry.
+                # self._log(f"Rejected solution {solution_obj.cut_value} (Exhausted Basin)")
+                return
+
         # Add copy of solution to pool
         from src.problems.max_cut.components import Solution
         
         # Deep copy the sets
         new_sol = Solution(set(solution_obj.set_a), set(solution_obj.set_b), solution_obj.cut_value)
         
-        # Check uniqueness by value AND diversity (Hamming Distance)
-        # If we already have this EXACT solution (Hamming Dist = 0), skip it to prevent cloning
-        is_duplicate = False
+        # [IMPROVED DIVERSITY CONTROL 2026-02-19]
+        # Instead of just appending best values (which leads to homogenization),
+        # we enforce spatial diversity based on Hamming Distance.
         
-        # Safer node_num inferrence
-        # If we can't trust self.problem, we assume partition is complete
+        # Helper: Calculate Hamming Distance
+        def calc_dist_pool(s1, s2):
+            d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
+            d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
+            return min(d1, d2)
+
+        # Dynamic similarity threshold (e.g. 50 nodes or 1% of graph)
+        # If a solution is within this distance, it is considered "The Same Peak"
         node_num = len(new_sol.set_a) + len(new_sol.set_b)
+        similarity_threshold = max(20, int(node_num * 0.01))
+
+        # 1. Check if this solution belongs to an existing "Family" (Peak) in the pool
+        closest_neighbor = None
+        min_dist = float('inf')
+        closest_index = -1
         
-        for existing in self.elite_pool:
-            if existing.cut_value == new_sol.cut_value:
-                # Check for identical sets (Hamming dist = 0)
-                # MaxCut solution is defined by set_a/set_b partition.
-                # Need to check if new_sol.set_a == existing.set_a OR new_sol.set_a == existing.set_b (symmetric)
-                # Assuming sets are normalized or checking both
-                if new_sol.set_a == existing.set_a or new_sol.set_a == existing.set_b:
-                    is_duplicate = True
-                    break
+        for i, existing in enumerate(self.elite_pool):
+            d = calc_dist_pool(new_sol, existing)
+            if d < min_dist:
+                min_dist = d
+                closest_neighbor = existing
+                closest_index = i
         
-        if not is_duplicate:
-            if len(self.elite_pool) < 20:
-                self.elite_pool.append(new_sol)
+        # Policy A: If very close to an existing solution (Same Peak)
+        if closest_neighbor and min_dist < similarity_threshold:
+            # Only update if strictly better, or equal but newer?
+            # We want to keep the PEAK of this family.
+            if new_sol.cut_value > closest_neighbor.cut_value:
+                # Upgrade the existing slot to the better version
+                self.elite_pool[closest_index] = new_sol
+                if share: self._save_to_shared_pool(new_sol)
+                # self._log(f"Pool Updated: Improved existing peak (Dist={min_dist}, Val={new_sol.cut_value})")
+                return
             else:
-                # Replace random or worst?
-                # If new solution is better than worst, replace worst
-                # stored sorted? No.
-                min_val = min(s.cut_value for s in self.elite_pool)
-                if new_sol.cut_value > min_val:
-                    # Find index of min
+                # We already have a better or equal representative for this peak. REJECT.
+                # (Unless it is the BEST known global optimum, then we might want copies?)
+                # No, keep diversity strict.
+                return
+
+        # Policy B: It is a distinct solution (Distant from everyone else)
+        # Proceed with standard admission (replace worst if full)
+        if len(self.elite_pool) < 20:
+            self.elite_pool.append(new_sol)
+            if share: self._save_to_shared_pool(new_sol)
+        else:
+            # Find global worst
+            min_val = min(s.cut_value for s in self.elite_pool)
+            
+            # Admission criteria: Must be better than worst
+            if new_sol.cut_value > min_val:
+                # Replace the worst one
+                for i, s in enumerate(self.elite_pool):
+                    if s.cut_value == min_val:
+                        self.elite_pool[i] = new_sol
+                        break
+                if share: self._save_to_shared_pool(new_sol)
+            
+            # [Relaxed Admission for Diversity]
+            # If it is roughly equal to worst, but adds significant diversity?
+            # Current logic: rigid value based. Let's stick to rigid value for now to ensure quality ascending.
+            # But duplicate values are handled by Policy A above (if they are close).
+            # If they are same value but FAR away (parallel peaks), they will fall through to here.
+            elif new_sol.cut_value == min_val:
+                 # It's equal to worst. Since we passed Policy A, we know it's DISTANT.
+                 # So we have a tie in value, but new_sol offers new genes.
+                 # Replace the old worst with this new distinct one (Probabilistic swap)
+                if random.random() < 0.5:
                     for i, s in enumerate(self.elite_pool):
                         if s.cut_value == min_val:
                             self.elite_pool[i] = new_sol
+                            if share: self._save_to_shared_pool(new_sol)
                             break
-                else:
-                    # If same quality but different structure? Keep diversity
-                    # If value equals min_val, but it's different structure, replace one with prob
-                    # [FIX] If it's a Top Tier solution (equal to max/BK), accept it with high probability (1.0) to encourage "Parallel Peak" drift
-                    # Otherwise use low probability
-                    is_top_tier = (new_sol.cut_value == min_val and min_val == max(s.cut_value for s in self.elite_pool))
-                    accept_prob = 1.0 if is_top_tier else 0.3
-                    
-                    if new_sol.cut_value == min_val and random.random() < accept_prob:
-                         for i, s in enumerate(self.elite_pool):
-                            if s.cut_value == min_val:
-                                self.elite_pool[i] = new_sol
-                                break
-        
-            if share:
-                self._save_to_shared_pool(new_sol)
 
     def _calculate_consensus_flip(self, node_num, flip_ratio=0.1):
         """
@@ -436,11 +485,31 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             
             # CRITICAL FIX: node_num is not in self.problem, it is in env.instance_data
             node_num = env.instance_data["node_num"]
-            threshold = max(10, int(node_num * 0.015))
+            # [FIX 2026-02-19] Increased safety radius to 2.5% to prevent black hole collapse
+            threshold = max(10, int(node_num * 0.025))
 
             if dist < threshold: 
-                 self.stagnation_level += 2
-                 self._log(f"Active Relinking: Target too close (Dist={dist} < Threshold={threshold}). Accelerating Stagnation Level +2.")
+                 # [FIX 2026-02-19] Improved Robustness:
+                 # If targets are too close, standard Path Relinking is weak.
+                 # Instead of skipping or punishing, we force a "Micro-Perturbation" to break strict convergence.
+                 # This helps exploring the immediate neighborhood of the basin.
+                 self._log(f"Active Relinking: Targets too close (Dist={dist} < Threshold={threshold}). Triggering Micro-Perturbation.")
+                 
+                 # Load best solution
+                 env.current_solution = copy.deepcopy(best_sol)
+                 env.current_solution.cut_value = best_sol.cut_value
+                 
+                 # Perturb 2% of nodes (enough to move away ~60 nodes in 3000)
+                 # This is lighter than Level 1 Stagnation (Light Ruin), keeping us in the same "Peak Family".
+                 micro_flip_count = max(5, int(node_num * 0.02))
+                 
+                 nodes_to_flip = random.sample(range(node_num), micro_flip_count)
+                 from src.problems.max_cut.components import BatchInsertNodeOperator
+                 to_a = [n for n in nodes_to_flip if n in env.current_solution.set_b]
+                 to_b = [n for n in nodes_to_flip if n in env.current_solution.set_a]
+                 op = BatchInsertNodeOperator(to_a, to_b)
+                 env.run_operator(op)
+                 
                  return
 
             self._log(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
@@ -618,6 +687,67 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  
                  self._log(f"Fallback Ruin: Random Flipped {len(nodes)} nodes.")
 
+        elif strategy == "soft_restart":
+             self._log("!!! SOFT RESTART TRIGGERED !!! Abandoning current solution.")
+             
+             # Option A: Jump to a random Elite (preferably one we haven't visited lately)
+             force_constructive = False
+             
+             if self.elite_pool and len(self.elite_pool) > 5:
+                  # Pick a random elite, but favor those DIFFERENT from current
+                  # Calculate distance to current
+                  def calc_dist_r(s1, s2):
+                        d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
+                        d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
+                        return min(d1, d2)
+                  
+                  # Sort by distance descending (furthest first)
+                  sorted_elites = sorted(self.elite_pool, key=lambda s: calc_dist_r(s, env.current_solution), reverse=True)
+                  # Pick from top 5 furthest
+                  target = random.choice(sorted_elites[:5])
+                  
+                  # [CRITICAL FIX 2026-02-19] Check if the "furthest" elite is actually distant.
+                  # If the pool has collapsed (Homogenized), the furthest elite might be just 10 flips away.
+                  # In that case, a Soft Restart is useless. We must force a HARD RESTART (Constructive).
+                  dist = calc_dist_r(target, env.current_solution)
+                  min_restart_dist = max(50, int(node_num * 0.05)) # e.g. 150 nodes for 3000 node graph
+                  
+                  if dist < min_restart_dist:
+                       self._log(f"Soft Restart Aborted: Pool Homogenized (Max Dist={dist} < {min_restart_dist}). Forcing Hard Constructive Restart.")
+                       force_constructive = True
+                  else:
+                       from src.problems.max_cut.components import Solution
+                       env.current_solution = Solution(set(target.set_a), set(target.set_b), target.cut_value)
+                       self._log(f"Restarted from Distant Elite (Val: {target.cut_value}, Dist: {dist})")
+             
+             else:
+                  force_constructive = True
+                  
+             if force_constructive:
+                  # Option B: Complete Noise Restart (if pool is empty or small OR homogenized)
+                  # Or Constructive Restart
+                  self._log("Restarting with Constructive Heuristic...")
+                  env.reset(output_dir=env.output_dir)
+                  if self.constructive_heuristics:
+                      h = random.choice(self.constructive_heuristics)
+                      env.run_heuristic(h)
+                  else:
+                      # Total random
+                      nodes = list(range(node_num))
+                      random.shuffle(nodes)
+                      mid = node_num // 2
+                      env.current_solution = Solution(set(nodes[:mid]), set(nodes[mid:]), 0)
+                      env.current_solution.cut_value = env.get_key_value(env.current_solution)
+
+                  # [FIX 2026-02-19] Set Immunity Timer
+                  self.last_restart_step = self.current_run_steps
+                  self._log(f"Immunity Activated for 500 steps (Restart Step: {self.current_run_steps})")
+
+
+             # Sync state
+             env.problem_state = env.get_problem_state()
+             env.current_solution.cut_value = env.get_key_value(env.current_solution)
+
 
     def run(self, env: BaseEnv) -> bool:
         # [REFACTORED for Cooperative Search]
@@ -713,13 +843,41 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         self._update_elite_pool(env.current_solution)
         
         no_improve_steps = 0
-        total_steps = 0
+        # CHANGE: Use instance variable to track steps for coordination with restart logic
+        self.current_run_steps = 0
         
         self._log(f"Starting Breakout Search from {current_best}...")
 
+        # [DYNAMIC TABU LIST]
+        # Keep track of local optima we have visited frequently.
+        # Format: {cut_value: visit_count}
+        self.visited_peaks = {}
+        TABU_TOLERANCE = 5.0 # Solutions within this range are considered the "same" peak
+        MAX_VISITS_PER_PEAK = 3 # How many times can we rediscover the same peak before banning it?
+
         while env.continue_run:
-            total_steps += 1
+            self.current_run_steps += 1
             
+            # [DYNAMIC ANTI-GRAVITY SHIELD]
+            # Instead of hardcoding, we check if the current value has been "exhausted".
+            current_val = env.key_value
+            is_tabu = False
+            
+            # Check if we are in a Forbidden Peak
+            for peak_val, count in self.visited_peaks.items():
+                if count >= MAX_VISITS_PER_PEAK and abs(current_val - peak_val) < TABU_TOLERANCE:
+                     is_tabu = True
+                     # Only log sparingly
+                     if self.current_run_steps % 100 == 0:
+                         self._log(f"In Exhausted Basin ({peak_val}). Triggering Evacuation.")
+                     break
+            
+            if is_tabu:
+                # Force massive ruin (Supernova) to escape processing this dead zone
+                self._apply_breakout(env, "supernova_ruin")
+                # Don't reset steps, we want to keep pressure high until we leave
+                continue
+
             # --- Phase A: Repair / Improve ---
             # Try to improve current solution (which might be ruined)
             improved = self._run_improvement_phase(env)
@@ -728,10 +886,29 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             # 1. Update Global/Local Best
             if env.key_value > current_best:
                 current_best = env.key_value
+                
+                # [DYNAMIC TABU LIST UPDATE]
+                # We found a new peak. Record it.
+                # Linear scan to see if it belongs to an existing family
+                found_family = False
+                for existing_val in list(self.visited_peaks.keys()): # List copy as we might modify
+                    if abs(current_best - existing_val) < TABU_TOLERANCE:
+                        # Update the peak definition to the better value
+                        count = self.visited_peaks[existing_val]
+                        del self.visited_peaks[existing_val]
+                        self.visited_peaks[current_best] = count + 1
+                        found_family = True
+                        break
+                
+                if not found_family:
+                    # New distinct peak
+                    self.visited_peaks[current_best] = 1
+                
                 no_improve_steps = 0
                 self.stagnation_level = 0
+                self.consecutive_massive_ruins = 0 # Reset panic counter on improvement
                 self._update_elite_pool(env.current_solution)
-                self._log(f"Step:{total_steps} NEW LOCAL BEST: {current_best}")
+                self._log(f"Step:{self.current_run_steps} NEW LOCAL BEST: {current_best}")
                 
                 # Always dump intermediate improvements as TXT for easy reuse
                 env.dump_result(result_file=f"intermediate_result.{current_best}.txt")
@@ -749,7 +926,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 # we add it to the pool to provide diversity for path relinking.
                 # Don't add every step, maybe every 10 steps to avoid flooding with identical copies
                 is_best_known = env.key_value >= env.best_known
-                if is_best_known or (env.key_value >= env.best_known * 0.98 and total_steps % 10 == 0):
+                if is_best_known or (env.key_value >= env.best_known * 0.98 and self.current_run_steps % 10 == 0):
                     self._update_elite_pool(env.current_solution)
 
             # --- Phase C: Breakout / Ruin Strategies ---
@@ -758,61 +935,68 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             # If we are far (after ruin), be impatient.
             
             # Adaptive Patience based on problem size
-            # For 1000 nodes, 50-100 is okay. For 3000 nodes, we need 200-300.
-            patience = max(50, int(env.instance_data["node_num"] / 10))
+            # [OPTIMIZED 2026-02-19] Reduced patience to fail fast.
+            patience = max(30, int(env.instance_data["node_num"] / 20))
             
             if no_improve_steps > patience:
                 # Escalation using stagnation_level
                 self.stagnation_level += 1
                 
-                strategy = "light_ruin"
+                # [OPTIMIZED HIERARCHY]
+                # Removed ineffective Level 1/2 (Light/Medium Ruin) which just wasted time.
+                # Direct escalation to structural changes.
                 
-                # Check if we have a "Good Local Optima" that is worth relinking before destroying
-                # Condition: High quality (>99.5% BK) AND Diversity (>200 distance) exists in pool
-                is_high_quality_stagnation = env.key_value > env.best_known * 0.995
+                strategy = "heavy_ruin" # Default start point
                 
-                if self.stagnation_level >= 5:
-                     # Ultimate Weapon: Massive Ruin (70%)
-                     # Replaces Supernova because 10-20% was not enough for sg3dl149000
+                if self.stagnation_level >= 3:
+                     # Level 3: SOFT RESTART (The "Give Up" Strategy)
+                     # Triggered much faster now.
+                     strategy = "soft_restart"
+                     self.stagnation_level = 0
+                     self.consecutive_massive_ruins = 0 # Reset
+                     
+                elif self.stagnation_level >= 2:
+                     # Level 2: Massive Reconstructive Ruin
                      strategy = "massive_ruin"
-                     # Reset stagnation completely to allow reconstruction from the ashes
-                     self.stagnation_level = 0 
-                elif self.stagnation_level >= 4:
-                     # Diversity Injection: Try jumping to a different peak or heavy ruin
-                     if random.random() < 0.4:
+                     
+                elif self.stagnation_level >= 1:
+                     # Level 1: Diversification / Path Relinking
+                     # Try to jump to a peer or link to best.
+                     if len(self.elite_pool) > 2 and random.random() < 0.6:
+                         strategy = "path_relinking_to_best"
+                     elif random.random() < 0.5:
                          strategy = "jump_to_secondary_peak"
                      else:
-                         strategy = "path_relinking_to_best"
-                elif self.stagnation_level >= 3:
-                     # If we are high quality, TRY HARD to link current state to Best Known
-                     if is_high_quality_stagnation and "path_relinking" in self.breakout_heuristics:
-                         strategy = "path_relinking_to_best"
-                     else:
-                         strategy = "heavy_ruin"
-                elif self.stagnation_level >= 2:
-                     strategy = "medium_ruin"
+                         strategy = "heavy_ruin" # 15% Cluster Ruin
                 
-                self._log(f"Step:{total_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
+                self._log(f"Step:{self.current_run_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
                 self._apply_breakout(env, strategy)
                 
                 # Reset counter to give the new candidate a chance
                 no_improve_steps = 0
                 
-            # Log periodically
-            if total_steps % 100 == 0:
-                 self._log(f"Step:{total_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known}) Stagnation:{no_improve_steps}")
+            # [NEW] Periodic Active Path Relinking to bridge peaks
+            # Increase frequency from 300 to 100 to force more hybridization
+            if self.current_run_steps % 100 == 0:
+                 self._log(f"Step:{self.current_run_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known}) Stagnation:{no_improve_steps}")
             
             # [NEW] Periodic Active Path Relinking to bridge peaks
             # Increase frequency from 300 to 100 to force more hybridization
-            if total_steps % 100 <= 1 and len(self.elite_pool) >= 2:
-                 self._apply_breakout(env, "active_pool_relinking")
+            # [FIX 2026-02-19] IMMUNITY PERIOD: Do NOT relink if recently restarted (within 500 steps).
+            # This allows new constructive solutions to mature without being pulled back to the black hole.
+            if self.current_run_steps % 100 <= 1 and len(self.elite_pool) >= 2:
+                 if (self.current_run_steps - self.last_restart_step) > 500:
+                     self._apply_breakout(env, "active_pool_relinking")
+                 else:
+                     pass # Immunized
+                 
                  # Code Check Fix: Do NOT reset no_improve_steps here. 
                  # We want the main stagnation logic (Heavy Ruin/Supernova) to still trigger if this fails.
                  # no_improve_steps = 0 
                  continue
 
             # Sync Distributed Elite Pool periodically
-            if total_steps % 50 == 0:
+            if self.current_run_steps % 50 == 0:
                 self._sync_shared_pool()
                 
                 # Check if we are currently in a "Recovery/Exploration" phase (high no_improve_steps)
