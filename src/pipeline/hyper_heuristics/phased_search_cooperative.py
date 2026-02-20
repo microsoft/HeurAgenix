@@ -504,7 +504,6 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  micro_flip_count = max(5, int(node_num * 0.02))
                  
                  nodes_to_flip = random.sample(range(node_num), micro_flip_count)
-                 from src.problems.max_cut.components import BatchInsertNodeOperator
                  to_a = [n for n in nodes_to_flip if n in env.current_solution.set_b]
                  to_b = [n for n in nodes_to_flip if n in env.current_solution.set_a]
                  op = BatchInsertNodeOperator(to_a, to_b)
@@ -663,7 +662,6 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 ratio_noise = 0.05
                 noise_nodes = random.sample(range(node_num), int(node_num * ratio_noise))
                 # Flip them
-                from src.problems.max_cut.components import BatchInsertNodeOperator
                 to_a_noise = [n for n in noise_nodes if n in env.current_solution.set_b]
                 to_b_noise = [n for n in noise_nodes if n in env.current_solution.set_a]
                 op_noise = BatchInsertNodeOperator(to_a_noise, to_b_noise)
@@ -679,7 +677,6 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                  # Fallback: Random Flip 40%
                  nodes = random.sample(range(node_num), int(node_num * 0.40))
                  
-                 from src.problems.max_cut.components import BatchInsertNodeOperator
                  to_a = [n for n in nodes if n in env.current_solution.set_b]
                  to_b = [n for n in nodes if n in env.current_solution.set_a]
                  op = BatchInsertNodeOperator(to_a, to_b)
@@ -948,8 +945,9 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 # Removed ineffective Level 1/2 (Light/Medium Ruin) which just wasted time.
                 # Direct escalation to structural changes.
                 
-                strategy = "heavy_ruin" # Default start point
-                
+                # [Printing Fix] Print BEFORE resetting level, so we see "Level 3" in logs
+                self._log(f"Step:{self.current_run_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
+
                 if self.stagnation_level >= 3:
                      # Level 3: SOFT RESTART (The "Give Up" Strategy)
                      # Triggered much faster now.
@@ -971,7 +969,6 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      else:
                          strategy = "heavy_ruin" # 15% Cluster Ruin
                 
-                self._log(f"Step:{self.current_run_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
                 self._apply_breakout(env, strategy)
                 
                 # Reset counter to give the new candidate a chance
@@ -1006,6 +1003,15 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 # Don't kill promising young solutions too early.
                 # Only apply catch-up if we have been stagnant for a while OR if the current solution is truly abysmal for too long.
                 
+                # [FIX 2026-02-20] Dynamic Immunity for "Rebel" Workers (Soft Restarted)
+                # If a worker recently restarted, it enters "Exploration Mode".
+                # We grant it a generous grace period (e.g. 2 * node_num steps or static 2000) to find a NEW peak.
+                # During this time, it is immune to "Catch-up" (being pulled back to the old peak).
+                
+                node_num = env.instance_data["node_num"]
+                immunity_period = max(2000, node_num) # Adaptive: At least 2000, or 1x node count
+                is_immune = (self.current_run_steps - self.last_restart_step) < immunity_period
+
                 if self.elite_pool and no_improve_steps > 300:
                     pool_best = max(self.elite_pool, key=lambda s: s.cut_value)
                     
@@ -1014,7 +1020,8 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     # Relaxed to 0.90 to allow deep exploration/ruin strategies to work.
                     catch_up_threshold = 0.90 
                     
-                    if env.key_value < pool_best.cut_value * catch_up_threshold:
+                    # Logically: If NOT immune AND score is too low -> Catch up
+                    if not is_immune and env.key_value < pool_best.cut_value * catch_up_threshold:
                         from src.problems.max_cut.components import Solution
                         self._log(f"AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value} (Threshold: {catch_up_threshold})...")
                         
@@ -1024,5 +1031,9 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                         
                         current_best = env.key_value
                         no_improve_steps = 0
+                    elif is_immune and env.key_value < pool_best.cut_value * catch_up_threshold:
+                        # Log sparsely
+                        if self.current_run_steps % 500 == 0:
+                             self._log(f"Catch-up IMMUNITY: Worker exploring ({self.current_run_steps - self.last_restart_step}/{immunity_period} steps). Val={env.key_value}")
 
         return False
