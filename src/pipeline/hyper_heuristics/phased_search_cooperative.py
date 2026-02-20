@@ -215,7 +215,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         # Deep copy the sets
         new_sol = Solution(set(solution_obj.set_a), set(solution_obj.set_b), solution_obj.cut_value)
         
-        # [IMPROVED DIVERSITY CONTROL 2026-02-19]
+        # [IMPROVED DIVERSITY CONTROL 2026-02-21]
         # Instead of just appending best values (which leads to homogenization),
         # we enforce spatial diversity based on Hamming Distance.
         
@@ -225,10 +225,17 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
             return min(d1, d2)
 
-        # Dynamic similarity threshold (e.g. 50 nodes or 1% of graph)
-        # If a solution is within this distance, it is considered "The Same Peak"
         node_num = len(new_sol.set_a) + len(new_sol.set_b)
-        similarity_threshold = max(20, int(node_num * 0.01))
+
+        # ------------------------------------------------------------------
+        # Strategy 1: Strict Spatial Exclusion (Prevent Clones)
+        # ------------------------------------------------------------------
+        # We define a "Similarity Radius". Any solution within this radius
+        # is considered to belong to the same "Peak".
+        # Dynamic threshold: e.g. 5% of nodes. 
+        # For N=2000, threshold=100. For N=800, threshold=40.
+        SIMILARITY_RATIO = 0.05
+        similarity_threshold = max(20, int(node_num * SIMILARITY_RATIO))
 
         # 1. Check if this solution belongs to an existing "Family" (Peak) in the pool
         closest_neighbor = None
@@ -244,7 +251,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         
         # Policy A: If very close to an existing solution (Same Peak)
         if closest_neighbor and min_dist < similarity_threshold:
-            # Only update if strictly better, or equal but newer?
+            # Only update if strictly better.
             # We want to keep the PEAK of this family.
             if new_sol.cut_value > closest_neighbor.cut_value:
                 # Upgrade the existing slot to the better version
@@ -254,42 +261,71 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 return
             else:
                 # We already have a better or equal representative for this peak. REJECT.
-                # (Unless it is the BEST known global optimum, then we might want copies?)
-                # No, keep diversity strict.
+                # Even if it's equal, we reject to avoid churn without gain.
                 return
 
+        # ------------------------------------------------------------------
+        # Strategy 2: Diversity Injection (Manage Pool Health)
+        # ------------------------------------------------------------------ 
         # Policy B: It is a distinct solution (Distant from everyone else)
-        # Proceed with standard admission (replace worst if full)
+        
+        # If pool is not full, just add it.
         if len(self.elite_pool) < 20:
             self.elite_pool.append(new_sol)
             if share: self._save_to_shared_pool(new_sol)
+            return
+
+        # If pool is full, we need to decide who to evict.
+        # Standard logic: Check against the worst solution.
+        min_val = min(s.cut_value for s in self.elite_pool)
+        
+        # Case 1: Better than worst (Standard quality improvement)
+        if new_sol.cut_value > min_val:
+            # Replace the worst one
+            for i, s in enumerate(self.elite_pool):
+                if s.cut_value == min_val:
+                    self.elite_pool[i] = new_sol
+                    break
+            if share: self._save_to_shared_pool(new_sol)
+            return
+        
+        # Case 2: Equal to worst
+        elif new_sol.cut_value == min_val:
+             # Since we passed Policy A, we know it is DISTANT from everyone (including the worst one).
+             # So we have a tie in value, but new_sol offers new genes.
+             # ALWAYS Replace the old worst with this new distinct one to improve diversity.
+            for i, s in enumerate(self.elite_pool):
+                if s.cut_value == min_val:
+                    self.elite_pool[i] = new_sol
+                    if share: self._save_to_shared_pool(new_sol)
+                    break
+            return
+
+        # Case 3: Worse than worst (Refuse, unless it is a "Stranger")
         else:
-            # Find global worst
-            min_val = min(s.cut_value for s in self.elite_pool)
-            
-            # Admission criteria: Must be better than worst
-            if new_sol.cut_value > min_val:
-                # Replace the worst one
-                for i, s in enumerate(self.elite_pool):
-                    if s.cut_value == min_val:
-                        self.elite_pool[i] = new_sol
-                        break
-                if share: self._save_to_shared_pool(new_sol)
-            
-            # [Relaxed Admission for Diversity]
-            # If it is roughly equal to worst, but adds significant diversity?
-            # Current logic: rigid value based. Let's stick to rigid value for now to ensure quality ascending.
-            # But duplicate values are handled by Policy A above (if they are close).
-            # If they are same value but FAR away (parallel peaks), they will fall through to here.
-            elif new_sol.cut_value == min_val:
-                 # It's equal to worst. Since we passed Policy A, we know it's DISTANT.
-                 # So we have a tie in value, but new_sol offers new genes.
-                 # Replace the old worst with this new distinct one (Probabilistic swap)
-                if random.random() < 0.5:
-                    for i, s in enumerate(self.elite_pool):
+             # Policy C: "Stranger" Admission
+             # If a solution is significantly different from the ENTIRE pool, 
+             # we might admit it even if it's poor, to break stagnation.
+             
+             # Dynamic threshold for "Stranger": e.g. 15% of nodes
+             STRANGER_RATIO = 0.15
+             stranger_threshold = max(30, int(node_num * STRANGER_RATIO))
+             
+             if min_dist > stranger_threshold:
+                 # It is a stranger! 
+                 # We want to add it, but we must evict someone.
+                 # To maintain average quality, we should evict the worst logic.
+                 # But we just established new_sol < min_val. So we are lowering the bar.
+                 # We do this probabilistically to avoid flooding.
+                 
+                 if random.random() < 0.2:
+                     # Find the worst elite to replace
+                     # (We could also replace the 'most redundant' elite, but that's expensive to compute)
+                     for i, s in enumerate(self.elite_pool):
                         if s.cut_value == min_val:
                             self.elite_pool[i] = new_sol
                             if share: self._save_to_shared_pool(new_sol)
+                            # self._log(f"Diversity Injection: Accepted DISTANT poor solution (Val={new_sol.cut_value}, Dist={min_dist})")
                             break
 
     def _calculate_consensus_flip(self, node_num, flip_ratio=0.1):
@@ -723,13 +759,34 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
              if force_constructive:
                   # Option B: Complete Noise Restart (if pool is empty or small OR homogenized)
                   # Or Constructive Restart
-                  self._log("Restarting with Constructive Heuristic...")
+                  self._log("Restarting with Constructive Heuristic (High Quality)...")
                   env.reset(output_dir=env.output_dir)
-                  if self.constructive_heuristics:
-                      h = random.choice(self.constructive_heuristics)
+                  
+                  # [SYNC WITH COLD START] Use best constructive heuristics to reach High Basin
+                  construction_steps = 0
+                  while not env.is_complete_solution and construction_steps < 1000:
+                      if not self.constructive_heuristics:
+                          break
+                      
+                      # Strict Priority: Detailed > Quick > Mean Field
+                      if construction_steps == 0:
+                           detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
+                           other_cosm = [h for h in self.constructive_heuristics if ("cosm" in h.__name__ or "mean_field" in h.__name__) and "detailed" not in h.__name__]
+                           
+                           if detailed_cosm:
+                               h = detailed_cosm[0] # Always pick detailed if available
+                           elif other_cosm:
+                               h = random.choice(other_cosm)
+                           else:
+                               h = random.choice(self.constructive_heuristics)
+                      else:
+                          h = random.choice(self.constructive_heuristics)
+                          
                       env.run_heuristic(h)
-                  else:
-                      # Total random
+                      construction_steps += 1
+                  
+                  if not env.is_complete_solution:
+                      # Total random fallback if heuristics fail
                       nodes = list(range(node_num))
                       random.shuffle(nodes)
                       mid = node_num // 2
@@ -974,7 +1031,19 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     self.stagnation_level = 0
                     self.consecutive_massive_ruins = 0
 
+                prev_val = env.key_value
                 self._apply_breakout(env, strategy)
+                
+                # [BUG FIX 2026-02-21] Detect Hard Restart and Reset Baseline
+                # If breakout resulted in a massive value drop (e.g. > 10%), it means we restarted.
+                # We must reset current_best to avoid immediate stagnation detection.
+                if env.key_value < current_best * 0.90:
+                    self._log(f"Hard Restart Detected: Resetting Local Baseline ({current_best} -> {env.key_value})")
+                    current_best = env.key_value
+                    # Also reset visited stats to allow re-visiting peaks? No, keep tabu.
+                    no_improve_steps = 0
+                    # Reset Stagnation Level again to be safe
+                    self.stagnation_level = 0
                 
                 # Reset counter to give the new candidate a chance
                 no_improve_steps = 0
