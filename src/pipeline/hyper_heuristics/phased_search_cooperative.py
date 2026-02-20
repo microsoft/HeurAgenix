@@ -934,8 +934,9 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
             # If we are far (after ruin), be impatient.
             
             # Adaptive Patience based on problem size
-            # [OPTIMIZED 2026-02-19] Reduced patience to fail fast.
-            patience = max(30, int(env.instance_data["node_num"] / 20))
+            # [OPTIMIZED 2026-02-20] Reduced patience to fail fast (Hard Cap: 100).
+            # Old: max(30, int(env.instance_data["node_num"] / 20)) -> Too slow for large graphs
+            patience = min(100, max(20, int(env.instance_data["node_num"] / 50)))
             
             if no_improve_steps > patience:
                 # Escalation using stagnation_level
@@ -945,15 +946,13 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 # Removed ineffective Level 1/2 (Light/Medium Ruin) which just wasted time.
                 # Direct escalation to structural changes.
                 
-                # [Printing Fix] Print BEFORE resetting level, so we see "Level 3" in logs
-                self._log(f"Step:{self.current_run_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
-
+                strategy = "heavy_ruin" # Default
+                
                 if self.stagnation_level >= 3:
-                     # Level 3: SOFT RESTART (The "Give Up" Strategy)
-                     # Triggered much faster now.
+                     # Level 3: SOFT RESTART (With Partial Backbone Preservation)
+                     # For large graphs, pure random restart is too destructive. 
+                     # We keep ~20% of the backbone or use elite crossover if possible.
                      strategy = "soft_restart"
-                     self.stagnation_level = 0
-                     self.consecutive_massive_ruins = 0 # Reset
                      
                 elif self.stagnation_level >= 2:
                      # Level 2: Massive Reconstructive Ruin
@@ -961,14 +960,20 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      
                 elif self.stagnation_level >= 1:
                      # Level 1: Diversification / Path Relinking
-                     # Try to jump to a peer or link to best.
                      if len(self.elite_pool) > 2 and random.random() < 0.6:
                          strategy = "path_relinking_to_best"
                      elif random.random() < 0.5:
                          strategy = "jump_to_secondary_peak"
                      else:
-                         strategy = "heavy_ruin" # 15% Cluster Ruin
+                         strategy = "heavy_ruin" 
+
+                # [Printing Fix] Log BEFORE action and BEFORE resetting level
+                self._log(f"Step:{self.current_run_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
                 
+                if strategy == "soft_restart":
+                    self.stagnation_level = 0
+                    self.consecutive_massive_ruins = 0
+
                 self._apply_breakout(env, strategy)
                 
                 # Reset counter to give the new candidate a chance
