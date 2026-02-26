@@ -1,5 +1,6 @@
 import os
 import random
+import math
 import pickle
 import glob
 import uuid
@@ -986,37 +987,60 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                     self._update_elite_pool(env.current_solution)
 
             # --- Phase C: Breakout / Ruin Strategies ---
-            # Adaptive Patience: 
-            # If we are close to best known, be more patient with small moves.
-            # If we are far (after ruin), be impatient.
-            
             # Adaptive Patience based on problem size
-            # [OPTIMIZED 2026-02-20] Reduced patience to fail fast (Hard Cap: 100).
-            # Old: max(30, int(env.instance_data["node_num"] / 20)) -> Too slow for large graphs
-            patience = min(100, max(20, int(env.instance_data["node_num"] / 50)))
+            # Large instances (e.g. 100k nodes) need significant time to explore deep basins.
+            node_num = env.instance_data.get("node_num", 1000)
+            base_patience = max(500, int(node_num / 10)) # e.g. 100k nodes -> 10,000 steps check interval? No, keep it responsive.
+            # Updated 2026-02-24: Use a balanced patience. 
+            # For 100k nodes, we check every ~2000 steps.
+            patience = min(2000, max(200, int(node_num / 50)))
             
             if no_improve_steps > patience:
-                # Escalation using stagnation_level
-                self.stagnation_level += 1
+                # Instead of immediate level jump, we use a "Retry Budget" based on graph size.
+                # Complex graphs need more retries at each intensity level before giving up.
                 
-                # [OPTIMIZED HIERARCHY]
-                # Removed ineffective Level 1/2 (Light/Medium Ruin) which just wasted time.
-                # Direct escalation to structural changes.
+                # Dynamic Retry Thresholds calculated from node_num
+                # Small graph (800): ~4 retries. Large graph (100k): ~20 retries allowed per phase.
+                # Logic: Don't give up strictly on a strategy until we've tried it enough times relative to problem complexity.
+                max_retries_per_phase = max(3, int(math.log10(node_num) * 2)) 
                 
-                strategy = "heavy_ruin" # Default
+                # Increment internal counter for current phase
+                if not hasattr(self, 'phase_retries'):
+                    self.phase_retries = 0
                 
-                if self.stagnation_level >= 3:
-                     # Level 3: SOFT RESTART (With Partial Backbone Preservation)
-                     # For large graphs, pure random restart is too destructive. 
-                     # We keep ~20% of the backbone or use elite crossover if possible.
+                self.phase_retries += 1
+                
+                # Map simple 4 levels (1, 2, 3, 4) based on how many retries we've exhausted
+                # We stay in strict 4 phases. Escalation happens only when phase_retries exceeds budget.
+                
+                if self.stagnation_level == 0:
+                    self.stagnation_level = 1 # Start stagnation handling
+                    self.phase_retries = 0
+                elif self.phase_retries > max_retries_per_phase:
+                     # Budget exhausted for current level, escalate!
+                     self.stagnation_level += 1
+                     self.phase_retries = 0 # Reset for new level
+                     self._log(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted {max_retries_per_phase} retries)")
+
+                # [OPTIMIZED HIERARCHY 2026-02-24: 4-Level Logic]
+                strategy = "heavy_ruin" # Fallback
+                
+                if self.stagnation_level >= 4:
+                     # Level 4: Soft Restart (The "Nuclear" Option)
                      strategy = "soft_restart"
+                
+                elif self.stagnation_level == 3:
+                     # Level 3: Supernova Ruin (Anti-Consensus)
+                     # Persistent effort to break comfortable consensus
+                     strategy = "supernova_ruin"
                      
-                elif self.stagnation_level >= 2:
+                elif self.stagnation_level == 2:
                      # Level 2: Massive Reconstructive Ruin
                      strategy = "massive_ruin"
                      
-                elif self.stagnation_level >= 1:
+                elif self.stagnation_level == 1:
                      # Level 1: Diversification / Path Relinking
+                     # Try to jump to other known elites or just shake slightly
                      if len(self.elite_pool) > 2 and random.random() < 0.6:
                          strategy = "path_relinking_to_best"
                      elif random.random() < 0.5:
@@ -1024,11 +1048,11 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                      else:
                          strategy = "heavy_ruin" 
 
-                # [Printing Fix] Log BEFORE action and BEFORE resetting level
-                self._log(f"Step:{self.current_run_steps} Stagnation (Level {self.stagnation_level}). Qual={env.key_value:.0f} Triggering {strategy}...")
+                self._log(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
                 
                 if strategy == "soft_restart":
                     self.stagnation_level = 0
+                    self.phase_retries = 0
                     self.consecutive_massive_ruins = 0
 
                 prev_val = env.key_value
