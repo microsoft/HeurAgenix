@@ -103,9 +103,7 @@ def run_once(
 
     env = Env(data_name=data_name)
 
-    output_dir = os.path.join(experiment_dir, str(run_id))
-
-    env.reset(output_dir=output_dir)
+    env.reset(output_dir=os.path.join(experiment_dir, "result"))
     
     log_system_status(f"Worker:{run_id} Start")
     
@@ -160,7 +158,6 @@ def run_once(
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
         
     algorithm.run(env)
-    return 
 
 def main(
         data_name: str,
@@ -182,10 +179,7 @@ def main(
     remaining = list(range(num_runs))
     finished_ids = []
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
-    experiment_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # Old structure: output/max_cut/search_best_result.{method}/{data_name}/{experiment_name}
-    # New structure: output/max_cut/{data_name}/search_best_result.{method}/{experiment_name}
-    experiment_dir = os.path.join(base_output_dir, "max_cut", data_name, f"search_best_result.{method}", experiment_name)
+    experiment_dir = os.path.join(base_output_dir, "max_cut", data_name)
 
     # Map cold_start to legacy load_ratio for display/logic
     load_ratio = 0.0 if cold_start else 1.0
@@ -193,6 +187,16 @@ def main(
     print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
     print(f"Cooperative Search: Top-K={top_k}, Cold Start={cold_start} (Load Ratio={load_ratio})")
     
+    # [INFO] Print Problem Statistics ONCE at Startup
+    temp_env = Env(data_name=data_name)
+    node_num = temp_env.instance_data.get("node_num", "Unknown")
+    bk = temp_env.best_known
+    print(f"============================================================")
+    print(f"  Target Data: {data_name}")
+    print(f"  Nodes: {node_num}")
+    print(f"  Best Known (BK): {bk}")
+    print(f"============================================================", flush=True)
+
     initial_solution_paths = []
     if method == "cooperative":
         # Auto-configure shared pool directory for cooperative methods (communication channel)

@@ -965,16 +965,39 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                 self._update_elite_pool(env.current_solution)
                 self._log(f"Step:{self.current_run_steps} NEW LOCAL BEST: {current_best}")
                 
-                # Always dump intermediate improvements as TXT for easy reuse
-                env.dump_result(result_file=f"intermediate_result.{current_best}.txt")
 
                 if current_best > env.best_known:
-                     self._log(f"!!! BREAKTHROUGH: {current_best} > {env.best_known} !!!")
-                     env.best_known = current_best
-                     env.dump_result(result_file=f"breakthrough.{current_best}.txt")
-                     return True
+                    self._log(f"!!! BREAKTHROUGH: {current_best} > {env.best_known} !!!")
+                    env.best_known = current_best
+                    
+                    # [SAFE SAVE STRATEGY] Only save if strictly better than anything on disk
+                    saved_best = 0.0
+                    if os.path.exists(env.output_dir):
+                        for f in os.listdir(env.output_dir):
+                            if f.startswith("breakthrough_") or f.startswith("match_"):
+                                try:
+                                    # Format: breakthrough_..._SCORE.txt
+                                    part = f.rsplit("_", 1)[-1] 
+                                    score = float(part.replace(".txt", ""))
+                                    if score > saved_best:
+                                        saved_best = score
+                                except: pass
+                    
+                    if current_best > saved_best:
+                        env.dump_result(result_file=f"breakthrough_from_worker_{self.worker_id}_{current_best}.txt")
+
                 elif abs(current_best - env.best_known) < 1e-6:
                      self._log(f"~~~ MATCHED BEST KNOWN: {current_best} ~~~")
+                     # Only save Match if no results exist yet
+                     has_records = False
+                     if os.path.exists(env.output_dir):
+                         for f in os.listdir(env.output_dir):
+                             if f.startswith("breakthrough_") or f.startswith("match_"):
+                                 has_records = True
+                                 break
+                     
+                     if not has_records:
+                        env.dump_result(result_file=f"match_best_known_from_worker_{self.worker_id}_{current_best}.txt")
             else:
                 no_improve_steps += 1
                 
@@ -1134,4 +1157,3 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                         if self.current_run_steps % 500 == 0:
                              self._log(f"Catch-up IMMUNITY: Worker exploring ({self.current_run_steps - self.last_restart_step}/{immunity_period} steps). Val={env.key_value}")
 
-        return False
