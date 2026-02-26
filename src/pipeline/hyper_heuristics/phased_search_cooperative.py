@@ -7,75 +7,145 @@ import uuid
 import time
 import hashlib
 import copy
-from datetime import datetime, timedelta
+from datetime import datetime
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
-from src.pipeline.hyper_heuristics.phased_search_adaptive_polishing import PhasedSearchAdaptivePolishingHyperHeuristic
-from src.problems.max_cut.components import BatchInsertNodeOperator, BatchDeleteOperator, Solution
+from src.problems.max_cut.components import BatchInsertNodeOperator
 
-class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHeuristic):
-    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, top_k=10, load_ratio=1.0, fail_fast_threshold=0.02, initial_solution_paths=None, worker_id=None):
-        # Force load_ratio to 1.0 to ensure we always try to load
+class PhasedSearchCooperativeHyperHeuristic:
+    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None):
+        self.heuristic_pool_names = heuristic_pool
+        self.logger = logger
+        self.problem = problem
+        self.worker_id = str(worker_id)
         self.shared_pool_dir = shared_pool_dir
-        super().__init__(heuristic_pool, problem, shared_pool_dir, top_k, 1.0, fail_fast_threshold)
+        
+        # Initialize heuristic lists
+        self.constructive_heuristics = []
+        self.improvement_heuristics = []
+        self.ruin_heuristics = []
+        self.breakout_heuristics = {}  # Keep the dictionary for breakout mapping
+        
+        # Load and Classify Heuristics
+        self._classify_heuristics()
         
         self.elite_pool = []
-        self.breakout_heuristics = {}
-        self._load_breakout_heuristics()
-        self.stagnation_level = 0 # Track escalation level
-        self.consecutive_massive_ruins = 0 # Track how many times we tried massive ruin in vain
+        self.stagnation_level = 0 
+        self.consecutive_massive_ruins = 0 
         
         # Distributed Cooperation Setup
-        if worker_id is not None:
-            self.worker_id = str(worker_id)
-        else:
-            self.worker_id = str(uuid.uuid4())[:8]
+        # worker_id is now set in __init__
             
         # Hash worker_id to get a shard index (0-9)
         self.shard_id = int(hashlib.md5(self.worker_id.encode()).hexdigest(), 16) % 10
-        # self.shared_pool_dir = None # REMOVED BUGGY LINE
         
         # Throttling
         self.last_upload_time = 0
         self.last_upload_value = 0
         self.last_sync_time = 0
-        self.last_restart_step = -1000 # Initialize with safe margin
-
+        self.last_restart_step = -1000 
         
         if self.shared_pool_dir:
-            # Use the path provided explicitly by search_best.py.
-            # No more complex inference or high_quality_solution logic.
             try:
                 self._log(f"Shared Elite Pool Directory: {self.shared_pool_dir}")
                 os.makedirs(self.shared_pool_dir, exist_ok=True)
             except OSError:
                 pass 
-        
-        # [NEW] Initial Load Logic from Main Process
-        # Use paths provided by the main process (which filtered them by diversity)
-        if initial_solution_paths:
-             self._load_initial_solutions_from_paths(initial_solution_paths)
-        else:
-            # Fallback legacy load
-            # self._load_initial_pool_from_disk()
-            pass
 
-    def _load_initial_solutions_from_paths(self, paths):
-        self._log(f"Loading {len(paths)} initial diverse solutions from main process...")
-        count = 0
-        for path in paths:
-            try:
-                if not os.path.exists(path):
-                    continue
-                with open(path, 'rb') as f:
-                    sol = pickle.load(f)
-                    # We use _add_to_local_pool but share=False because these are already known elites/breakthroughs
-                    # We do NOT share them back immediately to avoid storm
-                    self._add_to_local_pool(sol, share=False)
-                    count += 1
-            except Exception as e:
-                self._log(f"Warning: Failed to load {path}: {e}")
-        self._log(f"Successfully loaded {count} elites locally.")
+
+
+    def _classify_heuristics(self):
+        # Explicit classifications
+        constructive_names = {
+            "balance_biased_edge_placement_9f22",
+            "balanced_cut_21d5",
+            "balanced_cut_c0e6",
+            "balanced_random_7f42",
+            "heaviest_edge_seed_eb0d",
+            "heavy_edge_matching_seed_edd5",
+            "highest_delta_node_b31b",
+            "highest_delta_edge_9f66",
+            "highest_weight_edge_eb0d",
+            "highest_weight_edge_eb0c",
+            "highest_weight_edge_ca02",
+            "most_weight_neighbors_320c",
+            "most_weight_neighbors_d31b",
+            "random_5c59",
+            "semi_greedy_node_grasp_bf9a",
+            "softmax_gain_insertion_76de",
+            "spectral_seed_fiedler_51e0",
+            "continuous_mean_field_batch", 
+            "balanced_random_batch", 
+            "weighted_degree_batch", 
+            "cosm_heuristic_quick",
+            "cosm_heuristic_detailed",
+        }
+        
+        improvement_names = {
+            "cached_delta_flip_3cfd",
+            "first_improvement_flip_7a32",
+            "greedy_swap_5bb6",
+            "greedy_swap_5bb5",
+            "k_block_swap_topk_589e",
+            "majority_neighbor_flip_67a0",
+            "multi_flip_threshold_fd21",
+            "multi_swap_2_dbfe",
+            "multi_swap_2_dbff",
+            "single_flip_gain_5bb5",
+            "tabu_node_flip_cae6",
+            "two_node_joint_flip_590a",
+        }
+        
+        # Required Breakout Heuristics
+        # We look for these specifically to populate self.breakout_heuristics
+        breakout_map = {
+            "batch_cluster_ruin": ["batch_cluster_ruin"],
+            "batch_worst_ruin": ["batch_worst_ruin"],
+            "path_relinking": ["path_relinking_guided_perturbation", "path_relinking"],
+            "anti_consensus": ["anti_consensus_perturbation"]
+        }
+
+        # 1. Classify standard pool
+        for h_name in self.heuristic_pool_names:
+            base_name = os.path.basename(h_name).replace(".py", "")
+            func = load_function(h_name, problem=self.problem)
+            
+            if base_name in constructive_names:
+                self.constructive_heuristics.append(func)
+            elif base_name in improvement_names:
+                self.improvement_heuristics.append(func)
+            
+            # Map to breakout dictionary
+            for key, variations in breakout_map.items():
+                if base_name in variations:
+                    self.breakout_heuristics[key] = func
+
+        # 2. Fallback: If breakout heuristics were missed in the main pool, try to load them from standard paths
+        # This ensures backward compatibility with the original explicit loading logic.
+        base_path = "src/problems/max_cut/heuristics"
+        ruin_path = "evolved_heuristics.part3"
+        
+        fallback_map = {
+            "batch_cluster_ruin": os.path.join(base_path, ruin_path, "batch_cluster_ruin.py"),
+            "batch_worst_ruin": os.path.join(base_path, ruin_path, "batch_worst_ruin.py"),
+            "path_relinking": os.path.join(base_path, "path_relinking_guided_perturbation.py"),
+            "anti_consensus": os.path.join(base_path, ruin_path, "anti_consensus_perturbation.py")
+        }
+        
+        for key, path in fallback_map.items():
+            if key not in self.breakout_heuristics:
+                try:
+                    # Check relative or absolute
+                    if os.path.exists(path):
+                        self.breakout_heuristics[key] = load_function(path, problem=self.problem)
+                    else:
+                        abs_path = os.path.join(os.getcwd(), path)
+                        if os.path.exists(abs_path):
+                            self.breakout_heuristics[key] = load_function(abs_path, problem=self.problem)
+                except Exception:
+                    pass
+
+
 
     def _get_time_bucket_path(self, timestamp=None):
         if timestamp is None:
@@ -89,7 +159,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         return os.path.join(bucket_path, f"shard_{shard_index}")
 
     def _log(self, message):
-        print(f"[{datetime.now().strftime('%H:%M:%S')}, Worker:{self.worker_id}] {message}", flush=True)
+        self.logger(message)
 
     def _save_to_shared_pool(self, solution, is_keep_alive=False):
         if not self.shared_pool_dir: return
@@ -387,41 +457,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
     def _update_elite_pool(self, solution_obj):
         # Wrapper for backward compatibility or clarity
         self._add_to_local_pool(solution_obj, share=True)
-
-    def _load_breakout_heuristics(self):
-        # Explicitly load the designated heuristics for breakout
-        # Using relative paths from the workspace root or absolute paths
-        # load_function expects path relative to src/problems/max_cut/heuristics/ usually, or just filename if in path
-        
-        # We'll use the full path loader logic from util.py if possible, or manually load
-        # For safety/simplicity, I will try to load by filename if they are in the standard folders
-        
-        base_path = "src/problems/max_cut/heuristics"
-        ruin_path = "evolved_heuristics.part3"
-        
-        h_map = {
-            "batch_cluster_ruin": os.path.join(base_path, ruin_path, "batch_cluster_ruin.py"),
-            "batch_worst_ruin": os.path.join(base_path, ruin_path, "batch_worst_ruin.py"),
-            "path_relinking": os.path.join(base_path, "path_relinking_guided_perturbation.py"),
-            "anti_consensus": os.path.join(base_path, ruin_path, "anti_consensus_perturbation.py")
-        }
-        
-        for key, path in h_map.items():
-            try:
-                # Assuming running from root
-                if os.path.exists(path):
-                    self.breakout_heuristics[key] = load_function(path, problem=self.problem)
-                else:
-                    # Try absolute path
-                    abs_path = os.path.join(os.getcwd(), path)
-                    if os.path.exists(abs_path):
-                        self.breakout_heuristics[key] = load_function(abs_path, problem=self.problem)
-                    else:
-                        self._log(f"Warning: Could not find breakout heuristic {key} at {path}")
-            except Exception as e:
-                self._log(f"Error loading {key}: {e}")
-
-
+    
     def _run_improvement_phase(self, env):
         # [VND Implementation with Strict Hill Climbing]
         # Iterate through all available heuristics until no improvement is found.
@@ -823,99 +859,59 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
 
 
     def run(self, env: BaseEnv) -> bool:
-        # [REFACTORED for Cooperative Search]
-        # 1. Try to load initial solution (Hot Start) from the Shared Pool
-        # We rely SOLELY on the shared pool (which might have been pre-populated or filled by other workers)
-        loaded = False
+        # [REFACTORED for Cooperative Search - Cold Start Only]
         
-        # Explicitly maximize chances by syncing first
+        # Explicitly maximize chances by syncing first (populate pool for interactions later)
         self._sync_shared_pool()
 
-        # Try to find the best available solution in our local view of the pool
-        if self.elite_pool:
-            # Stochastic Hot Start: Pick randomly from Top K elite solutions
-            # This prevents all workers from greedily converging on the same local max (Black Hole Effect)
+        self._log("Switching to Constructive Phase (Cold Start)...")
+        # Fallback: Construct New Solution if no Best Known file
+        # Loop until solution is COMPLETE and VALID
+        max_retries = 10
+        for retry in range(max_retries):
             
-            # Filter for unique scores to ensure diversity
-            unique_pool = []
-            seen_scores = set()
-            for sol in sorted(self.elite_pool, key=lambda s: s.cut_value, reverse=True):
-                if sol.cut_value not in seen_scores:
-                    unique_pool.append(sol)
-                    seen_scores.add(sol.cut_value)
+            # Reset environment for a fresh start
+            env.reset(output_dir=env.output_dir)
             
-            # If we have enough unique solutions, pick from top 10. Otherwise, broaden search.
-            search_space = unique_pool[:min(len(unique_pool), 10)]
-            if len(search_space) < 3 and len(self.elite_pool) > 20:
-                 # Fallback: If pool is dominated by duplicates, broaden to raw top 50 to find *any* deviation
-                 search_space = sorted(self.elite_pool, key=lambda s: s.cut_value, reverse=True)[:50]
-            
-            best_sol = random.choice(search_space)
-            
-            self._log(f"Hot Start: Loaded stochastic best from Elite Pool (Val: {best_sol.cut_value} | Pool Max: {max(p.cut_value for p in self.elite_pool)})")
-            
-            # Deep Copy to ensure safety
-            from src.problems.max_cut.components import Solution
-            env.current_solution = Solution(set(best_sol.set_a), set(best_sol.set_b), best_sol.cut_value)
-            
-            # Update Environment State
-            env.current_solution.cut_value = env.get_key_value(env.current_solution) # Recalculate to be safe
-            env.problem_state = env.get_problem_state()
-            
-            # Update Env Best Known if we accidentally loaded something better
-            if env.key_value > env.best_known:
-                env.best_known = env.key_value
-                
-            loaded = True
-        
-        if not loaded: 
-            self._log("No Elite Pool solutions found. Switching to Constructive Phase (Cold Start)...")
-            # Fallback: Construct New Solution if no Best Known file
-            # Loop until solution is COMPLETE and VALID
-            max_retries = 10
-            for retry in range(max_retries):
-                
-                # Reset environment for a fresh start
-                env.reset(output_dir=env.output_dir)
-                
-                # Keep constructing until complete
-                construction_steps = 0
-                while not env.is_complete_solution and construction_steps < 1000:
-                    if not self.constructive_heuristics:
-                        break
-                    
-                    # Prefer Cosm for first attempt as it is SOTA for these graphs
-                    if retry == 0 and construction_steps == 0:
-                         # Strict Priority: Detailed > Quick > Mean Field
-                         detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
-                         other_cosm = [h for h in self.constructive_heuristics if ("cosm" in h.__name__ or "mean_field" in h.__name__) and "detailed" not in h.__name__]
-                         
-                         if detailed_cosm:
-                             h = detailed_cosm[0] # Always pick detailed if available
-                         elif other_cosm:
-                             h = random.choice(other_cosm)
-                         else:
-                             h = random.choice(self.constructive_heuristics)
-                    else:
-                        h = random.choice(self.constructive_heuristics)
-                        
-                    env.run_heuristic(h)
-                    construction_steps += 1
-                
-                if env.is_complete_solution and env.key_value > 100:
-                    self._log(f"Construction completed. Value: {env.key_value}")
+            # Keep constructing until complete
+            construction_steps = 0
+            while not env.is_complete_solution and construction_steps < 1000:
+                if not self.constructive_heuristics:
                     break
+                
+                # Prefer Cosm for first attempt as it is SOTA for these graphs
+                if retry == 0 and construction_steps == 0:
+                        # Strict Priority: Detailed > Quick > Mean Field
+                        detailed_cosm = [h for h in self.constructive_heuristics if "cosm_heuristic_detailed" in h.__name__]
+                        other_cosm = [h for h in self.constructive_heuristics if ("cosm" in h.__name__ or "mean_field" in h.__name__) and "detailed" not in h.__name__]
+                        
+                        if detailed_cosm:
+                            h = detailed_cosm[0] # Always pick detailed if available
+                        elif other_cosm:
+                            h = random.choice(other_cosm)
+                        else:
+                            h = random.choice(self.constructive_heuristics)
                 else:
-                    self._log(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+                    h = random.choice(self.constructive_heuristics)
+                    
+                env.run_heuristic(h)
+                construction_steps += 1
             
-            if not env.is_complete_solution:
-                 self._log("Critical Failure: Unable to construct valid solution after retries.")
-                 return False
+            if env.is_complete_solution and env.key_value > 100:
+                self._log(f"Construction completed. Value: {env.key_value}")
+                break
+            else:
+                self._log(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+        
+        if not env.is_complete_solution:
+                self._log("Critical Failure: Unable to construct valid solution after retries.")
+                return False
             
         current_best = env.key_value
         self._update_elite_pool(env.current_solution)
         
         no_improve_steps = 0
+
         # CHANGE: Use instance variable to track steps for coordination with restart logic
         self.current_run_steps = 0
         
@@ -1001,7 +997,7 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
                                         saved_best = score
                                 except: pass
                     
-                    if current_best > saved_best:
+                    if (current_best - saved_best) > 1e-6:
                         env.dump_result(result_file=f"breakthrough_from_worker_{self.worker_id}_{current_best}.txt")
 
                 elif abs(current_best - env.best_known) < 1e-6:

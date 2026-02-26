@@ -18,7 +18,10 @@ from src.pipeline.hyper_heuristics.phased_search_cooperative import PhasedSearch
 from src.util.filter_diverse_elites import get_diverse_elites
 
 
-def log_system_status(context: str):
+
+def log_system_status(context: str, logger=None):
+    if logger is None:
+        return
     try:
         cpu_percent = psutil.cpu_percent(interval=0.1)
         mem = psutil.virtual_memory()
@@ -28,10 +31,10 @@ def log_system_status(context: str):
         if hasattr(os, 'getloadavg'):
             load_avg = f"{os.getloadavg()}"
             
-        print(f"[System Status - {context}] Host: {platform.node()} | CPU: {cpu_percent}% | Load: {load_avg} | "
-              f"Mem: {mem.percent}% (Used: {mem.used>>20}MB, Avail: {mem.available>>20}MB) | {disk_info}", flush=True)
+        logger(f"[System Status - {context}] Host: {platform.node()} | CPU: {cpu_percent}% | Load: {load_avg} | "
+              f"Mem: {mem.percent}% (Used: {mem.used>>20}MB, Avail: {mem.available>>20}MB) | {disk_info}")
     except Exception as e:
-        print(f"Failed to log system status: {e}", flush=True)
+        logger(f"Failed to log system status: {e}")
 
 
 def _probe_env_mem(data_name: str, heuristic_dir: str) -> int:
@@ -77,9 +80,9 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
     # Remove artificial cap of 24 workers. Let hardware decide.
     workers = max(1, min(max_by_cpu, max_by_mem))
 
-    print(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, avail ~ {avail/1024/1024:.1f} MiB, choose workers={workers}", flush=True)
+    # print(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, avail ~ {avail/1024/1024:.1f} MiB, choose workers={workers}", flush=True)
 
-    return workers
+    return workers, mem_per_task, avail
 
 def run_once(
         data_name: str,
@@ -88,10 +91,7 @@ def run_once(
         run_id: int,
         method: str = "phased",
         shared_pool_dir: str = None,
-        top_k: int = 5,
-        cold_start: bool = False,
-        fail_fast_threshold: float = 0.02,
-        initial_solution_paths: list = None
+        log_file_path: str = None
 ) -> float:
     try:
         seed = time.time_ns() ^ os.getpid() ^ int.from_bytes(os.urandom(8), 'little')
@@ -105,15 +105,23 @@ def run_once(
 
     env.reset(output_dir=os.path.join(experiment_dir, "result"))
     
-    log_system_status(f"Worker:{run_id} Start")
-    
     # Use absolute paths for heuristics to avoid ambiguity
     heuristic_pool = [os.path.join(heuristic_dir, f) for f in os.listdir(heuristic_dir) if f.endswith(".py")]
+
+    # Local logger that writes ONLY to file
+    def local_log(message):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        full_msg = f"[{timestamp}, Worker:{run_id}] {message}"
+        if log_file_path:
+            try:
+                with open(log_file_path, "a", encoding="utf-8") as f:
+                    f.write(full_msg + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+            except Exception:
+                pass
     
-    # Map cold_start to legacy load_ratio for compatibility
-    # cold_start=True -> load_ratio=0.0
-    # cold_start=False -> load_ratio=1.0 (Hot Start)
-    load_ratio = 0.0 if cold_start else 1.0
+    log_system_status(f"Worker:{run_id} Start", logger=local_log)
     
     if method == "phased":
         algorithm = PhasedSearchBestHyperHeuristic(heuristic_pool, "max_cut")
@@ -122,37 +130,34 @@ def run_once(
             heuristic_pool, 
             "max_cut", 
             shared_pool_dir=shared_pool_dir,
-            top_k=top_k,
-            load_ratio=load_ratio
+            top_k=10,
+            load_ratio=1.0
         )
     elif method == "fast_stop":
         algorithm = PhasedSearchFastStopBestHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
             shared_pool_dir=shared_pool_dir,
-            top_k=top_k,
-            load_ratio=load_ratio,
-            fail_fast_threshold=fail_fast_threshold
+            top_k=10,
+            load_ratio=1.0,
+            fail_fast_threshold=0.02
         )
     elif method == "adaptive_polishing":
         algorithm = PhasedSearchAdaptivePolishingHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
             shared_pool_dir=shared_pool_dir,
-            top_k=top_k,
-            load_ratio=load_ratio,
-            fail_fast_threshold=fail_fast_threshold
+            top_k=10,
+            load_ratio=1.0,
+            fail_fast_threshold=0.02
         )
     elif method == "cooperative":
         algorithm = PhasedSearchCooperativeHyperHeuristic(
             heuristic_pool, 
             "max_cut", 
             shared_pool_dir=shared_pool_dir,
-            top_k=top_k,
-            load_ratio=load_ratio,
-            fail_fast_threshold=fail_fast_threshold,
-            initial_solution_paths=initial_solution_paths,
-            worker_id=run_id
+            worker_id=run_id,
+            logger=local_log
         )
     elif method == "random":
         algorithm = RandomSearchBestHyperHeuristic(heuristic_pool, "max_cut", iterations_scale_factor=50)
@@ -164,64 +169,69 @@ def main(
         heuristic_dir: str,
         num_runs: int,
         method: str = "phased",
-        top_k: int = 5,
-        cold_start: bool = False,
-        fail_fast_threshold: float = 0.02,
+        experiment_name: str = None
     ):
-    workers = pick_safe_workers(data_name, heuristic_dir)
+    workers, mem_per_task, avail = pick_safe_workers(data_name, heuristic_dir)
         
     ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
 
     if num_runs is None:
         num_runs = workers
-        print(f"Num runs not specified. Defaulting to max capacity: {workers}", flush=True)
 
     remaining = list(range(num_runs))
     finished_ids = []
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
-    experiment_dir = os.path.join(base_output_dir, "max_cut", data_name)
 
-    # Map cold_start to legacy load_ratio for display/logic
-    load_ratio = 0.0 if cold_start else 1.0
+    if experiment_name is None: 
+        experiment_dir = os.path.join(base_output_dir, "max_cut", data_name)
+    else:
+        experiment_dir = os.path.join(base_output_dir, "max_cut", experiment_name)
     
-    print(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
-    print(f"Cooperative Search: Top-K={top_k}, Cold Start={cold_start} (Load Ratio={load_ratio})")
+    os.makedirs(experiment_dir, exist_ok=True)
+    log_file_path = os.path.join(experiment_dir, "run.log")
+
+    # Main logger that writes ONLY to file
+    def main_logger(message):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        full_msg = f"[{timestamp}, Main] {message}"
+        try:
+            with open(log_file_path, "a", encoding="utf-8") as f:
+                f.write(full_msg + "\n")
+                f.flush()
+                # Force OS to write to disk
+                os.fsync(f.fileno())
+        except Exception:
+            pass
     
+    logger = main_logger
+    logger(f"Starting {method} Search for {data_name} with {workers} workers. Output: {experiment_dir}")
+    logger(f"Log file: {log_file_path}")
+    if num_runs == workers: # Originally "is None" but now we check if it was defaulted
+        logger(f"Num runs not specified. Defaulting to max capacity: {workers}")
+    logger(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, avail ~ {avail/1024/1024:.1f} MiB")
+
     # [INFO] Print Problem Statistics ONCE at Startup
     temp_env = Env(data_name=data_name)
     node_num = temp_env.instance_data.get("node_num", "Unknown")
     bk = temp_env.best_known
-    print(f"============================================================")
-    print(f"  Target Data: {data_name}")
-    print(f"  Nodes: {node_num}")
-    print(f"  Best Known (BK): {bk}")
-    print(f"============================================================", flush=True)
+    logger(f"============================================================")
+    logger(f"  Target Data: {data_name}")
+    logger(f"  Nodes: {node_num}")
+    logger(f"  Best Known (BK): {bk}")
+    logger(f"============================================================")
 
-    initial_solution_paths = []
     if method == "cooperative":
         # Auto-configure shared pool directory for cooperative methods (communication channel)
-        # Old structure: output/max_cut/elite_pool/{data_name}
-        # New structure: output/max_cut/{data_name}/elite_pool
-        shared_pool_dir = os.path.join(base_output_dir, "max_cut", data_name, "elite_pool")
+        # Shared pool is still tied to the experiment directory to keep runs isolated if needed
+        shared_pool_dir = os.path.join(experiment_dir, "elite_pool")
         os.makedirs(shared_pool_dir, exist_ok=True)
-        print(f"Shared Elite Pool: {shared_pool_dir}")
+        logger(f"Shared Elite Pool: {shared_pool_dir}")
 
-        # Only retrieve elites if NOT cold_start
-        if not cold_start:
-            print(f"Retrieving diverse elites for {data_name}...", flush=True)
-            # Use base_output_dir as the root search directory
-            elites = get_diverse_elites(data_name, top_k=top_k, threshold=0.0, base_output_dir=base_output_dir)
-            # filter_diverse_elites now returns dict with 'path' key, not 'file_path'
-            initial_solution_paths = [e["path"] for e in elites]
-            print(f"Found {len(initial_solution_paths)} diverse elites.", flush=True)
-        else:
-             print(f"Cold Start enabled. Skipping elite retrieval.", flush=True)
-
-    log_system_status("Main Start")
+    log_system_status("Main Start", logger=logger)
 
     while remaining:
-        print(f"Start batch with workers={workers}, remaining tasks={len(remaining)}", flush=True)
-        log_system_status(f"Batch Start (Remaining: {len(remaining)})")
+        logger(f"Start batch with workers={workers}, remaining tasks={len(remaining)}")
+        log_system_status(f"Batch Start (Remaining: {len(remaining)})", logger=logger)
         with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
             fut_map = {executor.submit(
                 run_once, 
@@ -230,11 +240,8 @@ def main(
                 experiment_dir, 
                 run_id, 
                 method=method, 
-                shared_pool_dir=shared_pool_dir, # Pass the auto-configured path
-                top_k=top_k,
-                cold_start=cold_start,
-                fail_fast_threshold=fail_fast_threshold,
-                initial_solution_paths=initial_solution_paths
+                shared_pool_dir=shared_pool_dir,
+                log_file_path=log_file_path
             ): run_id for run_id in remaining}
 
             for fut in as_completed(fut_map):
@@ -242,7 +249,7 @@ def main(
                 try:
                     fut.result()
                 except Exception as e:
-                    print(f"Run {run_id} failed: {e}")
+                    logger(f"Run {run_id} failed: {e}")
                 finished_ids.append(run_id)
 
         done_ids = {run_id for run_id in finished_ids}
@@ -260,12 +267,9 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--num_runs", type=int, default=None, help="Number of parallel runs (default: max capable)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
-    parser.add_argument("-m", "--method", type=str, default="fast_stop", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "cooperative"], 
+    parser.add_argument("-m", "--method", type=str, default="cooperative", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "cooperative"], 
                         help="Search method: 'phased', 'random', 'ucb', 'fast_stop', 'adaptive_polishing', or 'cooperative' (default: fast_stop)")
-    parser.add_argument("-k", "--top_k", type=int, default=100, help="Number of top solutions to consider for loading (default: 100)")
-    parser.add_argument("-c", "--cold_start", action="store_true", help="Disable hot start. Default is Hot Start.")
-    parser.add_argument("-f", "--fail_fast_threshold", type=float, default=0.02, help="Fail fast threshold (default: 0.02)")
-
+    parser.add_argument("-exp", "--experiment_name", type=str, default=None, help="Experiment name (default: None, uses data_name)")
 
     args = parser.parse_args()
-    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.top_k, cold_start=args.cold_start, fail_fast_threshold=args.fail_fast_threshold)
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.experiment_name)
