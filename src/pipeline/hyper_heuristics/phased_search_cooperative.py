@@ -161,9 +161,13 @@ class PhasedSearchCooperativeHyperHeuristic:
     def _log(self, message):
         self.logger(message)
 
-    def _save_to_shared_pool(self, solution, is_keep_alive=False):
+    def _save_to_shared_pool(self, item, is_keep_alive=False):
         if not self.shared_pool_dir: return
         
+        # [RESEARCH] Direct access, item is always a Wrapper Dict
+        solution = item["solution"]
+        save_obj = item 
+            
         current_time = time.time()
         
         # Throttling Logic (Skip if simply frequent updates of same quality, unless keep-alive)
@@ -191,7 +195,7 @@ class PhasedSearchCooperativeHyperHeuristic:
             # Atomic write
             temp_path = filepath + ".tmp"
             with open(temp_path, 'wb') as f:
-                pickle.dump(solution, f)
+                pickle.dump(save_obj, f)
             os.rename(temp_path, filepath)
             
             # [LOGGING UPDATE] Print the path of the saved elite/breakthrough
@@ -244,8 +248,11 @@ class PhasedSearchCooperativeHyperHeuristic:
         for fpath in files_to_read:
             try:
                 with open(fpath, 'rb') as f:
-                    sol = pickle.load(f)
-                    self._add_to_local_pool(sol, share=False)
+                    data = pickle.load(f)
+                    # Compatibility: If loaded data is Solution object, wrap it
+                    if not isinstance(data, dict):
+                         data = {"solution": data, "history": []}
+                    self._add_to_local_pool(data, share=False)
             except:
                 pass
                 
@@ -255,167 +262,100 @@ class PhasedSearchCooperativeHyperHeuristic:
         if random.random() < 0.2 and self.elite_pool:
             # Pick top 3 from local pool
             # Sort local pool by value descending
-            sorted_pool = sorted(self.elite_pool, key=lambda s: s.cut_value, reverse=True)
+            # [COMPATIBILITY] Handle Wrapper
+            sorted_pool = sorted(self.elite_pool, key=lambda s: s["solution"].cut_value, reverse=True)
             top_elites = sorted_pool[:3]
             
             for elite in top_elites:
                 self._save_to_shared_pool(elite, is_keep_alive=True)
 
-    def _add_to_local_pool(self, solution_obj, share=True):
-        # [DYNAMIC TABU STRATEGY 2026-02-19]
-        # Check against dynamic tabu list
-        # If this solution belongs to an "Exhausted Basin", we reject it to prevent re-infection.
+    def _add_to_local_pool(self, item, share=True):
+        # [RESEARCH] Direct access, item is always a Wrapper Dict
+        # Backward compatibility: If item is solution object, wrap it
+        if not isinstance(item, dict):
+             item = {"solution": item, "history": []}
+             
+        solution_ref = item["solution"]
+        history_ref = list(item.get("history", []))
         
-        # We need to access the dynamic visited_peaks from the instance.
-        # Initialize if not present (defensive programming)
+        # [DYNAMIC TABU STRATEGY 2026-02-19]
         if not hasattr(self, "visited_peaks"):
              self.visited_peaks = {}
              
-        TABU_TOLERANCE = 5.0
-        MAX_VISITS_PER_PEAK = 3
+        TABU_TOLERANCE = 1e-3
+        MAX_VISITS_PER_PEAK = 20
         
         for peak_val, count in self.visited_peaks.items():
-            if count >= MAX_VISITS_PER_PEAK and abs(solution_obj.cut_value - peak_val) < TABU_TOLERANCE:
-                # This peak is officially exhausted/tabu. Reject entry.
-                # self._log(f"Rejected solution {solution_obj.cut_value} (Exhausted Basin)")
+            if count >= MAX_VISITS_PER_PEAK and abs(solution_ref.cut_value - peak_val) < TABU_TOLERANCE:
                 return
 
         # Add copy of solution to pool
         from src.problems.max_cut.components import Solution
         
-        # Deep copy the sets
-        new_sol = Solution(set(solution_obj.set_a), set(solution_obj.set_b), solution_obj.cut_value)
+        # Deep copy the sets for storage
+        new_sol = Solution(set(solution_ref.set_a), set(solution_ref.set_b), solution_ref.cut_value)
+        # Create new wrapper
+        new_wrapper = {"solution": new_sol, "history": history_ref}
         
-        # [IMPROVED DIVERSITY CONTROL 2026-02-21]
-        # Instead of just appending best values (which leads to homogenization),
-        # we enforce spatial diversity based on Hamming Distance.
-        
-        # Helper: Calculate Hamming Distance
+        # [IMPROVED DIVERSITY CONTROL]
         def calc_dist_pool(s1, s2):
             d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
             d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
             return min(d1, d2)
 
         node_num = len(new_sol.set_a) + len(new_sol.set_b)
-
-        # ------------------------------------------------------------------
-        # Strategy 1: Strict Spatial Exclusion (Prevent Clones)
-        # ------------------------------------------------------------------
-        # We define a "Similarity Radius". Any solution within this radius
-        # is considered to belong to the same "Peak".
-        # Dynamic threshold: e.g. 5% of nodes. 
-        # For N=2000, threshold=100. For N=800, threshold=40.
-        SIMILARITY_RATIO = 0.05
-        similarity_threshold = max(20, int(node_num * SIMILARITY_RATIO))
-
-        # 1. Check if this solution belongs to an existing "Family" (Peak) in the pool
-        closest_neighbor = None
-        min_dist = float('inf')
-        closest_index = -1
         
-        for i, existing in enumerate(self.elite_pool):
-            d = calc_dist_pool(new_sol, existing)
-            if d < min_dist:
-                min_dist = d
-                closest_neighbor = existing
-                closest_index = i
-        
-        # Policy A: If very close to an existing solution (Same Peak)
-        if closest_neighbor and min_dist < similarity_threshold:
-            # Only update if strictly better.
-            # We want to keep the PEAK of this family.
-            if new_sol.cut_value > closest_neighbor.cut_value:
-                # Upgrade the existing slot to the better version
-                self.elite_pool[closest_index] = new_sol
-                if share: self._save_to_shared_pool(new_sol)
-                # self._log(f"Pool Updated: Improved existing peak (Dist={min_dist}, Val={new_sol.cut_value})")
-                return
-            else:
-                # We already have a better or equal representative for this peak. REJECT.
-                # Even if it's equal, we reject to avoid churn without gain.
-                return
-
         # ------------------------------------------------------------------
-        # Strategy 2: Diversity Injection (Manage Pool Health)
-        # ------------------------------------------------------------------ 
-        # Policy B: It is a distinct solution (Distant from everyone else)
+        # Strategy 1: Score-based Duplication Check (New Logic)
+        # ------------------------------------------------------------------
+        # [MODIFIED 2026-02-26] Allow up to 3 solutions with the same score (User Request)
+        # However, use a wider tolerance (1e-3) to treat "jittered" values as identical.
+        # This prevents the pool from filling with 20 copies of 5317.000001, 5317.000002, etc.
+        same_score_count = 0
+        pool_tolerance = 1e-3
+        
+        for existing_wrapper in self.elite_pool:
+            if abs(new_sol.cut_value - existing_wrapper["solution"].cut_value) < pool_tolerance:
+                same_score_count += 1
+        
+        if same_score_count >= 3:
+            # We already have enough (3) representatives of this score range. Reject.
+            return
+
+        # Policy B: Distinct Solution (Add/Evict)
         
         # If pool is not full, just add it.
         if len(self.elite_pool) < 20:
-            self.elite_pool.append(new_sol)
-            if share: self._save_to_shared_pool(new_sol)
+            self.elite_pool.append(new_wrapper)
+            if share: self._save_to_shared_pool(new_wrapper)
             return
 
-        # If pool is full, we need to decide who to evict.
-        # Standard logic: Check against the worst solution.
-        min_val = min(s.cut_value for s in self.elite_pool)
+        # Find worse solution (using wrappers)
         
-        # Case 1: Better than worst (Standard quality improvement)
-        if new_sol.cut_value > min_val:
-            # [FIX 2026-02-26] Preventing Pool Homogenization
-            # Check if we already have too many solutions with the SAME cut_value as this new one.
-            # If we have >= 3 solutions with this exact score, we reject adding another one (even if it improves the worst), 
-            # UNLESS the worst one is ALSO of this same score (which means we are just cycling).
-            # This forces the pool to keep lower-quality but diverse solutions.
+        pool_values = []
+        for e in self.elite_pool:
+            idx_val = e["solution"].cut_value
+            pool_values.append(idx_val)
             
-            same_score_count = sum(1 for s in self.elite_pool if abs(s.cut_value - new_sol.cut_value) < 1e-6)
-            MAX_SAME_SCORE = 3
-            
-            if same_score_count >= MAX_SAME_SCORE:
-                 # Too many identical scores. Reject to preserve diversity of lower scores.
-                 # Exception: If the solution to be replaced (min_val) is actually much worse, 
-                 # we might still want to replace it? 
-                 # No, strict diversity. If we have 3 copies of Best, we don't need a 4th. 
-                 # We need the 4th slot for a 2nd Best or 3rd Best to bridge the gap.
-                 # self._log(f"Pool Reject: Too many solutions with score {new_sol.cut_value}")
-                 return
-
+        min_val = min(pool_values)
+        
+        # Case 1 & 2: Better or Equal to worst
+        if new_sol.cut_value >= min_val:
             # Replace the worst one
+            # Note: Since we passed the "Score Check" above, we know we aren't flooding.
+            
             for i, s in enumerate(self.elite_pool):
-                if s.cut_value == min_val:
-                    self.elite_pool[i] = new_sol
-                    break
-            if share: self._save_to_shared_pool(new_sol)
-            return
-        
-        # Case 2: Equal to worst
-        elif new_sol.cut_value == min_val:
-             # Since we passed Policy A, we know it is DISTANT from everyone (including the worst one).
-             # So we have a tie in value, but new_sol offers new genes.
-             # ALWAYS Replace the old worst with this new distinct one to improve diversity.
-            for i, s in enumerate(self.elite_pool):
-                if s.cut_value == min_val:
-                    self.elite_pool[i] = new_sol
-                    if share: self._save_to_shared_pool(new_sol)
+                if s["solution"].cut_value == min_val:
+                    self.elite_pool[i] = new_wrapper
+                    if share: self._save_to_shared_pool(new_wrapper)
                     break
             return
 
-        # Case 3: Worse than worst (Refuse, unless it is a "Stranger")
+        # Case 3: Worse than worst -> REJECT
+        # [MODIFIED 2026-02-26] Removed "Stranger Admission" logic.
+        # We value quality first. If it's worse than the worst elite, it's out.
         else:
-             # Policy C: "Stranger" Admission
-             # If a solution is significantly different from the ENTIRE pool, 
-             # we might admit it even if it's poor, to break stagnation.
-             
-             # Dynamic threshold for "Stranger": e.g. 15% of nodes
-             STRANGER_RATIO = 0.15
-             stranger_threshold = max(30, int(node_num * STRANGER_RATIO))
-             
-             if min_dist > stranger_threshold:
-                 # It is a stranger! 
-                 # We want to add it, but we must evict someone.
-                 # To maintain average quality, we should evict the worst logic.
-                 # But we just established new_sol < min_val. So we are lowering the bar.
-                 # We do this probabilistically to avoid flooding.
-                 
-                 if random.random() < 0.2:
-                     # Find the worst elite to replace
-                     # (We could also replace the 'most redundant' elite, but that's expensive to compute)
-                     for i, s in enumerate(self.elite_pool):
-                        if s.cut_value == min_val:
-                            self.elite_pool[i] = new_sol
-                            if share: self._save_to_shared_pool(new_sol)
-                            # self._log(f"Diversity Injection: Accepted DISTANT poor solution (Val={new_sol.cut_value}, Dist={min_dist})")
-                            break
+             return
 
     def _calculate_consensus_flip(self, node_num, flip_ratio=0.1):
         """
@@ -432,7 +372,9 @@ class PhasedSearchCooperativeHyperHeuristic:
         # set_a_counts[i] = number of elite solutions where node i is in set_a
         set_a_counts = {}
         
-        for sol in self.elite_pool:
+        for item in self.elite_pool:
+            # Handle Wrapper
+            sol = item["solution"]
             for node in sol.set_a:
                 set_a_counts[node] = set_a_counts.get(node, 0) + 1
                 
@@ -454,9 +396,13 @@ class PhasedSearchCooperativeHyperHeuristic:
         flip_count = max(1, int(len(static_nodes) * flip_ratio))
         return random.sample(static_nodes, flip_count)
 
-    def _update_elite_pool(self, solution_obj):
-        # Wrapper for backward compatibility or clarity
-        self._add_to_local_pool(solution_obj, share=True)
+    def _update_elite_pool_from_env(self, env):
+        # [NEW 2026-02-26] Capture solution + history for full reproducibility
+        sol = env.current_solution
+        # Deep copy history to ensure it's frozen at this point
+        history = list(env.recordings) if env.recordings else []
+        package = {"solution": sol, "history": history}
+        self._add_to_local_pool(package, share=True)
     
     def _run_improvement_phase(self, env):
         # [VND Implementation with Strict Hill Climbing]
@@ -545,13 +491,14 @@ class PhasedSearchCooperativeHyperHeuristic:
             if len(self.elite_pool) < 2:
                  return
             
-            # 1. Find Best Known
-            best_sol = max(self.elite_pool, key=lambda s: s.cut_value)
+            # 1. Find Best Known (Handle Wrapper)
+            best_wrapper = max(self.elite_pool, key=lambda s: s["solution"].cut_value)
+            best_sol = best_wrapper["solution"]
             
             # 2. Find a "Distant" High-Quality Elite
             # [FIX] Lower threshold to 0.97 to ensure our current elites (2400-2406) can participate
             # 2446 * 0.97 = 2372, so 2400+ are valid candidates
-            candidates = [s for s in self.elite_pool if s.cut_value > env.best_known * 0.97]
+            candidates = [s for s in self.elite_pool if s["solution"].cut_value > env.best_known * 0.97]
             if not candidates: 
                  return
                  
@@ -561,12 +508,13 @@ class PhasedSearchCooperativeHyperHeuristic:
                 d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
                 return min(d1, d2)
             
-            # Find candidate farthest from best_sol
+            # Find candidate farthest from best_sol (Need to unwrap candidate for dist calculation)
             # [FIX] Use weighted random choice to avoid "Groundhog Day" repeating the same link
             # Pick from top 3 farthest
-            candidates.sort(key=lambda s: calc_dist(s, best_sol), reverse=True)
+            candidates.sort(key=lambda s: calc_dist(s["solution"], best_sol), reverse=True)
             top_candidates = candidates[:min(3, len(candidates))]
-            distant_elite = random.choice(top_candidates)
+            distant_wrapper = random.choice(top_candidates)
+            distant_elite = distant_wrapper["solution"]
             
             dist = calc_dist(best_sol, distant_elite)
             
@@ -586,8 +534,10 @@ class PhasedSearchCooperativeHyperHeuristic:
                  # This helps exploring the immediate neighborhood of the basin.
                  self._log(f"Active Relinking: Targets too close (Dist={dist} < Threshold={threshold}). Triggering Micro-Perturbation.")
                  
-                 # Load best solution
+                 # Load best solution (WITH HISTORY)
                  env.current_solution = copy.deepcopy(best_sol)
+                 env.recordings = list(best_wrapper.get("history", []))
+
                  env.current_solution.cut_value = best_sol.cut_value
                  
                  # Perturb 2% of nodes (enough to move away ~60 nodes in 3000)
@@ -604,12 +554,14 @@ class PhasedSearchCooperativeHyperHeuristic:
 
             self._log(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
 
-            # 3. Reset to Best, Target = Distant
+            # 3. Reset to Best, Target = Distant (WITH HISTORY)
             env.current_solution = copy.deepcopy(best_sol)
+            env.recordings = list(best_wrapper.get("history", []))
             env.current_solution.cut_value = best_sol.cut_value
             
+            # Pass unwrapped distant elite
             env.algorithm_data["elite_pool"] = [distant_elite] 
-            
+                
             if "path_relinking" in self.breakout_heuristics:
                 h = self.breakout_heuristics["path_relinking"]
                 # Move 40% towards the other peak
@@ -626,8 +578,9 @@ class PhasedSearchCooperativeHyperHeuristic:
              # Targeted PR: Force link towards the absolute Best Known in the pool
              h = self.breakout_heuristics["path_relinking"]
              # Filter pool to only include the BEST solution(s) to guarantee target direction
-             best_val = max(s.cut_value for s in self.elite_pool)
-             best_solutions = [s for s in self.elite_pool if s.cut_value == best_val]
+             best_val = max(s["solution"].cut_value for s in self.elite_pool)
+             # Unwrap solutions for heuristics
+             best_solutions = [s["solution"] for s in self.elite_pool if s["solution"].cut_value == best_val]
              
              # Create a focused context
              env.algorithm_data["elite_pool"] = best_solutions
@@ -650,7 +603,7 @@ class PhasedSearchCooperativeHyperHeuristic:
             # Pass elite_pool via algorithm_data
             # We need to hack/inject elite_pool into algorithm_data if not present
             # env.run_heuristic passes env.problem_state and env.algorithm_data
-            env.algorithm_data["elite_pool"] = self.elite_pool
+            env.algorithm_data["elite_pool"] = [s["solution"] for s in self.elite_pool]
             env.run_heuristic(h, parameters={"intensity": 0.3})
             
         elif strategy == "jump_to_secondary_peak":
@@ -658,13 +611,15 @@ class PhasedSearchCooperativeHyperHeuristic:
              if not self.elite_pool:
                  self._apply_breakout(env, "supernova_ruin")
                  return
-
-             best_val = max(s.cut_value for s in self.elite_pool)
+             
+             best_val = max(s["solution"].cut_value for s in self.elite_pool)
              # Candidates: High quality but strictly less than Best Known (to find secondary peaks)
              # We want to revisit peaks like 26992 to see if we can sharpen them
              # [FIX] Use relative threshold for large-weight instances (imgseg)
              threshold = max(150, env.best_known * 0.02)
-             candidates = [s for s in self.elite_pool if s.cut_value >= env.best_known - threshold and s.cut_value < best_val]
+             
+             # Filter wrappers/items based on unwrapped value
+             candidates = [s for s in self.elite_pool if s["solution"].cut_value >= env.best_known - threshold and s["solution"].cut_value < best_val]
              
              desc = "SECONDARY PEAK"
 
@@ -676,15 +631,23 @@ class PhasedSearchCooperativeHyperHeuristic:
                     return min(d1, d2)
                  
                  # Look for solutions with SAME best value but Distance > 400
-                 candidates = [s for s in self.elite_pool if abs(s.cut_value - best_val) <= 1e-3 and calc_dist_j(s, env.current_solution) > 400]
+                 current_sol = env.current_solution
+                 # Handle wrapper
+                 candidates = [s for s in self.elite_pool if abs(s["solution"].cut_value - best_val) <= 1e-3 and calc_dist_j(s["solution"], current_sol) > 400]
                  desc = "PARALLEL UNIVERSE PEAK"
              
              if candidates:
-                 target = random.choice(candidates)
+                 target_item = random.choice(candidates)
+                 target_sol = target_item["solution"]
+                 
                  # Deep copy
                  from src.problems.max_cut.components import Solution
-                 new_sol = Solution(set(target.set_a), set(target.set_b), target.cut_value)
+                 new_sol = Solution(set(target_sol.set_a), set(target_sol.set_b), target_sol.cut_value)
                  env.current_solution = new_sol
+                 
+                 # Restore History
+                 env.recordings = list(target_item.get("history", []))
+                     
                  # Verify value
                  env.current_solution.cut_value = env.get_key_value(env.current_solution)
                  # Sync problem state
@@ -790,14 +753,15 @@ class PhasedSearchCooperativeHyperHeuristic:
                         return min(d1, d2)
                   
                   # Sort by distance descending (furthest first)
-                  sorted_elites = sorted(self.elite_pool, key=lambda s: calc_dist_r(s, env.current_solution), reverse=True)
+                  sorted_elites = sorted(self.elite_pool, key=lambda s: calc_dist_r(s["solution"], env.current_solution), reverse=True)
                   # Pick from top 5 furthest
-                  target = random.choice(sorted_elites[:5])
+                  target_item = random.choice(sorted_elites[:5])
+                  target_sol = target_item["solution"]
                   
                   # [CRITICAL FIX 2026-02-19] Check if the "furthest" elite is actually distant.
                   # If the pool has collapsed (Homogenized), the furthest elite might be just 10 flips away.
                   # In that case, a Soft Restart is useless. We must force a HARD RESTART (Constructive).
-                  dist = calc_dist_r(target, env.current_solution)
+                  dist = calc_dist_r(target_sol, env.current_solution)
                   min_restart_dist = max(50, int(node_num * 0.05)) # e.g. 150 nodes for 3000 node graph
                   
                   if dist < min_restart_dist:
@@ -805,8 +769,11 @@ class PhasedSearchCooperativeHyperHeuristic:
                        force_constructive = True
                   else:
                        from src.problems.max_cut.components import Solution
-                       env.current_solution = Solution(set(target.set_a), set(target.set_b), target.cut_value)
-                       self._log(f"Restarted from Distant Elite (Val: {target.cut_value}, Dist: {dist})")
+                       env.current_solution = Solution(set(target_sol.set_a), set(target_sol.set_b), target_sol.cut_value)
+                       # Restore History
+                       env.recordings = list(target_item.get("history", []))
+
+                       self._log(f"Restarted from Distant Elite (Val: {target_sol.cut_value}, Dist: {dist})")
              
              else:
                   force_constructive = True
@@ -908,7 +875,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                 return False
             
         current_best = env.key_value
-        self._update_elite_pool(env.current_solution)
+        self._update_elite_pool_from_env(env)
         
         no_improve_steps = 0
 
@@ -921,8 +888,12 @@ class PhasedSearchCooperativeHyperHeuristic:
         # Keep track of local optima we have visited frequently.
         # Format: {cut_value: visit_count}
         self.visited_peaks = {}
-        TABU_TOLERANCE = 5.0 # Solutions within this range are considered the "same" peak
-        MAX_VISITS_PER_PEAK = 3 # How many times can we rediscover the same peak before banning it?
+        # [FIX: RELAX TOLERANCE]
+        # Strict 1e-6 is too tight for float variations on different heuristic paths.
+        # Use 1e-3 (or even 0.1) since object function values are usually large integers/floats.
+        # For MaxCut with float weights, peaks are usually separated by significant margins.
+        TABU_TOLERANCE = 1e-3 
+        MAX_VISITS_PER_PEAK = 20 # How many times can we rediscover the same peak before banning it?
 
         while env.continue_run:
             self.current_run_steps += 1
@@ -951,6 +922,20 @@ class PhasedSearchCooperativeHyperHeuristic:
             # Try to improve current solution (which might be ruined)
             improved = self._run_improvement_phase(env)
             
+            # [CRITICAL FIX 2026-02-26] Detect Stagnation at Local Optima
+            # If we are at a local optimum (not improving), we must record this peak
+            # to prevent infinite cycling around the same basin.
+            if not improved:
+                 peak_val = env.key_value
+                 found_family = False
+                 for existing_val in list(self.visited_peaks.keys()):
+                     if abs(peak_val - existing_val) < TABU_TOLERANCE:
+                         self.visited_peaks[existing_val] += 1
+                         found_family = True
+                         break
+                 if not found_family:
+                     self.visited_peaks[peak_val] = 1
+            
             # --- Phase B: Check Status ---
             # 1. Update Global/Local Best
             if env.key_value > current_best:
@@ -976,7 +961,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                 no_improve_steps = 0
                 self.stagnation_level = 0
                 self.consecutive_massive_ruins = 0 # Reset panic counter on improvement
-                self._update_elite_pool(env.current_solution)
+                self._update_elite_pool_from_env(env)
                 self._log(f"Step:{self.current_run_steps} NEW LOCAL BEST: {current_best}")
                 
 
@@ -997,10 +982,10 @@ class PhasedSearchCooperativeHyperHeuristic:
                                         saved_best = score
                                 except: pass
                     
-                    if (current_best - saved_best) > 1e-6:
+                    if (current_best - saved_best) > 1e-3:
                         env.dump_result(result_file=f"breakthrough_from_worker_{self.worker_id}_{current_best}.txt")
 
-                elif abs(current_best - env.best_known) < 1e-6:
+                elif abs(current_best - env.best_known) < 1e-3:
                      self._log(f"~~~ MATCHED BEST KNOWN: {current_best} ~~~")
                      # Only save Match if no results exist yet
                      has_records = False
@@ -1021,7 +1006,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # Don't add every step, maybe every 10 steps to avoid flooding with identical copies
                 is_best_known = env.key_value >= env.best_known
                 if is_best_known or (env.key_value >= env.best_known * 0.98 and self.current_run_steps % 10 == 0):
-                    self._update_elite_pool(env.current_solution)
+                    self._update_elite_pool_from_env(env)
 
             # --- Phase C: Breakout / Ruin Strategies ---
             # Adaptive Patience based on problem size
@@ -1148,7 +1133,8 @@ class PhasedSearchCooperativeHyperHeuristic:
                 is_immune = (self.current_run_steps - self.last_restart_step) < immunity_period
 
                 if self.elite_pool and no_improve_steps > 300:
-                    pool_best = max(self.elite_pool, key=lambda s: s.cut_value)
+                    pool_best_wrapper = max(self.elite_pool, key=lambda s: s["solution"].cut_value)
+                    pool_best = pool_best_wrapper["solution"]
                     
                     # Original: 0.998 allowed 5321 (0.9989) to survive indefinitely.
                     # Fix: 0.9992 was too strict and caused "Ruin -> Catch-up -> Reset" loop.
@@ -1161,6 +1147,9 @@ class PhasedSearchCooperativeHyperHeuristic:
                         self._log(f"AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value} (Threshold: {catch_up_threshold})...")
                         
                         env.current_solution = Solution(set(pool_best.set_a), set(pool_best.set_b), pool_best.cut_value)
+                        # Restore History
+                        env.recordings = list(pool_best_wrapper.get("history", []))
+
                         env.current_solution.cut_value = env.get_key_value(env.current_solution)
                         env.problem_state = env.get_problem_state()
                         
