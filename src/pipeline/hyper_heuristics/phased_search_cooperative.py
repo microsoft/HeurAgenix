@@ -282,6 +282,24 @@ class PhasedSearchCooperativeHyperHeuristic(PhasedSearchAdaptivePolishingHyperHe
         
         # Case 1: Better than worst (Standard quality improvement)
         if new_sol.cut_value > min_val:
+            # [FIX 2026-02-26] Preventing Pool Homogenization
+            # Check if we already have too many solutions with the SAME cut_value as this new one.
+            # If we have >= 3 solutions with this exact score, we reject adding another one (even if it improves the worst), 
+            # UNLESS the worst one is ALSO of this same score (which means we are just cycling).
+            # This forces the pool to keep lower-quality but diverse solutions.
+            
+            same_score_count = sum(1 for s in self.elite_pool if abs(s.cut_value - new_sol.cut_value) < 1e-6)
+            MAX_SAME_SCORE = 3
+            
+            if same_score_count >= MAX_SAME_SCORE:
+                 # Too many identical scores. Reject to preserve diversity of lower scores.
+                 # Exception: If the solution to be replaced (min_val) is actually much worse, 
+                 # we might still want to replace it? 
+                 # No, strict diversity. If we have 3 copies of Best, we don't need a 4th. 
+                 # We need the 4th slot for a 2nd Best or 3rd Best to bridge the gap.
+                 # self._log(f"Pool Reject: Too many solutions with score {new_sol.cut_value}")
+                 return
+
             # Replace the worst one
             for i, s in enumerate(self.elite_pool):
                 if s.cut_value == min_val:
