@@ -189,6 +189,36 @@ class PhasedSearchCooperativeHyperHeuristic:
                 except OSError:
                     pass
             
+            # [CRITICAL FIX 2026-02-27] Anti-Homogenization Check (Disk Level)
+            # Before writing, check if we already have enough copies of this solution score in the shard.
+            # This prevents "Keep-Alive" from flooding the pool with identical solutions (e.g. 5326663.8...).
+            # We match the integer part to be fast, then check strict float tolerance relative to filenames if needed.
+            # But simply limiting per-integer-bucket is a good heuristic for these large floats.
+            
+            # Pattern: sol_{val}_...
+            # We use a glob to count existing files for this roughly similar score
+            score_prefix = f"sol_{int(solution.cut_value)}"
+            existing_files = glob.glob(os.path.join(shard_path, f"{score_prefix}*.pkl"))
+            
+            if len(existing_files) >= 3:
+                # Check more strictly: are they actually the same score?
+                same_score_count = 0
+                target_val = solution.cut_value
+                for ef in existing_files:
+                    try:
+                        # filename format: sol_5326663.8146..._timestamp...
+                        fname = os.path.basename(ef)
+                        val_str = fname.split("_")[1]
+                        val = float(val_str)
+                        if abs(val - target_val) < 1e-3:
+                            same_score_count += 1
+                    except:
+                        pass
+                
+                if same_score_count >= 3:
+                    # Too many copies on disk already. Do not save/flood.
+                    return
+
             timestamp_int = int(current_time)
             # Filename: sol_{value}_{timestamp}_{worker}_{rand}.pkl
             filename = f"sol_{solution.cut_value}_{timestamp_int}_{self.worker_id}_{random.randint(1000,9999)}.pkl"
@@ -220,10 +250,82 @@ class PhasedSearchCooperativeHyperHeuristic:
         buckets_to_scan = []
         
         # Current hour
-        buckets_to_scan.append(self._get_time_bucket_path(current_time))
+        current_bucket = self._get_time_bucket_path(current_time)
+        buckets_to_scan.append(current_bucket)
         # Previous hour
-        buckets_to_scan.append(self._get_time_bucket_path(current_time - 3600))
+        prev_bucket = self._get_time_bucket_path(current_time - 3600)
+        buckets_to_scan.append(prev_bucket)
         
+        # [NEW 2026-02-27] Cross-Hour Migration Strategy
+        # If we just crossed into a new hour bucket (e.g. current_bucket is empty or very sparse),
+        # we risk "Cold Start Homogenization" where the first few solutions (likely local optima) 
+        # dominate the new empty bucket 100%.
+        # To prevent this, we forcingly migrate diverse elites from the previous bucket if the new one is empty.
+        
+        if os.path.exists(prev_bucket) and (not os.path.exists(current_bucket) or len(os.listdir(current_bucket)) < 5):
+             # Identify that we are in a transition period.
+             # Migration is done distributedly: Each worker checks their own shard.
+             prev_shard_path = self._get_shard_path(prev_bucket, self.shard_id)
+             curr_shard_path = self._get_shard_path(current_bucket, self.shard_id)
+             
+             if os.path.exists(prev_shard_path):
+                 try:
+                     # Create current shard if needed
+                     os.makedirs(curr_shard_path, exist_ok=True)
+                     
+                     # Read TOP 30 UNIQUE solutions from previous shard
+                     # Use strict 1e-3 difference to ensure diversity
+                     files = glob.glob(os.path.join(prev_shard_path, "*.pkl"))
+                     
+                     # 1. Parse all files and store as (score, filepath)
+                     candidates = []
+                     for f in files:
+                         try:
+                             # filename format: sol_5326663.8146..._timestamp...
+                             fname = os.path.basename(f)
+                             val_str = fname.split("_")[1]
+                             val = float(val_str)
+                             candidates.append((val, f))
+                         except: pass
+                     
+                     # 2. Sort by Score Descending (Quality First)
+                     candidates.sort(key=lambda x: x[0], reverse=True)
+                     
+                     # 3. Select unique solutions (Difference > 1e-3)
+                     # We only keep the FIRST occurrence of any score (highest quality duplicate if any)
+                     files_to_migrate = []
+                     selected_scores = []
+                     
+                     for score, fpath in candidates:
+                         is_duplicate = False
+                         for existing_score in selected_scores:
+                             if abs(score - existing_score) < 1e-3:
+                                 is_duplicate = True
+                                 break
+                         
+                         if not is_duplicate:
+                             files_to_migrate.append(fpath)
+                             selected_scores.append(score)
+                             
+                         if len(files_to_migrate) >= 30:
+                             break
+                     
+                     # Copy them to new bucket
+                     
+                     # Copy them to new bucket
+                     import shutil
+                     for old_f in files_to_migrate:
+                         new_f = os.path.join(curr_shard_path, os.path.basename(old_f))
+                         if not os.path.exists(new_f):
+                             shutil.copy2(old_f, new_f)
+                             
+                     if files_to_migrate:
+                         self._log(f"Migrated {len(files_to_migrate)} diverse elites from {os.path.basename(prev_bucket)} to {os.path.basename(current_bucket)}")
+                         
+                 except Exception as e:
+                     # self._log(f"Migration error: {e}")
+                     pass
+
         files_to_read = []
         
         for bucket in buckets_to_scan:
