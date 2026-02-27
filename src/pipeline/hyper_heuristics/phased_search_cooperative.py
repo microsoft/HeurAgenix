@@ -102,7 +102,8 @@ class PhasedSearchCooperativeHyperHeuristic:
             "batch_cluster_ruin": ["batch_cluster_ruin"],
             "batch_worst_ruin": ["batch_worst_ruin"],
             "path_relinking": ["path_relinking_guided_perturbation", "path_relinking"],
-            "anti_consensus": ["anti_consensus_perturbation"]
+            "anti_consensus": ["anti_consensus_perturbation"],
+            "batch_flip": ["batch_flip_perturbation"]
         }
 
         # 1. Classify standard pool
@@ -129,7 +130,8 @@ class PhasedSearchCooperativeHyperHeuristic:
             "batch_cluster_ruin": os.path.join(base_path, ruin_path, "batch_cluster_ruin.py"),
             "batch_worst_ruin": os.path.join(base_path, ruin_path, "batch_worst_ruin.py"),
             "path_relinking": os.path.join(base_path, "path_relinking_guided_perturbation.py"),
-            "anti_consensus": os.path.join(base_path, ruin_path, "anti_consensus_perturbation.py")
+            "anti_consensus": os.path.join(base_path, ruin_path, "anti_consensus_perturbation.py"),
+            "batch_flip": os.path.join(base_path, ruin_path, "batch_flip_perturbation.py")
         }
         
         for key, path in fallback_map.items():
@@ -357,44 +359,8 @@ class PhasedSearchCooperativeHyperHeuristic:
         else:
              return
 
-    def _calculate_consensus_flip(self, node_num, flip_ratio=0.1):
-        """
-        Identify variables that are 'static' across the entire elite pool (Consensus),
-        and select a subset of them to force flip.
-        This implements the 'Anti-Consensus' or 'Non-local Move' strategy.
-        """
-        if not self.elite_pool:
-             return []
-             
-        pool_size = len(self.elite_pool)
-        
-        # Count occurrence of each node in set_a
-        # set_a_counts[i] = number of elite solutions where node i is in set_a
-        set_a_counts = {}
-        
-        for item in self.elite_pool:
-            # Handle Wrapper
-            sol = item["solution"]
-            for node in sol.set_a:
-                set_a_counts[node] = set_a_counts.get(node, 0) + 1
-                
-        static_nodes = []
-        
-        for node in range(node_num):
-            count = set_a_counts.get(node, 0)
-            # If node is in A for all solutions (count == pool_size) 
-            # OR in A for 0 solutions (count == 0, meaning always in B)
-            # It is a Static/Consensus node.
-            if count == pool_size or count == 0:
-                static_nodes.append(node)
-                
-        if not static_nodes:
-            # Fallback if no consensus (unlikely in stagnation)
-            return random.sample(range(node_num), int(node_num * flip_ratio))
-            
-        # Select a subset of static nodes to flip
-        flip_count = max(1, int(len(static_nodes) * flip_ratio))
-        return random.sample(static_nodes, flip_count)
+    # Removed _calculate_consensus_flip (logic moved to anti_consensus_perturbation heuristic)
+
 
     def _update_elite_pool_from_env(self, env):
         # [NEW 2026-02-26] Capture solution + history for full reproducibility
@@ -434,13 +400,23 @@ class PhasedSearchCooperativeHyperHeuristic:
                                       set(env.current_solution.set_b), 
                                       env.current_solution.cut_value)
                 start_val = backup_sol.cut_value
+                # Backup recordings length to rollback changes if heuristic fails
+                recordings_len = len(env.recordings) if env.recordings else 0
                 
                 # 2. Run Heuristic (In-Place Modification)
                 try:
                     env.run_heuristic(heuristic)
                 except Exception as e:
-                    self._log(f"Error running heuristic: {e}")
+                    # Sparse logging to prevent explosion if heuristic is fundamentally broken
+                    if not hasattr(self, "_error_log_count"): self._error_log_count = 0
+                    self._error_log_count += 1
+                    if self._error_log_count < 10 or self._error_log_count % 1000 == 0:
+                         self._log(f"Error running heuristic {heuristic.__name__}: {e}")
+                    
                     env.current_solution = backup_sol
+                    # Rollback recordings on error
+                    if env.recordings:
+                        env.recordings = env.recordings[:recordings_len]
                     continue
 
                 # 3. Acceptance Criteria: Strict Ascent
@@ -451,6 +427,10 @@ class PhasedSearchCooperativeHyperHeuristic:
                     # Restore env properties just in case
                     env.current_solution.cut_value = start_val
                     env.problem_state = env.get_problem_state() 
+                    # Rollback recordings for rejected move
+                    if env.recordings:
+                        env.recordings = env.recordings[:recordings_len]
+                    
                     # Note: We assume env.problem_state is derived from current_solution, 
                     # but heuristic might modify algorithm_data too. Usually negligible for basic heuristics.
                 else:
@@ -473,17 +453,19 @@ class PhasedSearchCooperativeHyperHeuristic:
             # "Anti-Consensus" Strategy: Flip stable variables
             # Increase intensity to 10%-20% to escape deep basin
             ratio = random.uniform(0.10, 0.20)
-            nodes_to_flip = self._calculate_consensus_flip(node_num, flip_ratio=ratio) 
-            if nodes_to_flip:
-                 # Replaced direct modification with Operator
-                 to_a = [n for n in nodes_to_flip if n in env.current_solution.set_b]
-                 to_b = [n for n in nodes_to_flip if n in env.current_solution.set_a]
-                 op = BatchInsertNodeOperator(to_a, to_b)
-                 env.run_operator(op)
-                 
-                 self._log(f"Supernova Ruin applied: Flipped {len(nodes_to_flip)} static nodes (Ratio: {ratio:.2f}).")
+            
+            # Prepare algorithm context for heuristic (unpack Elite Pool wrappers)
+            if self.elite_pool:
+                env.algorithm_data["elite_pool"] = [s["solution"] for s in self.elite_pool]
+            
+            # Use evolved heuristic "anti_consensus"
+            if "anti_consensus" in self.breakout_heuristics:
+                 h = self.breakout_heuristics["anti_consensus"]
+                 env.run_heuristic(h, parameters={"ratio": ratio})
+                 self._log(f"Supernova Ruin applied: Anti-Consensus Flip (Ratio: {ratio:.2f}).")
             else:
-                 # Fallback if no static nodes found
+                 # Fallback if heuristic missing (should be loaded by default)
+                 self._log("Supernova Ruin: Heuristic missing, falling back to Heavy Ruin.")
                  self._apply_breakout(env, "heavy_ruin")
 
         elif strategy == "active_pool_relinking":
@@ -542,13 +524,17 @@ class PhasedSearchCooperativeHyperHeuristic:
                  
                  # Perturb 2% of nodes (enough to move away ~60 nodes in 3000)
                  # This is lighter than Level 1 Stagnation (Light Ruin), keeping us in the same "Peak Family".
-                 micro_flip_count = max(5, int(node_num * 0.02))
-                 
-                 nodes_to_flip = random.sample(range(node_num), micro_flip_count)
-                 to_a = [n for n in nodes_to_flip if n in env.current_solution.set_b]
-                 to_b = [n for n in nodes_to_flip if n in env.current_solution.set_a]
-                 op = BatchInsertNodeOperator(to_a, to_b)
-                 env.run_operator(op)
+                 if "batch_flip" in self.breakout_heuristics:
+                     h = self.breakout_heuristics["batch_flip"]
+                     env.run_heuristic(h, parameters={"ratio": 0.02})
+                 else:
+                     micro_flip_count = max(5, int(node_num * 0.02))
+                     nodes_to_flip = random.sample(range(node_num), micro_flip_count)
+                     op = BatchInsertNodeOperator(
+                         [n for n in nodes_to_flip if n in env.current_solution.set_b],
+                         [n for n in nodes_to_flip if n in env.current_solution.set_a]
+                     )
+                     env.run_operator(op)
                  
                  return
 
@@ -714,13 +700,18 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # Even after ruin, COSM might reconstruct the exact same solution.
                 # We force a small random perturbation (5%) to ensure we land in a NEW basin.
                 ratio_noise = 0.05
-                noise_nodes = random.sample(range(node_num), int(node_num * ratio_noise))
-                # Flip them
-                to_a_noise = [n for n in noise_nodes if n in env.current_solution.set_b]
-                to_b_noise = [n for n in noise_nodes if n in env.current_solution.set_a]
-                op_noise = BatchInsertNodeOperator(to_a_noise, to_b_noise)
-                env.run_operator(op_noise)
-                self._log(f"Noise Injection: Flipped {len(noise_nodes)} nodes ({ratio_noise:.1%}) to escape basin.")
+                if "batch_flip" in self.breakout_heuristics:
+                     h = self.breakout_heuristics["batch_flip"]
+                     env.run_heuristic(h, parameters={"ratio": ratio_noise})
+                     self._log(f"Noise Injection: Random Flip ({ratio_noise:.1%}) to escape basin.")
+                else:
+                     noise_nodes = random.sample(range(node_num), int(node_num * ratio_noise))
+                     op_noise = BatchInsertNodeOperator(
+                         [n for n in noise_nodes if n in env.current_solution.set_b],
+                         [n for n in noise_nodes if n in env.current_solution.set_a]
+                     )
+                     env.run_operator(op_noise)
+                     self._log(f"Noise Injection: Flipped {len(noise_nodes)} nodes ({ratio_noise:.1%}) to escape basin.")
                 
                 # Force update value
                 cur_val = env.get_key_value(env.current_solution)
@@ -729,14 +720,18 @@ class PhasedSearchCooperativeHyperHeuristic:
 
             else:
                  # Fallback: Random Flip 40%
-                 nodes = random.sample(range(node_num), int(node_num * 0.40))
-                 
-                 to_a = [n for n in nodes if n in env.current_solution.set_b]
-                 to_b = [n for n in nodes if n in env.current_solution.set_a]
-                 op = BatchInsertNodeOperator(to_a, to_b)
-                 env.run_operator(op)
-                 
-                 self._log(f"Fallback Ruin: Random Flipped {len(nodes)} nodes.")
+                 if "batch_flip" in self.breakout_heuristics:
+                     h = self.breakout_heuristics["batch_flip"]
+                     env.run_heuristic(h, parameters={"ratio": 0.40})
+                     self._log("Fallback Ruin: Random Flip (40%).")
+                 else:
+                     nodes = random.sample(range(node_num), int(node_num * 0.40))
+                     op = BatchInsertNodeOperator(
+                         [n for n in nodes if n in env.current_solution.set_b],
+                         [n for n in nodes if n in env.current_solution.set_a],
+                     )
+                     env.run_operator(op)
+                     self._log(f"Fallback Ruin: Random Flipped {len(nodes)} nodes.")
 
         elif strategy == "soft_restart":
              self._log("... Soft Restart Triggered ... Abandoning current solution.")
@@ -807,14 +802,6 @@ class PhasedSearchCooperativeHyperHeuristic:
                       env.run_heuristic(h)
                       construction_steps += 1
                   
-                  if not env.is_complete_solution:
-                      # Total random fallback if heuristics fail
-                      nodes = list(range(node_num))
-                      random.shuffle(nodes)
-                      mid = node_num // 2
-                      env.current_solution = Solution(set(nodes[:mid]), set(nodes[mid:]), 0)
-                      env.current_solution.cut_value = env.get_key_value(env.current_solution)
-
                   # [FIX 2026-02-19] Set Immunity Timer
                   self.last_restart_step = self.current_run_steps
                   self._log(f"Immunity Activated for 500 steps (Restart Step: {self.current_run_steps})")
@@ -914,9 +901,32 @@ class PhasedSearchCooperativeHyperHeuristic:
             
             if is_tabu:
                 # Force massive ruin (Supernova) to escape processing this dead zone
+                # [FIX 2026-02-27] Preventing infinite loop if heuristic fails to change solution
+                prev_tabu_val = env.key_value
                 self._apply_breakout(env, "supernova_ruin")
-                # Don't reset steps, we want to keep pressure high until we leave
-                continue
+                
+                # Check if we actually moved out of the basin
+                if abs(env.key_value - prev_tabu_val) < 1e-3:
+                     self._log("Supernova failed to break Tabu (Value unchanged). Forcing Random Ruin.")
+                     # Fallback to pure random ruin which is guaranteed to change state
+                     # Use batch_flip explicitly if available, otherwise massive_ruin which has fallbacks
+                     if "batch_flip" in self.breakout_heuristics:
+                         h = self.breakout_heuristics["batch_flip"]
+                         # Flip 20%
+                         env.run_heuristic(h, parameters={"ratio": 0.20})
+                     else:
+                         self._apply_breakout(env, "massive_ruin")
+                     
+                # [SAFETY BREAK 2026-02-27] Final check to prevent ANY infinite loop
+                if abs(env.key_value - prev_tabu_val) < 1e-3:
+                     self._log("CRITICAL: Breakout failed to change solution. Forcing escape from Tabu block.")
+                     # If we can't move, we must let the main loop proceed, 
+                     # even if it means researching the same peak (which will trigger standard stagnation logic).
+                     # We might be at a global optimum where no move is possible? (Unlikely for MaxCut)
+                     pass
+                else:
+                    # Successful move, loop back to start to re-evaluate new position
+                    continue
 
             # --- Phase A: Repair / Improve ---
             # Try to improve current solution (which might be ruined)
