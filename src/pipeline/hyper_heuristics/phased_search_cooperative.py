@@ -1050,7 +1050,9 @@ class PhasedSearchCooperativeHyperHeuristic:
             
             # --- Phase B: Check Status ---
             # 1. Update Global/Local Best
-            if env.key_value > current_best:
+            # [2026-02-28] Use threshold to prevent micro-fluctuations (1e-6) from resetting stagnation
+            # Only count as improvement if gain > 1e-3
+            if env.key_value > current_best + 1e-3:
                 current_best = env.key_value
                 
                 # [DYNAMIC TABU LIST UPDATE]
@@ -1136,7 +1138,10 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # Dynamic Retry Thresholds calculated from node_num
                 # Small graph (800): ~4 retries. Large graph (100k): ~20 retries allowed per phase.
                 # Logic: Don't give up strictly on a strategy until we've tried it enough times relative to problem complexity.
-                max_retries_per_phase = max(3, int(math.log10(node_num) * 2)) 
+                # [2026-02-28] UPDATE: Log analysis (imgseg_103041, 126039, 135037) shows >1 retry per phase is futile.
+                # All successful breakouts happen on Attempt 0 or 1. Escalation is better.
+                # [Request 2026-02-28] Increase to 2 retries to give each level slightly more chance before nuclear option.
+                max_retries_per_phase = 2 
                 
                 # Increment internal counter for current phase
                 if not hasattr(self, 'phase_retries'):
@@ -1149,11 +1154,11 @@ class PhasedSearchCooperativeHyperHeuristic:
                 
                 if self.stagnation_level == 0:
                     self.stagnation_level = 1 # Start stagnation handling
-                    self.phase_retries = 0
+                    self.phase_retries = 1 # [2026-02-28] Start at 1 for clearer logging (Try 1/2, 2/2)
                 elif self.phase_retries > max_retries_per_phase:
                      # Budget exhausted for current level, escalate!
                      self.stagnation_level += 1
-                     self.phase_retries = 0 # Reset for new level
+                     self.phase_retries = 1 # Reset for new level (Start at 1)
                      self._log(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted {max_retries_per_phase} retries)")
 
                 # [OPTIMIZED HIERARCHY 2026-02-24: 4-Level Logic]
@@ -1194,14 +1199,27 @@ class PhasedSearchCooperativeHyperHeuristic:
                 
                 # [BUG FIX 2026-02-21] Detect Hard Restart and Reset Baseline
                 # If breakout resulted in a massive value drop (e.g. > 10%), it means we restarted.
-                # We must reset current_best to avoid immediate stagnation detection.
+                # We must reset current_best to avoid immediate stagnation detection (comparing against the old peak).
                 if env.key_value < current_best * 0.90:
                     self._log(f"Hard Restart Detected: Resetting Local Baseline ({current_best} -> {env.key_value})")
-                    current_best = env.key_value
+                    # current_best = env.key_value  <-- CRITICAL FIX: Do NOT reset the goalpost!
+                    # If we lower the bar, any tiny climb will count as "Success" and reset the stagnation level to 0.
+                    # We want to escalate if we cannot beat the ORIGINAL peak.
+                    # So we keep current_best as the high water mark.
+                    
                     # Also reset visited stats to allow re-visiting peaks? No, keep tabu.
                     no_improve_steps = 0
-                    # Reset Stagnation Level again to be safe
-                    self.stagnation_level = 0
+                    
+                    # [CRITICAL Fix 2026-02-28] Do NOT reset Stagnation Level unless it was a real Soft Restart.
+                    # If we are in Level 2 or 3 (Ruin), a drop is EXPECTED. We must NOT forget we are in a stagnation fight.
+                    # Only reset level if we specifically asked for a soft restart.
+                    if strategy == "soft_restart":
+                        self.stagnation_level = 0
+                        current_best = env.key_value # ONLY reset baseline on explicit soft restart
+                    else:
+                        # We keep stagnation_level as is.
+                        # We rely on 'no_improve_steps' accumulating again in this NEW basin to trigger the NEXT escalation.
+                        pass
                 
                 # Reset counter to give the new candidate a chance
                 no_improve_steps = 0
