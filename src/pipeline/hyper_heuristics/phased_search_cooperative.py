@@ -54,6 +54,19 @@ class PhasedSearchCooperativeHyperHeuristic:
         # Capacity limit for pool expansion. 
         self.POOL_CAPACITY = 10000
         
+        # [NEW] Elite Quality Filter Size (N)
+        # We only use the top N elites for active optimization (relinking, etc.)
+        self.ELITE_FILTER_SIZE = 1000
+        
+        # [NEW] Migration Count
+        # Number of elites to migrate to new pool during inherit expansion
+        self.MIGRATION_COUNT = 100
+
+        # [NEW] Diversity Control
+        # Minimum distance ratio for diversity checks (0.05 = 5% of nodes)
+        self.MIN_DIST_RATIO_MIGRATION = 0.05 
+        self.MIN_DIST_RATIO_RELINKING = 0.025 # 2.5% for active relinking warning threshold
+        
         if self.shared_pool_dir:
             try:
                 self._log(f"Shared Elite Pool Directory: {self.shared_pool_dir}")
@@ -289,9 +302,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                  migrated_elites = []
                  seen_values = []
                  
-                 # Parameters for diversity check
-                 MAX_MIGRATION = 100
-                 MIN_DIST_RATIO = 0.05 # Solutions must differ by 5% of nodes
+                 # Parameters for diversity check (Direct usage)
                  
                  # Helper for distance
                  def quick_dist(s1, s2):
@@ -306,10 +317,10 @@ class PhasedSearchCooperativeHyperHeuristic:
                      return min(d1, d2)
 
                  node_num = len(sorted_pool[0]["solution"].set_a) + len(sorted_pool[0]["solution"].set_b)
-                 min_dist = max(10, int(node_num * MIN_DIST_RATIO))
+                 min_dist = max(10, int(node_num * self.MIN_DIST_RATIO_MIGRATION))
                  
                  for wrapper in sorted_pool:
-                     if len(migrated_elites) >= MAX_MIGRATION:
+                     if len(migrated_elites) >= self.MIGRATION_COUNT:
                          break
                          
                      candidate = wrapper["solution"]
@@ -799,6 +810,16 @@ class PhasedSearchCooperativeHyperHeuristic:
 
     def _apply_breakout(self, env, strategy):
         node_num = env.instance_data["node_num"]
+
+        # [NEW] Prepare Filtered Elite Pool for Breakout
+        # We only expose the Top N elites to the heuristic engine
+        filtered_elites = []
+        if self.elite_pool:
+             # Sort desc
+             sorted_pool = sorted(self.elite_pool, key=lambda s: s["solution"].cut_value, reverse=True)
+             # Take top N
+             top_n = sorted_pool[:self.ELITE_FILTER_SIZE]
+             filtered_elites = [s["solution"] for s in top_n]
         
         if strategy == "supernova_ruin":
             # "Anti-Consensus" Strategy: Flip stable variables
@@ -806,8 +827,8 @@ class PhasedSearchCooperativeHyperHeuristic:
             ratio = random.uniform(0.10, 0.20)
             
             # Prepare algorithm context for heuristic (unpack Elite Pool wrappers)
-            if self.elite_pool:
-                env.algorithm_data["elite_pool"] = [s["solution"] for s in self.elite_pool]
+            if filtered_elites:
+                env.algorithm_data["elite_pool"] = filtered_elites
             
             # Use evolved heuristic "anti_consensus"
             if "anti_consensus" in self.breakout_heuristics:
@@ -823,15 +844,26 @@ class PhasedSearchCooperativeHyperHeuristic:
             # [NEW] Active strategy: Force path relinking between distant elites
             if len(self.elite_pool) < 2:
                  return
+
+            # [OPTIMIZED] Use Filtered Pool for Target Selection
+            # We want to link with HIGH QUALITY elites (Top N), not just any random elite in the 10000 pool.
+            # Using self.ELITE_FILTER_SIZE
             
-            # 1. Find Best Known (Handle Wrapper)
+            candidate_pool = self.elite_pool
+            if len(self.elite_pool) > self.ELITE_FILTER_SIZE:
+                 # Sort desc and take top N
+                 sorted_pool = sorted(self.elite_pool, key=lambda s: s["solution"].cut_value, reverse=True)
+                 candidate_pool = sorted_pool[:self.ELITE_FILTER_SIZE]
+            
+            # 1. Find Best Known (Handle Wrapper) from the FULL pool (usually same as filtered, but just in case)
             best_wrapper = max(self.elite_pool, key=lambda s: s["solution"].cut_value)
             best_sol = best_wrapper["solution"]
             
             # 2. Find a "Distant" High-Quality Elite
             # [FIX] Lower threshold to 0.97 to ensure our current elites (2400-2406) can participate
             # 2446 * 0.97 = 2372, so 2400+ are valid candidates
-            candidates = [s for s in self.elite_pool if s["solution"].cut_value > env.best_known * 0.97]
+            # Use candidate_pool instead of self.elite_pool
+            candidates = [s for s in candidate_pool if s["solution"].cut_value > env.best_known * 0.97]
             if not candidates: 
                  return
                  
@@ -858,7 +890,7 @@ class PhasedSearchCooperativeHyperHeuristic:
             # CRITICAL FIX: node_num is not in self.problem, it is in env.instance_data
             node_num = env.instance_data["node_num"]
             # [FIX 2026-02-19] Increased safety radius to 2.5% to prevent black hole collapse
-            threshold = max(10, int(node_num * 0.025))
+            threshold = max(10, int(node_num * self.MIN_DIST_RATIO_RELINKING))
 
             if dist < threshold: 
                  # [FIX 2026-02-19] Improved Robustness:
