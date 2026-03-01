@@ -1208,9 +1208,7 @@ class PhasedSearchCooperativeHyperHeuristic:
             result = self._run_epoch(env)
             
             if self.pending_rebuild:
-                self._log("="*50)
                 self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id})")
-                self._log("="*50 + "\n")
                 
                 # Reset Flags
                 self.pending_rebuild = False
