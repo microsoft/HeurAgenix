@@ -175,11 +175,11 @@ def main(
     temp_env = Env(data_name=data_name)
     node_num = temp_env.instance_data.get("node_num", "Unknown")
     bk = temp_env.best_known
-    logger(f"============================================================")
+    logger(f"=" * 50)
     logger(f"  Target Data: {data_name}")
     logger(f"  Nodes: {node_num}")
     logger(f"  Best Known (BK): {bk}")
-    logger(f"============================================================")
+    logger(f"=" * 50)
 
     if method == "cooperative":
         # Auto-configure shared pool directory for cooperative methods (communication channel)

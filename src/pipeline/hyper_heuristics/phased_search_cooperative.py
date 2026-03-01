@@ -45,14 +45,317 @@ class PhasedSearchCooperativeHyperHeuristic:
         self.last_sync_time = 0
         self.last_restart_step = -1000 
         
+        # [NEW 2026-03-01] Epoch-based Elite Pool Infrastructure
+        self.pool_id = 0
+        self.pool_type = 'inherit'
+        self.pending_rebuild = False # Flag to signal main loop to perform hard reset
+        
+        # [PHASE 2 CONFIG]
+        # Capacity limit for pool expansion. 
+        self.POOL_CAPACITY = 10000
+        
         if self.shared_pool_dir:
             try:
                 self._log(f"Shared Elite Pool Directory: {self.shared_pool_dir}")
                 os.makedirs(self.shared_pool_dir, exist_ok=True)
+                
+                # Check for existing epoch pools and sync state
+                latest_found = self._scan_pool_epochs()
+                
+                # [NEW] Explicitly Create/Log Pool 0 if we are starting fresh
+                # If _scan_pool_epochs returns default (0, 'inherit') AND the directory doesn't exist yet, we create it.
+                if self.pool_id == 0 and self.pool_type == 'inherit':
+                     pool0_path = self._get_pool_path(0, 'inherit')
+                     if not os.path.exists(pool0_path):
+                         try:
+                             os.makedirs(pool0_path, exist_ok=False)
+                             self._log("\n" + "-" * 60 + "\n" + f"  INITIALIZATION: Created First Pool pool_0_inherit" + "\n" + "-" * 60)
+                         except FileExistsError:
+                             pass # Someone else created it just now
+                
+                # If no pool exists, self.pool_id / self.pool_type remain default (0, 'inherit')
+                # but we need to ensure the directory exists for writing (lazy create in write)
+                
             except OSError:
                 pass 
+                
+    def _scan_pool_epochs(self):
+        """Scans the shared directory for pool_{id}_{type} folders and updates local pointer to the latest epoch."""
+        if not self.shared_pool_dir: return
+        
+        try:
+            entries = os.listdir(self.shared_pool_dir)
+            pools = []
+            
+            for entry in entries:
+                # Format: pool_{id}_{type}
+                parts = entry.split('_')
+                if len(parts) >= 3 and parts[0] == 'pool' and parts[1].isdigit():
+                    pid = int(parts[1])
+                    ptype = parts[2]
+                    # Full path
+                    path = os.path.join(self.shared_pool_dir, entry)
+                    if os.path.isdir(path):
+                        pools.append((pid, ptype))
+            
+            if pools:
+                # Sort by ID ascending
+                pools.sort(key=lambda x: x[0])
+                latest_id, latest_type = pools[-1]
+                
+                if latest_id > self.pool_id:
+                     self.pool_id = latest_id
+                     self.pool_type = latest_type
+                     self._log(f"Initialized Pool Pointer to Epoch {self.pool_id} ({self.pool_type})")
+                     return (latest_id, latest_type)
+            
+            return (self.pool_id, self.pool_type)
+                     
+        except Exception as e:
+            self._log(f"Error scanning pool epochs: {e}")
+            return (self.pool_id, self.pool_type)
 
+    def _get_pool_path(self, pool_id, pool_type):
+        """Returns the directory path for a specific pool epoch."""
+        return os.path.join(self.shared_pool_dir, f"pool_{pool_id}_{pool_type}")
 
+    def _check_and_update_pool_id(self):
+        """Scans periodically and updates the pool pointer if a new epoch is found (Follower Logic)."""
+        old_id = self.pool_id
+        new_id, new_type = self._scan_pool_epochs()
+        if new_id > old_id:
+            self.pool_id = new_id
+            self.pool_type = new_type
+            
+            # [CRITICAL DATA HYGIENE 2026-03-01]
+            # If we switch to a 'rebuild' pool (L5 Hard Restart), we MUST clear our local elite pool.
+            # Otherwise, the subsequent 'Keep-Alive' logic in _sync_shared_pool (which runs right after this)
+            # will upload our OLD dirty elites into the pristine NEW pool, contaminating it instantly.
+            if new_type == 'rebuild':
+                # Follower's response to Revolution
+                self._log(f"-> [FOLLOW] Detected REVOLUTION (Pool {new_id}_rebuild). Resetting...")
+                
+                self.pending_rebuild = True
+                self.elite_pool = [] # CLEAR IMMEDIATELY
+                self.visited_peaks = {}
+            else:
+                # Follower's response to Expansion
+                self._log(f"-> [EXPAND] Switched to new pool: {new_id} ({new_type}) (Inherit)")
+
+    def _try_trigger_rebuild(self):
+        """Attempts to trigger a Global Hard Restart (L5) by creating a 'rebuild' epoch."""
+        self._log("Attempting to trigger L5 Global Hard Restart...")
+        
+        # 1. Check Current Global State (Race Condition Check)
+        latest_id, latest_type = self._scan_pool_epochs()
+        
+        # Scenario 4 (Corrected): Someone (or even myself effectively) is already in a rebuild epoch.
+        # If the latest epoch is 'rebuild', we generally verify if we should join it.
+        # Logic: If latest is rebuild, and it's fresh (not full/old), we join/reset instead of creating another one.
+        if latest_type == 'rebuild':
+             # Whether latest_id > self.pool_id (new) or latest_id == self.pool_id (current),
+             # if the world is already in 'rebuild' mode, we shouldn't trigger another one immediately
+             # unless that rebuild pool is already 'saturated' (which is handled by expansion logic, not rebuild logic).
+             
+             self._log(f"Global Rebuild (pool_{latest_id}) already active. Avoiding double-rebuild. Joining/Resetting...")
+             
+             # If ID is greater, update to it.
+             if latest_id > self.pool_id:
+                 self._check_and_update_pool_id()
+             else:
+                 # If we are already on this ID but still trying to trigger L5, 
+                 # it means we haven't reset ourselves yet.
+                 self.pending_rebuild = True 
+                 
+             return
+
+        # Scenario 2: Inherit happened, but we want REBUILD. 
+        # Determine the next ID. ALWAYS increment.
+        # If latest_id > self.pool_id (someone expanded), we skip that expansion and create rebuild on top.
+        # If latest_id == self.pool_id, we just increment.
+        
+        target_id = latest_id + 1
+        target_type = 'rebuild'
+        
+        new_pool_path = self._get_pool_path(target_id, target_type)
+        
+        try:
+             # Atomic creation
+             os.makedirs(new_pool_path, exist_ok=False)
+             
+             # LOGGING: DISTINCTIVE BLOCK FOR INITIATOR
+             self._log("\n" + "-" * 60 + "\n" + f"REBUILD INITIATED: pool_{target_id}_rebuild (Worker {self.worker_id})" + "\n" + "-" * 60)
+
+             
+             # Immediately switch to it
+             self.pool_id = target_id
+             self.pool_type = target_type
+             self.pending_rebuild = True # I triggered it, so I must also reset myself!
+             
+        except FileExistsError:
+             # Scenario 3/4 Race: Someone beat us to creating pool_{target_id}
+             # Check what they created
+             race_id, race_type = self._scan_pool_epochs()
+             
+             if race_type == 'rebuild':
+                 # Good, they did what we wanted. Join them.
+                 self._log("Rebuild race lost, but goal achieved. Joining...")
+                 self._check_and_update_pool_id()
+             else:
+                 # Scenario 3: They created an INHERIT pool while we wanted REBUILD.
+                 # We must NOT settle for inherit. We must try again to create rebuild on top of theirs.
+                 self._log("Conflict: Inherit pool created during Rebuild attempt. Retrying Rebuild on top...")
+                 # We simply update to the latest inherited pool.
+                 # Since search is still stagnant (we didn't rebuild), the next loop iteration in _run_epoch
+                 # will see stagnation_level >= 5 again, and call _try_trigger_rebuild AGAIN.
+                 # This time, we will try to build on top of the new inherited pool.
+                 self._check_and_update_pool_id()
+        
+        except Exception as e:
+             self._log(f"Error triggering rebuild: {e}")
+
+    def _estimate_pool_size(self):
+        """Estimates current pool size by counting ALL shards (Accurate)."""
+        current_path = self._get_pool_path(self.pool_id, self.pool_type)
+        if not os.path.exists(current_path): return 0
+        
+        # [OPTIMIZATION REMOVED]
+        # Previously sampled 3 shards. For 10 shards, verifying all is fast enough (ms).
+        # This provides accurate capacity control.
+        total_files = 0
+        
+        for s_idx in range(10):
+             s_path = self._get_shard_path(current_path, s_idx)
+             if os.path.exists(s_path):
+                 try:
+                     # Using scandir is faster than listdir/glob for just counting
+                     # We use a generator expression to avoid building a list in memory
+                     count = sum(1 for _ in os.scandir(s_path) if _.is_file())
+                     total_files += count
+                 except:
+                     pass
+        
+        return total_files
+
+    def _try_expand_pool(self):
+        """Checks capacity and attempts to create the next pool epoch if needed (Leader Logic)."""
+        
+        # 1. Estimate Size
+        size = self._estimate_pool_size()
+        
+        if size < self.POOL_CAPACITY:
+            return # Not full yet
+            
+        self._log(f"Pool Capacity Reached ({size} > {self.POOL_CAPACITY}). Checking for expansion...")
+        
+        # 2. Race Condition Check: Does a newer pool ALREADY exist?
+        latest_id, latest_type = self._scan_pool_epochs()
+        
+        if latest_id > self.pool_id:
+            # SOMEONE BEAT US TO IT!
+            # Just switch.
+            self.pool_id = latest_id
+            self.pool_type = latest_type
+            self._log(f"-> Switched to new pool: {latest_id} ({latest_type}) (Expansion Preempted)")
+            return
+
+        # 3. Create New Pool (Leader Action)
+        # Inherit Strategy: Next ID, type 'inherit'
+        next_id = self.pool_id + 1
+        next_type = 'inherit'
+        
+        new_pool_path = self._get_pool_path(next_id, next_type)
+        
+        try:
+             # Atomic directory creation (mkdir fails if exists)
+             os.makedirs(new_pool_path, exist_ok=False)
+             self._log("\n" + "-" * 60 + "\n" + f"  INHERIT EXPANSION: Created pool_{next_id}_{next_type} from pool_{self.pool_id}" + "\n" + "-" * 60)
+             
+             # 4. Migrate Top Elites (Seed the new pool)
+             # [PHASE 3 OPTIMIZATION] Diversity-Aware Migration
+             # Instead of just taking the top 100, we select solutions that are:
+             # 1. High Score (Top priority)
+             # 2. Distinct (Distance check to avoid cloning the same peak)
+             
+             # [IMPORTANT 2026-03-01]
+             # If this is a 'rebuild' epoch (L5 Hard Restart), we do NOT migrate anything.
+             # The goal is to start FRESH. Zero legacy.
+             # Migration is ONLY for 'inherit' epochs (Pool Expansion).
+             
+             if next_type == 'inherit' and self.elite_pool:
+                 # Sort by value descending
+                 sorted_pool = sorted(self.elite_pool, key=lambda x: x["solution"].cut_value, reverse=True)
+                 
+                 migrated_elites = []
+                 seen_values = []
+                 
+                 # Parameters for diversity check
+                 MAX_MIGRATION = 100
+                 MIN_DIST_RATIO = 0.05 # Solutions must differ by 5% of nodes
+                 
+                 # Helper for distance
+                 def quick_dist(s1, s2):
+                     # Simplified distance check:
+                     # 1. Check value difference (Fastest)
+                     if abs(s1.cut_value - s2.cut_value) > 1e-3:
+                         return 999999 # Treat as different
+                     
+                     # 2. Check Set Intersection (Slow)
+                     d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
+                     d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
+                     return min(d1, d2)
+
+                 node_num = len(sorted_pool[0]["solution"].set_a) + len(sorted_pool[0]["solution"].set_b)
+                 min_dist = max(10, int(node_num * MIN_DIST_RATIO))
+                 
+                 for wrapper in sorted_pool:
+                     if len(migrated_elites) >= MAX_MIGRATION:
+                         break
+                         
+                     candidate = wrapper["solution"]
+                     is_distinct = True
+                     
+                     # Compare with already selected elites
+                     # Limit check to top 20 to speed up (O(N*M))
+                     for selected in migrated_elites[:20]: 
+                         dist = quick_dist(candidate, selected["solution"])
+                         if dist < min_dist:
+                             is_distinct = False
+                             break
+                     
+                     if is_distinct:
+                         migrated_elites.append(wrapper)
+                 
+                 # If we filtered too aggressively and have very few, relax and fill up
+                 if len(migrated_elites) < 20 and len(sorted_pool) > 20:
+                      remaining = [w for w in sorted_pool if w not in migrated_elites]
+                      migrated_elites.extend(remaining[:(20 - len(migrated_elites))])
+                 
+                 # Save to NEW pool
+                 # Actually, update ID first, then write.
+                 self.pool_id = next_id
+                 self.pool_type = next_type
+                 
+                 count = 0 
+                 for wrapper in migrated_elites:
+                      self._save_to_shared_pool(wrapper, is_keep_alive=True)
+                      count += 1
+                 
+                 self._log(f"Migrated {count} DIVERSE elites (from {len(sorted_pool)}) to pool_{next_id}_{next_type}")
+             else:
+                 # Rebuild or Empty Pool: Just Set ID
+                 self.pool_id = next_id
+                 self.pool_type = next_type
+                 self._log(f"Initialized Empty Pool: pool_{next_id}_{next_type}") 
+
+                 
+        except FileExistsError:
+             # Race Condition: Another worker created it milliseconds ago.
+             self._log("Pool creation raced. Switching to winner.")
+             self._check_and_update_pool_id()
+             
+        except Exception as e:
+             self._log(f"Error creating pool: {e}")
 
     def _classify_heuristics(self):
         # Explicit classifications
@@ -149,19 +452,13 @@ class PhasedSearchCooperativeHyperHeuristic:
 
 
 
-    def _get_time_bucket_path(self, timestamp=None):
-        if timestamp is None:
-            timestamp = time.time()
-        # YYYYMMDD_HH
-        dt = datetime.fromtimestamp(timestamp)
-        bucket_name = dt.strftime("%Y%m%d_%H")
-        return os.path.join(self.shared_pool_dir, bucket_name)
 
     def _get_shard_path(self, bucket_path, shard_index):
         return os.path.join(bucket_path, f"shard_{shard_index}")
 
     def _log(self, message):
-        self.logger(message)
+        if self.logger:
+             self.logger(message)
 
     def _save_to_shared_pool(self, item, is_keep_alive=False):
         if not self.shared_pool_dir: return
@@ -174,12 +471,19 @@ class PhasedSearchCooperativeHyperHeuristic:
         
         # Throttling Logic (Skip if simply frequent updates of same quality, unless keep-alive)
         if not is_keep_alive:
-            if solution.cut_value == self.last_upload_value and (current_time - self.last_upload_time) < 300:
-                return # Skip if same value uploaded recently within 5 mins
+            # [2026-03-01] Relaxed Throttling for Diversity
+            # We want to allow saving up to 3 different solutions with same score.
+            # So we only throttle if we are bombarding the server with the SAME value extremely fast (e.g. < 5s)
+            # giving a chance for the disk check below to filter duplicates.
+            if solution.cut_value == self.last_upload_value and (current_time - self.last_upload_time) < 5:
+                 return 
             
         try:
            
-            bucket_path = self._get_time_bucket_path(current_time)
+            # [NEW 2026-03-01] Use Epoch-based Path
+            # bucket_path = self._get_time_bucket_path(current_time)
+            bucket_path = self._get_pool_path(self.pool_id, self.pool_type)
+            
             shard_path = self._get_shard_path(bucket_path, self.shard_id)
             
             # Ensure directories exist (lazy creation)
@@ -244,92 +548,37 @@ class PhasedSearchCooperativeHyperHeuristic:
     def _sync_shared_pool(self):
         if not self.shared_pool_dir: return
         
-        current_time = time.time()
+        # [NEW 2026-03-01] Phase 2: Check Pool Status & Read
         
-        # 1. READ: Scan current hour and previous hour buckets
+        # 1. Update Pool Pointer (Follower Logic)
+        self._check_and_update_pool_id()
+        
+        # [CRITICAL SAFETY 2026-03-01]
+        # If we detected a REBUILD (Hard Restart), we must ABORT syncing immediately.
+        # We are about to be reset. Any read/write now is dangerous and pointless.
+        # Specifically, we must NOT execute the Keep-Alive write below.
+        if self.pending_rebuild:
+             return 
+        
+        # 2. Check for Expansion (Leader Logic: Am I the one to expand?)
+        # Use simple random probability to avoid all workers checking simultaneously
+        if random.random() < 0.05: # 5% chance per sync
+             self._try_expand_pool()
+        
+        # 3. READ: Scan CURRENT epoch pool
         buckets_to_scan = []
         
-        # Current hour
-        current_bucket = self._get_time_bucket_path(current_time)
+        current_bucket = self._get_pool_path(self.pool_id, self.pool_type)
         buckets_to_scan.append(current_bucket)
-        # Previous hour
-        prev_bucket = self._get_time_bucket_path(current_time - 3600)
-        buckets_to_scan.append(prev_bucket)
         
-        # [NEW 2026-02-27] Cross-Hour Migration Strategy
-        # If we just crossed into a new hour bucket (e.g. current_bucket is empty or very sparse),
-        # we risk "Cold Start Homogenization" where the first few solutions (likely local optima) 
-        # dominate the new empty bucket 100%.
-        # To prevent this, we forcingly migrate diverse elites from the previous bucket if the new one is empty.
+        # [NEW Phase 2] If new pool is young (e.g. few files), we might also want to read from previous pool?
+        # For now, stick to simple switch.
         
-        if os.path.exists(prev_bucket) and (not os.path.exists(current_bucket) or len(os.listdir(current_bucket)) < 5):
-             # Identify that we are in a transition period.
-             # Migration is done distributedly: Each worker checks their own shard.
-             prev_shard_path = self._get_shard_path(prev_bucket, self.shard_id)
-             curr_shard_path = self._get_shard_path(current_bucket, self.shard_id)
-             
-             if os.path.exists(prev_shard_path):
-                 try:
-                     # Create current shard if needed
-                     os.makedirs(curr_shard_path, exist_ok=True)
-                     
-                     # Read TOP 30 UNIQUE solutions from previous shard
-                     # Use strict 1e-3 difference to ensure diversity
-                     files = glob.glob(os.path.join(prev_shard_path, "*.pkl"))
-                     
-                     # 1. Parse all files and store as (score, filepath)
-                     candidates = []
-                     for f in files:
-                         try:
-                             # filename format: sol_5326663.8146..._timestamp...
-                             fname = os.path.basename(f)
-                             val_str = fname.split("_")[1]
-                             val = float(val_str)
-                             candidates.append((val, f))
-                         except: pass
-                     
-                     # 2. Sort by Score Descending (Quality First)
-                     candidates.sort(key=lambda x: x[0], reverse=True)
-                     
-                     # 3. Select unique solutions (Difference > 1e-3)
-                     # We only keep the FIRST occurrence of any score (highest quality duplicate if any)
-                     files_to_migrate = []
-                     selected_scores = []
-                     
-                     for score, fpath in candidates:
-                         is_duplicate = False
-                         for existing_score in selected_scores:
-                             if abs(score - existing_score) < 1e-3:
-                                 is_duplicate = True
-                                 break
-                         
-                         if not is_duplicate:
-                             files_to_migrate.append(fpath)
-                             selected_scores.append(score)
-                             
-                         if len(files_to_migrate) >= 30:
-                             break
-                     
-                     # Copy them to new bucket
-                     
-                     # Copy them to new bucket
-                     import shutil
-                     for old_f in files_to_migrate:
-                         new_f = os.path.join(curr_shard_path, os.path.basename(old_f))
-                         if not os.path.exists(new_f):
-                             shutil.copy2(old_f, new_f)
-                             
-                     if files_to_migrate:
-                         self._log(f"Migrated {len(files_to_migrate)} diverse elites from {os.path.basename(prev_bucket)} to {os.path.basename(current_bucket)}")
-                         
-                 except Exception as e:
-                     # self._log(f"Migration error: {e}")
-                     pass
-
         files_to_read = []
         
         for bucket in buckets_to_scan:
             if not os.path.exists(bucket): continue
+
             
             # Randomly pick 2-3 shards to check in this bucket (Statistically sufficient)
             # We assume shards 0-9 exist
@@ -915,13 +1164,61 @@ class PhasedSearchCooperativeHyperHeuristic:
 
 
     def run(self, env: BaseEnv) -> bool:
+        """
+        Main entry point. Wraps the actual search epoch in a loop to handle Global Hard Restarts (L5).
+        """
+        while True:
+            # Run one epoch. Outcomes:
+            # 1. Complete successfully (Time limit reached) -> Returns True
+            # 2. Critical Failure (Construction failed) -> Returns False
+            # 3. L5 Rebuild Triggered -> Set self.pending_rebuild = True, Break Loop
+            
+            result = self._run_epoch(env)
+            
+            if self.pending_rebuild:
+                self._log("="*50)
+                self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id})")
+                self._log("="*50 + "\n")
+                
+                # Reset Flags
+                self.pending_rebuild = False
+                self.stagnation_level = 0
+                self.consecutive_massive_ruins = 0
+                if hasattr(self, 'phase_retries'):
+                    self.phase_retries = 0
+                
+                # Reset Environment Logic
+                # Reuse output dir
+                # Note: env.reset() clears solution and history
+                env.reset(output_dir=env.output_dir)
+                
+                # Clear local elite pool to match the new epoch (Blank Slate)
+                self.elite_pool = []
+                self.visited_peaks = {}
+                
+                # Sync to ensure we are pointing to the correct rebuild pool
+                self._sync_shared_pool()
+                
+                continue # Restart Outer Loop
+            
+            return result
+
+    def _run_epoch(self, env: BaseEnv) -> bool:
         # [REFACTORED for Cooperative Search - Cold Start Only]
         
         # Explicitly maximize chances by syncing first (populate pool for interactions later)
         self._sync_shared_pool()
 
+        # Outer Loop for Hard Restart (L5)
+        # We wrap the entire search process so we can restart from scratch if a Rebuild epoch is triggered
+        # while True: <-- REMOVED, Handled in run() wrapper
+            
+            # Reset flags for new epoch
+            # self.pending_rebuild = False <-- REMOVED
+            # self.stagnation_level = 0 <-- REMOVED
+            
         self._log("Switching to Constructive Phase (Cold Start)...")
-        # Fallback: Construct New Solution if no Best Known file
+            # Fallback: Construct New Solution if no Best Known file
         # Loop until solution is COMPLETE and VALID
         max_retries = 10
         for retry in range(max_retries):
@@ -1157,20 +1454,50 @@ class PhasedSearchCooperativeHyperHeuristic:
                     self.phase_retries = 1 # [2026-02-28] Start at 1 for clearer logging (Try 1/2, 2/2)
                 elif self.phase_retries > max_retries_per_phase:
                      # Budget exhausted for current level, escalate!
+                     
+                     # [TEST MODE: Fast Forward L1->L4] Reverted to normal logic
                      self.stagnation_level += 1
+                     
                      self.phase_retries = 1 # Reset for new level (Start at 1)
                      self._log(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted {max_retries_per_phase} retries)")
 
-                # [OPTIMIZED HIERARCHY 2026-02-24: 4-Level Logic]
+                # [OPTIMIZED HIERARCHY 2026-03-01: 5-Level Logic with Race Handling]
                 strategy = "heavy_ruin" # Fallback
                 
-                if self.stagnation_level >= 4:
+                # Check relation to Elite Pool (Global Best)
+                is_attacking_global_best = False
+                global_best_val = 0
+                if self.elite_pool:
+                     global_best_val = max(s["solution"].cut_value for s in self.elite_pool)
+                     # Using 1e-3 tolerance
+                     if current_best >= global_best_val - 1e-3:
+                         is_attacking_global_best = True
+                
+                if self.stagnation_level >= 5:
+                     # L5: Global Hard Restart
+                     # [CONSTRAINT 2026-03-01] Only trigger if we are actively attacking the Global Best
+                     # and have failed multiple times (implied by reaching Level 5).
+                     # If we are just a weak worker failing locally, we shouldn't reset everyone.
+                     
+                     if is_attacking_global_best:
+                         self._log(f"Step:{self.current_run_steps} L5 Detected (Attacking Global Best {global_best_val})! -> ATTEMPTING REVOLUTION")
+                         self._try_trigger_rebuild()
+                         
+                         if self.pending_rebuild:
+                             break # Break loop to restart
+                         else:
+                             strategy = "soft_restart" # Fallback
+                     else:
+                         self._log(f"Step:{self.current_run_steps} L5 Detected, but Local Best ({current_best}) < Global Best ({global_best_val}). Downgrading to Soft Restart.")
+                         strategy = "soft_restart"
+                
+                elif self.stagnation_level == 4:
                      # Level 4: Soft Restart (The "Nuclear" Option)
+                     # Standard Soft Restart to random distant elite or constructive
                      strategy = "soft_restart"
                 
                 elif self.stagnation_level == 3:
                      # Level 3: Supernova Ruin (Anti-Consensus)
-                     # Persistent effort to break comfortable consensus
                      strategy = "supernova_ruin"
                      
                 elif self.stagnation_level == 2:
@@ -1178,8 +1505,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                      strategy = "massive_ruin"
                      
                 elif self.stagnation_level == 1:
-                     # Level 1: Diversification / Path Relinking
-                     # Try to jump to other known elites or just shake slightly
+                     # Level 1: Diversification
                      if len(self.elite_pool) > 2 and random.random() < 0.6:
                          strategy = "path_relinking_to_best"
                      elif random.random() < 0.5:
@@ -1189,11 +1515,12 @@ class PhasedSearchCooperativeHyperHeuristic:
 
                 self._log(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
                 
-                if strategy == "soft_restart":
-                    self.stagnation_level = 0
-                    self.phase_retries = 0
-                    self.consecutive_massive_ruins = 0
-
+                # [CRITICAL LOGIC FIX 2026-03-01] Remove Premature Resets
+                # Do NOT reset stagnation_level = 0 here. 
+                # Doing so prevents us from climbing the ladder (L1->L2->...->L5).
+                # The accumulation of phase_retries will push us to the next Level.
+                # Only if the strat SUCCEEDS (finds improvement) do we reset in the improvement check above.
+                
                 prev_val = env.key_value
                 self._apply_breakout(env, strategy)
                 
@@ -1201,25 +1528,43 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # If breakout resulted in a massive value drop (e.g. > 10%), it means we restarted.
                 # We must reset current_best to avoid immediate stagnation detection (comparing against the old peak).
                 if env.key_value < current_best * 0.90:
-                    self._log(f"Hard Restart Detected: Resetting Local Baseline ({current_best} -> {env.key_value})")
-                    # current_best = env.key_value  <-- CRITICAL FIX: Do NOT reset the goalpost!
-                    # If we lower the bar, any tiny climb will count as "Success" and reset the stagnation level to 0.
-                    # We want to escalate if we cannot beat the ORIGINAL peak.
-                    # So we keep current_best as the high water mark.
+                    self._log(f"Significant Value Drop ({current_best} -> {env.key_value})")
                     
-                    # Also reset visited stats to allow re-visiting peaks? No, keep tabu.
-                    no_improve_steps = 0
+                    # [CRITICAL FIX 2026-03-01] Handle Baseline Resets Correctly
+                    # 1. current_best: 
+                    #    - If Soft Restart was intended (L4), we MUST reset current_best to the new value.
+                    #      Otherwise, the worker will be "forever stagnant" because it can't beat its old ghost.
+                    #      BUT, we should NOT reset the *Strategy Level* if we want to count this as a failure attempt.
+                    #    - Wait... if we reset current_best, the system thinks we found a "New Local Best" as soon as we climb 0.001.
+                    #      This triggers "NEW LOCAL BEST" logic which resets stagnation_level = 0.
+                    #      So, Soft Restart effectively resets the clock.
+                    #
+                    #    - How to allow L5 then?
+                    #      L5 requires reaching L4, trying X times, and failing.
+                    #      If Soft Restart (L4) resets current_best -> finds "improvement" -> resets stagnation -> Cycle L0...L4.
+                    #
+                    #    - SOLUTION: 
+                    #      If we are "Attacking Global Best" (current_best >= global_best), we MUST NOT RESET current_best downward.
+                    #      We must keep the high bar. If Soft Restart spawns us at 0.9*Best, and we climb to 0.95*Best,
+                    #      that is NOT a success if our goal is > 1.0*Best.
+                    #      So, for the Leader (Attacking Global Best), keep current_best high.
+                    #      For a Follower (Local Optima), resetting is fine.
                     
-                    # [CRITICAL Fix 2026-02-28] Do NOT reset Stagnation Level unless it was a real Soft Restart.
-                    # If we are in Level 2 or 3 (Ruin), a drop is EXPECTED. We must NOT forget we are in a stagnation fight.
-                    # Only reset level if we specifically asked for a soft restart.
-                    if strategy == "soft_restart":
-                        self.stagnation_level = 0
-                        current_best = env.key_value # ONLY reset baseline on explicit soft restart
+                    if is_attacking_global_best:
+                         self._log("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement or L5 trigger.")
+                         # Do not reset current_best.
+                         # Do not reset stagnation_level.
+                         pass
                     else:
-                        # We keep stagnation_level as is.
-                        # We rely on 'no_improve_steps' accumulating again in this NEW basin to trigger the NEXT escalation.
-                        pass
+                         # Follower Mode: Reset and try somewhere else
+                         self._log("Follower Mode: Resetting 'current_best' to allow local hill climbing.")
+                         current_best = env.key_value
+                         # Resetting stagnation level here makes sense for followers - they just want to work.
+                         # But if we want L4 to retry specifically... 
+                         # Actually, if a follower restarts, they are effectively a new worker. Reset is fine.
+                         self.stagnation_level = 0
+                         self.phase_retries = 0
+
                 
                 # Reset counter to give the new candidate a chance
                 no_improve_steps = 0
@@ -1247,6 +1592,11 @@ class PhasedSearchCooperativeHyperHeuristic:
             # Sync Distributed Elite Pool periodically
             if self.current_run_steps % 50 == 0:
                 self._sync_shared_pool()
+                
+                # Check for Rebuild Signal from Follower Logic
+                if self.pending_rebuild:
+                    self._log("Detected Rebuild Signal during Sync. Aborting current run... ")
+                    break 
                 
                 # Check if we are currently in a "Recovery/Exploration" phase (high no_improve_steps)
                 # If we just performed a massive ruin/injection, we need time to climb back up.
