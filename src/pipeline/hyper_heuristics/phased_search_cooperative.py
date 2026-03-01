@@ -1510,6 +1510,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                      # If we are just a weak worker failing locally, we shouldn't reset everyone.
                      
                      if is_attacking_global_best:
+                         self._log(f"Stagnation L5. Qual={env.key_value:.0f} Act=hard_restart")
                          self._log(f"Step:{self.current_run_steps} L5 Detected (Attacking Global Best {global_best_val})! -> ATTEMPTING REVOLUTION")
                          self._try_trigger_rebuild()
                          
@@ -1581,7 +1582,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                     #      For a Follower (Local Optima), resetting is fine.
                     
                     if is_attacking_global_best:
-                         self._log("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement or L5 trigger.")
+                         self._log("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement or hard restart trigger.")
                          # Do not reset current_best.
                          # Do not reset stagnation_level.
                          pass
