@@ -73,7 +73,11 @@ class PhasedSearchCooperativeHyperHeuristic:
                 os.makedirs(self.shared_pool_dir, exist_ok=True)
                 
                 # Check for existing epoch pools and sync state
-                latest_found = self._scan_pool_epochs()
+                latest_id, latest_type = self._scan_pool_epochs()
+                if latest_id > self.pool_id:
+                     self.pool_id = latest_id
+                     self.pool_type = latest_type
+                     self._log(f"Initialized Pool Pointer to Epoch {self.pool_id} ({self.pool_type})")
                 
                 # [NEW] Explicitly Create/Log Pool 0 if we are starting fresh
                 # If _scan_pool_epochs returns default (0, 'inherit') AND the directory doesn't exist yet, we create it.
@@ -116,11 +120,9 @@ class PhasedSearchCooperativeHyperHeuristic:
                 pools.sort(key=lambda x: x[0])
                 latest_id, latest_type = pools[-1]
                 
-                if latest_id > self.pool_id:
-                     self.pool_id = latest_id
-                     self.pool_type = latest_type
-                     self._log(f"Initialized Pool Pointer to Epoch {self.pool_id} ({self.pool_type})")
-                     return (latest_id, latest_type)
+                # [FIX] Do NOT update state here. Just return what we found.
+                # State update should be explicit in _check_and_update_pool_id()
+                return (latest_id, latest_type)
             
             return (self.pool_id, self.pool_type)
                      
@@ -474,6 +476,12 @@ class PhasedSearchCooperativeHyperHeuristic:
     def _save_to_shared_pool(self, item, is_keep_alive=False):
         if not self.shared_pool_dir: return
         
+        # [CRITICAL HYGIENE FIX] 
+        # If we are pending a rebuild, we are essentially a "zombie" holding a solution 
+        # from Old Epoch. DO NOT save it to the New Epoch directory.
+        if getattr(self, "pending_rebuild", False):
+            return
+        
         # [RESEARCH] Direct access, item is always a Wrapper Dict
         solution = item["solution"]
         save_obj = item 
@@ -484,9 +492,9 @@ class PhasedSearchCooperativeHyperHeuristic:
         if not is_keep_alive:
             # [2026-03-01] Relaxed Throttling for Diversity
             # We want to allow saving up to 3 different solutions with same score.
-            # So we only throttle if we are bombarding the server with the SAME value extremely fast (e.g. < 5s)
+            # So we only throttle if we are bombarding the server with the SAME value extremely fast (e.g. < 300s)
             # giving a chance for the disk check below to filter duplicates.
-            if solution.cut_value == self.last_upload_value and (current_time - self.last_upload_time) < 5:
+            if solution.cut_value == self.last_upload_value and (current_time - self.last_upload_time) < 300:
                  return 
             
         try:
@@ -1210,8 +1218,7 @@ class PhasedSearchCooperativeHyperHeuristic:
             if self.pending_rebuild:
                 self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id})")
                 
-                # Reset Flags
-                self.pending_rebuild = False
+                # Reset Flags (Except pending_rebuild which must protect the reset phase)
                 self.stagnation_level = 0
                 self.consecutive_massive_ruins = 0
                 if hasattr(self, 'phase_retries'):
@@ -1228,6 +1235,10 @@ class PhasedSearchCooperativeHyperHeuristic:
                 
                 # Sync to ensure we are pointing to the correct rebuild pool
                 self._sync_shared_pool()
+                
+                # ONLY NOW that all local state has synced and initialized to the fresh environment,
+                # we disengage the safety lock preventing old outputs.
+                self.pending_rebuild = False
                 
                 continue # Restart Outer Loop
             
