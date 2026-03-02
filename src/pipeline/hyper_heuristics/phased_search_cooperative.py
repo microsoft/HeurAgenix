@@ -166,23 +166,23 @@ class PhasedSearchCooperativeHyperHeuristic:
         # If the latest epoch is 'rebuild', we generally verify if we should join it.
         # Logic: If latest is rebuild, and it's fresh (not full/old), we join/reset instead of creating another one.
         if latest_type == 'rebuild':
-             # Whether latest_id > self.pool_id (new) or latest_id == self.pool_id (current),
-             # if the world is already in 'rebuild' mode, we shouldn't trigger another one immediately
-             # unless that rebuild pool is already 'saturated' (which is handled by expansion logic, not rebuild logic).
-             
-             self._log(f"Global Rebuild (pool_{latest_id}) already active. Avoiding double-rebuild. Joining/Resetting...")
-             
-             # If ID is greater, update to it.
+             # CASE A: Someone else just created a NEW rebuild pool that I haven't joined yet.
              if latest_id > self.pool_id:
+                 self._log(f"Global Rebuild (pool_{latest_id}) detected. Joining revolution...")
                  self._check_and_update_pool_id()
+                 return
+             
+             # CASE B: I am ALREADY in this rebuild pool (latest_id == self.pool_id).
+             # If I am calling this, it means I have stagnation_level=5 WITHIN this rebuild epoch.
+             # This implies the current rebuild FAILED to solve the problem.
+             # So we MUST trigger a NEW rebuild (pool_{n+1}_rebuild).
+             # We continually increment IDs to signify new eras.
              else:
-                 # If we are already on this ID but still trying to trigger L5, 
-                 # it means we haven't reset ourselves yet.
-                 self.pending_rebuild = True 
-                 
-             return
+                 self._log(f"Current Rebuild (pool_{latest_id}) failed (L5 detected). Initiating NEXT Rebuild...")
+                 # Do NOT return. Fall through to creation logic below.
+                 pass
 
-        # Scenario 2: Inherit happened, but we want REBUILD. 
+        # Scenario 2: Inherit happened or Rebuild failed. 
         # Determine the next ID. ALWAYS increment.
         # If latest_id > self.pool_id (someone expanded), we skip that expansion and create rebuild on top.
         # If latest_id == self.pool_id, we just increment.
