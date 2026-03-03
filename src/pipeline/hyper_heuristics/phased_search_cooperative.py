@@ -13,12 +13,14 @@ from src.util.util import load_function
 from src.problems.max_cut.components import BatchInsertNodeOperator
 
 class PhasedSearchCooperativeHyperHeuristic:
-    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None):
+    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None, max_restarts=None):
         self.heuristic_pool_names = heuristic_pool
         self.logger = logger
         self.problem = problem
         self.worker_id = str(worker_id)
         self.shared_pool_dir = shared_pool_dir
+        self.max_restarts = max_restarts
+        self.restart_count = 0
         
         # Initialize heuristic lists
         self.constructive_heuristics = []
@@ -1216,7 +1218,12 @@ class PhasedSearchCooperativeHyperHeuristic:
             result = self._run_epoch(env)
             
             if self.pending_rebuild:
-                self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id})")
+                self.restart_count += 1
+                if self.max_restarts is not None and self.restart_count > self.max_restarts:
+                    self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - ABORTING due to max_restarts={self.max_restarts} limit reached.")
+                    return result
+                
+                self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - Restart {self.restart_count}/{self.max_restarts if self.max_restarts else 'inf'}")
                 
                 # Reset Flags (Except pending_rebuild which must protect the reset phase)
                 self.stagnation_level = 0

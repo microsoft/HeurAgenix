@@ -73,7 +73,8 @@ def run_once(
         run_id: int,
         method: str = "phased",
         shared_pool_dir: str = None,
-        log_file_path: str = None
+        log_file_path: str = None,
+        max_restarts: int = None
 ) -> float:
     try:
         seed = time.time_ns() ^ os.getpid() ^ int.from_bytes(os.urandom(8), 'little')
@@ -129,6 +130,7 @@ def run_once(
             "max_cut", 
             shared_pool_dir=shared_pool_dir,
             worker_id=run_id,
+            max_restarts=max_restarts,
             logger=local_log
         )
     elif method == "random":
@@ -141,7 +143,8 @@ def main(
         heuristic_dir: str,
         num_runs: int,
         method: str = "phased",
-        experiment_name: str = None
+        experiment_name: str = None,
+        max_restarts: int = None
     ):
     workers, mem_per_task, avail = pick_safe_workers(data_name, heuristic_dir)
         
@@ -202,7 +205,8 @@ def main(
                 run_id, 
                 method=method, 
                 shared_pool_dir=shared_pool_dir,
-                log_file_path=log_file_path
+                log_file_path=log_file_path,
+                max_restarts=max_restarts
             ): run_id for run_id in remaining}
 
             for fut in as_completed(fut_map):
@@ -231,6 +235,7 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--method", type=str, default="cooperative", choices=["phased", "random", "ucb", "fast_stop", "adaptive_polishing", "cooperative"], 
                         help="Search method: 'phased', 'random', 'ucb', 'fast_stop', 'adaptive_polishing', or 'cooperative' (default: fast_stop)")
     parser.add_argument("-exp", "--experiment_name", type=str, default=None, help="Experiment name (default: None, uses data_name)")
+    parser.add_argument("-r", "--max_restarts", type=int, default=5, help="Maximum number of global restarts before exiting worker")
 
     args = parser.parse_args()
-    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.experiment_name)
+    main(args.data_name, os.path.join("src", "problems", "max_cut", "heuristics", args.heuristic_dir), args.num_runs, args.method, args.experiment_name, args.max_restarts)
