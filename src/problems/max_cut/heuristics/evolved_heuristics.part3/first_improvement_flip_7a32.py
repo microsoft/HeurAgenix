@@ -37,8 +37,18 @@ def first_improvement_flip_7a32(problem_state: dict, algorithm_data: dict, epsil
     idx_b = list(set_b)
 
     n = weight_matrix.shape[0]
-    weight_to_a = np.zeros(n, dtype=weight_matrix.dtype) if len(idx_a) == 0 else weight_matrix[:, idx_a].sum(axis=1)
-    weight_to_b = np.zeros(n, dtype=weight_matrix.dtype) if len(idx_b) == 0 else weight_matrix[:, idx_b].sum(axis=1)
+    # === Global Delta Caching Layer ===
+    current_fingerprint = (current_solution.cut_value, len(set_a))
+    if algorithm_data.get("_g_fingerprint") == current_fingerprint and "_g_w_a" in algorithm_data:
+        weight_to_a = np.asarray(algorithm_data["_g_w_a"])
+        weight_to_b = np.asarray(algorithm_data["_g_w_b"])
+    else:
+        weight_to_a = np.zeros(n, dtype=weight_matrix.dtype) if len(idx_a) == 0 else weight_matrix[:, idx_a].sum(axis=1)
+        weight_to_b = np.zeros(n, dtype=weight_matrix.dtype) if len(idx_b) == 0 else weight_matrix[:, idx_b].sum(axis=1)
+        algorithm_data["_g_fingerprint"] = current_fingerprint
+        algorithm_data["_g_w_a"] = weight_to_a
+        algorithm_data["_g_w_b"] = weight_to_b
+    # ===================================
 
     if scan_order == "A_then_B":
         scan_nodes = idx_a + idx_b

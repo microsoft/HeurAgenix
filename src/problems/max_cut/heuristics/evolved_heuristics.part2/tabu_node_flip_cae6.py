@@ -88,8 +88,18 @@ def tabu_node_flip_cae6(
     assigned_nodes = list(sorted(set_a)) + list(sorted(set_b))
 
     # Precompute side weights
-    weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1) if set_a else np.zeros(n, dtype=float)
-    weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1) if set_b else np.zeros(n, dtype=float)
+    # === Global Delta Caching Layer ===
+    current_fingerprint = (current_solution.cut_value, len(set_a))
+    if algorithm_data.get("_g_fingerprint") == current_fingerprint and "_g_w_a" in algorithm_data:
+        weight_to_a = np.asarray(algorithm_data["_g_w_a"])
+        weight_to_b = np.asarray(algorithm_data["_g_w_b"])
+    else:
+        weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1) if set_a else np.zeros(n, dtype=float)
+        weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1) if set_b else np.zeros(n, dtype=float)
+        algorithm_data["_g_fingerprint"] = current_fingerprint
+        algorithm_data["_g_w_a"] = weight_to_a
+        algorithm_data["_g_w_b"] = weight_to_b
+    # ===================================
 
     def is_tabu(node: int, curr_iter: int) -> bool:
         expiry = tabu.get(node, None)

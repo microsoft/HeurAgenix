@@ -53,12 +53,12 @@ def cached_delta_flip_3cfd(
     n = int(weight_matrix.shape[0])
 
     # Build current partition signature
-    partition_signature = (tuple(sorted(set_a)), tuple(sorted(set_b)))
+    partition_signature = (current_solution.cut_value, len(set_a))
 
     # Retrieve caches
-    cached_a = algorithm_data.get("weight_to_a")
-    cached_b = algorithm_data.get("weight_to_b")
-    cached_sig = algorithm_data.get("partition_signature")
+    cached_a = np.asarray(algorithm_data.get("_g_w_a")) if algorithm_data.get("_g_w_a") is not None else None
+    cached_b = np.asarray(algorithm_data.get("_g_w_b")) if algorithm_data.get("_g_w_b") is not None else None
+    cached_sig = algorithm_data.get("_g_fingerprint")
 
     # Decide whether to rebuild caches
     need_rebuild = (
@@ -73,16 +73,16 @@ def cached_delta_flip_3cfd(
     if need_rebuild:
         if use_numpy_vectorization:
             if set_a:
-                weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1).astype(float).tolist()
+                weight_to_a = weight_matrix[:, list(set_a)].sum(axis=1)
             else:
-                weight_to_a = [0.0] * n
+                weight_to_a = np.zeros(n, dtype=float)
             if set_b:
-                weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1).astype(float).tolist()
+                weight_to_b = weight_matrix[:, list(set_b)].sum(axis=1)
             else:
-                weight_to_b = [0.0] * n
+                weight_to_b = np.zeros(n, dtype=float)
         else:
-            weight_to_a = [0.0] * n
-            weight_to_b = [0.0] * n
+            weight_to_a = np.zeros(n, dtype=float)
+            weight_to_b = np.zeros(n, dtype=float)
             if set_a:
                 for v in range(n):
                     s = 0.0
@@ -96,8 +96,8 @@ def cached_delta_flip_3cfd(
                         s += float(weight_matrix[v, u])
                     weight_to_b[v] = s
     else:
-        weight_to_a = list(cached_a)
-        weight_to_b = list(cached_b)
+        weight_to_a = np.array(cached_a, copy=False)
+        weight_to_b = np.array(cached_b, copy=False)
 
     # Scan for the best strictly improving single-node flip
     best_node = None
@@ -120,9 +120,9 @@ def cached_delta_flip_3cfd(
     # If no improving move exists, return updated caches without an operator
     if best_node is None or best_delta <= float(min_improvement):
         updated_data = {
-            "weight_to_a": weight_to_a,
-            "weight_to_b": weight_to_b,
-            "partition_signature": partition_signature,
+            "_g_w_a": weight_to_a,
+            "_g_w_b": weight_to_b,
+            "_g_fingerprint": partition_signature,
             "last_move_node": None,
             "last_delta": float(best_delta),
             "min_improvement": float(min_improvement),
@@ -133,8 +133,8 @@ def cached_delta_flip_3cfd(
     op = SwapOperator([best_node])
 
     # Lazily update caches in O(n) using the column to the flipped node
-    updated_weight_to_a = list(weight_to_a)
-    updated_weight_to_b = list(weight_to_b)
+    updated_weight_to_a = np.array(weight_to_a, copy=True)
+    updated_weight_to_b = np.array(weight_to_b, copy=True)
     column_to_node = weight_matrix[:, best_node]
 
     if best_node in set_a:
@@ -158,8 +158,8 @@ def cached_delta_flip_3cfd(
 
     # Return operator and updated caches
     updated_data = {
-        "weight_to_a": updated_weight_to_a,
-        "weight_to_b": updated_weight_to_b,
+        "_g_w_a": updated_weight_to_a,
+        "_g_w_b": updated_weight_to_b,
         "partition_signature": new_signature,
         "last_move_node": best_node,
         "last_delta": float(best_delta),
