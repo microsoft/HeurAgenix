@@ -1,5 +1,6 @@
 import os
 import traceback
+import copy
 from src.problems.base.components import BaseSolution, BaseOperator
 from src.util.util import load_function, search_file
 
@@ -14,7 +15,7 @@ class BaseEnv:
         self.instance_data: tuple = self.load_data(self.data_path)
         self.current_solution: BaseSolution = self.init_solution()
         self.algorithm_data: dict = None
-        self.recordings: list[tuple] = None
+        self.trajectory: list[dict] = []
         self.output_dir: str = None
         # Maximum step to constructive a complete solution
         self.construction_steps: int = None
@@ -29,7 +30,8 @@ class BaseEnv:
         self.get_instance_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_instance_problem_state")
         self.get_solution_problem_state = load_function(problem_state_file, problem=self.problem, function_name="get_solution_problem_state")
         self.instance_problem_state = self.get_instance_problem_state(self.instance_data)
-        self.problem_state = self.get_problem_state()
+        self.problem_state = {}
+        self.update_problem_state()
 
 
     @property
@@ -47,7 +49,7 @@ class BaseEnv:
     @property
     def key_value(self) -> float:
         """Get the key value of the current solution."""
-        return self.get_key_value()
+        return self.get_key_value(self.current_solution)
 
     def get_key_value(self, solution: BaseSolution=None) -> float:
         """Get the key value of the solution."""
@@ -55,16 +57,34 @@ class BaseEnv:
 
     def reset(self, output_dir: str=None):
         self.current_solution = self.init_solution()
-        self.problem_state = self.get_problem_state()
+        self.update_problem_state()
         self.algorithm_data = {}
-        self.recordings = []
+        self.trajectory = []
         if output_dir:
             if os.sep in output_dir:
                 self.output_dir = output_dir
             else:
                 base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
                 self.output_dir = os.path.join(base_output_dir, self.problem, "result", self.data_ref_name, output_dir)
-            # os.makedirs(self.output_dir, exist_ok=True)
+
+    def clear_solution(self):
+        self.current_solution = self.init_solution()
+        self.trajectory = []
+        self.update_problem_state()
+
+    def export_solution_wrapper(self) -> dict:
+        return {
+            "solution": copy.deepcopy(self.current_solution),
+            "trajectory": copy.deepcopy(self.trajectory)
+        }
+
+    def import_solution_wrapper(self, wrapper: dict):
+        self.current_solution = copy.deepcopy(wrapper["solution"])
+        traj = wrapper.get("trajectory")
+        if traj is None:
+            traj = wrapper.get("history", [])
+        self.trajectory = copy.deepcopy(traj)
+        self.update_problem_state()
 
     def load_data(self, data_path: str) -> dict:
         pass
@@ -72,25 +92,16 @@ class BaseEnv:
     def init_solution(self) -> None:
         pass
 
-    def helper_function(self) -> dict:
-        return {"get_problem_state": self.get_problem_state, "validation_solution": self.validation_solution}
-
-    def get_problem_state(self, solution: BaseSolution=None) -> dict:
-        if solution is None:
-            solution = self.current_solution
-        solution_problem_state = self.get_solution_problem_state(self.instance_data, solution)
-        helper_function = self.helper_function()
-        problem_state = None
+    def update_problem_state(self) -> None:
+        solution_problem_state = self.get_solution_problem_state(self.instance_data, self.current_solution)
         if solution_problem_state:
-            problem_state = {
+            self.problem_state = {
                 **self.instance_data,
-                "current_solution": solution,
-                self.key_item: self.get_key_value(solution),
-                **helper_function,
+                "current_solution": self.current_solution,
+                self.key_item: self.get_key_value(self.current_solution),
                 **self.instance_problem_state,
                 **solution_problem_state,
             }
-        return problem_state
 
     def validation_solution(self, solution: BaseSolution=None) -> bool:
         """Check the validation of this solution"""
@@ -106,9 +117,9 @@ class BaseEnv:
             if isinstance(operator, BaseOperator):
                 self.run_operator(operator)
                 self.algorithm_data.update(delta)
-            record_item = {"operation_id": len(self.recordings), "heuristic": heuristic.__name__, "operator": operator}
+            record_item = {"operation_id": len(self.trajectory), "heuristic": heuristic.__name__, "operator": operator}
             record_item.update(add_record_item)
-            self.recordings.append(record_item)
+            self.trajectory.append(record_item)
             return operator
         except Exception as e:
             trace_string = traceback.format_exc()
@@ -118,7 +129,7 @@ class BaseEnv:
     def run_operator(self, operator: BaseOperator) -> bool:
         if isinstance(operator, BaseOperator):
             self.current_solution = operator.run(self.current_solution)
-            self.problem_state = self.get_problem_state()
+            self.update_problem_state()
         return operator
 
     def summarize_env(self) -> str:
@@ -144,12 +155,12 @@ class BaseEnv:
         content += f"-{self.key_item}: {self.key_value}\n"
         for item, value in content_dict.items():
             content += f"-{item}: {value}\n"
-        if dump_records and len(dump_records) > 0 and len(self.recordings) > 0 and len(self.recordings[0].keys()) > 0:
-            dump_records = [item for item in dump_records if item in self.recordings[0].keys()]
+        if dump_records and len(dump_records) > 0 and len(self.trajectory) > 0 and len(self.trajectory[0].keys()) > 0:
+            dump_records = [item for item in dump_records if item in self.trajectory[0].keys()]
             content += "-trajectory:\n" + "\t".join(dump_records) + "\n"
             trajectory_str = "\n".join([
                 "\t".join([str(recording_item.get(item, "None")) for item in dump_records])
-                for recording_item in self.recordings
+                for recording_item in self.trajectory
             ])
             content += trajectory_str
 

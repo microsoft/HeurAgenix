@@ -283,7 +283,7 @@ class PhasedSearchUCBBestHyperHeuristic:
             new_sol = Solution(new_set_a, new_set_b)
             env.current_solution = new_sol
             env.current_solution.cut_value = env.get_key_value(new_sol)
-            env.problem_state = env.get_problem_state()
+            env.update_problem_state()
             
             return True
             
@@ -391,7 +391,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                         env.current_solution = new_sol
                         # Recalculate value
                         env.current_solution.cut_value = env.get_key_value(new_sol)
-                        env.problem_state = env.get_problem_state()
+                        env.update_problem_state()
                         
                         print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
                         return True

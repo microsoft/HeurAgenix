@@ -74,49 +74,28 @@ class Env(BaseEnv):
     def init_solution(self) -> Solution:
         return Solution(set_a=set(), set_b=set(), cut_value=0)
 
-    def get_key_value(self, solution: Solution=None) -> float:
+    def get_key_value(self, recalculate: bool=False) -> float:
         """Get the key value of the current solution based on the key item."""
-        if solution is None:
-            solution = self.current_solution
-            if solution.cut_value is not None:
-                return solution.cut_value
-        
-        if solution.cut_value is not None:
-             return solution.cut_value
+        if not recalculate and self.current_solution.cut_value is not None:
+            return self.current_solution.cut_value
 
         current_cut_value = 0
-        adj = self.instance_data["adj"]
-        
-        # DEBUG CHECK (Temp)
-        if hasattr(self, "_debug_first_run") and not self._debug_first_run:
-            pass # Skip check
-        else:
-            self._debug_first_run = False
-            # Check edge counts
-            edge_count = sum(len(neighbors) for neighbors in adj)
-            if edge_count == 0:
-                print("[ERROR] get_key_value: adj is empty! Data loading failed?")
-            elif len(solution.set_a) == 0:
-                print("[ERROR] get_key_value: set_a is empty!")
-            elif len(solution.set_b) == 0:
-                print("[ERROR] get_key_value: set_b is empty!")
-            
-        
-        if len(solution.set_a) < len(solution.set_b):
-            for u in solution.set_a:
+        adj = self.instance_data["adj"]    
+
+        if len(self.current_solution.set_a) < len(self.current_solution.set_b):
+            for u in self.current_solution.set_a:
                 # Safety: u must be valid index
                 if u < 0 or u >= len(adj): continue
                 
                 for v, w in adj[u].items():
-                    if v in solution.set_b:
+                    if v in self.current_solution.set_b:
                         current_cut_value += w
         else:
-            for u in solution.set_b:
+            for u in self.current_solution.set_b:
                 if u < 0 or u >= len(adj): continue
                 for v, w in adj[u].items():
-                    if v in solution.set_a:
+                    if v in self.current_solution.set_a:
                         current_cut_value += w # Symmetric
-                    
         return current_cut_value
 
     def _calculate_delta(self, operator: BaseOperator) -> float:
@@ -312,7 +291,6 @@ class Env(BaseEnv):
     def run_operator(self, operator: BaseOperator) -> bool:
         """
         Apply the operator to the current solution In-Place.
-        This updates self.current_solution directly without creating a new Solution object.
         """
         if isinstance(operator, BaseOperator):
             # STRATEGY: 
@@ -385,39 +363,37 @@ class Env(BaseEnv):
             # --- End In-Place Update ---
 
             # Update cut_value
-            if is_complex_batch:
+            if is_complex_batch or self.current_solution.cut_value is None:
                 # [Optimization] Full Recalculation for Batch Ops
                 # This guarantees correctness for Massive Ruin / Anti-Consensus
-                solution.cut_value = None 
-                solution.cut_value = self.get_key_value(solution)
+                self.current_solution.cut_value = self.get_key_value(recalculate=True)
             else:
-                # Incremental Update for Single Ops (Speed critical)
-                if solution.cut_value is not None:
-                    solution.cut_value += delta
-                else:
-                    solution.cut_value = self.get_key_value(solution)
+                self.current_solution.cut_value += delta
 
             # Performance Critical: Do NOT recalculate full problem state on every step.
             # Heuristics that need fresh problem_state must call get_problem_state() explicitly.
-            self.problem_state = self.get_problem_state()
+            self.update_problem_state()
             return True # Indicate success
         return False
 
-    def validation_solution(self, solution: Solution=None) -> bool:
+    def validation_solution(self) -> bool:
         """Check the validation of this solution in the following items:
-            1. Non-repeat: No nodes in both set A and set B
+            1. No repeat: No nodes in both set A and set B
+            2. No non-exisits nodes: All nodes in A and B should be valid nodes in the graph
         """
-        if solution is None:
-            solution = self.current_solution
 
-        if not isinstance(solution, Solution) or not isinstance(solution.set_a, set) or not isinstance(solution.set_b, set):
+        if not isinstance(self.current_solution, Solution) or not isinstance(self.current_solution.set_a, set) or not isinstance(self.current_solution.set_b, set):
             return False
 
         # Check non-repeat
-        all_selected_nodes = solution.set_a.union(solution.set_b)
-        if len(all_selected_nodes) != len(solution.set_a) + len(solution.set_b):
+        all_selected_nodes = self.current_solution.set_a.union(self.current_solution.set_b)
+        if len(all_selected_nodes) != len(self.current_solution.set_a) + len(self.current_solution.set_b):
             return False
-
+        
+        # Check no non-exist nodes
+        node_num = self.instance_data["node_num"]
+        if any(node >= node_num or node < 0 for node in all_selected_nodes):
+            return False
         return True
 
     def dump_best_solution(self, path: str) -> None:
@@ -455,7 +431,7 @@ class Env(BaseEnv):
             set_a = set()
             set_b = set()
             cut_value = 0.0
-            loaded_recordings = []
+            loaded_trajectory = []
             headers = []
             reading_trajectory = False
             
@@ -484,7 +460,7 @@ class Env(BaseEnv):
                             values = line.split("\t")
                             if len(values) == len(headers):
                                 record = dict(zip(headers, values))
-                                loaded_recordings.append(record)
+                                loaded_trajectory.append(record)
                         continue
 
                     if line.startswith("set_a:"):
@@ -500,14 +476,14 @@ class Env(BaseEnv):
             
             self.current_solution = Solution(set_a=set_a, set_b=set_b, cut_value=cut_value)
             
-            # Append loaded recordings to self.recordings
-            if self.recordings is None:
-                self.recordings = []
-            # Prepend loaded recordings to maintain history
-            self.recordings = loaded_recordings + self.recordings
+            # Append loaded trajectory to self.trajectory
+            if self.trajectory is None:
+                self.trajectory = []
+            # Prepend loaded trajectory to maintain history
+            self.trajectory = loaded_trajectory + self.trajectory
             
             # Update problem state
-            self.problem_state = self.get_problem_state()
+            self.update_problem_state()
             
             return True
         except Exception as e:

@@ -11,7 +11,6 @@ def simulated_annealing_ed14(problem_state: dict, algorithm_data: dict, **kwargs
             - "total_nodes" (int): The total number of vertices in the graph.
             - "current_solution" (Solution): The current solution of the Max Cut problem.
             - "current_cut_value" (int or float): The total weight of edges between set A and set B in the current solution.
-            - get_problem_state (callable): def validation_solution(solution: Solution) -> bool: The function to get the problem state for given solution without modify it.
         algorithm_data (dict): Contains the data specific to the simulated annealing algorithm.
             - "temperature" (float): The current temperature for the simulated annealing process.
             - "cooling_rate" (float): The rate at which the temperature decreases.

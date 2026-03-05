@@ -32,7 +32,7 @@ class MDPEnv(BaseEnv):
     def init_solution(self) -> None:
         return Solution()
 
-    def get_key_value(self, solution: Solution=None) -> float:
+    def get_key_value(self, recalculate: bool=False) -> float:
         """Get the key value of the current solution based on the key item."""
         return self.reward
 

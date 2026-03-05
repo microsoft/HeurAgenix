@@ -62,7 +62,6 @@ def pick_safe_workers(data_name: str, heuristic_dir: str,
     # Remove artificial cap of 24 workers. Let hardware decide.
     workers = max(1, min(max_by_cpu, max_by_mem))
 
-    # print(f"Estimated per-task RSS ~ {mem_per_task/1024/1024:.1f} MiB, avail ~ {avail/1024/1024:.1f} MiB, choose workers={workers}", flush=True)
 
     return workers, mem_per_task, avail
 

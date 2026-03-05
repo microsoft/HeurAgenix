@@ -14,7 +14,7 @@ def batch_cluster_ruin(problem_state: dict, algorithm_data: dict, **kwargs) -> t
     """
     current_solution = problem_state.get("current_solution")
     
-    # [FIX] instance_data is often flattened into problem_state by env.get_problem_state()
+    # [FIX] instance_data is often flattened into problem_state by env.update_problem_state()
     # So we should look for keys directly, or check instance_data fallback
     adj = problem_state.get("adj")
     if adj is None and "instance_data" in problem_state:

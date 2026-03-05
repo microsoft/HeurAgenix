@@ -1,16 +1,12 @@
 import os
 import random
-import math
 import pickle
 import glob
-import uuid
 import time
 import hashlib
-import copy
-from datetime import datetime
-from src.problems.base.env import BaseEnv
+from src.problems.max_cut.env import Env
+from src.problems.max_cut.components import Solution
 from src.util.util import load_function
-from src.problems.max_cut.components import BatchInsertNodeOperator
 
 class PhasedSearchCooperativeHyperHeuristic:
     def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None, max_restarts=None):
@@ -623,9 +619,6 @@ class PhasedSearchCooperativeHyperHeuristic:
             try:
                 with open(fpath, 'rb') as f:
                     data = pickle.load(f)
-                    # Compatibility: If loaded data is Solution object, wrap it
-                    if not isinstance(data, dict):
-                         data = {"solution": data, "history": []}
                     self._add_to_local_pool(data, share=False)
             except:
                 pass
@@ -645,12 +638,8 @@ class PhasedSearchCooperativeHyperHeuristic:
 
     def _add_to_local_pool(self, item, share=True):
         # [RESEARCH] Direct access, item is always a Wrapper Dict
-        # Backward compatibility: If item is solution object, wrap it
-        if not isinstance(item, dict):
-             item = {"solution": item, "history": []}
-             
         solution_ref = item["solution"]
-        history_ref = list(item.get("history", []))
+        trajectory_ref = list(item.get("trajectory", []))
         
         # [DYNAMIC TABU STRATEGY 2026-02-19]
         if not hasattr(self, "visited_peaks"):
@@ -664,20 +653,11 @@ class PhasedSearchCooperativeHyperHeuristic:
                 return
 
         # Add copy of solution to pool
-        from src.problems.max_cut.components import Solution
         
         # Deep copy the sets for storage
         new_sol = Solution(set(solution_ref.set_a), set(solution_ref.set_b), solution_ref.cut_value)
         # Create new wrapper
-        new_wrapper = {"solution": new_sol, "history": history_ref}
-        
-        # [IMPROVED DIVERSITY CONTROL]
-        def calc_dist_pool(s1, s2):
-            d1 = len((s1.set_a & s2.set_b) | (s1.set_b & s2.set_a))
-            d2 = len((s1.set_a & s2.set_a) | (s1.set_b & s2.set_b))
-            return min(d1, d2)
-
-        node_num = len(new_sol.set_a) + len(new_sol.set_b)
+        new_wrapper = {"solution": new_sol, "trajectory": trajectory_ref}
         
         # ------------------------------------------------------------------
         # Strategy 1: Score-based Duplication Check (New Logic)
@@ -735,11 +715,8 @@ class PhasedSearchCooperativeHyperHeuristic:
 
 
     def _update_elite_pool_from_env(self, env):
-        # [NEW 2026-02-26] Capture solution + history for full reproducibility
-        sol = env.current_solution
-        # Deep copy history to ensure it's frozen at this point
-        history = list(env.recordings) if env.recordings else []
-        package = {"solution": sol, "history": history}
+        # [NEW 2026-02-26] Capture solution + trajectory for full reproducibility
+        package = env.export_solution_wrapper()
         self._add_to_local_pool(package, share=True)
     
     def _run_improvement_phase(self, env):
@@ -766,14 +743,8 @@ class PhasedSearchCooperativeHyperHeuristic:
             
             for heuristic in heuristics_queue:
                 # 1. Snapshot State
-                # Deep copy is needed for components.Solution
-                from src.problems.max_cut.components import Solution
-                backup_sol = Solution(set(env.current_solution.set_a), 
-                                      set(env.current_solution.set_b), 
-                                      env.current_solution.cut_value)
-                start_val = backup_sol.cut_value
-                # Backup recordings length to rollback changes if heuristic fails
-                recordings_len = len(env.recordings) if env.recordings else 0
+                backup_wrapper = env.export_solution_wrapper()
+                start_val = backup_wrapper["solution"].cut_value
                 
                 # 2. Run Heuristic (In-Place Modification)
                 try:
@@ -785,23 +756,14 @@ class PhasedSearchCooperativeHyperHeuristic:
                     if self._error_log_count < 10 or self._error_log_count % 1000 == 0:
                          self._log(f"Error running heuristic {heuristic.__name__}: {e}")
                     
-                    env.current_solution = backup_sol
-                    # Rollback recordings on error
-                    if env.recordings:
-                        env.recordings = env.recordings[:recordings_len]
+                    env.import_solution_wrapper(backup_wrapper)
                     continue
 
                 # 3. Acceptance Criteria: Strict Ascent
                 # If Score Dropped or Equal -> Revert (We want to find peaks, not drift)
                 if env.key_value <= start_val:
                     # Revert
-                    env.current_solution = backup_sol
-                    # Restore env properties just in case
-                    env.current_solution.cut_value = start_val
-                    env.problem_state = env.get_problem_state() 
-                    # Rollback recordings for rejected move
-                    if env.recordings:
-                        env.recordings = env.recordings[:recordings_len]
+                    env.import_solution_wrapper(backup_wrapper)
                     
                     # Note: We assume env.problem_state is derived from current_solution, 
                     # but heuristic might modify algorithm_data too. Usually negligible for basic heuristics.
@@ -903,40 +865,25 @@ class PhasedSearchCooperativeHyperHeuristic:
             threshold = max(10, int(node_num * self.MIN_DIST_RATIO_RELINKING))
 
             if dist < threshold: 
-                 # [FIX 2026-02-19] Improved Robustness:
-                 # If targets are too close, standard Path Relinking is weak.
-                 # Instead of skipping or punishing, we force a "Micro-Perturbation" to break strict convergence.
-                 # This helps exploring the immediate neighborhood of the basin.
-                 self._log(f"Active Relinking: Targets too close (Dist={dist} < Threshold={threshold}). Triggering Micro-Perturbation.")
+                # [FIX 2026-02-19] Improved Robustness:
+                # If targets are too close, standard Path Relinking is weak.
+                # Instead of skipping or punishing, we force a "Micro-Perturbation" to break strict convergence.
+                # This helps exploring the immediate neighborhood of the basin.
+                self._log(f"Active Relinking: Targets too close (Dist={dist} < Threshold={threshold}). Triggering Micro-Perturbation.")
                  
-                 # Load best solution (WITH HISTORY)
-                 env.current_solution = copy.deepcopy(best_sol)
-                 env.recordings = list(best_wrapper.get("history", []))
-
-                 env.current_solution.cut_value = best_sol.cut_value
+                # Load best solution (WITH TRAJECTORY)
+                env.import_solution_wrapper(best_wrapper)
                  
-                 # Perturb 2% of nodes (enough to move away ~60 nodes in 3000)
-                 # This is lighter than Level 1 Stagnation (Light Ruin), keeping us in the same "Peak Family".
-                 if "batch_flip" in self.breakout_heuristics:
-                     h = self.breakout_heuristics["batch_flip"]
-                     env.run_heuristic(h, parameters={"ratio": 0.02})
-                 else:
-                     micro_flip_count = max(5, int(node_num * 0.02))
-                     nodes_to_flip = random.sample(range(node_num), micro_flip_count)
-                     op = BatchInsertNodeOperator(
-                         [n for n in nodes_to_flip if n in env.current_solution.set_b],
-                         [n for n in nodes_to_flip if n in env.current_solution.set_a]
-                     )
-                     env.run_operator(op)
-                 
-                 return
+                # Perturb 2% of nodes (enough to move away ~60 nodes in 3000)
+                # This is lighter than Level 1 Stagnation (Light Ruin), keeping us in the same "Peak Family".
+                h = self.breakout_heuristics["batch_flip"]
+                env.run_heuristic(h, parameters={"ratio": 0.02}) 
+                return
 
             self._log(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
 
-            # 3. Reset to Best, Target = Distant (WITH HISTORY)
-            env.current_solution = copy.deepcopy(best_sol)
-            env.recordings = list(best_wrapper.get("history", []))
-            env.current_solution.cut_value = best_sol.cut_value
+            # 3. Reset to Best, Target = Distant (WITH TRAJECTORY)
+            env.import_solution_wrapper(best_wrapper)
             
             # Pass unwrapped distant elite
             env.algorithm_data["elite_pool"] = [distant_elite] 
@@ -1010,28 +957,21 @@ class PhasedSearchCooperativeHyperHeuristic:
                     return min(d1, d2)
                  
                  # Look for solutions with SAME best value but Distance > 400
-                 current_sol = env.current_solution
                  # Handle wrapper
-                 candidates = [s for s in self.elite_pool if abs(s["solution"].cut_value - best_val) <= 1e-3 and calc_dist_j(s["solution"], current_sol) > 400]
+                 candidates = [s for s in self.elite_pool if abs(s["solution"].cut_value - best_val) <= 1e-3 and calc_dist_j(s["solution"], env.current_solution) > 400]
                  desc = "PARALLEL UNIVERSE PEAK"
              
              if candidates:
                  target_item = random.choice(candidates)
                  target_sol = target_item["solution"]
                  
-                 # Deep copy
-                 from src.problems.max_cut.components import Solution
-                 new_sol = Solution(set(target_sol.set_a), set(target_sol.set_b), target_sol.cut_value)
-                 env.current_solution = new_sol
-                 
-                 # Restore History
-                 env.recordings = list(target_item.get("history", []))
+                 # Restore using standard wrapper interface
+                 env.import_solution_wrapper(target_item)
                      
                  # Verify value
-                 env.current_solution.cut_value = env.get_key_value(env.current_solution)
                  # Sync problem state
-                 env.problem_state = env.get_problem_state()
-                 self._log(f"*** JUMPED TO {desc}: {env.current_solution.cut_value} (from pool of {len(candidates)}) ***")
+                 env.update_problem_state()
+                 self._log(f"*** JUMPED TO {desc}: {env.key_value} (from pool of {len(candidates)}) ***")
              else:
                  # If no secondary peak found, try Supernova
                  self._apply_breakout(env, "supernova_ruin")
@@ -1093,38 +1033,15 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # Even after ruin, COSM might reconstruct the exact same solution.
                 # We force a small random perturbation (5%) to ensure we land in a NEW basin.
                 ratio_noise = 0.05
-                if "batch_flip" in self.breakout_heuristics:
-                     h = self.breakout_heuristics["batch_flip"]
-                     env.run_heuristic(h, parameters={"ratio": ratio_noise})
-                     self._log(f"Noise Injection: Random Flip ({ratio_noise:.1%}) to escape basin.")
-                else:
-                     noise_nodes = random.sample(range(node_num), int(node_num * ratio_noise))
-                     op_noise = BatchInsertNodeOperator(
-                         [n for n in noise_nodes if n in env.current_solution.set_b],
-                         [n for n in noise_nodes if n in env.current_solution.set_a]
-                     )
-                     env.run_operator(op_noise)
-                     self._log(f"Noise Injection: Flipped {len(noise_nodes)} nodes ({ratio_noise:.1%}) to escape basin.")
-                
-                # Force update value
-                cur_val = env.get_key_value(env.current_solution)
-                if env.current_solution.cut_value != cur_val:
-                    env.current_solution.cut_value = cur_val
+                h = self.breakout_heuristics["batch_flip"]
+                env.run_heuristic(h, parameters={"ratio": ratio_noise})
+                self._log(f"Noise Injection: Random Flip ({ratio_noise:.1%}) to escape basin.")
 
             else:
-                 # Fallback: Random Flip 40%
-                 if "batch_flip" in self.breakout_heuristics:
-                     h = self.breakout_heuristics["batch_flip"]
-                     env.run_heuristic(h, parameters={"ratio": 0.40})
-                     self._log("Fallback Ruin: Random Flip (40%).")
-                 else:
-                     nodes = random.sample(range(node_num), int(node_num * 0.40))
-                     op = BatchInsertNodeOperator(
-                         [n for n in nodes if n in env.current_solution.set_b],
-                         [n for n in nodes if n in env.current_solution.set_a],
-                     )
-                     env.run_operator(op)
-                     self._log(f"Fallback Ruin: Random Flipped {len(nodes)} nodes.")
+                # Fallback: Random Flip 40%
+                h = self.breakout_heuristics["batch_flip"]
+                env.run_heuristic(h, parameters={"ratio": 0.40})
+                self._log("Fallback Ruin: Random Flip (40%).")
 
         elif strategy == "soft_restart":
              self._log("... Soft Restart Triggered ... Abandoning current solution.")
@@ -1156,10 +1073,8 @@ class PhasedSearchCooperativeHyperHeuristic:
                        self._log(f"Soft Restart Aborted: Pool Homogenized (Max Dist={dist} < {min_restart_dist}). Forcing Hard Constructive Restart.")
                        force_constructive = True
                   else:
-                       from src.problems.max_cut.components import Solution
-                       env.current_solution = Solution(set(target_sol.set_a), set(target_sol.set_b), target_sol.cut_value)
-                       # Restore History
-                       env.recordings = list(target_item.get("history", []))
+                       # Restore using standard wrapper interface
+                       env.import_solution_wrapper(target_item)
 
                        self._log(f"Restarted from Distant Elite (Val: {target_sol.cut_value}, Dist: {dist})")
              
@@ -1170,7 +1085,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                   # Option B: Complete Noise Restart (if pool is empty or small OR homogenized)
                   # Or Constructive Restart
                   self._log("Restarting with Constructive Heuristic (High Quality)...")
-                  env.reset(output_dir=env.output_dir)
+                  env.clear_solution()
                   
                   # [SYNC WITH COLD START] Use best constructive heuristics to reach High Basin
                   construction_steps = 0
@@ -1201,11 +1116,10 @@ class PhasedSearchCooperativeHyperHeuristic:
 
 
              # Sync state
-             env.problem_state = env.get_problem_state()
-             env.current_solution.cut_value = env.get_key_value(env.current_solution)
+             env.update_problem_state()
 
 
-    def run(self, env: BaseEnv) -> bool:
+    def run(self, env: Env) -> bool:
         """
         Main entry point. Wraps the actual search epoch in a loop to handle Global Hard Restarts (L5).
         """
@@ -1233,7 +1147,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                 
                 # Reset Environment Logic
                 # Reuse output dir
-                # Note: env.reset() clears solution and history
+                # Note: env.reset() clears solution and trajectory
                 env.reset(output_dir=env.output_dir)
                 
                 # Clear local elite pool to match the new epoch (Blank Slate)
@@ -1251,7 +1165,7 @@ class PhasedSearchCooperativeHyperHeuristic:
             
             return result
 
-    def _run_epoch(self, env: BaseEnv) -> bool:
+    def _run_epoch(self, env: Env) -> bool:
         # [REFACTORED for Cooperative Search - Cold Start Only]
         
         # Explicitly maximize chances by syncing first (populate pool for interactions later)
@@ -1271,8 +1185,8 @@ class PhasedSearchCooperativeHyperHeuristic:
         max_retries = 10
         for retry in range(max_retries):
             
-            # Reset environment for a fresh start
-            env.reset(output_dir=env.output_dir)
+            # Clear solution for a fresh start while preserving algorithm_data
+            env.clear_solution()
             
             # Keep constructing until complete
             construction_steps = 0
@@ -1570,7 +1484,6 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # The accumulation of phase_retries will push us to the next Level.
                 # Only if the strat SUCCEEDS (finds improvement) do we reset in the improvement check above.
                 
-                prev_val = env.key_value
                 self._apply_breakout(env, strategy)
                 
                 # [BUG FIX 2026-02-21] Detect Hard Restart and Reset Baseline
@@ -1672,15 +1585,12 @@ class PhasedSearchCooperativeHyperHeuristic:
                     
                     # Logically: If NOT immune AND score is too low -> Catch up
                     if not is_immune and env.key_value < pool_best.cut_value * catch_up_threshold:
-                        from src.problems.max_cut.components import Solution
                         self._log(f"AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value} (Threshold: {catch_up_threshold})...")
                         
-                        env.current_solution = Solution(set(pool_best.set_a), set(pool_best.set_b), pool_best.cut_value)
-                        # Restore History
-                        env.recordings = list(pool_best_wrapper.get("history", []))
+                        # Restore using standard wrapper interface
+                        env.import_solution_wrapper(pool_best_wrapper)
 
-                        env.current_solution.cut_value = env.get_key_value(env.current_solution)
-                        env.problem_state = env.get_problem_state()
+                        env.update_problem_state()
                         
                         current_best = env.key_value
                         no_improve_steps = 0

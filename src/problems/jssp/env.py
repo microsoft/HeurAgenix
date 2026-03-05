@@ -14,7 +14,7 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        self.get_key_value()
+        self.get_key_value(self.current_solution)
         return self.unfinished_jobs == []
 
     def load_data(self, data_path: str) -> tuple:
