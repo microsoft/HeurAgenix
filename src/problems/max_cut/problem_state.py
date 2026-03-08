@@ -68,10 +68,6 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
             - unselected_nodes (set[int]): The set of unselected nodes.
             - unselected_num (int): The number of nodes have not been selected.
             - current_cut_value (int or float): The total weight of edges between set A and set B in the current solution.
-            - average_completion_time (float): The average time of job completion.
-            - operation_balance (float): The variance in the number of completed operations across jobs.
-            - scheduling_efficiency (float): Ratio of completed operations to total possible operations.
-            - remaining_jobs (int): Number of jobs still in progress or not started.
     """
     node_num = instance_data["node_num"]
     weight_matrix = instance_data["weight_matrix"]
@@ -84,19 +80,8 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     unselected_nodes = set(range(node_num)) - solution.set_a - solution.set_b
 
     # Calculate problem states
-    # 0. Density Check for Performance (Lazy Mode)
-    # If edges > 500,000, we skip expensive O(E) calculations like internal variance
-    is_dense_large = False
-    edge_limit = 500000
-    total_edges_approx = len(adj) * 20 if adj else (weight_matrix.size // node_num) * node_num
-    # Better estimation if adj is list of dicts
-    if adj and hasattr(adj, '__len__') and len(adj) > 0:
-        # Sample degree
-        sample_deg = len(adj[0])
-        total_edges_approx = len(adj) * sample_deg
-        if total_edges_approx > edge_limit:
-            is_dense_large = True
-
+    # 0. Density Check for Performance (Lazy Mode) (Removed, since we disabled expensive ops)
+    
     # 1. Current Cut Value (Optimized)
     if hasattr(solution, "cut_value") and solution.cut_value is not None:
         current_cut_value = solution.cut_value
@@ -116,52 +101,6 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
             sub_matrix = weight_matrix[np.ix_(indices_a, indices_b)]
             current_cut_value = np.sum(sub_matrix)
 
-    imbalance_ratio = abs(set_a_count - set_b_count) / node_num
-    selected_nodes_ratio = len(selected_nodes) / node_num
-    unselected_nodes_ratio = len(unselected_nodes) / node_num
-    
-    # 2. Internal Edges Variance (Optimized / Skipped for Large Graphs)
-    edge_weight_variance_within_sets = 0.0
-    average_cut_edge_weight = 0.0
-    
-    if not is_dense_large:
-        # Fast path only for sparse graphs
-        internal_edges = []
-        if adj:
-            for u in current_solution.set_a:
-                for v, w in adj[u].items():
-                    if v in current_solution.set_a:
-                        internal_edges.append(w)
-            for u in current_solution.set_b:
-                for v, w in adj[u].items():
-                    if v in current_solution.set_b:
-                        internal_edges.append(w)
-        
-        if internal_edges:
-            edge_weight_variance_within_sets = np.var(internal_edges)
-        
-        # Avg cut weight
-        if selected_nodes and current_cut_value > 0:
-             # Just an approximation of "avg weight per cut edge"? 
-             # Precise calculation requires counting cut edges.
-             # Let's skip precise count for speed and use per-node proxy or 0
-             pass
-
-    # 3. Boundary Nodes (Optimized)
-    boundary_node_ratio = 0.0
-    if not is_dense_large:
-         if adj:
-            boundary_nodes = 0
-            for node in selected_nodes:
-                for neighbor in adj[node]:
-                    if neighbor in unselected_nodes:
-                        boundary_nodes += 1
-                        break
-            boundary_node_ratio = boundary_nodes / node_num
-         else:
-            # Matrix version (simplified)
-            boundary_node_ratio = 0.5 # Placeholder for dense matrix case
-
     # Construct the feature dictionary
     problem_states = {
         "set_a_count": set_a_count,
@@ -170,13 +109,7 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
         "selected_num": len(selected_nodes),
         "unselected_nodes": unselected_nodes,
         "unselected_num": len(unselected_nodes),
-        "current_cut_value": current_cut_value,
-        "imbalance_ratio": imbalance_ratio,
-        "average_cut_edge_weight": average_cut_edge_weight,
-        "selected_nodes_ratio": selected_nodes_ratio,
-        "unselected_nodes_ratio": unselected_nodes_ratio,
-        "edge_weight_variance_within_sets": edge_weight_variance_within_sets,
-        "boundary_node_ratio": boundary_node_ratio
+        "current_cut_value": current_cut_value
     }
 
     return problem_states

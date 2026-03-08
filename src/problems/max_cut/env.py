@@ -72,7 +72,7 @@ class Env(BaseEnv):
         self.algorithm_data["final_temperature"] = self.algorithm_data.get("final_temperature", 0.001) * self.mean_weight
 
     def init_solution(self) -> Solution:
-        return Solution(set_a=set(), set_b=set(), cut_value=0)
+        return Solution(set_a=set(), set_b=set(), cut_value=0.0)
 
     def get_key_value(self, recalculate: bool=False) -> float:
         """Get the key value of the current solution based on the key item."""

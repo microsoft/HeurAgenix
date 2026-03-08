@@ -896,8 +896,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # [FIX]: Immediate Local Optimization in the Valley
                 if self.improvement_heuristics:
                      self._log("Rapid Mining in Valley...")
-                     # Execute 2 rounds of improvement to settle into a local optimum
-                     self._run_improvement_phase(env)
+                     # Execute improvement to settle into a local optimum
                      self._run_improvement_phase(env)
 
         elif strategy == "path_relinking_to_best" and "path_relinking" in self.breakout_heuristics:
@@ -920,7 +919,6 @@ class PhasedSearchCooperativeHyperHeuristic:
              # [FIX] Dig deeper around the path
              if self.improvement_heuristics:
                  self._log("Mining Path to Best...")
-                 self._run_improvement_phase(env)
                  self._run_improvement_phase(env)
 
         elif strategy == "path_relinking" and "path_relinking" in self.breakout_heuristics:
@@ -967,10 +965,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                  
                  # Restore using standard wrapper interface
                  env.import_solution_wrapper(target_item)
-                     
-                 # Verify value
-                 # Sync problem state
-                 env.update_problem_state()
+
                  self._log(f"*** JUMPED TO {desc}: {env.key_value} (from pool of {len(candidates)}) ***")
              else:
                  # If no secondary peak found, try Supernova
@@ -1113,10 +1108,6 @@ class PhasedSearchCooperativeHyperHeuristic:
                   # [FIX 2026-02-19] Set Immunity Timer
                   self.last_restart_step = self.current_run_steps
                   self._log(f"Immunity Activated for 500 steps (Restart Step: {self.current_run_steps})")
-
-
-             # Sync state
-             env.update_problem_state()
 
 
     def run(self, env: Env) -> bool:
@@ -1590,7 +1581,6 @@ class PhasedSearchCooperativeHyperHeuristic:
                         # Restore using standard wrapper interface
                         env.import_solution_wrapper(pool_best_wrapper)
 
-                        env.update_problem_state()
                         
                         current_best = env.key_value
                         no_improve_steps = 0
