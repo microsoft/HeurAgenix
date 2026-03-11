@@ -8,8 +8,8 @@ from src.problems.max_cut.env import Env
 from src.problems.max_cut.components import Solution
 from src.util.util import load_function
 
-class PhasedSearchCooperativeHyperHeuristic:
-    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None, max_restarts=None):
+class PhasedSearchDiscreteHyperHeuristic:
+    def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None, max_restarts=None, **kwargs):
         self.heuristic_pool_names = heuristic_pool
         self.logger = logger
         self.problem = problem
@@ -486,14 +486,20 @@ class PhasedSearchCooperativeHyperHeuristic:
             
         current_time = time.time()
         
-        # Throttling Logic (Skip if simply frequent updates of same quality, unless keep-alive)
+        # [DISCRETE MODE] Throttling based on Content Hash
+        # Gset solutions have identical integer scores but different structures.
+        try:
+             sol_hash = hash(frozenset(solution.set_a))
+        except:
+             sol_hash = 0
+        
         if not is_keep_alive:
-            # [2026-03-01] Relaxed Throttling for Diversity
-            # We want to allow saving up to 3 different solutions with same score.
-            # So we only throttle if we are bombarding the server with the SAME value extremely fast (e.g. < 300s)
-            # giving a chance for the disk check below to filter duplicates.
-            if solution.cut_value == self.last_upload_value and (current_time - self.last_upload_time) < 300:
-                 return 
+             # Only throttle actual duplicates (Same Hash) within short window
+             if hasattr(self, 'last_upload_hash') and sol_hash == self.last_upload_hash and (current_time - self.last_upload_time) < 60:
+                  return
+             # Update hash
+             self.last_upload_hash = sol_hash
+             self.last_upload_time = current_time 
             
         try:
            
@@ -659,22 +665,24 @@ class PhasedSearchCooperativeHyperHeuristic:
         # Create new wrapper
         new_wrapper = {"solution": new_sol, "trajectory": trajectory_ref}
         
-        # ------------------------------------------------------------------
-        # Strategy 1: Score-based Duplication Check (New Logic)
-        # ------------------------------------------------------------------
-        # [MODIFIED 2026-02-26] Allow up to 3 solutions with the same score (User Request)
-        # However, use a wider tolerance (1e-3) to treat "jittered" values as identical.
-        # This prevents the pool from filling with 20 copies of 5317.000001, 5317.000002, etc.
-        same_score_count = 0
-        pool_tolerance = 1e-3
+        # [DISCRETE MODE] Hash-based Duplication Check
+        # We allow many solutions with same score (Gset Plateau), but reject exact duplicates.
+        try:
+            new_hash = hash(frozenset(new_sol.set_a))
+        except:
+            new_hash = 0
         
         for existing_wrapper in self.elite_pool:
-            if abs(new_sol.cut_value - existing_wrapper["solution"].cut_value) < pool_tolerance:
-                same_score_count += 1
-        
-        if same_score_count >= 3:
-            # We already have enough (3) representatives of this score range. Reject.
-            return
+            existing_sol = existing_wrapper["solution"]
+            if existing_sol.cut_value == new_sol.cut_value:
+                 try:
+                     existing_hash = hash(frozenset(existing_sol.set_a))
+                 except:
+                     existing_hash = 0
+                     
+                 if existing_hash == new_hash:
+                     # Exact Duplicate: Reject
+                     return
 
         # Policy B: Distinct Solution (Add/Evict)
         
@@ -1139,7 +1147,7 @@ class PhasedSearchCooperativeHyperHeuristic:
                 # Reset Environment Logic
                 # Reuse output dir
                 # Note: env.reset() clears solution and trajectory
-                env.reset(output_dir=env.output_dir)
+                env.reset(output_dir=env.output_dir, temperature_scaling=2.0)
                 
                 # Clear local elite pool to match the new epoch (Blank Slate)
                 self.elite_pool = []
@@ -1589,3 +1597,6 @@ class PhasedSearchCooperativeHyperHeuristic:
                         if self.current_run_steps % 500 == 0:
                              self._log(f"Catch-up IMMUNITY: Worker exploring ({self.current_run_steps - self.last_restart_step}/{immunity_period} steps). Val={env.key_value}")
 
+
+
+        return True

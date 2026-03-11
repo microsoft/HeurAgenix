@@ -57,12 +57,14 @@ class Env(BaseEnv):
 
         return {"node_num": node_num, "weight_matrix": weight_matrix, "adj": adj}
     
-    def reset(self, output_dir: str=None):
+    def reset(self, output_dir: str=None, **kwargs):
         super().reset(output_dir)
         # Adaptive Temperature Initialization for Large Scale Weights (ImgSeg)
         # Standard Gset (Weight~1) uses T=100. scaling_factor = 100.
         # UPDATE: Increased to 1000.0 to break stagnation in large float graphs (2026-02-10)
-        base_scaling = 1000.0
+        # UPDATE 2026-03-09: Allow external control for Discrete/Continuous strategy
+        base_scaling = kwargs.get("temperature_scaling", 1000.0) 
+        
         adaptive_temp = self.mean_weight * base_scaling
         
         # Inject into algorithm_data so heuristics pick it up automatically

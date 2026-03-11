@@ -63,6 +63,7 @@ class PhasedSearchBestHyperHeuristic:
         self,
         heuristic_pool: list[str],
         problem: str,
+        **kwargs,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem

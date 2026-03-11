@@ -60,6 +60,7 @@ class PhasedSearchUCBBestHyperHeuristic:
         shared_pool_dir: str = None,
         top_k: int = 10,
         load_ratio: float = 0.4,
+        **kwargs,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
         self.problem = problem
