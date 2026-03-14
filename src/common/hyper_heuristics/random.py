@@ -10,6 +10,7 @@ class RandomHyperHeuristic:
         heuristic_pool: list[str],
         problem: str,
         iterations_scale_factor: float=2.0,
+        **kwargs
     ) -> None:
         self.heuristic_pools = [load_function(heuristic, problem=problem) for heuristic in heuristic_pool]
         self.iterations_scale_factor = iterations_scale_factor

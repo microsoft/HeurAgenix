@@ -147,7 +147,6 @@ def run_once(
     except Exception as e:
         local_log(f"Error instantiating {hh_class.__name__}: {e}")
         return 0.0
-        
     algorithm.run(env)
 
 def main(
@@ -171,9 +170,9 @@ def main(
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
 
     if experiment_name is None: 
-        experiment_dir = os.path.join(base_output_dir, "max_cut", data_name)
+        experiment_dir = os.path.join(base_output_dir, problem, data_name)
     else:
-        experiment_dir = os.path.join(base_output_dir, "max_cut", experiment_name)
+        experiment_dir = os.path.join(base_output_dir, problem, experiment_name)
     
     os.makedirs(experiment_dir, exist_ok=True)
     log_file_path = os.path.join(experiment_dir, "run.log")

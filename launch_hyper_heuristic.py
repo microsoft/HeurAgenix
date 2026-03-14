@@ -2,10 +2,6 @@ import argparse
 import os
 import importlib
 from datetime import datetime
-from src.pipeline.hyper_heuristics.random import RandomHyperHeuristic
-from src.pipeline.hyper_heuristics.single import SingleHyperHeuristic
-from src.pipeline.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
-from src.util.llm_client.get_llm_client import get_llm_client
 from src.util.util import search_file
 
 def parse_arguments():
@@ -50,6 +46,8 @@ def main():
     base_output_dir = os.path.join(os.getenv("AMLT_OUTPUT_DIR"), "..", "..", "orllm", "output") if os.getenv("AMLT_OUTPUT_DIR") else "output"
 
     if heuristic == "llm_hh":
+        from src.common.hyper_heuristics.llm_selection import LLMSelectionHyperHeuristic
+        from src.util.llm_client.get_llm_client import get_llm_client
         prompt_dir = os.path.join("src", "problems", "base", "prompt")
         llm_client = get_llm_client(llm_config_file, prompt_dir, None)
         hyper_heuristic = LLMSelectionHyperHeuristic(
@@ -63,12 +61,14 @@ def main():
             rollout_budget=rollout_budget,
         )
     elif heuristic == "random_hh":
+        from src.common.hyper_heuristics.random import RandomHyperHeuristic
         hyper_heuristic = RandomHyperHeuristic(heuristic_pool=heuristic_pool, problem=problem, iterations_scale_factor=iterations_scale_factor)
     elif heuristic == "or_solver":
         module = importlib.import_module(f"src.problems.{problem}.or_solver")
         globals()["ORSolver"] = getattr(module, "ORSolver")
         hyper_heuristic = ORSolver(problem=problem)
     else:
+        from src.common.hyper_heuristics.single import SingleHyperHeuristic
         hyper_heuristic = SingleHyperHeuristic(heuristic=heuristic, problem=problem)
 
     module = importlib.import_module(f"src.problems.{problem}.env")
@@ -85,14 +85,6 @@ def main():
         experiment_name = experiment_name if experiment_name else datetime_str
         output_dir = os.path.join(base_output_dir, problem, result_name, env.data_ref_name, experiment_name)
         env.reset(output_dir)
-
-        paras = '\n'.join(f'{key}={value}' for key, value in vars(args).items()) 
-        paras += f"\ndata_path={env.data_path}"
-        llm_config = open(llm_config_file, encoding="utf-8").read()
-        paras += f"llm_config={llm_config}\n"
-        # with open(os.path.join(env.output_dir, "parameters.txt"), 'w') as file:
-            # file.write(paras)
-
         if heuristic == "llm_hh":
             llm_client.reset(env.output_dir)
         validation_result = hyper_heuristic.run(env)

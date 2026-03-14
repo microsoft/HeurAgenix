@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+import time
 from src.problems.base.components import BaseOperator
 from src.problems.base.env import BaseEnv
 from src.util.util import load_function
@@ -12,66 +13,68 @@ class RandomSearchBestHyperHeuristic:
         heuristic_pool: list[str],
         problem: str,
         iterations_scale_factor: float=2.0,
-        
+        **kwargs # Added to accept extra args from search_best.py
     ) -> None:
         self.heuristic_pools = [load_function(heuristic, problem=problem) for heuristic in heuristic_pool]
         self.iterations_scale_factor = iterations_scale_factor
+        self.logger = kwargs.get("logger", None)
+
+    def _log(self, msg):
+        if self.logger:
+            self.logger(msg)
+        else:
+            print(msg, flush=True)
 
     def run(self, env:BaseEnv) -> bool:
-        max_steps = int(env.construction_steps * self.iterations_scale_factor)
+        # Random Search should run as long as the environment allows (Time-based usually)
+        # We ignore iterations_scale_factor for "Search Best" scenario as we want to exhaust time budget.
         current_steps = 0
-        data = env.output_dir.split(os.sep)[-3]
-        experiment = env.output_dir.split(os.sep)[-2]
-        run_id = env.output_dir.split(os.sep)[-1]
         
-        print(f"start running: {data}, {experiment}, {run_id}", flush=True)
+        if env.output_dir:
+            data = env.output_dir.split(os.sep)[-3] if len(env.output_dir.split(os.sep)) >= 3 else "unknown"
+            experiment = env.output_dir.split(os.sep)[-2] if len(env.output_dir.split(os.sep)) >= 2 else "unknown"
+            run_id = env.output_dir.split(os.sep)[-1]
+        else:
+            data, experiment, run_id = "unknown", "unknown", "unknown"
+        
+        self._log(f"RandomSearchBest running: Data={data}, Exp={experiment}, ID={run_id}")
             
         begin = datetime.now()
-        last_value = 0
         found_best = False
-        node_num = env.instance_data["node_num"]
         current_best = 0
+        
+        # Determine strict stop limit if env doesn't enforce time
+        max_steps = 1000000000 
+        
         while current_steps <= max_steps and env.continue_run:
+            if not self.heuristic_pools:
+                break
+                
             heuristic = random.choice(self.heuristic_pools)
-            if current_steps % 1000 == 0:
-                selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
-                end = datetime.now()
-                time_cost = (end - begin).total_seconds()
-                print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
-                if env.is_complete_solution and last_value == env.key_value:
-                    print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
-                    print(f"No better solution found {last_value} => {env.key_value}, {current_steps}, stop", flush=True)
-                    env.dump_result()
-                    return found_best
-                last_value = env.key_value
-            _ = env.run_heuristic(heuristic)
-            if env.key_value == env.best_known:
-                print(f"Found best known value at step {current_steps}", flush=True)
+            env.run_heuristic(heuristic)
+            
+            # Update Best
+            
+            if env.compare(env.key_value, current_best) > 0:
+                current_best = env.key_value
+                if env.is_complete_solution and env.is_valid_solution:
+                     self._log(f"Step:{current_steps} New Local Best: {current_best}")
+
+            # Check Global Best Known
+            if env.best_known is not None and env.compare(env.key_value, env.best_known) > 0:
+                if env.is_complete_solution and env.is_valid_solution:
+                    self._log(f"!!! NEW BEST FOUND: {env.key_value} (Better than {env.best_known}) !!!")
+                    # Update local copy of best known to suppress repeated logs
+                    env.best_known = env.key_value
+                    env.dump_result(result_file=f"break_best_known_result_random_{run_id}.txt")
+                    found_best = True
 
             # Logging
-            current_best = max(current_best, env.key_value)
             if current_steps % 1000 == 0:
-                selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
-                print(f"Data:{data}\tExp:{experiment}\tID:{run_id}\tSteps:{current_steps}\tSelected:{selected_nodes}\tTotal:{node_num}\tNow:{env.key_value}\tCurrent best:{current_best}\tBest known:{env.best_known}\tNow:{end.strftime('%Y-%m-%d %H:%M:%S')}\tTime cost(hour):{time_cost/3600:.4f}", flush=True)
-
-            if env.key_value == env.best_known:
-                if env.is_complete_solution and env.is_valid_solution:
-                    print(f"!!! NEW BEST FOUND: {env.key_value} > {env.best_known} !!!")
-                    env.dump_result(result_file=f"match_best_known_result.txt")
-                    found_best = True
-                    # Don't stop, try to improve more!
-                    env.best_known = env.key_value # Update local best known to keep pushing
-
-            # Check best known
-            if env.key_value > env.best_known:
-                if env.is_complete_solution and env.is_valid_solution:
-                    print(f"!!! NEW BEST FOUND: {env.key_value} > {env.best_known} !!!")
-                    env.dump_result(result_file=f"break_best_known_result.txt")
-                    found_best = True
-                    # Don't stop, try to improve more!
-                    env.best_known = env.key_value # Update local best known to keep pushing
+                self._log(f"Data:{data} ID:{run_id} Step:{current_steps} Val:{env.key_value} Best:{current_best} BK:{env.best_known} Time:{time_cost/3600:.4f}h")
 
             current_steps += 1
+            
         return found_best

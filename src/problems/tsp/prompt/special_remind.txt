@@ -1,2 +1,0 @@
-1. Consider empty solution as input (no last_visited).
-2. Make sure solution is valid, such as: no-revisited.

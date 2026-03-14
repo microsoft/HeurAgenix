@@ -15,13 +15,14 @@ class Env(BaseEnv):
         self.construction_steps = self.instance_data["node_num"]
         self.key_item = "total_current_cost"
         self.compare = lambda x, y: y - x
-        self.best_known = best_known.get(data_name, None)
 
     @property
     def is_complete_solution(self) -> bool:
         return len(set([node for route in self.current_solution.routes for node in route])) == self.instance_data["node_num"]
 
     def load_data(self, data_path: str) -> None:
+        data_name = data_path.split(os.sep)[-1].split(".")[0]
+        self.best_known = best_known.get(data_name, None)
         problem = tsplib95.load(data_path)
         depot = problem.depots[0] - 1
         if problem.edge_weight_type == "EUC_2D":
