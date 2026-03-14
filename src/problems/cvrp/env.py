@@ -5,6 +5,7 @@ import pandas as pd
 import networkx as nx
 from src.problems.base.env import BaseEnv
 from src.problems.cvrp.components import Solution
+from src.problems.cvrp.best_known import best_known
 
 
 class Env(BaseEnv):
@@ -14,6 +15,7 @@ class Env(BaseEnv):
         self.construction_steps = self.instance_data["node_num"]
         self.key_item = "total_current_cost"
         self.compare = lambda x, y: y - x
+        self.best_known = best_known.get(data_name, None)
 
     @property
     def is_complete_solution(self) -> bool:
