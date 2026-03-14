@@ -41,7 +41,11 @@ class RandomSearchBestHyperHeuristic:
             
         begin = datetime.now()
         found_best = False
-        current_best = 0
+
+        if env.compare(100, 0) > 0:
+            current_best = float('-inf')
+        else:
+            current_best = float('inf')
         
         # Determine strict stop limit if env doesn't enforce time
         max_steps = 1000000000 
@@ -56,9 +60,9 @@ class RandomSearchBestHyperHeuristic:
             # Update Best
             
             if env.compare(env.key_value, current_best) > 0:
-                current_best = env.key_value
                 if env.is_complete_solution and env.is_valid_solution:
-                     self._log(f"Step:{current_steps} New Local Best: {current_best}")
+                    current_best = env.key_value
+                    self._log(f"Step:{current_steps} New Local Best: {current_best}")
 
             # Check Global Best Known
             if env.best_known is not None and env.compare(env.key_value, env.best_known) > 0:
@@ -73,7 +77,7 @@ class RandomSearchBestHyperHeuristic:
             if current_steps % 1000 == 0:
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
-                self._log(f"Data:{data} ID:{run_id} Step:{current_steps} Val:{env.key_value} Best:{current_best} BK:{env.best_known} Time:{time_cost/3600:.4f}h")
+                self._log(f"Data:{data} ID:{run_id} Step:{current_steps} Val:{env.key_value} Completed:{env.is_complete_solution} Current best:{current_best} BK:{env.best_known} Time:{time_cost/3600:.4f}h")
 
             current_steps += 1
             

@@ -127,10 +127,7 @@ class BaseEnv:
             return trace_string
 
     def run_operator(self, operator: BaseOperator) -> bool:
-        if isinstance(operator, BaseOperator):
-            self.current_solution = operator.run(self.current_solution)
-            self.update_problem_state()
-        return operator
+        pass
 
     def summarize_env(self) -> str:
         pass

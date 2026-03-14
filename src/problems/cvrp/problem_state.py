@@ -91,97 +91,44 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
     """
     node_num = instance_data["node_num"]
     vehicle_num = instance_data["vehicle_num"]
-    distance_matrix = instance_data["distance_matrix"]
-    demands = instance_data["demands"]
     capacity = instance_data["capacity"]
+    demands = instance_data["demands"] # Needed for fallback
+    
+    # Use cached values if available
+    if hasattr(solution, "total_cost") and solution.total_cost is not None:
+        total_current_cost = solution.total_cost
+    else:
+        total_current_cost = 0 
+        
+    if hasattr(solution, "loads") and solution.loads is not None:
+        vehicle_loads = solution.loads
+    else:
+        # Fallback calculation
+        vehicle_loads = [sum([demands[node] for node in route]) for route in solution.routes]
 
-    # A list of integers representing the IDs of nodes that have been visited.
-    visited_nodes = list(set([node for route in solution.routes for node in route]))
-    visited_num = len(visited_nodes)
+    # Calculate derived state
+    vehicle_remaining_capacity = [capacity - l for l in vehicle_loads]
 
-    # A list of integers representing the IDs of nodes that have not yet been visited.
-    unvisited_nodes = [node for node in range(node_num) if node not in visited_nodes]
-    unvisited_num = len(unvisited_nodes)
-
-    last_visited = []
-    vehicle_loads = []
-    vehicle_remaining_capacity = []
-    total_current_cost = 0
-    for vehicle_index in range(vehicle_num):
-        route = solution.routes[vehicle_index]
-        # The cost of the current solution for each vehicle.
-        cost_for_vehicle = sum([distance_matrix[route[index]][route[index + 1]] for index in range(len(route) - 1)])
-        if len(route) > 0:
-            cost_for_vehicle += distance_matrix[route[-1]][route[0]]
-        total_current_cost += cost_for_vehicle
-        # The last visited node for each vehicle.
-        if len(route) == 0:
-            last_visited.append("None")
-        else:
-            last_visited.append(route[-1])
-        # The current load of each vehicle.
-        vehicle_loads.append(sum([demands[node] for node in route]))
-        # The remaining capacity for each vehicle.
-        vehicle_remaining_capacity.append(capacity - sum([demands[node] for node in route]))
-
-    # Calculate route lengths and costs
-    route_lengths = [len(route) for route in solution.routes]
-    route_costs = [sum(distance_matrix[route[i]][route[i+1]] 
-                       for i in range(len(route)-1)) 
-                   for route in solution.routes 
-                   if len(route) > 1]
+    # Visited/Unvisited
+    visited_nodes_set = set()
+    for route in solution.routes:
+        visited_nodes_set.update(route)
+        
+    visited_nodes = list(visited_nodes_set)
+    # Assumes node 0 is depot or handled elsewhere if needed. 
+    # Original logic included all nodes in range(node_num) not in visited.
+    # We maintain that logic for compatibility.
+    unvisited_nodes = [node for node in range(node_num) if node not in visited_nodes_set]
     
-    # Calculate average route length
-    average_route_length = np.mean(route_lengths) if route_lengths else 0
-    
-    # Calculate max and min route length
-    max_route_length = max(route_lengths, default=0)
-    min_route_length = min(route_lengths, default=0)
-    
-    # Calculate standard deviation of route length
-    std_dev_route_length = np.std(route_lengths) if route_lengths else 0
-    
-    # Calculate average route cost
-    average_route_cost = np.mean(route_costs) if route_costs else 0
-    
-    # Calculate total demand served
-    total_demand_served = sum(demands[node] for route in solution.routes for node in route)
-    
-    # Calculate average vehicle load
-    average_vehicle_load = np.mean(vehicle_loads) if vehicle_loads else 0
-    
-    # Calculate average remaining vehicle capacity
-    average_remaining_vehicle_capacity = np.mean(vehicle_remaining_capacity) if vehicle_remaining_capacity else capacity
-    
-    # Count the number of unvisited nodes
-    number_of_unvisited_nodes = len(unvisited_nodes)
-    
-    # Calculate average unvisited node demand
-    average_unvisited_node_demand = np.mean(demands[unvisited_nodes]) if unvisited_nodes else 0
-    
-    # Calculate total remaining demand
-    total_remaining_demand = sum(demands[node] for node in unvisited_nodes)
-    
-    
+    # Populate dictionary with keys expected by heuristics
     return {
         "visited_nodes": visited_nodes,
-        "visited_num": visited_num,
+        "visited_num": len(visited_nodes),
         "unvisited_nodes": unvisited_nodes,
-        "unvisited_num": unvisited_num,
-        "last_visited": last_visited,
+        "unvisited_num": len(unvisited_nodes),
         "vehicle_loads": vehicle_loads,
         "vehicle_remaining_capacity": vehicle_remaining_capacity,
-        "average_route_length": average_route_length,
-        "max_route_length": max_route_length,
-        "min_route_length": min_route_length,
-        "std_dev_route_length": std_dev_route_length,
-        "average_route_cost": average_route_cost,
-        "total_demand_served": total_demand_served,
-        "average_vehicle_load": average_vehicle_load,
-        "average_remaining_vehicle_capacity": average_remaining_vehicle_capacity,
-        "number_of_unvisited_nodes": number_of_unvisited_nodes,
-        "average_unvisited_node_demand": average_unvisited_node_demand,
-        "total_remaining_demand": total_remaining_demand,
+        "total_cost": total_current_cost,
     }
 
 
@@ -195,7 +142,6 @@ def get_observation_problem_state(problem_state: dict) -> dict:
         dict: The dictionary contains the core problem state.
     """
     return {
-        "visited_num": problem_state["visited_num"],
-        "total_demand_served": problem_state["total_demand_served"],
-        "average_vehicle_load": problem_state["average_vehicle_load"]
+        "visited_num": problem_state.get("visited_num", 0),
+        "total_cost": problem_state.get("total_cost", 0)
     }
