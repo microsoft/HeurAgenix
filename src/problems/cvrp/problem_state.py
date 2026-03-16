@@ -70,24 +70,13 @@ def get_solution_problem_state(instance_data: dict, solution: Solution) -> dict:
 
     Returns:
         dict: The dictionary contains the solution problem state with:
-            - visited_nodes (list[int]): A list of lists representing the nodes visited by each vehicle.
-            - visited_num (int): Number of nodes visited by each vehicle.
-            - unvisited_nodes (list[int]): A list of lists representing the nodes unvisited by each vehicle.
-            - unvisited_num (int): Number of nodes unvisited by each vehicle.
-            - last_visited (list[int]): The last visited node for each vehicle.
-            - vehicle_loads (list[int]): The current load of each vehicle.
-            - vehicle_remaining_capacity (list[int]): The remaining capacity for each vehicle.
-            - average_route_length (float): The average length of all routes.
-            - max_route_length (int): The maximum length of any route.
-            - min_route_length (int): The minimum length of any route.
-            - std_dev_route_length (float): The standard deviation of the route lengths.
-            - average_route_cost (float): The average cost of all routes.
-            - total_demand_served (int): The cumulative demand served across all routes.
-            - average_vehicle_load (float): The average load across all vehicles.
-            - average_remaining_vehicle_capacity (float): The average remaining capacity for all vehicles.
-            - number_of_unvisited_nodes (int): The count of nodes that have not been visited.
-            - average_unvisited_node_demand (float): The average demand of unvisited nodes.
-            - total_remaining_demand (int): The cumulative demand of unvisited nodes.
+            - visited_nodes (list[int]): A list containing the nodes visited.
+            - visited_num (int): Number of nodes visited.
+            - unvisited_nodes (list[int]): A list representing the nodes unvisited.
+            - unvisited_num (int): Number of nodes unvisited.
+            - vehicle_loads (list[float]): The current load of each vehicle.
+            - vehicle_remaining_capacity (list[float]): The remaining capacity for each vehicle.
+            - total_cost (float): The total cost of the current solution.
     """
     node_num = instance_data["node_num"]
     vehicle_num = instance_data["vehicle_num"]

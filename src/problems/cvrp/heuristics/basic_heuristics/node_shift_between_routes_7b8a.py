@@ -56,7 +56,7 @@ def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **
                 new_load_target = vehicle_loads[target_vehicle_id] + problem_state["demands"][node]
                 if new_load_target > capacity:
                     continue  # Skip if moving the node violates target vehicle's capacity
-                for target_position in range(len(target_route) + 1):
+                for target_position in range(1, len(target_route) + 1):
                         # Calculate the cost difference if the node is inserted at the target position
                         source_previous_node = source_route[(source_position - 1) % len(source_route)]
                         source_next_node = source_route[(source_position + 1) % len(source_route)]

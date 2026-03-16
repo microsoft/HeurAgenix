@@ -27,7 +27,7 @@ def two_opt_0554(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[R
 
     # Iterate over all routes to apply the 2-opt move
     for route_index, route in enumerate(current_solution.routes):
-        for i in range(0, len(route)):
+        for i in range(1, len(route)):
             for j in range(i + 1, len(route) + 1):
                 # Calculate the cost difference for the current 2-opt move
                 delta = two_opt_cost_change(distance_matrix, route, i, j, depot)
