@@ -11,13 +11,15 @@ class GraspBestHyperHeuristic:
     Phase 1: Randomized Construction (picking constructive heuristics until solution is complete).
     Phase 2: Local Search Optimization (repeatedly running improvement heuristics until local optima).
     """
-    def __init__(self, heuristic_pool: list[str], problem: str, **kwargs) -> None:
+    def __init__(self, heuristic_pool, problem, worker_id=None, logger=None, **kwargs) -> None:
         self.heuristic_names = heuristic_pool
+        self.problem = problem
+        self.worker_id = str(worker_id)
         self.heuristics_dict = {}
         for h in heuristic_pool:
             self.heuristics_dict[h] = load_function(h, problem=problem)
         
-        self.logger = kwargs.get("logger", None)
+        self.logger = logger
         self._classify_heuristics()
 
     def _classify_heuristics(self):
@@ -68,11 +70,10 @@ class GraspBestHyperHeuristic:
         if env.output_dir:
             data = env.output_dir.split(os.sep)[-3] if len(env.output_dir.split(os.sep)) >= 3 else "unknown"
             experiment = env.output_dir.split(os.sep)[-2] if len(env.output_dir.split(os.sep)) >= 2 else "unknown"
-            run_id = env.output_dir.split(os.sep)[-1]
         else:
-            data, experiment, run_id = "unknown", "unknown", "unknown"
+            data, experiment = "unknown", "unknown"
         
-        self._log(f"GraspBest running: Data={data}, Exp={experiment}, ID={run_id}")
+        self._log(f"GraspBest running: Data={data}, Exp={experiment}, WorkerID={self.worker_id}")
             
         begin = datetime.now()
         
@@ -126,10 +127,10 @@ class GraspBestHyperHeuristic:
                 current_best = final_cost
                 end = datetime.now()
                 time_cost = (end - begin).total_seconds()
-                self._log(f"[Epoch {epoch}] Data:{data} ID:{run_id} Step:{total_steps} Val:{current_best} BK:{env.best_known} Time:{time_cost/3600:.4f}h")
+                self._log(f"[Epoch {epoch}] Data:{data} WorkerID:{self.worker_id} Step:{total_steps} Val:{current_best} BK:{env.best_known} Time:{time_cost/3600:.4f}h")
                 
                 if env.best_known is not None and env.compare(current_best, env.best_known) >= 0:
-                    worker_name = getattr(self, "worker_id", run_id)
+                    worker_name = self.worker_id
                     if env.compare(current_best, env.best_known) > 1e-3:
                         self._log(f"!!! BREAKTHROUGH FOUND: {current_best} (Better than {env.best_known}) !!!")
                         env.best_known = current_best
