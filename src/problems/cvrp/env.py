@@ -14,12 +14,14 @@ class Env(BaseEnv):
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "cvrp")
         self.construction_steps = self.instance_data["node_num"]
-        self.key_item = "total_current_cost"
+        self.key_item = "total_cost"
         self.compare = lambda x, y: y - x
 
     @property
     def is_complete_solution(self) -> bool:
-        return len(set([node for route in self.current_solution.routes for node in route])) == self.instance_data["node_num"]
+        # Fast O(V) check: each route has 1 depot, so total len = nodes - 1 + vehicles
+        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
+        return sum(len(route) for route in self.current_solution.routes) == expected_len
 
     def load_data(self, data_path: str) -> None:
         data_name = data_path.split(os.sep)[-1].split(".")[0]
@@ -248,16 +250,38 @@ class Env(BaseEnv):
             return False
             
         solution = self.current_solution
-        recalculate_cost = False
-        recalculate_load = False
-        delta = 0.0
-        
-        recalculate_cost = True
-        recalculate_load = True
-        delta = 0.0
-            
         demands = self.instance_data["demands"]
-        
+
+        # 1. Detect affected vehicles for safe and fast Route-Level Delta evaluation
+        affected_vehicles = set()
+        if isinstance(operator, AppendOperator):
+            affected_vehicles.add(operator.vehicle_id)
+        elif isinstance(operator, InsertOperator):
+            affected_vehicles.add(operator.vehicle_id)
+        elif isinstance(operator, SwapOperator):
+            affected_vehicles.add(operator.vehicle_id1)
+            affected_vehicles.add(operator.vehicle_id2)
+        elif isinstance(operator, ReverseSegmentOperator):
+            affected_vehicles.add(operator.vehicle_id)
+        elif isinstance(operator, RelocateOperator):
+            affected_vehicles.add(operator.source_vehicle_id)
+            affected_vehicles.add(operator.target_vehicle_id)
+        elif isinstance(operator, BatchRemoveOperator):
+            nodes_to_remove = set(operator.nodes)
+            for vid, route in enumerate(solution.routes):
+                if not set(route).isdisjoint(nodes_to_remove):
+                    affected_vehicles.add(vid)
+        elif isinstance(operator, BatchInsertOperator):
+            for vid, pos, node in operator.insertions:
+                affected_vehicles.add(vid)
+        elif isinstance(operator, MergeRoutesOperator):
+            affected_vehicles.add(operator.source_vehicle_id)
+            affected_vehicles.add(operator.target_vehicle_id)
+
+        # 2. Calculate old cost for the affected routes BEFORE modification (Route-Level O(L) instead of Global O(N))
+        old_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
+            
+        # 3. Apply the IN-PLACE structural modifications AND Update Loads
         if isinstance(operator, AppendOperator):
             solution.routes[operator.vehicle_id].append(operator.node)
             solution.loads[operator.vehicle_id] += demands[operator.node]
@@ -274,7 +298,7 @@ class Env(BaseEnv):
             if operator.vehicle_id1 != operator.vehicle_id2:
                 solution.loads[operator.vehicle_id1] += demands[node2] - demands[node1]
                 solution.loads[operator.vehicle_id2] += demands[node1] - demands[node2]
-            
+                
         elif isinstance(operator, ReverseSegmentOperator):
             r = solution.routes[operator.vehicle_id]
             for start, end in operator.segments:
@@ -284,7 +308,7 @@ class Env(BaseEnv):
             node = solution.routes[operator.source_vehicle_id].pop(operator.source_position)
             t_pos = operator.target_position
             if operator.source_vehicle_id == operator.target_vehicle_id and operator.source_position < operator.target_position:
-                 t_pos -= 1
+                t_pos -= 1
             solution.routes[operator.target_vehicle_id].insert(t_pos, node)
             if operator.source_vehicle_id != operator.target_vehicle_id:
                 solution.loads[operator.source_vehicle_id] -= demands[node]
@@ -292,8 +316,10 @@ class Env(BaseEnv):
             
         elif isinstance(operator, BatchRemoveOperator):
             nodes_to_remove = set(operator.nodes)
-            for i in range(len(solution.routes)):
-                solution.routes[i] = [n for n in solution.routes[i] if n not in nodes_to_remove]
+            for vid in affected_vehicles:
+                removed_demand = sum(demands[n] for n in solution.routes[vid] if n in nodes_to_remove)
+                solution.routes[vid] = [n for n in solution.routes[vid] if n not in nodes_to_remove]
+                solution.loads[vid] -= removed_demand
                 
         elif isinstance(operator, BatchInsertOperator):
             inserts_by_vehicle = {}
@@ -305,6 +331,7 @@ class Env(BaseEnv):
                  ops.sort(key=lambda x: x[0], reverse=True)
                  for pos, node in ops:
                      solution.routes[vid].insert(pos, node)
+                     solution.loads[vid] += demands[node]
         
         elif isinstance(operator, MergeRoutesOperator):
              depot = self.instance_data["depot"]
@@ -327,14 +354,18 @@ class Env(BaseEnv):
                  
              solution.routes[operator.target_vehicle_id] = [depot] + src_nodes + tgt_nodes
              solution.routes[operator.source_vehicle_id] = [depot]
+             
+             # Also fix loads
+             solution.loads[operator.target_vehicle_id] += solution.loads[operator.source_vehicle_id] - demands[depot]
+             solution.loads[operator.source_vehicle_id] = demands[depot]
 
-        if recalculate_load:
-            self._update_loads_full(solution)
-
-        if recalculate_cost or solution.total_cost is None:
+        # 4. Calculate new cost ONLY for affected routes
+        new_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
+        
+        if solution.total_cost is None:
             solution.total_cost = self.get_key_value(recalculate=True)
         else:
-            solution.total_cost += delta
+            solution.total_cost += (new_cost - old_cost)
             
         self.update_problem_state()
         return True
