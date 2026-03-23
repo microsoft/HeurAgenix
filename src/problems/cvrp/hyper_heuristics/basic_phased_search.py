@@ -73,15 +73,15 @@ class BasicPhasedSearchHyperHeuristic:
 
     def _log(self, msg):
         if self.logger:
-            self.logger(msg)
+             self.logger(msg)
         else:
-            print(msg, flush=True)
+             print(msg, flush=True)
 
     def run(self, env: BaseEnv) -> bool:
         """Main entry point: Single-machine version for evaluation & update loop."""
         data = env.data_ref_name if hasattr(env, "data_ref_name") else "unknown"
         
-        self._log(f"[Bootstrapping] BasicPhasedSearch initialized. Data={data}, WorkerID={self.worker_id}")
+        self._log(f"Bootstrapping BasicPhasedSearch initialized. Data={data}")
         
         begin = datetime.now()
         
@@ -109,20 +109,19 @@ class BasicPhasedSearchHyperHeuristic:
             final_cost = env.get_key_value()
             if final_cost < current_best:
                 current_best = final_cost
-                time_cost = (datetime.now() - begin).total_seconds()
                 
                 # Report
                 self._log(
-                    f"[Epoch {epoch_count}] Data:{data} Worker:{self.worker_id} "
-                    f"Cost:{current_best:.4f} BK:{env.best_known} Time:{time_cost:.2f}s"
+                    f"Epoch={epoch_count}, Step={total_steps}, Val={current_best:.1f}, BK={env.best_known}"
                 )
                 
                 if env.best_known is not None and current_best <= env.best_known:
                     if current_best < env.best_known:
-                        self._log(f"!!! BREAKTHROUGH FOUND: {current_best} (Ref: {env.best_known}) !!!")
+                        self._log(f"!!! BREAKTHROUGH: {current_best} > {env.best_known} !!!")
                         env.best_known = current_best
                         env.dump_result(result_file=f"breakthrough_{self.worker_id}_{current_best:.4f}.txt")
                     else:
+                        self._log(f"~~~ MATCHED BEST KNOWN: {current_best} ~~~")
                         env.dump_result(result_file=f"match_bk_{self.worker_id}_{current_best:.4f}.txt")
             
             epoch_count += 1
