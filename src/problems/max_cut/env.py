@@ -398,35 +398,6 @@ class Env(BaseEnv):
             return False
         return True
 
-    def dump_best_solution(self, path: str) -> None:
-        """Dump the current best solution to a file."""
-        # Temporarily swap output_dir to dump to the specific path
-        original_output_dir = self.output_dir
-        
-        try:
-            # path is like ".../high_quality_solution/current_best.12345.exp.runid"
-            # dump_result expects a directory and a filename
-            target_dir = os.path.dirname(path)
-            target_file = os.path.basename(path)
-            
-            self.output_dir = target_dir
-            
-            # Use dump_result to get full info (trajectory, etc.)
-            # We use a temp file first for atomic write safety
-            temp_file = target_file + ".tmp"
-            self.dump_result(result_file=temp_file)
-            
-            # Atomic rename
-            temp_path = os.path.join(target_dir, temp_file)
-            final_path = os.path.join(target_dir, target_file)
-            os.replace(temp_path, final_path)
-            
-        except Exception as e:
-            print(f"Error dumping solution to {path}: {e}")
-        finally:
-            # Restore original output_dir
-            self.output_dir = original_output_dir
-
     def load_solution(self, path: str) -> bool:
         """Load a solution from a file."""
         try:

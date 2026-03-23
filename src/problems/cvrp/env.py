@@ -74,16 +74,6 @@ class Env(BaseEnv):
             total_current_cost += self._get_route_cost(route)
         return total_current_cost
 
-
-    def _recalculate_exact(self) -> float:
-        solution = self.current_solution
-        total_current_cost = 0.0
-        for vehicle_index in range(self.instance_data["vehicle_num"]):
-            route = solution.routes[vehicle_index]
-            if len(route) == 0: continue
-            total_current_cost += self._get_route_cost(route)
-        return total_current_cost
-
     def get_key_value(self, recalculate: bool=False) -> float:
         """Get the key value of the current solution based on the key item."""
         if not recalculate and self.current_solution.total_cost is not None:
@@ -278,8 +268,17 @@ class Env(BaseEnv):
             affected_vehicles.add(operator.source_vehicle_id)
             affected_vehicles.add(operator.target_vehicle_id)
 
-        # 2. Calculate old cost for the affected routes BEFORE modification (Route-Level O(L) instead of Global O(N))
-        old_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
+        # 2. Determine if we can use O(1) Delta or need O(L) Route-Level recalculation
+        is_complex_batch = isinstance(operator, (BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator)) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id]))) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id])))
+        delta = 0.0
+        old_cost = 0.0
+        
+        if not is_complex_batch:
+            # TRUE O(1) UPDATE: Avoid traversing the lists entirely
+            delta = self._calculate_delta(operator)
+        else:
+            # MULTI-NODE UPDATE: Fallback to O(L) local route recalculation (safer)
+            old_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
             
         # 3. Apply the IN-PLACE structural modifications AND Update Loads
         if isinstance(operator, AppendOperator):
@@ -301,8 +300,26 @@ class Env(BaseEnv):
                 
         elif isinstance(operator, ReverseSegmentOperator):
             r = solution.routes[operator.vehicle_id]
-            for start, end in operator.segments:
-                r[start:end+1] = r[start:end+1][::-1]
+            n_r = len(r)
+            if n_r > 0:
+                for start, end in operator.segments:
+                    start = start % n_r
+                    end = end % n_r
+                    if start <= end:
+                        r[start:end+1] = r[start:end+1][::-1]
+                    else:
+                        segment = r[start:n_r] + r[0:end+1]
+                        segment = segment[::-1]
+                        r[start:n_r] = segment[:n_r-start]
+                        r[0:end+1] = segment[n_r-start:]
+            depot = self.instance_data["depot"]
+            if r[0] != depot and depot in r:
+                idx = r.index(depot)
+                solution.routes[operator.vehicle_id] = r[idx:] + r[:idx]
+            depot = self.instance_data["depot"]
+            if r[0] != depot and depot in r:
+                idx = r.index(depot)
+                solution.routes[operator.vehicle_id] = r[idx:] + r[:idx]
                 
         elif isinstance(operator, RelocateOperator):
             node = solution.routes[operator.source_vehicle_id].pop(operator.source_position)
@@ -359,13 +376,17 @@ class Env(BaseEnv):
              solution.loads[operator.target_vehicle_id] += solution.loads[operator.source_vehicle_id] - demands[depot]
              solution.loads[operator.source_vehicle_id] = demands[depot]
 
-        # 4. Calculate new cost ONLY for affected routes
-        new_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
-        
-        if solution.total_cost is None:
-            solution.total_cost = self.get_key_value(recalculate=True)
+        # 4. Update Cost
+        if is_complex_batch or solution.total_cost is None:
+            # Batch Operations: Full localized recalculation
+            new_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
+            if solution.total_cost is None:
+                solution.total_cost = self.get_key_value(recalculate=True)
+            else:
+                solution.total_cost += (new_cost - old_cost)
         else:
-            solution.total_cost += (new_cost - old_cost)
+            # Single Operations: O(1) Absolute Speed
+            solution.total_cost += delta
             
         self.update_problem_state()
         return True
@@ -405,5 +426,75 @@ class Env(BaseEnv):
         all_nodes.append(depot)
         if len(all_nodes) != len(set(all_nodes)):
             return False
+            
+        # Must visit all nodes
+        if len(set(all_nodes)) != node_num:
+            return False
 
         return True
+
+    def load_solution(self, path: str) -> bool:
+        """Load a solution from a file."""
+        try:
+            routes = []
+            total_cost = 0.0
+            loads = []
+            loaded_trajectory = []
+            headers = []
+            reading_trajectory = False
+            depot = self.instance_data["depot"]
+            demands = self.instance_data["demands"]
+            
+            with open(path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line: continue
+                    
+                    # Check for section headers
+                    if line.startswith("-"):
+                        if line.startswith("-trajectory:") or line.startswith("-parent_trajectory:"):
+                            reading_trajectory = True
+                            headers = []
+                            continue
+                        else:
+                            reading_trajectory = False
+
+                    if reading_trajectory:
+                        if not headers:
+                            headers = line.split("\t")
+                        else:
+                            values = line.split("\t")
+                            if len(values) == len(headers):
+                                record = dict(zip(headers, values))
+                                loaded_trajectory.append(record)
+                        continue
+
+                    if line.startswith("vehicle_"):
+                        # Format: vehicle_0: 0->1->2->0
+                        content = line.split(":", 1)[1].strip()
+                        nodes_str = content.split("->")
+                        # exclude the last element which is the depot
+                        route = [int(x) for x in nodes_str][:-1]
+                        routes.append(route)
+                        
+                        # Re-calculate loads 
+                        current_load = sum([demands[node] for node in route])
+                        loads.append(current_load)
+                        
+                    elif line.startswith("-total_cost:"):
+                        total_cost = float(line.split(":", 1)[1].strip())
+            
+            self.current_solution = Solution(routes=routes, depot=depot, total_cost=total_cost, loads=loads)
+            
+            if self.trajectory is None:
+                self.trajectory = []
+            self.trajectory = loaded_trajectory + self.trajectory
+            
+            self.update_problem_state()
+            
+            return True
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Error loading solution from {path}: {e}")
+            return False
