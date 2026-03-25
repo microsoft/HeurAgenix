@@ -91,3 +91,13 @@ class MergeRoutesOperator(BaseOperator):
     def __init__(self, source_vehicle_id: int, target_vehicle_id: int):
         self.source_vehicle_id = source_vehicle_id
         self.target_vehicle_id = target_vehicle_id
+
+class ReplaceSolutionOperator(BaseOperator):
+    """Replace the current solution with a completely new solution (useful for crossover/relinking)."""
+    def __init__(self, routes: list[list[int]]):
+        self.routes = routes
+
+class ReplaceSolutionOperator(BaseOperator):
+    """Replace the entire solution routes with new routes."""
+    def __init__(self, routes: list[list[int]]):
+        self.routes = routes

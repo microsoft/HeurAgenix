@@ -5,7 +5,7 @@ import pandas as pd
 import networkx as nx
 from src.problems.base.env import BaseEnv
 from src.problems.base.components import BaseOperator
-from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator
+from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, ReplaceSolutionOperator
 from src.problems.cvrp.best_known import best_known
 
 
@@ -236,6 +236,14 @@ class Env(BaseEnv):
 
     def run_operator(self, operator: BaseOperator) -> bool:
         """Apply the operator to the current solution In-Place."""
+        if isinstance(operator, ReplaceSolutionOperator):
+            self.current_solution.routes = [list(route) for route in operator.routes]
+            demands = self.instance_data["demands"]
+            self.current_solution.loads = [sum(demands[n] for n in route) for route in self.current_solution.routes]
+            self.current_solution.total_cost = self.get_key_value(recalculate=True)
+            self.update_problem_state()
+            return True
+            
         if self._is_invalid_operator(operator):
             return False
             
