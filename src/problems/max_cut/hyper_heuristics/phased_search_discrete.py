@@ -67,7 +67,7 @@ class PhasedSearchDiscreteHyperHeuristic:
         
         if self.shared_pool_dir:
             try:
-                self._log(f"Shared Elite Pool Directory: {self.shared_pool_dir}")
+                self.logger(f"Shared Elite Pool Directory: {self.shared_pool_dir}")
                 os.makedirs(self.shared_pool_dir, exist_ok=True)
                 
                 # Check for existing epoch pools and sync state
@@ -75,7 +75,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 if latest_id > self.pool_id:
                      self.pool_id = latest_id
                      self.pool_type = latest_type
-                     self._log(f"Initialized Pool Pointer to Epoch {self.pool_id} ({self.pool_type})")
+                     self.logger(f"Initialized Pool Pointer to Epoch {self.pool_id} ({self.pool_type})")
                 
                 # [NEW] Explicitly Create/Log Pool 0 if we are starting fresh
                 # If _scan_pool_epochs returns default (0, 'inherit') AND the directory doesn't exist yet, we create it.
@@ -84,7 +84,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                      if not os.path.exists(pool0_path):
                          try:
                              os.makedirs(pool0_path, exist_ok=False)
-                             self._log("\n" + "-" * 60 + "\n" + f"  INITIALIZATION: Created First Pool pool_0_inherit" + "\n" + "-" * 60)
+                             self.logger("\n" + "-" * 60 + "\n" + f"  INITIALIZATION: Created First Pool pool_0_inherit" + "\n" + "-" * 60)
                          except FileExistsError:
                              pass # Someone else created it just now
                 
@@ -125,7 +125,7 @@ class PhasedSearchDiscreteHyperHeuristic:
             return (self.pool_id, self.pool_type)
                      
         except Exception as e:
-            self._log(f"Error scanning pool epochs: {e}")
+            self.logger(f"Error scanning pool epochs: {e}")
             return (self.pool_id, self.pool_type)
 
     def _get_pool_path(self, pool_id, pool_type):
@@ -146,18 +146,18 @@ class PhasedSearchDiscreteHyperHeuristic:
             # will upload our OLD dirty elites into the pristine NEW pool, contaminating it instantly.
             if new_type == 'rebuild':
                 # Follower's response to Revolution
-                self._log(f"-> [FOLLOW] Detected REVOLUTION (Pool {new_id}_rebuild). Resetting...")
+                self.logger(f"-> [FOLLOW] Detected REVOLUTION (Pool {new_id}_rebuild). Resetting...")
                 
                 self.pending_rebuild = True
                 self.elite_pool = [] # CLEAR IMMEDIATELY
                 self.visited_peaks = {}
             else:
                 # Follower's response to Expansion
-                self._log(f"-> [EXPAND] Switched to new pool: {new_id} ({new_type}) (Inherit)")
+                self.logger(f"-> [EXPAND] Switched to new pool: {new_id} ({new_type}) (Inherit)")
 
     def _try_trigger_rebuild(self):
         """Attempts to trigger a Global Hard Restart (L5) by creating a 'rebuild' epoch."""
-        self._log("Attempting to trigger L5 Global Hard Restart...")
+        self.logger("Attempting to trigger L5 Global Hard Restart...")
         
         # 1. Check Current Global State (Race Condition Check)
         latest_id, latest_type = self._scan_pool_epochs()
@@ -168,7 +168,7 @@ class PhasedSearchDiscreteHyperHeuristic:
         if latest_type == 'rebuild':
              # CASE A: Someone else just created a NEW rebuild pool that I haven't joined yet.
              if latest_id > self.pool_id:
-                 self._log(f"Global Rebuild (pool_{latest_id}) detected. Joining revolution...")
+                 self.logger(f"Global Rebuild (pool_{latest_id}) detected. Joining revolution...")
                  self._check_and_update_pool_id()
                  return
              
@@ -178,7 +178,7 @@ class PhasedSearchDiscreteHyperHeuristic:
              # So we MUST trigger a NEW rebuild (pool_{n+1}_rebuild).
              # We continually increment IDs to signify new eras.
              else:
-                 self._log(f"Current Rebuild (pool_{latest_id}) failed (L5 detected). Initiating NEXT Rebuild...")
+                 self.logger(f"Current Rebuild (pool_{latest_id}) failed (L5 detected). Initiating NEXT Rebuild...")
                  # Do NOT return. Fall through to creation logic below.
                  pass
 
@@ -197,7 +197,7 @@ class PhasedSearchDiscreteHyperHeuristic:
              os.makedirs(new_pool_path, exist_ok=False)
              
              # LOGGING: DISTINCTIVE BLOCK FOR INITIATOR
-             self._log("\n" + "-" * 60 + "\n" + f"REBUILD INITIATED: pool_{target_id}_rebuild (Worker {self.worker_id})" + "\n" + "-" * 60)
+             self.logger("\n" + "-" * 60 + "\n" + f"REBUILD INITIATED: pool_{target_id}_rebuild (Worker {self.worker_id})" + "\n" + "-" * 60)
 
              
              # Immediately switch to it
@@ -212,12 +212,12 @@ class PhasedSearchDiscreteHyperHeuristic:
              
              if race_type == 'rebuild':
                  # Good, they did what we wanted. Join them.
-                 self._log("Rebuild race lost, but goal achieved. Joining...")
+                 self.logger("Rebuild race lost, but goal achieved. Joining...")
                  self._check_and_update_pool_id()
              else:
                  # Scenario 3: They created an INHERIT pool while we wanted REBUILD.
                  # We must NOT settle for inherit. We must try again to create rebuild on top of theirs.
-                 self._log("Conflict: Inherit pool created during Rebuild attempt. Retrying Rebuild on top...")
+                 self.logger("Conflict: Inherit pool created during Rebuild attempt. Retrying Rebuild on top...")
                  # We simply update to the latest inherited pool.
                  # Since search is still stagnant (we didn't rebuild), the next loop iteration in _run_epoch
                  # will see stagnation_level >= 5 again, and call _try_trigger_rebuild AGAIN.
@@ -225,7 +225,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                  self._check_and_update_pool_id()
         
         except Exception as e:
-             self._log(f"Error triggering rebuild: {e}")
+             self.logger(f"Error triggering rebuild: {e}")
 
     def _estimate_pool_size(self):
         """Estimates current pool size by counting ALL shards (Accurate)."""
@@ -259,7 +259,7 @@ class PhasedSearchDiscreteHyperHeuristic:
         if size < self.POOL_CAPACITY:
             return # Not full yet
             
-        self._log(f"Pool Capacity Reached ({size} > {self.POOL_CAPACITY}). Checking for expansion...")
+        self.logger(f"Pool Capacity Reached ({size} > {self.POOL_CAPACITY}). Checking for expansion...")
         
         # 2. Race Condition Check: Does a newer pool ALREADY exist?
         latest_id, latest_type = self._scan_pool_epochs()
@@ -269,7 +269,7 @@ class PhasedSearchDiscreteHyperHeuristic:
             # Just switch.
             self.pool_id = latest_id
             self.pool_type = latest_type
-            self._log(f"-> Switched to new pool: {latest_id} ({latest_type}) (Expansion Preempted)")
+            self.logger(f"-> Switched to new pool: {latest_id} ({latest_type}) (Expansion Preempted)")
             return
 
         # 3. Create New Pool (Leader Action)
@@ -282,7 +282,7 @@ class PhasedSearchDiscreteHyperHeuristic:
         try:
              # Atomic directory creation (mkdir fails if exists)
              os.makedirs(new_pool_path, exist_ok=False)
-             self._log("\n" + "-" * 60 + "\n" + f"  INHERIT EXPANSION: Created pool_{next_id}_{next_type} from pool_{self.pool_id}" + "\n" + "-" * 60)
+             self.logger("\n" + "-" * 60 + "\n" + f"  INHERIT EXPANSION: Created pool_{next_id}_{next_type} from pool_{self.pool_id}" + "\n" + "-" * 60)
              
              # 4. Migrate Top Elites (Seed the new pool)
              # [PHASE 3 OPTIMIZATION] Diversity-Aware Migration
@@ -352,21 +352,21 @@ class PhasedSearchDiscreteHyperHeuristic:
                       self._save_to_shared_pool(wrapper, is_keep_alive=True)
                       count += 1
                  
-                 self._log(f"Migrated {count} DIVERSE elites (from {len(sorted_pool)}) to pool_{next_id}_{next_type}")
+                 self.logger(f"Migrated {count} DIVERSE elites (from {len(sorted_pool)}) to pool_{next_id}_{next_type}")
              else:
                  # Rebuild or Empty Pool: Just Set ID
                  self.pool_id = next_id
                  self.pool_type = next_type
-                 self._log(f"Initialized Empty Pool: pool_{next_id}_{next_type}") 
+                 self.logger(f"Initialized Empty Pool: pool_{next_id}_{next_type}") 
 
                  
         except FileExistsError:
              # Race Condition: Another worker created it milliseconds ago.
-             self._log("Pool creation raced. Switching to winner.")
+             self.logger("Pool creation raced. Switching to winner.")
              self._check_and_update_pool_id()
              
         except Exception as e:
-             self._log(f"Error creating pool: {e}")
+             self.logger(f"Error creating pool: {e}")
 
     def _classify_heuristics(self):
         # Explicit classifications
@@ -467,10 +467,6 @@ class PhasedSearchDiscreteHyperHeuristic:
     def _get_shard_path(self, bucket_path, shard_index):
         return os.path.join(bucket_path, f"shard_{shard_index}")
 
-    def _log(self, message):
-        if self.logger:
-             self.logger(message)
-
     def _save_to_shared_pool(self, item, is_keep_alive=False):
         if not self.shared_pool_dir: return
         
@@ -558,7 +554,7 @@ class PhasedSearchDiscreteHyperHeuristic:
             os.rename(temp_path, filepath)
             
             # [LOGGING UPDATE] Print the path of the saved elite/breakthrough
-            self._log(f"Saved elite solution to: {filepath}")
+            self.logger(f"Saved elite solution to: {filepath}")
             
             # Update throttle stats
             self.last_upload_time = current_time
@@ -762,7 +758,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                     if not hasattr(self, "_error_log_count"): self._error_log_count = 0
                     self._error_log_count += 1
                     if self._error_log_count < 10 or self._error_log_count % 1000 == 0:
-                         self._log(f"Error running heuristic {heuristic.__name__}: {e}")
+                         self.logger(f"Error running heuristic {heuristic.__name__}: {e}")
                     
                     env.import_solution_wrapper(backup_wrapper)
                     continue
@@ -814,10 +810,10 @@ class PhasedSearchDiscreteHyperHeuristic:
             if "anti_consensus" in self.breakout_heuristics:
                  h = self.breakout_heuristics["anti_consensus"]
                  env.run_heuristic(h, parameters={"ratio": ratio})
-                 self._log(f"Supernova Ruin applied: Anti-Consensus Flip (Ratio: {ratio:.2f}).")
+                 self.logger(f"Supernova Ruin applied: Anti-Consensus Flip (Ratio: {ratio:.2f}).")
             else:
                  # Fallback if heuristic missing (should be loaded by default)
-                 self._log("Supernova Ruin: Heuristic missing, falling back to Heavy Ruin.")
+                 self.logger("Supernova Ruin: Heuristic missing, falling back to Heavy Ruin.")
                  self._apply_breakout(env, "heavy_ruin")
 
         elif strategy == "active_pool_relinking":
@@ -877,7 +873,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 # If targets are too close, standard Path Relinking is weak.
                 # Instead of skipping or punishing, we force a "Micro-Perturbation" to break strict convergence.
                 # This helps exploring the immediate neighborhood of the basin.
-                self._log(f"Active Relinking: Targets too close (Dist={dist} < Threshold={threshold}). Triggering Micro-Perturbation.")
+                self.logger(f"Active Relinking: Targets too close (Dist={dist} < Threshold={threshold}). Triggering Micro-Perturbation.")
                  
                 # Load best solution (WITH TRAJECTORY)
                 env.import_solution_wrapper(best_wrapper)
@@ -888,7 +884,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 env.run_heuristic(h, parameters={"ratio": 0.02}) 
                 return
 
-            self._log(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
+            self.logger(f"*** ACTIVE RELINKING: Best({best_sol.cut_value}) <-> Distant({distant_elite.cut_value}, Dist={dist}) ***")
 
             # 3. Reset to Best, Target = Distant (WITH TRAJECTORY)
             env.import_solution_wrapper(best_wrapper)
@@ -903,7 +899,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 
                 # [FIX]: Immediate Local Optimization in the Valley
                 if self.improvement_heuristics:
-                     self._log("Rapid Mining in Valley...")
+                     self.logger("Rapid Mining in Valley...")
                      # Execute improvement to settle into a local optimum
                      self._run_improvement_phase(env)
 
@@ -922,11 +918,11 @@ class PhasedSearchDiscreteHyperHeuristic:
              # Restore full pool for other operations (though reference is passed, we shouldn't damage self.elite_pool)
              # NOTE: Since we pass list by ref, safest is to NOT modify self.elite_pool. 
              # But here we temporarily overwrote algorithm_data entry, which is fine.
-             self._log(f"Targeted Path Relinking -> Best Known ({best_val})")
+             self.logger(f"Targeted Path Relinking -> Best Known ({best_val})")
 
              # [FIX] Dig deeper around the path
              if self.improvement_heuristics:
-                 self._log("Mining Path to Best...")
+                 self.logger("Mining Path to Best...")
                  self._run_improvement_phase(env)
 
         elif strategy == "path_relinking" and "path_relinking" in self.breakout_heuristics:
@@ -974,7 +970,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                  # Restore using standard wrapper interface
                  env.import_solution_wrapper(target_item)
 
-                 self._log(f"*** JUMPED TO {desc}: {env.key_value} (from pool of {len(candidates)}) ***")
+                 self.logger(f"*** JUMPED TO {desc}: {env.key_value} (from pool of {len(candidates)}) ***")
              else:
                  # If no secondary peak found, try Supernova
                  self._apply_breakout(env, "supernova_ruin")
@@ -1017,7 +1013,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 ratio = random.uniform(0.20, 0.50)
                 count = int(node_num * ratio)
                 
-                self._log(f"RECONSTRUCTIVE RUIN: Removing {count} nodes ({ratio:.1%}) to trigger repair...")
+                self.logger(f"RECONSTRUCTIVE RUIN: Removing {count} nodes ({ratio:.1%}) to trigger repair...")
                 env.run_heuristic(h_ruin, parameters={"count": count})
                 
                 # [Repair Phase]
@@ -1028,7 +1024,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                         repair_h = [h for h in self.constructive_heuristics if "cosm" in h.__name__]
                     
                     if repair_h:
-                         # self._log(f"Repairing with {repair_h[0].__name__}...")
+                         # self.logger(f"Repairing with {repair_h[0].__name__}...")
                          # Cosm checks solution state and fills unselected_nodes
                          env.run_heuristic(repair_h[0])
                 
@@ -1038,16 +1034,16 @@ class PhasedSearchDiscreteHyperHeuristic:
                 ratio_noise = 0.05
                 h = self.breakout_heuristics["batch_flip"]
                 env.run_heuristic(h, parameters={"ratio": ratio_noise})
-                self._log(f"Noise Injection: Random Flip ({ratio_noise:.1%}) to escape basin.")
+                self.logger(f"Noise Injection: Random Flip ({ratio_noise:.1%}) to escape basin.")
 
             else:
                 # Fallback: Random Flip 40%
                 h = self.breakout_heuristics["batch_flip"]
                 env.run_heuristic(h, parameters={"ratio": 0.40})
-                self._log("Fallback Ruin: Random Flip (40%).")
+                self.logger("Fallback Ruin: Random Flip (40%).")
 
         elif strategy == "soft_restart":
-             self._log("... Soft Restart Triggered ... Abandoning current solution.")
+             self.logger("... Soft Restart Triggered ... Abandoning current solution.")
              
              # Option A: Jump to a random Elite (preferably one we haven't visited lately)
              force_constructive = False
@@ -1073,13 +1069,13 @@ class PhasedSearchDiscreteHyperHeuristic:
                   min_restart_dist = max(50, int(node_num * 0.05)) # e.g. 150 nodes for 3000 node graph
                   
                   if dist < min_restart_dist:
-                       self._log(f"Soft Restart Aborted: Pool Homogenized (Max Dist={dist} < {min_restart_dist}). Forcing Hard Constructive Restart.")
+                       self.logger(f"Soft Restart Aborted: Pool Homogenized (Max Dist={dist} < {min_restart_dist}). Forcing Hard Constructive Restart.")
                        force_constructive = True
                   else:
                        # Restore using standard wrapper interface
                        env.import_solution_wrapper(target_item)
 
-                       self._log(f"Restarted from Distant Elite (Val: {target_sol.cut_value}, Dist: {dist})")
+                       self.logger(f"Restarted from Distant Elite (Val: {target_sol.cut_value}, Dist: {dist})")
              
              else:
                   force_constructive = True
@@ -1087,7 +1083,7 @@ class PhasedSearchDiscreteHyperHeuristic:
              if force_constructive:
                   # Option B: Complete Noise Restart (if pool is empty or small OR homogenized)
                   # Or Constructive Restart
-                  self._log("Restarting with Constructive Heuristic (High Quality)...")
+                  self.logger("Restarting with Constructive Heuristic (High Quality)...")
                   env.clear_solution()
                   
                   # [SYNC WITH COLD START] Use best constructive heuristics to reach High Basin
@@ -1115,7 +1111,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                   
                   # [FIX 2026-02-19] Set Immunity Timer
                   self.last_restart_step = self.current_run_steps
-                  self._log(f"Immunity Activated for 500 steps (Restart Step: {self.current_run_steps})")
+                  self.logger(f"Immunity Activated for 500 steps (Restart Step: {self.current_run_steps})")
 
 
     def run(self, env: Env) -> bool:
@@ -1133,10 +1129,10 @@ class PhasedSearchDiscreteHyperHeuristic:
             if self.pending_rebuild:
                 self.restart_count += 1
                 if self.max_restarts is not None and self.restart_count > self.max_restarts:
-                    self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - ABORTING due to max_restarts={self.max_restarts} limit reached.")
+                    self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - ABORTING due to max_restarts={self.max_restarts} limit reached.")
                     return result
                 
-                self._log(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - Restart {self.restart_count}/{self.max_restarts if self.max_restarts else 'inf'}")
+                self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - Restart {self.restart_count}/{self.max_restarts if self.max_restarts else 'inf'}")
                 
                 # Reset Flags (Except pending_rebuild which must protect the reset phase)
                 self.stagnation_level = 0
@@ -1178,7 +1174,7 @@ class PhasedSearchDiscreteHyperHeuristic:
             # self.pending_rebuild = False <-- REMOVED
             # self.stagnation_level = 0 <-- REMOVED
             
-        self._log("Switching to Constructive Phase (Cold Start)...")
+        self.logger("Switching to Constructive Phase (Cold Start)...")
             # Fallback: Construct New Solution if no Best Known file
         # Loop until solution is COMPLETE and VALID
         max_retries = 10
@@ -1212,13 +1208,13 @@ class PhasedSearchDiscreteHyperHeuristic:
                 construction_steps += 1
             
             if env.is_complete_solution and env.key_value > 100:
-                self._log(f"Construction completed. Value: {env.key_value}")
+                self.logger(f"Construction completed. Value: {env.key_value}")
                 break
             else:
-                self._log(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+                self.logger(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
         
         if not env.is_complete_solution:
-                self._log("Critical Failure: Unable to construct valid solution after retries.")
+                self.logger("Critical Failure: Unable to construct valid solution after retries.")
                 return False
             
         current_best = env.key_value
@@ -1229,7 +1225,7 @@ class PhasedSearchDiscreteHyperHeuristic:
         # CHANGE: Use instance variable to track steps for coordination with restart logic
         self.current_run_steps = 0
         
-        self._log(f"Starting Breakout Search from {current_best}...")
+        self.logger(f"Starting Breakout Search from {current_best}...")
 
         # [DYNAMIC TABU LIST]
         # Keep track of local optima we have visited frequently.
@@ -1256,7 +1252,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                      is_tabu = True
                      # Only log sparingly
                      if self.current_run_steps % 100 == 0:
-                         self._log(f"In Exhausted Basin ({peak_val}). Triggering Evacuation.")
+                         self.logger(f"In Exhausted Basin ({peak_val}). Triggering Evacuation.")
                      break
             
             if is_tabu:
@@ -1267,7 +1263,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 
                 # Check if we actually moved out of the basin
                 if abs(env.key_value - prev_tabu_val) < 1e-3:
-                     self._log("Supernova failed to break Tabu (Value unchanged). Forcing Random Ruin.")
+                     self.logger("Supernova failed to break Tabu (Value unchanged). Forcing Random Ruin.")
                      # Fallback to pure random ruin which is guaranteed to change state
                      # Use batch_flip explicitly if available, otherwise massive_ruin which has fallbacks
                      if "batch_flip" in self.breakout_heuristics:
@@ -1279,7 +1275,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                      
                 # [SAFETY BREAK 2026-02-27] Final check to prevent ANY infinite loop
                 if abs(env.key_value - prev_tabu_val) < 1e-3:
-                     self._log("CRITICAL: Breakout failed to change solution. Forcing escape from Tabu block.")
+                     self.logger("CRITICAL: Breakout failed to change solution. Forcing escape from Tabu block.")
                      # If we can't move, we must let the main loop proceed, 
                      # even if it means researching the same peak (which will trigger standard stagnation logic).
                      # We might be at a global optimum where no move is possible? (Unlikely for MaxCut)
@@ -1334,11 +1330,11 @@ class PhasedSearchDiscreteHyperHeuristic:
                 self.stagnation_level = 0
                 self.consecutive_massive_ruins = 0 # Reset panic counter on improvement
                 self._update_elite_pool_from_env(env)
-                self._log(f"Step:{self.current_run_steps} NEW LOCAL BEST: {current_best}")
+                self.logger(f"Step:{self.current_run_steps} NEW LOCAL BEST: {current_best}")
                 
 
                 if current_best > env.best_known:
-                    self._log(f"!!! BREAKTHROUGH: {current_best} > {env.best_known} !!!")
+                    self.logger(f"!!! BREAKTHROUGH: {current_best} > {env.best_known} !!!")
                     env.best_known = current_best
                     
                     # [SAFE SAVE STRATEGY] Only save if strictly better than anything on disk
@@ -1358,7 +1354,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                         env.dump_result(result_file=f"breakthrough_from_worker_{self.worker_id}_{current_best}.txt")
 
                 elif abs(current_best - env.best_known) < 1e-3:
-                     self._log(f"~~~ MATCHED BEST KNOWN: {current_best} ~~~")
+                     self.logger(f"~~~ MATCHED BEST KNOWN: {current_best} ~~~")
                      # Only save Match if no results exist yet
                      has_records = False
                      if os.path.exists(env.output_dir):
@@ -1420,7 +1416,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                      self.stagnation_level += 1
                      
                      self.phase_retries = 1 # Reset for new level (Start at 1)
-                     self._log(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted {max_retries_per_phase} retries)")
+                     self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted {max_retries_per_phase} retries)")
 
                 # [OPTIMIZED HIERARCHY 2026-03-01: 5-Level Logic with Race Handling]
                 strategy = "heavy_ruin" # Fallback
@@ -1441,8 +1437,8 @@ class PhasedSearchDiscreteHyperHeuristic:
                      # If we are just a weak worker failing locally, we shouldn't reset everyone.
                      
                      if is_attacking_global_best:
-                         self._log(f"Stagnation L5. Qual={env.key_value:.0f} Act=hard_restart")
-                         self._log(f"Step:{self.current_run_steps} L5 Detected (Attacking Global Best {global_best_val})! -> ATTEMPTING REVOLUTION")
+                         self.logger(f"Stagnation L5. Qual={env.key_value:.0f} Act=hard_restart")
+                         self.logger(f"Step:{self.current_run_steps} L5 Detected (Attacking Global Best {global_best_val})! -> ATTEMPTING REVOLUTION")
                          self._try_trigger_rebuild()
                          
                          if self.pending_rebuild:
@@ -1450,7 +1446,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                          else:
                              strategy = "soft_restart" # Fallback
                      else:
-                         self._log(f"Step:{self.current_run_steps} L5 Detected, but Local Best ({current_best}) < Global Best ({global_best_val}). Downgrading to Soft Restart.")
+                         self.logger(f"Step:{self.current_run_steps} L5 Detected, but Local Best ({current_best}) < Global Best ({global_best_val}). Downgrading to Soft Restart.")
                          strategy = "soft_restart"
                 
                 elif self.stagnation_level == 4:
@@ -1475,7 +1471,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                      else:
                          strategy = "heavy_ruin" 
 
-                self._log(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
+                self.logger(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
                 
                 # [CRITICAL LOGIC FIX 2026-03-01] Remove Premature Resets
                 # Do NOT reset stagnation_level = 0 here. 
@@ -1489,7 +1485,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 # If breakout resulted in a massive value drop (e.g. > 10%), it means we restarted.
                 # We must reset current_best to avoid immediate stagnation detection (comparing against the old peak).
                 if env.key_value < current_best * 0.90:
-                    self._log(f"Significant Value Drop ({current_best} -> {env.key_value})")
+                    self.logger(f"Significant Value Drop ({current_best} -> {env.key_value})")
                     
                     # [CRITICAL FIX 2026-03-01] Handle Baseline Resets Correctly
                     # 1. current_best: 
@@ -1512,13 +1508,13 @@ class PhasedSearchDiscreteHyperHeuristic:
                     #      For a Follower (Local Optima), resetting is fine.
                     
                     if is_attacking_global_best:
-                         self._log("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement or hard restart trigger.")
+                         self.logger("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement or hard restart trigger.")
                          # Do not reset current_best.
                          # Do not reset stagnation_level.
                          pass
                     else:
                          # Follower Mode: Reset and try somewhere else
-                         self._log("Follower Mode: Resetting 'current_best' to allow local hill climbing.")
+                         self.logger("Follower Mode: Resetting 'current_best' to allow local hill climbing.")
                          current_best = env.key_value
                          # Resetting stagnation level here makes sense for followers - they just want to work.
                          # But if we want L4 to retry specifically... 
@@ -1533,7 +1529,7 @@ class PhasedSearchDiscreteHyperHeuristic:
             # [NEW] Periodic Active Path Relinking to bridge peaks
             # Increase frequency from 300 to 100 to force more hybridization
             if self.current_run_steps % 100 == 0:
-                 self._log(f"Step:{self.current_run_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known}) Stagnation:{no_improve_steps}")
+                 self.logger(f"Step:{self.current_run_steps} Cur:{env.key_value} Best:{current_best} (BK:{env.best_known}) Stagnation:{no_improve_steps}")
             
             # [NEW] Periodic Active Path Relinking to bridge peaks
             # Increase frequency from 300 to 100 to force more hybridization
@@ -1556,7 +1552,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                 
                 # Check for Rebuild Signal from Follower Logic
                 if self.pending_rebuild:
-                    self._log("Detected Rebuild Signal during Sync. Aborting current run... ")
+                    self.logger("Detected Rebuild Signal during Sync. Aborting current run... ")
                     break 
                 
                 # Check if we are currently in a "Recovery/Exploration" phase (high no_improve_steps)
@@ -1584,7 +1580,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                     
                     # Logically: If NOT immune AND score is too low -> Catch up
                     if not is_immune and env.key_value < pool_best.cut_value * catch_up_threshold:
-                        self._log(f"AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value} (Threshold: {catch_up_threshold})...")
+                        self.logger(f"AGGRESSIVE CATCH-UP: Abandoning {env.key_value} for {pool_best.cut_value} (Threshold: {catch_up_threshold})...")
                         
                         # Restore using standard wrapper interface
                         env.import_solution_wrapper(pool_best_wrapper)
@@ -1595,7 +1591,7 @@ class PhasedSearchDiscreteHyperHeuristic:
                     elif is_immune and env.key_value < pool_best.cut_value * catch_up_threshold:
                         # Log sparsely
                         if self.current_run_steps % 500 == 0:
-                             self._log(f"Catch-up IMMUNITY: Worker exploring ({self.current_run_steps - self.last_restart_step}/{immunity_period} steps). Val={env.key_value}")
+                             self.logger(f"Catch-up IMMUNITY: Worker exploring ({self.current_run_steps - self.last_restart_step}/{immunity_period} steps). Val={env.key_value}")
 
 
 

@@ -34,7 +34,6 @@ def farthest_insertion_6308(problem_state: dict, algorithm_data: dict, **kwargs)
 
     current_solution = problem_state["current_solution"]
     unvisited_nodes = problem_state["unvisited_nodes"]
-    last_visited = problem_state["last_visited"]
     vehicle_remaining_capacity = problem_state["vehicle_remaining_capacity"]
 
     # Hyper-parameters
