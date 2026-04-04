@@ -62,4 +62,13 @@ def route_based_crossover_9f8a(problem_state: dict, algorithm_data: dict, target
         if any(n != depot for n in new_route_b):
             offspring_routes.append(new_route_b)
             
+    # Pad with empty routes if necessary
+    vehicle_num = problem_state.get("vehicle_num", len(parent_a.routes))
+    while len(offspring_routes) < vehicle_num:
+        offspring_routes.append([depot])
+        
+    # Strictly truncate if we somehow exceeded vehicle_num (should not happen in this logic, but safe)
+    if len(offspring_routes) > vehicle_num:
+        offspring_routes = offspring_routes[:vehicle_num]
+            
     return ReplaceSolutionOperator(routes=offspring_routes), {}
