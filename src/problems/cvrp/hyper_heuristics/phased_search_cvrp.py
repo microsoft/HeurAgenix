@@ -40,7 +40,10 @@ class PhasedSearchCvrpHyperHeuristic:
         self.pool_type = 'inherit'
         self.pending_rebuild = False 
         
-        self.POOL_CAPACITY = 10000
+        # [CRITICAL KNOWLEDGE SHARING FIX]
+        # Keep the elite pool strictly tightly bounded.
+        # If it is 10000, L2 and L4 will prioritize crossing over with terrible distant solutions.
+        self.POOL_CAPACITY = 20
         
         # Initialize Base Pool Directory
         if self.shared_pool_dir:
@@ -62,7 +65,6 @@ class PhasedSearchCvrpHyperHeuristic:
         constructive_names = {
             "nearest_neighbor_54a9",
             "nearest_neighbor_99ba",
-            "saving_algorithm_710e",
             "petal_algorithm_b384",
             "greedy_f4c4",
             "farthest_insertion_4e1d",
@@ -74,6 +76,7 @@ class PhasedSearchCvrpHyperHeuristic:
         }
         
         improvement_names = {
+            "saving_algorithm_710e",
             "two_opt_0554",
             "three_opt_e8d7",
             "node_shift_between_routes_7b8a",
@@ -99,7 +102,9 @@ class PhasedSearchCvrpHyperHeuristic:
             # Map to breakout dictionary
             for key, variations in breakout_map.items():
                 if base_name in variations:
-                    self.breakout_heuristics[key] = func
+                    if key not in self.breakout_heuristics:
+                        self.breakout_heuristics[key] = []
+                    self.breakout_heuristics[key].append(func)
         
     def _get_pool_path(self, pool_id, pool_type):
         """Returns the directory path for a specific Epoch Pool."""
@@ -175,7 +180,8 @@ class PhasedSearchCvrpHyperHeuristic:
                     if os.path.isdir(path):
                         pools.append((pid, ptype))
             if pools:
-                pools.sort(key=lambda x: x[0])
+                # Primary sort by id, secondary fallback to give 'rebuild' priority if same ID (shouldn't happen)
+                pools.sort(key=lambda x: (x[0], 1 if x[1] == 'rebuild' else 0))
                 return pools[-1]
             return (self.pool_id, self.pool_type)
         except Exception as e:
@@ -186,10 +192,12 @@ class PhasedSearchCvrpHyperHeuristic:
         """Scans periodically and updates the pool pointer if a new epoch is found."""
         old_id = self.pool_id
         new_id, new_type = self._scan_pool_epochs()
-        if new_id > old_id:
+        
+        # Priority to Rebuild: Follow if it's a completely new ID, OR if it's the same ID but a 'rebuild' taking over an 'inherit'
+        if new_id > old_id or (new_id == old_id and new_type == 'rebuild' and self.pool_type != 'rebuild'):
             self.pool_id = new_id
             self.pool_type = new_type
-            self.logger(f"-> [FOLLOW] Detected REVOLUTION (Pool {new_id}). Resetting...")
+            self.logger(f"-> [FOLLOW] Detected REVOLUTION (Pool {new_id}_{new_type}). Resetting...")
             self.pending_rebuild = True
 
     def _get_cvrp_fingerprint(self, env: Env):
@@ -255,6 +263,16 @@ class PhasedSearchCvrpHyperHeuristic:
         """Save a new breakthrough solution to the distributed filesystem mapping to shard."""
         if not self.shared_pool_dir: return
         
+        # Double check we haven't been forcefully obsoleted by a Rebuild before writing
+        new_id, new_type = self._scan_pool_epochs()
+        if new_id > self.pool_id:
+            # We are holding a ghost solution from a past epoch, let the check_and_update grab it later
+            return
+        
+        if new_id == self.pool_id and new_type == 'rebuild' and self.pool_type != 'rebuild':
+            # DO NOT write legacy inherit solutions into a fresh rebuild pool
+            return
+            
         pool_path = os.path.join(self.shared_pool_dir, f"pool_{self.pool_id}_{self.pool_type}")
         shard_path = os.path.join(pool_path, f"shard_{self.shard_id}")
         os.makedirs(shard_path, exist_ok=True)
@@ -274,6 +292,204 @@ class PhasedSearchCvrpHyperHeuristic:
         except Exception as e:
             pass
 
+    def _apply_breakout(self, env: Env, strategy: str):
+        if strategy == "targeted_ruin":
+            # [L1 - Targeted Small Ruin & Recreate]
+            # Precise 5%-15% geographic/cost ruin followed by regret insertion.
+            ratio = random.uniform(0.05, 0.15)
+            
+            # Select operators
+            ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
+            recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
+            
+            if not ruin_h or not recreate_h:
+                self.logger("Warning: Missing required operators for L1 breakout.")
+                return
+                
+            # 1. Take snapshot for safe rollback
+            backup_wrapper = env.export_solution_wrapper()
+            
+            # 2. Execute Ruin (becomes incomplete)
+            try:
+                env.run_heuristic(ruin_h, parameters={"removal_fraction": ratio})
+            except Exception as e:
+                self.logger(f"Ruin failed: {e}")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+                
+            # 3. Execute Recreate loop (restores feasibility)
+            c_steps = 0
+            while not env.is_complete_solution and c_steps < 100:
+                try:
+                    op = env.run_heuristic(recreate_h)
+                    if not op or isinstance(op, str):
+                        break  # Early breakout if operator fails or does nothing saving CPU
+                except Exception as e:
+                    self.logger(f"Recreate step failed: {e}")
+                    break
+                c_steps += 1
+                
+            if not env.is_complete_solution:
+                self.logger("Recreate could not complete solution. Rolling back.")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+                
+        elif strategy == "elite_route_injection":
+            # [L2 - Elite Route Injection / Crossover]
+            if len(self.elite_pool) < 2:
+                # Fallback back to L1 if pool is essentially empty
+                self.logger("Elite pool too small for Crossover. Falling back to L1 targeted_ruin.")
+                return self._apply_breakout(env, "targeted_ruin")
+                
+            # Current fingerprint
+            fingerprint = self._get_cvrp_fingerprint(env)
+            
+            candidates = []
+            for elite in self.elite_pool:
+                dist = self._get_cvrp_distance(fingerprint, elite['fingerprint'])
+                # Only consider distinct elites (diff >= 5 edges)
+                if dist >= 5:
+                    candidates.append((dist, elite))
+            
+            if not candidates:
+                self.logger("Active Relinking: Targets too close. Triggering Micro-Perturbation (L1).")
+                return self._apply_breakout(env, "targeted_ruin")
+                
+            # Pick from the furthest 3 candidates
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            top_candidates = candidates[:min(3, len(candidates))]
+            chosen_dist, target_elite_dict = random.choice(top_candidates)
+            
+            # Construct Solution object for target
+            from src.problems.cvrp.components import Solution
+            target_sol = Solution(
+                routes=target_elite_dict['routes'],
+                depot=env.problem_state.get('depot', 0),
+                total_cost=target_elite_dict['value']
+            )
+            
+            # Select operators
+            crossover_h = random.choice(self.breakout_heuristics["crossover"]) if "crossover" in self.breakout_heuristics else None
+            recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
+            
+            if not crossover_h or not recreate_h:
+                self.logger("Warning: Missing required operators for L2 breakout.")
+                return self._apply_breakout(env, "targeted_ruin")
+                
+            # 0. Take snapshot for safe rollback
+            backup_wrapper = env.export_solution_wrapper()
+                
+            # 1. Execute Crossover (Inject Elite Route -> invalidates overlaps, creates unfilled nodes)
+            try:
+                env.run_heuristic(crossover_h, parameters={"target_solution": target_sol})
+            except Exception as e:
+                self.logger(f"Crossover injection failed: {e}")
+                env.import_solution_wrapper(backup_wrapper)
+                return self._apply_breakout(env, "targeted_ruin")
+                
+            # 2. Execute Recreate loop to insert the unassigned nodes 
+            c_steps = 0
+            while not env.is_complete_solution and c_steps < 100:
+                try:
+                    op = env.run_heuristic(recreate_h)
+                    if not op or isinstance(op, str):
+                        break
+                except Exception as e:
+                    self.logger(f"Recreate step failed after crossover: {e}")
+                    break
+                c_steps += 1
+                
+            if not env.is_complete_solution:
+                self.logger("Recreate could not complete solution after crossover. Rolling back.")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+                
+        elif strategy == "macro_route_ruin":
+            # [L3 - Macro / Route-Ejection Ruin]
+            # Execute large-scale random destruction (30%-40%) to force a macro topology change.
+            # Using mass_ruin (random or radial) with a much larger parameter to simulate destroying 2-3 entire routes.
+            ratio = random.uniform(0.30, 0.40)
+            ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
+            recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
+            
+            if not ruin_h or not recreate_h:
+                self.logger("Warning: Missing required operators for L3 breakout.")
+                return
+                
+            # 1. Take snapshot for safe rollback
+            backup_wrapper = env.export_solution_wrapper()
+                
+            try:
+                env.run_heuristic(ruin_h, parameters={"removal_fraction": ratio})
+            except Exception as e:
+                self.logger(f"Macro Ruin failed: {e}")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+                
+            # 2. Execute Recreate loop
+            c_steps = 0
+            while not env.is_complete_solution and c_steps < 100:
+                try:
+                    op = env.run_heuristic(recreate_h)
+                    if not op or isinstance(op, str):
+                        break
+                except Exception as e:
+                    self.logger(f"Macro Recreate step failed: {e}")
+                    break
+                c_steps += 1
+                
+            if not env.is_complete_solution:
+                self.logger("Macro Recreate could not complete solution. Rolling back.")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+                
+        elif strategy == "soft_restart":
+             self.logger("... Soft Restart Triggered ... Abandoning current solution.")
+             
+             force_constructive = False
+             
+             if self.elite_pool and len(self.elite_pool) > 5:
+                  # 1. Option A: Jump to a Distant Elite
+                  # Calculate distance to current
+                  current_fp = self._get_cvrp_fingerprint(env)
+                  
+                  # Find furthest elites
+                  candidates = []
+                  for elite in self.elite_pool:
+                      dist = self._get_cvrp_distance(current_fp, elite['fingerprint'])
+                      candidates.append((dist, elite))
+                  
+                  candidates.sort(key=lambda x: x[0], reverse=True)
+                  # Pick from top 5 furthest
+                  target_dist, target_elite = random.choice(candidates[:5])
+                  
+                  if target_dist < max(10, int(len(env.instance_data.get('demands', [])) * 0.1)):
+                       self.logger(f"Soft Restart Aborted: Pool Homogenized (Max Dist={target_dist}). Forcing construction.")
+                       force_constructive = True
+                  else:
+                       # 2. Re-import selected Elite into Environment
+                       from src.problems.cvrp.components import ReplaceSolutionOperator
+                       op = ReplaceSolutionOperator(routes=[list(r) for r in target_elite['routes']])
+                       env.run_operator(op)
+                       self.logger(f"Restarted from Distant Elite (Val: {target_elite['value']}, Dist: {target_dist})")
+             else:
+                  force_constructive = True
+                  
+             if force_constructive:
+                  # 1. Option B: Cold Build
+                  self.logger("Restarting with Constructive Heuristic (Cold Build)...")
+                  env.clear_solution()
+                  c_steps = 0
+                  while not env.is_complete_solution and c_steps < 1000:
+                      if not self.constructive_heuristics: break
+                      env.run_heuristic(random.choice(self.constructive_heuristics))
+                      c_steps += 1
+                  if not env.is_complete_solution:
+                      self.logger("Soft restart construction failed.")
+                 
+        else:
+            self.logger(f"Warning: Unknown breakout strategy '{strategy}'.")
+
     def _sync_shared_pool(self):
         """Syncs elite pool from file system."""
         if not self.shared_pool_dir: return
@@ -290,10 +506,23 @@ class PhasedSearchCvrpHyperHeuristic:
         if not pkl_files:
             return
             
-        if len(pkl_files) > 50:
-            pkl_files = random.sample(pkl_files, 50)
-            
+        # Parse the values from the filenames to ensure we always get the *best* items
+        # Format: sol_2157.0_1775402373_14_5644.pkl
+        file_entries = []
         for f in pkl_files:
+            try:
+                fname = os.path.basename(f)
+                val = float(fname.split("_")[1])
+                file_entries.append((val, f))
+            except Exception:
+                continue
+                
+        file_entries.sort(key=lambda x: x[0])  # Sort by value ascending (since CVRP is minimization)
+        
+        # Extract the absolute top 50 global elites across all workers
+        top_files = [f for v, f in file_entries[:50]]
+            
+        for f in top_files:
             try:
                 fname = os.path.basename(f)
                 val_str = fname.split("_")[1]
@@ -479,6 +708,82 @@ class PhasedSearchCvrpHyperHeuristic:
                     # Leader called a rebuild L5, exit epoch to restart
                     return True
 
+            # --- Phase D: Breakout / Ruin Strategies ---
+            # For CVRP, since we run a full VND loop in Phase B that exhausts all improvement moves, 
+            # we reach a local optimum almost instantly. 
+            # Thus, patience should be very small to avoid wasting cycles checking an already converged solution.
+            node_num = env.instance_data.get("node_num", 80) if hasattr(env, 'instance_data') else 80
+            patience = 3
+            
+            if no_improve_steps > patience:
+                # [Dynamic Retry Setting] Increase attempts generously so workers search relentlessly before rebooting
+                max_retries_per_phase = max(10, int(node_num / 5))
+                self.phase_retries += 1
+                
+                if self.stagnation_level == 0:
+                    self.stagnation_level = 1
+                    self.phase_retries = 1
+                    strategy = "targeted_ruin"
+                elif self.stagnation_level == 1 and self.phase_retries <= max_retries_per_phase:
+                    strategy = "targeted_ruin"
+                elif self.stagnation_level == 1 and self.phase_retries > max_retries_per_phase:
+                    # Upgrade to L2
+                    self.stagnation_level = 2
+                    self.phase_retries = 1
+                    strategy = "elite_route_injection"
+                    self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L1 retries)")
+                elif self.stagnation_level == 2 and self.phase_retries <= max_retries_per_phase:
+                    strategy = "elite_route_injection"
+                elif self.stagnation_level == 2 and self.phase_retries > max_retries_per_phase:
+                    # Upgrade to L3
+                    self.stagnation_level = 3
+                    self.phase_retries = 1
+                    strategy = "macro_route_ruin"
+                    self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L2 retries)")
+                elif self.stagnation_level == 3 and self.phase_retries <= max_retries_per_phase:
+                    strategy = "macro_route_ruin"
+                elif self.stagnation_level == 3 and self.phase_retries > max_retries_per_phase:
+                    # Upgrade to L4
+                    self.stagnation_level = 4
+                    self.phase_retries = 1
+                    strategy = "soft_restart"
+                    self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L3 retries)")
+                elif self.stagnation_level == 4 and self.phase_retries <= max_retries_per_phase:
+                    strategy = "soft_restart"
+                else:
+                    # L4 opportunities exhausted. Trigger L5 Global Hard Restart.
+                    self.logger(f"Step:{self.current_run_steps} Exhausted L4 ({max_retries_per_phase} retries). Triggering L5 (Global Rebuild).")
+                    
+                    # 1. 意图检查与抢占式创建 (Concurrency Control)
+                    if self.shared_pool_dir:
+                        new_pool_id = self.pool_id + 1
+                        new_pool_type = 'rebuild'
+                        pool_path = os.path.join(self.shared_pool_dir, f"pool_{new_pool_id}_{new_pool_type}")
+                        try:
+                            os.makedirs(pool_path, exist_ok=False)  # Atomic creation
+                            self.pool_id = new_pool_id
+                            self.pool_type = new_pool_type
+                            self.logger(f"Initiated NEW REBUILD Epoch: {new_pool_id}_{new_pool_type}")
+                        except FileExistsError:
+                            self.logger(f"Conflict: Rebuild Epoch {new_pool_id}_{new_pool_type} already created by another worker. Obeying.")
+                            self.pool_id = new_pool_id
+                            self.pool_type = new_pool_type
+                    
+                    self.pending_rebuild = True
+                    return True
+
+                self.logger(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
+                
+                # Apply Breakout (Ruin & Recreate) before going back to Improve phase
+                self._apply_breakout(env, strategy)
+                
+                # If L4 triggers, worker abandons trajectory. We MUST reset current_best to track the new trajectory.
+                if strategy == "soft_restart":
+                    current_best = env.key_value
+                
+                # Reset counter to give the new candidate a chance
+                no_improve_steps = 0
+
                 
         return True
         
@@ -487,17 +792,20 @@ class PhasedSearchCvrpHyperHeuristic:
         while True:
             result = self._run_epoch(env)
             
-            if self.pending_rebuild:
+            if getattr(self, 'pending_rebuild', False):
                 self.restart_count += 1
                 if self.max_restarts is not None and self.restart_count > self.max_restarts:
                     self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - ABORTING.")
                     return result
                 
-                self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}) - Continue")
+                self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}_{self.pool_type}) - Continue")
                 
-                # Reset Environment Logic for CVRP
+                # [L5 CORE: Reset Environment Logic for CVRP - 焦土政策]
                 env.reset()
-                self.elite_pool = []
+                
+                # pool_id already incremented in Phase D breakout block using Atomic Filesys Create
+                
+                self.elite_pool = [] # 亲手烧毁本地积累的所有 Elite 解
                 self.pending_rebuild = False
                 continue
                 
