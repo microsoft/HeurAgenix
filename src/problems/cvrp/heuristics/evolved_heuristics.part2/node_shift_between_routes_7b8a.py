@@ -36,7 +36,14 @@ def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **
                     target_routes_to_check.add(tvid)
                     
         for tvid in target_routes_to_check:
-            if vehicle_loads[tvid] + demand_u > capacity: continue
+            # Penalty evaluation for relocate
+            old_s_penalty = max(0, vehicle_loads[svid] - capacity)
+            old_t_penalty = max(0, vehicle_loads[tvid] - capacity)
+            new_s_penalty = max(0, vehicle_loads[svid] - demand_u - capacity)
+            new_t_penalty = max(0, vehicle_loads[tvid] + demand_u - capacity)
+            penalty_factor = 100000.0
+            penalty_delta = (new_s_penalty + new_t_penalty - old_s_penalty - old_t_penalty) * penalty_factor
+
             
             s_route = current_solution.routes[svid]
             t_route = current_solution.routes[tvid]

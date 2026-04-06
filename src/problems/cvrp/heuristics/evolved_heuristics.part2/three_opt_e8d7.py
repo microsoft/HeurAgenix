@@ -35,8 +35,14 @@ def three_opt_e8d7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple
             r_v_idx, pos_v = node_to_route[v]
             if r_u_idx == r_v_idx: continue
             
-            if vehicle_loads[r_u_idx] - demands[u] + demands[v] > capacity: continue
-            if vehicle_loads[r_v_idx] - demands[v] + demands[u] > capacity: continue
+            # Penalty evaluation for SWAP*
+            new_load1 = vehicle_loads[r_u_idx] - demands[u] + demands[v]
+            new_load2 = vehicle_loads[r_v_idx] - demands[v] + demands[u]
+            old_1_pen = max(0, vehicle_loads[r_u_idx] - capacity)
+            old_2_pen = max(0, vehicle_loads[r_v_idx] - capacity)
+            new_1_pen = max(0, new_load1 - capacity)
+            new_2_pen = max(0, new_load2 - capacity)
+            penalty_delta = (new_1_pen + new_2_pen - old_1_pen - old_2_pen) * 100000.0
             
             r_v = current_solution.routes[r_v_idx]
             n_v = len(r_v)

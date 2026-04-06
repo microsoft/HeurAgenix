@@ -23,7 +23,7 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
     
     # We define a penalty factor (starts small, grows with stagnation)
     # If the hyper heuristic supports setting this, we get it from env.
-    penalty_factor = problem_state.get("capacity_penalty_factor", 10.0) 
+    penalty_factor = problem_state.get("capacity_penalty_factor", 100000.0) 
 
     # Helper function to find best insertion cost of node N into route R
     def evaluate_best_insertion(route, node_to_insert, node_to_remove):
