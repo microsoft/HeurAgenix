@@ -48,9 +48,14 @@ class Env(BaseEnv):
             vehicle_num = int(open(data_path).readlines()[-1].strip().split(" : ")[-1])
         else:
             raise NotImplementedError("Vehicle number error")
+        
+        # Calculate K-Nearest Neighbors for Granular Neighborhood search
+        # Keep top 40 neighbors (excluding self, so start at index 1)
+        nearest_neighbors = np.argsort(distance_matrix, axis=1)[:, 1:min(node_num, 41)]
+
         capacity = problem.capacity
         demands = np.array(list(problem.demands.values()))
-        return {"node_num": node_num, "distance_matrix": distance_matrix, "depot": depot, "vehicle_num": vehicle_num, "capacity": capacity, "demands": demands}
+        return {"node_num": node_num, "distance_matrix": distance_matrix, "depot": depot, "vehicle_num": vehicle_num, "capacity": capacity, "demands": demands, "nearest_neighbors": nearest_neighbors}
 
     def init_solution(self) -> Solution:
         vehicle_num = self.instance_data["vehicle_num"]

@@ -6,11 +6,14 @@ class Solution(BaseSolution):
     Each sublist contains integers representing the nodes (customers) visited by the vehicle in the order of visitation.
     The routes are sorted by vehicle identifier and the nodes in the list sorted by visited order.
     """
-    def __init__(self, routes: list[list[int]], depot: int, total_cost: float = None, loads: list[float] = None):
+    def __init__(self, routes: list[list[int]], depot: int, total_cost: float = None, loads: list[float] = None, fitness: float = None, capacity_violation: float = 0.0, unassigned_nodes: list[int] = None):
         self.routes = routes
         self.depot = depot
         self.total_cost = total_cost
         self.loads = loads
+        self.fitness = fitness if fitness is not None else total_cost
+        self.capacity_violation = capacity_violation
+        self.unassigned_nodes = unassigned_nodes if unassigned_nodes is not None else []
 
     def __str__(self) -> str:
         route_string = ""
@@ -101,3 +104,38 @@ class ReplaceSolutionOperator(BaseOperator):
     """Replace the entire solution routes with new routes."""
     def __init__(self, routes: list[list[int]]):
         self.routes = routes
+
+class SwapStarOperator(BaseOperator):
+    """SWAP* Operator: Swap two nodes between two different routes, but insert them into their BEST positions in the target routes rather than their original positions."""
+    def __init__(self, vehicle_id1: int, node1: int, best_pos_for_1_in_2: int, 
+                 vehicle_id2: int, node2: int, best_pos_for_2_in_1: int):
+        self.vehicle_id1 = vehicle_id1
+        self.node1 = node1
+        self.best_pos_for_1_in_2 = best_pos_for_1_in_2
+        self.vehicle_id2 = vehicle_id2
+        self.node2 = node2
+        self.best_pos_for_2_in_1 = best_pos_for_2_in_1
+
+class BlockRelocateOperator(BaseOperator):
+    """SREX/Macro-Ruin base: Relocate a contiguous block of nodes from a source route to a target position in another route."""
+    def __init__(self, source_vehicle_id: int, start_idx: int, end_idx: int, 
+                 target_vehicle_id: int, target_position: int):
+        self.source_vehicle_id = source_vehicle_id
+        self.start_idx = start_idx
+        self.end_idx = end_idx
+        self.target_vehicle_id = target_vehicle_id
+        self.target_position = target_position
+
+class EjectNodeOperator(BaseOperator):
+    """Remove a node from a route and place it into the unassigned nodes pool (Dynamic Penalty search)."""
+    def __init__(self, vehicle_id: int, position: int):
+        self.vehicle_id = vehicle_id
+        self.position = position
+
+class InjectNodeOperator(BaseOperator):
+    """Take a node from the unassigned pool and insert it into a route."""
+    def __init__(self, node: int, vehicle_id: int, position: int):
+        self.node = node
+        self.vehicle_id = vehicle_id
+        self.position = position
+

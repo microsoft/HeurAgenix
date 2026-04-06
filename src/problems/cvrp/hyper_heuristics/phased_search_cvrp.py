@@ -40,10 +40,23 @@ class PhasedSearchCvrpHyperHeuristic:
         self.pool_type = 'inherit'
         self.pending_rebuild = False 
         
-        # [CRITICAL KNOWLEDGE SHARING FIX]
-        # Keep the elite pool strictly tightly bounded.
-        # If it is 10000, L2 and L4 will prioritize crossing over with terrible distant solutions.
-        self.POOL_CAPACITY = 20
+        # [PHASE 2 CONFIG - Aligned with Max-Cut]
+        # Capacity limit for Global Epoch expansion (Total files on disk before inheritance).
+        self.POOL_CAPACITY = 10000
+        
+        # [NEW] Elite Quality Filter Size (N)
+        # For CVRP, we ONLY want to cross-over/relink with the absolute top tier, to prevent
+        # transferring genes from terrible distant solutions.
+        self.ELITE_FILTER_SIZE = 30
+        
+        # [NEW] Migration Count
+        # Number of elites to migrate to new pool during inherit expansion
+        self.MIGRATION_COUNT = 100
+
+        # [NEW] Diversity Control
+        # Minimum distance ratio for diversity checks (0.05 = 5% of nodes)
+        self.MIN_DIST_RATIO_MIGRATION = 0.05 
+        self.MIN_DIST_RATIO_RELINKING = 0.05
         
         # Initialize Base Pool Directory
         if self.shared_pool_dir:
@@ -345,7 +358,10 @@ class PhasedSearchCvrpHyperHeuristic:
             fingerprint = self._get_cvrp_fingerprint(env)
             
             candidates = []
-            for elite in self.elite_pool:
+            # We ONLY use the Top N elites (Filter) to prevent mating with trash solutions
+            candidate_pool = self.elite_pool[:self.ELITE_FILTER_SIZE] if hasattr(self, 'ELITE_FILTER_SIZE') else self.elite_pool
+            
+            for elite in candidate_pool:
                 dist = self._get_cvrp_distance(fingerprint, elite['fingerprint'])
                 # Only consider distinct elites (diff >= 5 edges)
                 if dist >= 5:
@@ -453,9 +469,10 @@ class PhasedSearchCvrpHyperHeuristic:
                   # Calculate distance to current
                   current_fp = self._get_cvrp_fingerprint(env)
                   
-                  # Find furthest elites
+                  # Find furthest elites within top filtered quality
                   candidates = []
-                  for elite in self.elite_pool:
+                  candidate_pool = self.elite_pool[:self.ELITE_FILTER_SIZE] if hasattr(self, 'ELITE_FILTER_SIZE') else self.elite_pool
+                  for elite in candidate_pool:
                       dist = self._get_cvrp_distance(current_fp, elite['fingerprint'])
                       candidates.append((dist, elite))
                   
