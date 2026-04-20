@@ -496,6 +496,10 @@ class Env(BaseEnv):
         self.update_problem_state()
         return True
 
+    def update_problem_state(self) -> None:
+        super().update_problem_state()
+        self.problem_state["capacity_penalty_factor"] = getattr(self, "penalty_factor", 100000.0)
+
     def validation_solution(self) -> bool:
         """
         Check the validation of this solution. O(1) checks mapped effectively.
@@ -509,6 +513,11 @@ class Env(BaseEnv):
                 return False
 
         # 2. Check load capacity constraints (DISABLED for Infeasible Penalty Search)
+        capacity = self.instance_data['capacity']
+        demands = self.instance_data['demands']
+        for route in self.current_solution.routes:
+            if sum(demands[n] for n in route) > capacity:
+                return False
         # 3. Check uniqueness & node existence
         all_nodes = []
         for route in self.current_solution.routes:

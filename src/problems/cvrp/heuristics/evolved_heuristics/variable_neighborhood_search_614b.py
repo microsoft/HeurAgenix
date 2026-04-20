@@ -43,7 +43,7 @@ def variable_neighborhood_search_614b(problem_state: dict, algorithm_data: dict,
             node = unvisited_nodes[node_index]
             # Check if adding this node to the route exceeds the vehicle's capacity
             if vehicle_loads[vehicle_id] + problem_state['demands'][node] <= capacity:
-                for position in range(len(current_solution.routes[vehicle_id]) + 1):
+                for position in range(1, len(current_solution.routes[vehicle_id]) + 1):
                     # Calculate the cost of inserting the node at the current position
                     if position == 0:
                         before_node = depot

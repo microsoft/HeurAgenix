@@ -258,7 +258,7 @@ if __name__ == '__main__':
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
     parser.add_argument("-m", "--method", type=str, default="conphased_search_discretetinuous", help="Hyper heuristics method")
     parser.add_argument("-exp", "--experiment_name", type=str, default=None, help="Experiment name (default: None, uses data_name)")
-    parser.add_argument("-r", "--max_restarts", type=int, default=5, help="Maximum number of global restarts before exiting worker")
+    parser.add_argument("-r", "--max_restarts", type=int, default=0, help="Maximum number of global restarts before exiting worker")
 
     args = parser.parse_args()
     main(

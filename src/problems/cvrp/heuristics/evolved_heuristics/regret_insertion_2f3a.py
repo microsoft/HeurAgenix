@@ -63,7 +63,7 @@ def regret_insertion_2f3a(problem_state: dict, algorithm_data: dict, **kwargs) -
                 # Check all insertion positions in this route
                 # Route structure implicit: usually [node1, node2, ...] (depot is implied at start and end)
                 # Position pos means inserting before route[pos].
-                for pos in range(len(route) + 1):
+                for pos in range(1, len(route) + 1):
                     prev_node = route[pos - 1] if pos > 0 else depot
                     next_node = route[pos] if pos < len(route) else depot
                     

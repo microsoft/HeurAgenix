@@ -60,7 +60,7 @@ def farthest_insertion_6308(problem_state: dict, algorithm_data: dict, **kwargs)
 
             # Try inserting the node at all possible positions in the vehicle's route
             route = current_solution.routes[vehicle_id]
-            for position in range(len(route) + 1):
+            for position in range(1, len(route) + 1):
                 prev_node = depot if position == 0 else route[position - 1]
                 next_node = depot if position == len(route) else route[position]
 
@@ -151,7 +151,7 @@ def farthest_insertion_6308(problem_state: dict, algorithm_data: dict, **kwargs)
                     if new_load_target < 0:
                         continue  # Skip if moving the node violates target vehicle's capacity
 
-                    for target_position in range(len(target_route) + 1):
+                    for target_position in range(1, len(target_route) + 1):
                             # Calculate the cost difference if the node is inserted at the target position
                             source_previous_node = source_route[(source_position - 1) % len(source_route)]
                             source_next_node = source_route[(source_position + 1) % len(source_route)]

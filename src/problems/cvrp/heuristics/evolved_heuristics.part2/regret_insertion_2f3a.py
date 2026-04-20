@@ -37,16 +37,21 @@ def regret_insertion_2f3a(problem_state: dict, algorithm_data: dict, **kwargs) -
 
         for v_idx, route in enumerate(current_solution.routes):
             # strict check
-            is_feasible = (vehicle_loads[v_idx] + demand <= capacity)
+            penalty_factor = problem_state.get('capacity_penalty_factor', 100000.0)
+            old_penalty = max(0, vehicle_loads[v_idx] - capacity)
+            new_penalty = max(0, vehicle_loads[v_idx] + demand - capacity)
+            penalty_cost = (new_penalty - old_penalty) * penalty_factor
+            # is_feasible logic relaxed to penalty
             
             n = len(route)
-            for p in range(n + 1):
+            for p in range(1, n + 1):
                 prev_n = route[p-1] if p > 0 else depot
                 next_n = route[p] if p < n else depot
                 
                 cost = distance_matrix[prev_n][node] + distance_matrix[node][next_n] - distance_matrix[prev_n][next_n]
                 
-                if is_feasible:
+                cost += penalty_cost
+                if True:
                     if cost < best_cost:
                         second_best_cost = best_cost
                         best_cost = cost

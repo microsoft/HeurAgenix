@@ -40,7 +40,7 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
         
         # Check all insertion points
         # Because depot is implied at start and end
-        for k in range(n_temp + 1):
+        for k in range(1, n_temp + 1):
             prev_n = depot if k == 0 else temp_r[k - 1]
             next_n = depot if k == n_temp else temp_r[k]
             
@@ -62,6 +62,7 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
             
             # Simple pairwise evaluation (can be accelerated with KNN filtering)
             for idx1, node1 in enumerate(route1):
+                if node1 == depot: continue
                 # Filter by KNN if available to boost speed
                 if nearest_neighbors is not None:
                     # Check if any part of route2 has a neighbor to node1
@@ -69,6 +70,7 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
                         continue
                         
                 for idx2, node2 in enumerate(route2):
+                    if node2 == depot: continue
                     # 1. Removal Savings
                     prev1 = depot if idx1 == 0 else route1[idx1 - 1]
                     next1 = depot if idx1 == len(route1) - 1 else route1[idx1 + 1]

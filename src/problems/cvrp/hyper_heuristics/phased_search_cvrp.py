@@ -790,8 +790,13 @@ class PhasedSearchCvrpHyperHeuristic:
                     if is_attacking_global_best:
                         self.logger(f"Step:{self.current_run_steps} Exhausted L4 ({max_retries_per_phase} retries). Triggering L5 (Global Rebuild).")
                         
-                        # 1. 意图检查与抢占式创建 (Concurrency Control)
+                        # 1. Intent check and preemptive creation (Concurrency Control)
                         if self.shared_pool_dir:
+                            if self.max_restarts is not None and self.restart_count >= self.max_restarts:
+                                self.logger(f"Max restarts ({self.max_restarts}) reached. Skipping pool creation.")
+                                self.pending_rebuild = True
+                                return True
+                                
                             new_pool_id = self.pool_id + 1
                             new_pool_type = 'rebuild'
                             pool_path = os.path.join(self.shared_pool_dir, f"pool_{new_pool_id}_{new_pool_type}")
@@ -810,6 +815,10 @@ class PhasedSearchCvrpHyperHeuristic:
                     else:
                         self.logger(f"Step:{self.current_run_steps} L5 Detected, but Local Best ({current_best}) > Global Best ({global_best_val}). Downgrading to L4 Soft Restart.")
                         strategy = "soft_restart"
+                        self.stagnation_level = 4
+                        self.phase_retries = 0
+                        self.stagnation_level = 4
+                        self.phase_retries = 0
 
                 # [FIX]: Revert to the tracking best solution to ensure we are always perturbing our peak, 
                 # instead of drifting into a random walk sequence of failed breakouts.
@@ -829,6 +838,10 @@ class PhasedSearchCvrpHyperHeuristic:
                         self.logger("Follower Mode: Resetting 'current_best' to allow local hill climbing.")
                         current_best = env.key_value
                         best_wrapper = env.export_solution_wrapper()
+                        self.stagnation_level = 0
+                        self.phase_retries = 0
+                        self.stagnation_level = 0
+                        self.phase_retries = 0
                 
                 # Reset counter to give the new candidate a chance
                 no_improve_steps = 0
@@ -849,12 +862,12 @@ class PhasedSearchCvrpHyperHeuristic:
                 
                 self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}_{self.pool_type}) - Continue")
                 
-                # [L5 CORE: Reset Environment Logic for CVRP - 焦土政策]
+                # [L5 CORE: Reset Environment Logic for CVRP - Scorched Earth]
                 env.reset()
                 
                 # pool_id already incremented in Phase D breakout block using Atomic Filesys Create
                 
-                self.elite_pool = [] # 亲手烧毁本地积累的所有 Elite 解
+                self.elite_pool = [] # Destroy all locally accumulated Elite solutions
                 
                 # [CRITICAL FIX]: Immediately seed the new epoch with our absolute global best
                 if hasattr(self, 'global_best_wrapper') and getattr(self, 'global_best_wrapper') is not None:
