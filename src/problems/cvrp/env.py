@@ -5,7 +5,7 @@ import pandas as pd
 import networkx as nx
 from src.problems.base.env import BaseEnv
 from src.problems.base.components import BaseOperator
-from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, ReplaceSolutionOperator
+from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, ReplaceSolutionOperator, RemoveNodesOperator, SwapStarOperator
 from src.problems.cvrp.best_known import best_known
 
 
@@ -13,6 +13,10 @@ class Env(BaseEnv):
     """CVRP env that stores the instance data, current solution, and problem state to support algorithm."""
     def __init__(self, data_name: str, **kwargs):
         super().__init__(data_name, "cvrp")
+
+        self.penalty_factor = getattr(self, "penalty_factor", 200.0)
+        self.feasible_history = []
+
         self.construction_steps = self.instance_data["node_num"]
         self.key_item = "total_cost"
         self.compare = lambda x, y: y - x
@@ -137,6 +141,7 @@ class Env(BaseEnv):
         if isinstance(operator, InsertOperator) and operator.position == 0: return True
         if isinstance(operator, RelocateOperator) and (operator.source_position == 0 or operator.target_position == 0): return True
         if isinstance(operator, SwapOperator) and (operator.position1 == 0 or operator.position2 == 0): return True
+        if isinstance(operator, SwapStarOperator) and (operator.best_pos_for_1_in_2 == 0 or operator.best_pos_for_2_in_1 == 0): return True
         if isinstance(operator, ReverseSegmentOperator):
             for s, e in operator.segments:
                 if s == 0: return True
@@ -271,7 +276,48 @@ class Env(BaseEnv):
             demands = self.instance_data["demands"]
             self.current_solution.loads = [sum(demands[n] for n in route) for route in self.current_solution.routes]
             self.current_solution.total_cost = self.get_key_value(recalculate=True)
+            if not getattr(operator, "skip_eval", False):
+                self.current_solution.total_cost = getattr(self, "current_solution", None).total_cost if hasattr(self.current_solution, "total_cost") else self.get_key_value(recalculate=True)
+            else:
+                self.current_solution.total_cost = self.get_key_value(recalculate=True)
+
+            # Adaptive Penalty Logic
+            is_feasible = True
+            for i, route in enumerate(self.current_solution.routes):
+                if sum(self.instance_data["demands"][n] for n in route) > self.instance_data["capacity"]:
+                    is_feasible = False
+                    break
+            
+            self.feasible_history.append(is_feasible)
+            if len(self.feasible_history) > 100:
+                self.feasible_history.pop(0)
+                if all(self.feasible_history):
+                    self.penalty_factor = max(1.0, self.penalty_factor / 1.2)
+                elif not any(self.feasible_history):
+                    self.penalty_factor = min(100000.0, self.penalty_factor * 1.2)
+            if not getattr(operator, "skip_eval", False):
+                self.current_solution.total_cost = getattr(self, "current_solution", None).total_cost if hasattr(self.current_solution, "total_cost") else self.get_key_value(recalculate=True)
+            else:
+                self.current_solution.total_cost = self.get_key_value(recalculate=True)
+
+            # Adaptive Penalty Logic
+            is_feasible = True
+            for i, route in enumerate(self.current_solution.routes):
+                if sum(self.instance_data["demands"][n] for n in route) > self.instance_data["capacity"]:
+                    is_feasible = False
+                    break
+            
+            self.feasible_history.append(is_feasible)
+            if len(self.feasible_history) > 100:
+                self.feasible_history.pop(0)
+                if all(self.feasible_history):
+                    self.penalty_factor = max(1.0, self.penalty_factor / 1.2)
+                elif not any(self.feasible_history):
+                    self.penalty_factor = min(100000.0, self.penalty_factor * 1.2)
+            
             self.update_problem_state()
+
+
             return True
             
         if self._is_invalid_operator(operator):
@@ -294,6 +340,16 @@ class Env(BaseEnv):
         elif isinstance(operator, RelocateOperator):
             affected_vehicles.add(operator.source_vehicle_id)
             affected_vehicles.add(operator.target_vehicle_id)
+        
+        elif isinstance(operator, RemoveNodesOperator):
+            for route in solution.routes:
+                for node in operator.nodes:
+                    if node in route:
+                        route.remove(node)
+
+        elif isinstance(operator, SwapStarOperator):
+            affected_vehicles.add(operator.vehicle_id1)
+            affected_vehicles.add(operator.vehicle_id2)
         elif isinstance(operator, BatchRemoveOperator):
             nodes_to_remove = set(operator.nodes)
             for vid, route in enumerate(solution.routes):
@@ -307,7 +363,7 @@ class Env(BaseEnv):
             affected_vehicles.add(operator.target_vehicle_id)
 
         # 2. Determine if we can use O(1) Delta or need O(L) Route-Level recalculation
-        is_complex_batch = isinstance(operator, (BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator)) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id]))) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id])))
+        is_complex_batch = isinstance(operator, (BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, SwapStarOperator)) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id]))) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id])))
         delta = 0.0
         old_cost = 0.0
         
@@ -384,6 +440,25 @@ class Env(BaseEnv):
                  for pos, node in ops:
                      solution.routes[vid].insert(pos, node)
                      solution.loads[vid] += demands[node]
+
+        
+        elif isinstance(operator, RemoveNodesOperator):
+            for route in solution.routes:
+                for node in operator.nodes:
+                    if node in route:
+                        route.remove(node)
+
+        elif isinstance(operator, SwapStarOperator):
+            r1 = solution.routes[operator.vehicle_id1]
+            r2 = solution.routes[operator.vehicle_id2]
+            n1 = operator.node1
+            n2 = operator.node2
+            r1.remove(n1)
+            r2.remove(n2)
+            r2.insert(operator.best_pos_for_1_in_2, n1)
+            r1.insert(operator.best_pos_for_2_in_1, n2)
+            solution.loads[operator.vehicle_id1] += demands[n2] - demands[n1]
+            solution.loads[operator.vehicle_id2] += demands[n1] - demands[n2]
         
         elif isinstance(operator, MergeRoutesOperator):
              depot = self.instance_data["depot"]
@@ -412,16 +487,11 @@ class Env(BaseEnv):
              solution.loads[operator.source_vehicle_id] = demands[depot]
 
         # 4. Update Cost
-        if is_complex_batch or solution.total_cost is None:
-            # Batch Operations: Full localized recalculation
-            new_cost = sum(self._get_route_cost(solution.routes[vid]) for vid in affected_vehicles)
-            if solution.total_cost is None:
-                solution.total_cost = self.get_key_value(recalculate=True)
-            else:
-                solution.total_cost += (new_cost - old_cost)
+        new_cost = sum(self._get_route_cost(solution.routes[vid]) + self._get_route_penalty(solution.routes[vid]) for vid in affected_vehicles)
+        if solution.total_cost is None:
+            solution.total_cost = self.get_key_value(recalculate=True)
         else:
-            # Single Operations: O(1) Absolute Speed
-            solution.total_cost += delta
+            solution.total_cost += (new_cost - old_cost)
             
         self.update_problem_state()
         return True

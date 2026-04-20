@@ -60,7 +60,7 @@ def node_shift_between_routes_7b8a(problem_state: dict, algorithm_data: dict, **
                 
                 cost_add = dist[prev_t][u] + dist[u][next_t] - dist[prev_t][next_t]
                 
-                cost_reduction = -(cost_rem + cost_add)
+                cost_reduction = -(cost_rem + cost_add + penalty_delta)
                 if cost_reduction > best_cost_reduction + 1e-4:
                     best_cost_reduction = cost_reduction
                     best_operator = RelocateOperator(

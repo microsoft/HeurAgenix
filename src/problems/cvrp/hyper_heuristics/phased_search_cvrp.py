@@ -85,7 +85,8 @@ class PhasedSearchCvrpHyperHeuristic:
             "min_cost_insertion_048f",
             "min_cost_insertion_3b2b",
             "random_bfdc",
-            "regret_insertion_2f3a" # Include strong operator for tight capacities
+            "regret_insertion_2f3a", # Include strong operator for tight capacities
+            "first_fit_decreasing_bfd"
         }
         
         improvement_names = {
@@ -93,12 +94,14 @@ class PhasedSearchCvrpHyperHeuristic:
             "two_opt_0554",
             "three_opt_e8d7",
             "node_shift_between_routes_7b8a",
-            "variable_neighborhood_search_614b"
+            "variable_neighborhood_search_614b",
+            "giant_tour_dp_split",
+            "swap_star"
         }
         
         breakout_map = {
-            "mass_ruin": ["radial_ruin_3c4d", "random_ruin_1a2b"],
-            "recreate": ["regret_insertion_2f3a", "min_cost_insertion_048f"],
+            "mass_ruin": ["radial_ruin_3c4d", "random_ruin_1a2b", "sisr_ruin", "sisr_ruin_4a5b"],
+            "recreate": ["regret_insertion_2f3a", "min_cost_insertion_048f", "min_cost_insertion_3b2b"],
             "crossover": ["route_based_crossover_9f8a"]
         }
 
@@ -632,6 +635,7 @@ class PhasedSearchCvrpHyperHeuristic:
             return False
 
         current_best = env.key_value
+        best_wrapper = env.export_solution_wrapper()
         no_improve_steps = 0
         self.current_run_steps = 0
         self.stagnation_level = 0
@@ -648,16 +652,9 @@ class PhasedSearchCvrpHyperHeuristic:
             # If the breakout/repair failed to visit all nodes, the cost drops artificially to 170.
             # We must NEVER evaluate or accept this broken solution!
             if not env.is_complete_solution or not env.validation_solution():
-                self.logger(f"Step:{self.current_run_steps} POISON DETECTED: Solution invalid! Forcing complete rebuild.")
-                env.clear_solution()
-                c_steps = 0
-                while not env.is_complete_solution and c_steps < 1000:
-                    if not self.constructive_heuristics: break
-                    try: env.run_heuristic(__import__('random').choice(self.constructive_heuristics))
-                    except: pass
-                    c_steps += 1
-                if not env.is_complete_solution:
-                    return False # Abort epoch completely
+                self.logger(f"Step:{self.current_run_steps} POISON DETECTED: Solution invalid! Forcing rollback to best.")
+                env.import_solution_wrapper(best_wrapper)
+                # It continues as the old best, skipping Phase C update as it's == current_best
             
             # --- Phase C: Check Status (Log Formats must align with Max-Cut) ---
             # Evaluate if a Breakthrough occurred
@@ -666,6 +663,11 @@ class PhasedSearchCvrpHyperHeuristic:
             if env.key_value < current_best - 1e-3: # Meaningful Cost decreased
                 old_best = current_best
                 current_best = env.key_value
+                best_wrapper = env.export_solution_wrapper()
+                
+                if not hasattr(self, 'global_best_cost') or current_best < self.global_best_cost:
+                    self.global_best_cost = current_best
+                    self.global_best_wrapper = env.export_solution_wrapper()
                 
                 # Reset Stagnation & Climb Ladder
                 no_improve_steps = 0
@@ -728,15 +730,25 @@ class PhasedSearchCvrpHyperHeuristic:
             # --- Phase D: Breakout / Ruin Strategies ---
             # For CVRP, since we run a full VND loop in Phase B that exhausts all improvement moves, 
             # we reach a local optimum almost instantly. 
-            # Thus, patience should be very small to avoid wasting cycles checking an already converged solution.
+            # Thus, patience should be zero to avoid wasting cycles checking an already converged solution.
             node_num = env.instance_data.get("node_num", 80) if hasattr(env, 'instance_data') else 80
-            patience = 3
+            patience = 0
             
             if no_improve_steps > patience:
                 # [Dynamic Retry Setting] Increase attempts generously so workers search relentlessly before rebooting
-                max_retries_per_phase = max(10, int(node_num / 5))
+                # CVRP local optima can be deep. Give it plenty of ruins to escape before upgrading stagnation.
+                max_retries_per_phase = max(50, int(node_num * 2.0))
                 self.phase_retries += 1
                 
+                # Check relation to Elite Pool (Global Best)
+                is_attacking_global_best = False
+                global_best_val = float('inf')
+                if self.elite_pool:
+                     global_best_val = min(s["value"] for s in self.elite_pool)
+                     # Using tolerance for CVRP (minimization)
+                     if current_best <= global_best_val + 1e-3:
+                         is_attacking_global_best = True
+
                 if self.stagnation_level == 0:
                     self.stagnation_level = 1
                     self.phase_retries = 1
@@ -768,26 +780,41 @@ class PhasedSearchCvrpHyperHeuristic:
                 elif self.stagnation_level == 4 and self.phase_retries <= max_retries_per_phase:
                     strategy = "soft_restart"
                 else:
-                    # L4 opportunities exhausted. Trigger L5 Global Hard Restart.
-                    self.logger(f"Step:{self.current_run_steps} Exhausted L4 ({max_retries_per_phase} retries). Triggering L5 (Global Rebuild).")
+                    self.stagnation_level += 1
+                    self.phase_retries = 1
+                    self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L4 retries)")
+                    strategy = "soft_restart"
                     
-                    # 1. 意图检查与抢占式创建 (Concurrency Control)
-                    if self.shared_pool_dir:
-                        new_pool_id = self.pool_id + 1
-                        new_pool_type = 'rebuild'
-                        pool_path = os.path.join(self.shared_pool_dir, f"pool_{new_pool_id}_{new_pool_type}")
-                        try:
-                            os.makedirs(pool_path, exist_ok=False)  # Atomic creation
-                            self.pool_id = new_pool_id
-                            self.pool_type = new_pool_type
-                            self.logger(f"Initiated NEW REBUILD Epoch: {new_pool_id}_{new_pool_type}")
-                        except FileExistsError:
-                            self.logger(f"Conflict: Rebuild Epoch {new_pool_id}_{new_pool_type} already created by another worker. Obeying.")
-                            self.pool_id = new_pool_id
-                            self.pool_type = new_pool_type
-                    
-                    self.pending_rebuild = True
-                    return True
+                # Evaluate Hard Restarts explicitly
+                if self.stagnation_level >= 5:
+                    if is_attacking_global_best:
+                        self.logger(f"Step:{self.current_run_steps} Exhausted L4 ({max_retries_per_phase} retries). Triggering L5 (Global Rebuild).")
+                        
+                        # 1. 意图检查与抢占式创建 (Concurrency Control)
+                        if self.shared_pool_dir:
+                            new_pool_id = self.pool_id + 1
+                            new_pool_type = 'rebuild'
+                            pool_path = os.path.join(self.shared_pool_dir, f"pool_{new_pool_id}_{new_pool_type}")
+                            try:
+                                os.makedirs(pool_path, exist_ok=False)  # Atomic creation
+                                self.pool_id = new_pool_id
+                                self.pool_type = new_pool_type
+                                self.logger(f"Initiated NEW REBUILD Epoch: {new_pool_id}_{new_pool_type}")
+                            except FileExistsError:
+                                self.logger(f"Conflict: Rebuild Epoch {new_pool_id}_{new_pool_type} already created by another worker. Obeying.")
+                                self.pool_id = new_pool_id
+                                self.pool_type = new_pool_type
+                        
+                        self.pending_rebuild = True
+                        return True
+                    else:
+                        self.logger(f"Step:{self.current_run_steps} L5 Detected, but Local Best ({current_best}) > Global Best ({global_best_val}). Downgrading to L4 Soft Restart.")
+                        strategy = "soft_restart"
+
+                # [FIX]: Revert to the tracking best solution to ensure we are always perturbing our peak, 
+                # instead of drifting into a random walk sequence of failed breakouts.
+                if strategy != "soft_restart":
+                    env.import_solution_wrapper(best_wrapper)
 
                 self.logger(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
                 
@@ -796,7 +823,12 @@ class PhasedSearchCvrpHyperHeuristic:
                 
                 # If L4 triggers, worker abandons trajectory. We MUST reset current_best to track the new trajectory.
                 if strategy == "soft_restart":
-                    current_best = env.key_value
+                    if is_attacking_global_best:
+                        self.logger("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement across Soft Restarts.")
+                    else:
+                        self.logger("Follower Mode: Resetting 'current_best' to allow local hill climbing.")
+                        current_best = env.key_value
+                        best_wrapper = env.export_solution_wrapper()
                 
                 # Reset counter to give the new candidate a chance
                 no_improve_steps = 0
@@ -823,6 +855,14 @@ class PhasedSearchCvrpHyperHeuristic:
                 # pool_id already incremented in Phase D breakout block using Atomic Filesys Create
                 
                 self.elite_pool = [] # 亲手烧毁本地积累的所有 Elite 解
+                
+                # [CRITICAL FIX]: Immediately seed the new epoch with our absolute global best
+                if hasattr(self, 'global_best_wrapper') and getattr(self, 'global_best_wrapper') is not None:
+                    # Temporarily load it into env to get the fingerprint and add it
+                    env.import_solution_wrapper(self.global_best_wrapper)
+                    self._add_to_local_pool(env, self.global_best_cost)
+                    env.reset() # Re-reset env context to actually restart
+                    
                 self.pending_rebuild = False
                 continue
                 

@@ -139,3 +139,12 @@ class InjectNodeOperator(BaseOperator):
         self.vehicle_id = vehicle_id
         self.position = position
 
+
+
+class RemoveNodesOperator(BaseOperator):
+    def __init__(self, nodes: list[int]):
+        super().__init__()
+        self.nodes = nodes
+
+    def _get_description(self) -> str:
+        return f"RemoveNodesOperator(nodes={self.nodes})"
