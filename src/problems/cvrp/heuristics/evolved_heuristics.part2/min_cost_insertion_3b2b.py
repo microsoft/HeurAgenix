@@ -98,7 +98,7 @@ def min_cost_insertion_3b2b(problem_state: dict, algorithm_data: dict, **kwargs)
                         continue
 
                     new_load_target = vehicle_remaining_capacity[target_vehicle_id] - demands[node]
-                    capacity_pf = problem_state.get('capacity_penalty_factor', 100000.0)
+                    capacity_pf = problem_state.get('capacity_penalty_factor', 10.0)
                     old_s_pen = max(0, -vehicle_remaining_capacity[source_vehicle_id])
                     old_t_pen = max(0, -vehicle_remaining_capacity[target_vehicle_id])
                     new_s_pen = max(0, -new_load_source)
@@ -106,7 +106,7 @@ def min_cost_insertion_3b2b(problem_state: dict, algorithm_data: dict, **kwargs)
                     pen_diff = (new_s_pen + new_t_pen - old_s_pen - old_t_pen) * capacity_pf
 
 
-                    for target_position in range(1, len(target_route) + 1):
+                    for target_position in range(len(target_route) + 1):
                             # Calculate the cost difference if the node is inserted at the target position
                             source_previous_node = source_route[(source_position - 1) % len(source_route)]
                             source_next_node = source_route[(source_position + 1) % len(source_route)]
@@ -148,7 +148,7 @@ def min_cost_insertion_3b2b(problem_state: dict, algorithm_data: dict, **kwargs)
 
     for node in unvisited_nodes:
         for vehicle_id, remaining_capacity in enumerate(vehicle_remaining_capacity):
-            capacity_penalty_factor = problem_state.get('capacity_penalty_factor', 100000.0)
+            capacity_penalty_factor = problem_state.get('capacity_penalty_factor', 10.0)
             old_penalty = max(0, -remaining_capacity)
             new_penalty = max(0, demands[node] - remaining_capacity)
             penalty_cost = (new_penalty - old_penalty) * capacity_penalty_factor

@@ -665,7 +665,8 @@ class PhasedSearchCvrpHyperHeuristic:
                 current_best = env.key_value
                 best_wrapper = env.export_solution_wrapper()
                 
-                if not hasattr(self, 'global_best_cost') or current_best < self.global_best_cost:
+                is_sol_feas = all(sum(env.instance_data['demands'][n] for n in route) <= env.instance_data['capacity'] for route in env.current_solution.routes)
+                if not hasattr(self, 'global_best_cost') or (current_best < self.global_best_cost and is_sol_feas):
                     self.global_best_cost = current_best
                     self.global_best_wrapper = env.export_solution_wrapper()
                 
@@ -822,7 +823,7 @@ class PhasedSearchCvrpHyperHeuristic:
 
                 # [FIX]: Revert to the tracking best solution to ensure we are always perturbing our peak, 
                 # instead of drifting into a random walk sequence of failed breakouts.
-                if strategy != "soft_restart":
+                if strategy != "soft_restart" and env.key_value > current_best * 1.6:
                     env.import_solution_wrapper(best_wrapper)
 
                 self.logger(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")

@@ -37,7 +37,7 @@ def regret_insertion_2f3a(problem_state: dict, algorithm_data: dict, **kwargs) -
 
         for v_idx, route in enumerate(current_solution.routes):
             # strict check
-            penalty_factor = problem_state.get('capacity_penalty_factor', 100000.0)
+            penalty_factor = problem_state.get('penalty_factor', 50.0)
             old_penalty = max(0, vehicle_loads[v_idx] - capacity)
             new_penalty = max(0, vehicle_loads[v_idx] + demand - capacity)
             penalty_cost = (new_penalty - old_penalty) * penalty_factor

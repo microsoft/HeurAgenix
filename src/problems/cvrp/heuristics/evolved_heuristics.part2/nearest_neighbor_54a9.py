@@ -61,7 +61,7 @@ def nearest_neighbor_54a9(problem_state: dict, algorithm_data: dict, **kwargs) -
 
                 # Try inserting the node at all possible positions in the vehicle's route
                 route = current_solution.routes[vehicle_id]
-                for position in range(1, len(route) + 1):
+                for position in range(len(route) + 1):
                     prev_node = depot if position == 0 else route[position - 1]
                     next_node = depot if position == len(route) else route[position]
 
@@ -93,7 +93,7 @@ def nearest_neighbor_54a9(problem_state: dict, algorithm_data: dict, **kwargs) -
 
             # Try inserting the node at all possible positions in the vehicle's route
             route = current_solution.routes[vehicle_id]
-            for position in range(1, len(route) + 1):
+            for position in range(len(route) + 1):
                 prev_node = depot if position == 0 else route[position - 1]
                 next_node = depot if position == len(route) else route[position]
 

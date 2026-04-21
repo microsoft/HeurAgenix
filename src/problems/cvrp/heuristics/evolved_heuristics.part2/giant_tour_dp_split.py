@@ -109,7 +109,7 @@ def giant_tour_dp_split(problem_state: dict, algorithm_data: dict, **kwargs) -> 
         rc = dist[depot][r[0]] + sum(dist[r[i]][r[i+1]] for i in range(len(r)-1)) + dist[r[-1]][depot]
         old_total_cost += rc
 
-    old_total_cost += sum((max(0, sum(demands[n] for n in r) - capacity) * 100000.0) for r in current_solution.routes)
+    old_total_cost += sum((max(0, sum(demands[n] for n in r) - capacity) * 10.0) for r in current_solution.routes)
     if new_total_cost < old_total_cost - 1e-4:
         return ReplaceSolutionOperator(routes=routes), algorithm_data
         

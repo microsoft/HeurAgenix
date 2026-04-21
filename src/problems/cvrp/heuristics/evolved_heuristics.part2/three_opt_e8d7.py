@@ -42,7 +42,7 @@ def three_opt_e8d7(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple
             old_2_pen = max(0, vehicle_loads[r_v_idx] - capacity)
             new_1_pen = max(0, new_load1 - capacity)
             new_2_pen = max(0, new_load2 - capacity)
-            penalty_delta = (new_1_pen + new_2_pen - old_1_pen - old_2_pen) * 100000.0
+            penalty_delta = (new_1_pen + new_2_pen - old_1_pen - old_2_pen) * 10.0
             
             r_v = current_solution.routes[r_v_idx]
             n_v = len(r_v)

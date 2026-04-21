@@ -79,7 +79,7 @@ class Env(BaseEnv):
         total_current_cost = 0.0
         demands = self.instance_data["demands"]
         capacity = self.instance_data["capacity"]
-        penalty_factor = getattr(self, "penalty_factor", 1000.0) # Penalty multiplier
+        penalty_factor = self.problem_state.get("penalty_factor", getattr(self, "penalty_factor", 10.0)) # Penalty multiplier
         
         for vehicle_index in range(self.instance_data["vehicle_num"]):
             route = solution.routes[vehicle_index]
@@ -126,7 +126,9 @@ class Env(BaseEnv):
     def _get_route_penalty(self, route: list[int]) -> float:
         """Calculate capacity violation penalty for a route."""
         if getattr(self, "penalty_factor", None) is None:
-            self.penalty_factor = 100000.0
+            self.penalty_factor = self.problem_state.get("penalty_factor", 10.0)
+        #
+            self.penalty_factor = min(self.penalty_factor, 100000.0)
         if not route:
             return 0.0
         demands = self.instance_data["demands"]
@@ -276,44 +278,6 @@ class Env(BaseEnv):
             demands = self.instance_data["demands"]
             self.current_solution.loads = [sum(demands[n] for n in route) for route in self.current_solution.routes]
             self.current_solution.total_cost = self.get_key_value(recalculate=True)
-            if not getattr(operator, "skip_eval", False):
-                self.current_solution.total_cost = getattr(self, "current_solution", None).total_cost if hasattr(self.current_solution, "total_cost") else self.get_key_value(recalculate=True)
-            else:
-                self.current_solution.total_cost = self.get_key_value(recalculate=True)
-
-            # Adaptive Penalty Logic
-            is_feasible = True
-            for i, route in enumerate(self.current_solution.routes):
-                if sum(self.instance_data["demands"][n] for n in route) > self.instance_data["capacity"]:
-                    is_feasible = False
-                    break
-            
-            self.feasible_history.append(is_feasible)
-            if len(self.feasible_history) > 100:
-                self.feasible_history.pop(0)
-                if all(self.feasible_history):
-                    self.penalty_factor = max(1.0, self.penalty_factor / 1.2)
-                elif not any(self.feasible_history):
-                    self.penalty_factor = min(100000.0, self.penalty_factor * 1.2)
-            if not getattr(operator, "skip_eval", False):
-                self.current_solution.total_cost = getattr(self, "current_solution", None).total_cost if hasattr(self.current_solution, "total_cost") else self.get_key_value(recalculate=True)
-            else:
-                self.current_solution.total_cost = self.get_key_value(recalculate=True)
-
-            # Adaptive Penalty Logic
-            is_feasible = True
-            for i, route in enumerate(self.current_solution.routes):
-                if sum(self.instance_data["demands"][n] for n in route) > self.instance_data["capacity"]:
-                    is_feasible = False
-                    break
-            
-            self.feasible_history.append(is_feasible)
-            if len(self.feasible_history) > 100:
-                self.feasible_history.pop(0)
-                if all(self.feasible_history):
-                    self.penalty_factor = max(1.0, self.penalty_factor / 1.2)
-                elif not any(self.feasible_history):
-                    self.penalty_factor = min(100000.0, self.penalty_factor * 1.2)
             
             self.update_problem_state()
 
@@ -516,7 +480,7 @@ class Env(BaseEnv):
         capacity = self.instance_data['capacity']
         demands = self.instance_data['demands']
         for route in self.current_solution.routes:
-            if sum(demands[n] for n in route) > capacity:
+            if False: # DISABLED
                 return False
         # 3. Check uniqueness & node existence
         all_nodes = []

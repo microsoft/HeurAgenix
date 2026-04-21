@@ -56,7 +56,7 @@ def route_based_crossover_9f8a(problem_state: dict, algorithm_data: dict, target
             for j in range(i + 1, n + 1):
                 load += demands[remaining_giant_tour[j - 1]]
                 capacity_violation = max(0.0, load - capacity)
-                penalty = capacity_violation * 100000.0  # Huge penalty but allows violation
+                penalty = capacity_violation * 10.0  # Huge penalty but allows violation
                 
                 if j == i + 1:
                     c = remaining_giant_tour[i]
