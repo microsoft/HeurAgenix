@@ -58,7 +58,7 @@ def get_dynamic_threshold(env, data_name):
     _GRAPH_THRESHOLD_CACHE[data_name] = threshold
     return threshold
 
-class PhasedSearchBestHyperHeuristic:
+class UcbRuinRecreateHyperHeuristic:
     def __init__(
         self,
         heuristic_pool: list[str],

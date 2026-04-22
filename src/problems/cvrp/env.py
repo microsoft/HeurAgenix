@@ -5,7 +5,7 @@ import pandas as pd
 import networkx as nx
 from src.problems.base.env import BaseEnv
 from src.problems.base.components import BaseOperator
-from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, ReplaceSolutionOperator, RemoveNodesOperator, SwapStarOperator
+from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, ReplaceSolutionOperator, RemoveNodesOperator, SwapStarOperator, BlockRelocateOperator
 from src.problems.cvrp.best_known import best_known
 
 
@@ -79,7 +79,7 @@ class Env(BaseEnv):
         total_current_cost = 0.0
         demands = self.instance_data["demands"]
         capacity = self.instance_data["capacity"]
-        penalty_factor = self.problem_state.get("penalty_factor", getattr(self, "penalty_factor", 10.0)) # Penalty multiplier
+        penalty_factor = self.problem_state.get("capacity_penalty_factor", getattr(self, "penalty_factor", 200.0)) # Penalty multiplier
         
         for vehicle_index in range(self.instance_data["vehicle_num"]):
             route = solution.routes[vehicle_index]
@@ -125,16 +125,16 @@ class Env(BaseEnv):
 
     def _get_route_penalty(self, route: list[int]) -> float:
         """Calculate capacity violation penalty for a route."""
-        if getattr(self, "penalty_factor", None) is None:
-            self.penalty_factor = self.problem_state.get("penalty_factor", 10.0)
-        #
-            self.penalty_factor = min(self.penalty_factor, 100000.0)
+        # Always sync penalty_factor from problem_state (written by update_problem_state as "capacity_penalty_factor")
+        pf = self.problem_state.get("capacity_penalty_factor", getattr(self, "penalty_factor", 200.0))
+        pf = min(pf, 100000.0)
+        self.penalty_factor = pf
         if not route:
             return 0.0
         demands = self.instance_data["demands"]
         capacity = self.instance_data["capacity"]
         load = sum(demands[n] for n in route)
-        return max(0, load - capacity) * self.penalty_factor
+        return max(0, load - capacity) * pf
 
     def _is_invalid_operator(self, operator: BaseOperator) -> bool:
         if not operator: return True
@@ -325,9 +325,12 @@ class Env(BaseEnv):
         elif isinstance(operator, MergeRoutesOperator):
             affected_vehicles.add(operator.source_vehicle_id)
             affected_vehicles.add(operator.target_vehicle_id)
+        elif isinstance(operator, BlockRelocateOperator):
+            affected_vehicles.add(operator.source_vehicle_id)
+            affected_vehicles.add(operator.target_vehicle_id)
 
         # 2. Determine if we can use O(1) Delta or need O(L) Route-Level recalculation
-        is_complex_batch = isinstance(operator, (BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, SwapStarOperator)) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id]))) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id])))
+        is_complex_batch = isinstance(operator, (BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, SwapStarOperator, BlockRelocateOperator)) or (isinstance(operator, ReverseSegmentOperator) and len(operator.segments) > 1) or (isinstance(operator, ReverseSegmentOperator) and operator.segments[0][0] % max(1, len(self.current_solution.routes[operator.vehicle_id])) > operator.segments[0][1] % max(1, len(self.current_solution.routes[operator.vehicle_id])))
         delta = 0.0
         old_cost = 0.0
         
@@ -424,6 +427,24 @@ class Env(BaseEnv):
             solution.loads[operator.vehicle_id1] += demands[n2] - demands[n1]
             solution.loads[operator.vehicle_id2] += demands[n1] - demands[n2]
         
+        elif isinstance(operator, BlockRelocateOperator):
+            svid = operator.source_vehicle_id
+            tvid = operator.target_vehicle_id
+            si = operator.start_idx
+            ei = operator.end_idx
+            tpos = operator.target_position
+            # Extract segment
+            seg = solution.routes[svid][si:ei+1]
+            seg_demand = sum(demands[n] for n in seg)
+            # Remove from source (reverse order to keep indices valid)
+            del solution.routes[svid][si:ei+1]
+            # Insert into target
+            for k, node in enumerate(seg):
+                solution.routes[tvid].insert(tpos + k, node)
+            # Update loads
+            solution.loads[svid] -= seg_demand
+            solution.loads[tvid] += seg_demand
+
         elif isinstance(operator, MergeRoutesOperator):
              depot = self.instance_data["depot"]
              r_src = solution.routes[operator.source_vehicle_id]

@@ -7,9 +7,9 @@ import hashlib
 from src.problems.cvrp.env import Env  # Adjust import based on actual CVRP env location
 from src.util.util import load_function
 
-class PhasedSearchCvrpHyperHeuristic:
+class VNDRuinRecreateHyperHeuristic:
     """
-    CVRP-specialized Phased Search hyper-heuristic scheduling strategy (Skeleton version).
+    CVRP-specialized VND Ruin-Recreate hyper-heuristic scheduling strategy (Skeleton version).
     Maintains 100% log and architecture style compatibility with the Max-Cut Twin-Engine.
     """
     def __init__(self, heuristic_pool, problem, shared_pool_dir=None, worker_id=None, logger=None, max_restarts=None, **kwargs):

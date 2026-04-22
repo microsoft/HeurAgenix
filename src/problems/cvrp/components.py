@@ -100,11 +100,6 @@ class ReplaceSolutionOperator(BaseOperator):
     def __init__(self, routes: list[list[int]]):
         self.routes = routes
 
-class ReplaceSolutionOperator(BaseOperator):
-    """Replace the entire solution routes with new routes."""
-    def __init__(self, routes: list[list[int]]):
-        self.routes = routes
-
 class SwapStarOperator(BaseOperator):
     """SWAP* Operator: Swap two nodes between two different routes, but insert them into their BEST positions in the target routes rather than their original positions."""
     def __init__(self, vehicle_id1: int, node1: int, best_pos_for_1_in_2: int, 

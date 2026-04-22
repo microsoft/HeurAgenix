@@ -52,7 +52,7 @@ def get_dynamic_threshold(env, data_name):
     else:
         return 0.8
 
-class PhasedSearchAdaptivePolishingHyperHeuristic:
+class ElitePolishingHyperHeuristic:
     def __init__(
         self,
         heuristic_pool: list[str],

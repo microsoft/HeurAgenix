@@ -256,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument("-n", "--num_runs", type=int, default=None, help="Number of parallel runs (default: max capable)")
     parser.add_argument("-d", "--heuristic_dir", type=str, 
                         default="evolved_heuristics.part3", help="Directory containing heuristics")
-    parser.add_argument("-m", "--method", type=str, default="conphased_search_discretetinuous", help="Hyper heuristics method")
+    parser.add_argument("-m", "--method", type=str, default="island_vnd_discrete", help="Hyper heuristics method")
     parser.add_argument("-exp", "--experiment_name", type=str, default=None, help="Experiment name (default: None, uses data_name)")
     parser.add_argument("-r", "--max_restarts", type=int, default=0, help="Maximum number of global restarts before exiting worker")
 

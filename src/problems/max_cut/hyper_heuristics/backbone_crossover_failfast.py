@@ -52,7 +52,7 @@ def get_dynamic_threshold(env, data_name):
     else:
         return 0.8
 
-class PhasedSearchUCBBestHyperHeuristic:
+class BackboneCrossoverFailfastHyperHeuristic:
     def __init__(
         self,
         heuristic_pool: list[str],
@@ -60,6 +60,7 @@ class PhasedSearchUCBBestHyperHeuristic:
         shared_pool_dir: str = None,
         top_k: int = 10,
         load_ratio: float = 0.4,
+        fail_fast_threshold: float = 0.02,
         **kwargs,
     ) -> None:
         self.heuristic_pool_names = heuristic_pool
@@ -67,6 +68,7 @@ class PhasedSearchUCBBestHyperHeuristic:
         self.shared_pool_dir = shared_pool_dir
         self.top_k = top_k
         self.load_ratio = load_ratio
+        self.fail_fast_threshold = fail_fast_threshold
         
         self.constructive_heuristics = []
         self.improvement_heuristics = []
@@ -278,6 +280,13 @@ class PhasedSearchUCBBestHyperHeuristic:
                     else:
                         new_set_b.add(node)
             
+            # Quality Gate: If consensus is too low, the backbone is essentially random.
+            # We reject it to force a proper construction phase.
+            consensus_ratio = fixed_count / node_num
+            if consensus_ratio < 0.6:
+                print(f"Backbone generation rejected: Consensus too low ({consensus_ratio:.1%}). Need > 60%.")
+                return False
+
             print(f"Backbone Construction: Fixed {fixed_count}/{node_num} nodes ({fixed_count/node_num:.1%}). Randomizing rest.")
             
             # 5. Apply
@@ -303,6 +312,7 @@ class PhasedSearchUCBBestHyperHeuristic:
         try:
             files = [f for f in os.listdir(self.shared_pool_dir) if f.startswith("current_best.")]
             if not files:
+                print(f"Warning: No files found in {self.shared_pool_dir}", flush=True)
                 return False
             
             # Simplified logic: Just pick from top K solutions found in the folder
@@ -324,6 +334,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                     continue
             
             if not solution_files:
+                print(f"Warning: Files found but none matched format 'current_best.VAL.EXP.ID' in {self.shared_pool_dir}. Example: {files[0]}", flush=True)
                 return False
 
             # Sort solutions by value (descending)
@@ -363,39 +374,60 @@ class PhasedSearchUCBBestHyperHeuristic:
                     set_a2, set_b2 = self._read_solution_sets(path2)
                     
                     if set_a1 and set_a2:
-                        # Crossover Logic:
-                        # 1. Intersection: Keep nodes that agree
-                        # 2. Disagreement: Randomly assign
-                        new_set_a = set()
-                        new_set_b = set()
+                        # SYMMETRY FIX: MaxCut solutions are symmetric (A, B) == (B, A).
+                        # Align Parent 2 to Parent 1 to maximize overlap.
+                        overlap_direct = len(set_a1 & set_a2)
+                        overlap_flipped = len(set_a1 & set_b2)
                         
-                        # Union of all nodes involved (should be all nodes if complete)
-                        all_nodes = set_a1 | set_b1 | set_a2 | set_b2
+                        if overlap_flipped > overlap_direct:
+                            # Flip Parent 2
+                            set_a2, set_b2 = set_b2, set_a2
+                            max_overlap = overlap_flipped
+                        else:
+                            max_overlap = overlap_direct
                         
-                        for node in all_nodes:
-                            in_a1 = node in set_a1
-                            in_a2 = node in set_a2
+                        # Quality Gate for Crossover:
+                        # If parents are too different (low overlap), the child will be mostly random noise.
+                        # We reject such pairs to avoid polluting the search with bad seeds.
+                        node_num = env.instance_data["node_num"]
+                        overlap_ratio = max_overlap / node_num
+                        if overlap_ratio < 0.6:
+                            # print(f"Crossover rejected: Parents too different (Overlap: {overlap_ratio:.1%}). Need > 60%.")
+                            pass # Silently skip to try other strategies
+                        else:
+                            # Crossover Logic:
+                            # 1. Intersection: Keep nodes that agree
+                            # 2. Disagreement: Randomly assign
+                            new_set_a = set()
+                            new_set_b = set()
                             
-                            if in_a1 and in_a2:
-                                new_set_a.add(node)
-                            elif not in_a1 and not in_a2:
-                                new_set_b.add(node)
-                            else:
-                                # Disagreement
-                                if random.random() < 0.5:
+                            # Union of all nodes involved (should be all nodes if complete)
+                            all_nodes = set_a1 | set_b1 | set_a2 | set_b2
+                            
+                            for node in all_nodes:
+                                in_a1 = node in set_a1
+                                in_a2 = node in set_a2
+                                
+                                if in_a1 and in_a2:
                                     new_set_a.add(node)
-                                else:
+                                elif not in_a1 and not in_a2:
                                     new_set_b.add(node)
-                        
-                        # Create and set solution
-                        new_sol = Solution(new_set_a, new_set_b)
-                        env.current_solution = new_sol
-                        # Recalculate value
-                        env.current_solution.cut_value = env.get_key_value(new_sol)
-                        env.update_problem_state()
-                        
-                        print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
-                        return True
+                                else:
+                                    # Disagreement
+                                    if random.random() < 0.5:
+                                        new_set_a.add(node)
+                                    else:
+                                        new_set_b.add(node)
+                            
+                            # Create and set solution
+                            new_sol = Solution(new_set_a, new_set_b)
+                            env.current_solution = new_sol
+                            # Recalculate value
+                            env.current_solution.cut_value = env.get_key_value(new_sol)
+                            env.update_problem_state()
+                            
+                            print(f"Successfully generated Hybrid Solution from {parent1_file} and {parent2_file} (Value: {env.key_value})")
+                            return True
 
             # === STRATEGY 3: DIVERSITY INJECTION (Selection) ===
             # Instead of always picking the absolute best, we pick from a wider range (Top 20)
@@ -428,16 +460,31 @@ class PhasedSearchUCBBestHyperHeuristic:
         
         begin = datetime.now()
         last_value = 0
+        init_value = 0
         found_best = False
+        init_value = 0
         node_num = env.instance_data["node_num"]
         print(f"Start running phased search. Data:{data}\tExp\t{experiment}\tID:{run_id}\tStart:{begin.strftime('%Y-%m-%d %H:%M:%S')}\t", flush=True)
         
         # Try to load initial solution
-        if self._try_load_initial_solution(env):
+        loaded_init = self._try_load_initial_solution(env)
+        quality_threshold = get_dynamic_threshold(env, data.split('.')[0])
+        
+        # Quality Gate for Initial Solution
+        # If the loaded solution is significantly worse than best known (e.g. < 60%), discard it.
+        # This prevents starting from "random-like" backbones or bad seeds.
+        if loaded_init and env.best_known and env.best_known > 0:
+            ratio = env.key_value / env.best_known
+            if ratio < quality_threshold:
+                print(f"Run:{run_id} Loaded solution quality too low ({env.key_value}/{env.best_known} = {ratio:.1%}). Discarding and restarting construction.", flush=True)
+                loaded_init = False
+                env.reset(output_dir=env.output_dir)
+
+        if loaded_init:
             current_best = env.key_value
             last_value = env.key_value
             init_value = env.key_value
-            print(f"Run:{run_id} Loaded initial solution with value {current_best}. Skipping construction.")
+            print(f"Run:{run_id} Loaded initial solution with value {current_best}. Skipping construction.", flush=True)
         else:
             current_best = 0
         
@@ -466,14 +513,25 @@ class PhasedSearchUCBBestHyperHeuristic:
             fast_heuristics = [h for h in self.constructive_heuristics if h.__name__ in fast_constructive_names]
             
             if fast_heuristics:
-                print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.")
+                print(f"Large graph detected ({node_num} nodes). Switching to Hybrid Constructive Heuristics.", flush=True)
                 active_constructive_heuristics = fast_heuristics
                 
-                # Prioritize CMF if available
+                # Prioritize Cosm/CMF if available
+                cosm_heuristic = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic"]
+                cosm_quick = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic_quick"]
+                cosm_detailed = [h for h in fast_heuristics if h.__name__ == "cosm_heuristic_detailed"]
                 cmf_heuristic = [h for h in fast_heuristics if h.__name__ == "continuous_mean_field_batch"]
-                if cmf_heuristic:
-                    # Give CMF a higher weight or make it the primary choice
-                    # We can just duplicate it in the list to increase probability
+                
+                if cosm_quick or cosm_detailed:
+                    # Prioritize the new split heuristics
+                    if cosm_quick:
+                        active_constructive_heuristics.extend(cosm_quick * 2)
+                    if cosm_detailed:
+                        active_constructive_heuristics.extend(cosm_detailed * 20)
+                elif cosm_heuristic:
+                    # Give Cosm a much higher weight (Primary Choice)
+                    active_constructive_heuristics.extend(cosm_heuristic * 10)
+                elif cmf_heuristic:
                     active_constructive_heuristics.extend(cmf_heuristic * 5)
             else:
                 print("Warning: Large graph detected but no fast heuristics found. Using default pool.")
@@ -481,7 +539,6 @@ class PhasedSearchUCBBestHyperHeuristic:
             # Also filter IMPROVEMENT heuristics for large graphs
             # We keep 'cached_delta_flip' for speed (it replaces slow greedy swaps).
             # We REMOVE 'tabu_node_flip' from the random pool because it is O(N^2) and too slow for frequent use.
-            # Instead, we will trigger it conditionally when stuck.
             fast_improvement_names = {
                 "cached_delta_flip_3cfd", # O(1) update, extremely fast greedy descent
                 "first_improvement_flip_7a32", # O(N) scan, good for diversity
@@ -547,6 +604,12 @@ class PhasedSearchUCBBestHyperHeuristic:
                 # 1. Identify Batch vs Single Heuristics
                 # We want to use it sparingly (20% prob), not frequently (80% prob).
                 batch_heuristics = [h for h in active_constructive_heuristics if "batch" in h.__name__]
+                
+                # Treat Cosm Detailed as a batch heuristic because it constructs the full solution efficiently
+                cosm_detailed_list = [h for h in active_constructive_heuristics if h.__name__ == "cosm_heuristic_detailed"]
+                if cosm_detailed_list:
+                    batch_heuristics.extend(cosm_detailed_list)
+
                 single_heuristics = [h for h in active_constructive_heuristics if h not in batch_heuristics]
                 
                 # 2. Determine Strategy
@@ -585,14 +648,25 @@ class PhasedSearchUCBBestHyperHeuristic:
                 # 3. Execute
                 if use_batch:
                     heuristic = random.choice(batch_heuristics)
-                    # Use ratio instead of fixed batch size
-                    # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
-                    # Adaptive Batch Size: Smaller batches for small graphs or rebuilding
-                    batch_ratio = 0.05
-                    if node_num < 2000 or is_rebuilding:
-                        batch_ratio = 0.01 # More precise construction
-                        
-                    env.run_heuristic(heuristic, parameters={"batch_ratio": batch_ratio})
+                    
+                    # Special handling for Cosm Heuristic (Quick vs Slow)
+                    if heuristic.__name__ == "cosm_heuristic":
+                        # Randomize steps for diversity: 100 (fast) to 500 (precise)
+                        # This creates diverse starting points in different basins
+                        steps = random.randint(100, 500)
+                        env.run_heuristic(heuristic, parameters={"steps": steps})
+                    elif heuristic.__name__ in ["cosm_heuristic_quick", "cosm_heuristic_detailed"]:
+                        # New split heuristics handle steps internally (dynamic based on graph size)
+                        env.run_heuristic(heuristic)
+                    else:
+                        # Use ratio instead of fixed batch size
+                        # 1% of nodes per batch allows for ~100 phases of construction (Fine-grained)
+                        # Adaptive Batch Size: Smaller batches for small graphs or rebuilding
+                        batch_ratio = 0.01
+                        if node_num < 2000 or is_rebuilding:
+                            batch_ratio = 0.01 # More precise construction
+                            
+                        env.run_heuristic(heuristic, parameters={"batch_ratio": batch_ratio})
                 else:
                     # Single Insertion (Precision)
                     if single_heuristics:
@@ -619,7 +693,6 @@ class PhasedSearchUCBBestHyperHeuristic:
                     
                     # Dynamic thresholds based on log analysis (20th percentile of good runs)
                     case_name = data.split('.')[0]
-                    quality_threshold = get_dynamic_threshold(env, case_name)
                     
                     quality_ratio = env.key_value / env.best_known
 
@@ -656,8 +729,9 @@ class PhasedSearchUCBBestHyperHeuristic:
             else:
                 # POLISHING PHASE: If we are close to best known and stagnating, try all heuristics
                 # This is the "Last Mile" optimization.
-                if not polishing_attempted and no_improve_steps > max_no_improve * 0.8 and current_best >= env.best_known * 0.99:
-                     # print(f"Run:{run_id} Close to optimum ({current_best}/{env.best_known}). Triggering Polishing Phase.", flush=True)
+                # Trigger earlier (50% of stagnation) to catch local optima before ruin
+                if not polishing_attempted and no_improve_steps > max_no_improve * 0.5 and current_best >= env.best_known * 0.99:
+                     print(f"Run:{run_id} Close to optimum ({current_best}/{env.best_known}). Triggering Polishing Phase.", flush=True)
                      # Try all improvement heuristics once (VND style)
                      for h in self.improvement_heuristics:
                          env.run_heuristic(h)
@@ -679,6 +753,22 @@ class PhasedSearchUCBBestHyperHeuristic:
                     # Check for Massive Ruin (Continuous Deletion)
                     if perturbation_count > max_perturbations_before_ruin:
                         
+                        # === FAIL FAST STRATEGY (Dynamic Restart) ===
+                        # Calculate gap to best known
+                        gap = 1.0
+                        if env.best_known > 0:
+                            gap = (env.best_known - current_best) / env.best_known
+                        
+                        # Threshold for "Close Enough to Dig Deep"
+                        # If we are more than the threshold away, we are likely in a bad basin.
+                        # Instead of spending hours trying to fix it with Massive Ruin, 
+                        # we just FAIL FAST and let the worker pick a new seed.
+                        
+                        if gap > self.fail_fast_threshold:
+                            print(f"Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). Threshold {self.fail_fast_threshold:.2%}. FAIL FAST triggered -> Next Task.", flush=True)
+                            env.dump_result(result_file=f"final_result.{experiment}.{run_id}.txt")
+                            return False
+
                         # Adaptive Logic: Did we improve since the last ruin?
                         if current_best > best_at_last_ruin:
                             # Yes, we improved! Reset ruin intensity.
@@ -768,19 +858,58 @@ class PhasedSearchUCBBestHyperHeuristic:
                     # Normal (Small) Perturbation
                     # Delete a few nodes (5-20) instead of just 1 to shake it up more
                     # For large graphs, we need stronger perturbation
+                    # Adaptive Perturbation: Increase size if we keep stagnating (perturbation_count)
                     base_perturb = max(20, int(node_num * 0.005)) # 0.5% of nodes (e.g. 100 for G81)
-                    perturb_size = random.randint(base_perturb, base_perturb * 2)
                     
-                    print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}).", flush=True)
+                    # Scale up with repeated failures
+                    multiplier = 1.0 + (perturbation_count * 0.5)
+                    base_perturb = int(base_perturb * multiplier)
+
+                    # REMOVED: High quality protection logic. 
+                    # We need strong perturbation to escape local optima, even if we are close to best known.
+                    # if current_best > env.best_known * 0.9 and perturbation_count == 0:
+                    #    base_perturb = max(10, int(node_num * 0.001)) 
+                        
+                    perturb_size = random.randint(base_perturb, base_perturb * 2)
+                    # === FAIL FAST STRATEGY (Dynamic Restart) ===
+                    # Calculate gap to best known
+                    gap = 1.0
+                    if env.best_known > 0:
+                        gap = (env.best_known - current_best) / env.best_known
+                    
+                    # Threshold for "Close Enough to Dig Deep"
+                    # If we are more than the threshold away, we are likely in a bad basin.
+                    # Instead of spending hours trying to fix it with Massive Ruin, 
+                    # we just FAIL FAST and let the worker pick a new seed.
+                    
+                    # FIX: Do NOT Fail Fast on small perturbations. Only on Massive Ruin.
+                    # Small perturbation is part of the local search process.
+                    # if gap > self.fail_fast_threshold:
+                    #    print(f"Run:{run_id} Stagnated at {current_best} (Gap: {gap:.2%}). Threshold {self.fail_fast_threshold:.2%}. FAIL FAST triggered -> Next Task.", flush=True)
+                    #    return False        
+                    # else:            
+                    print(f"Run:{run_id} Stagnation ({no_improve_steps} steps). Triggering Small Perturbation (Size: {perturb_size}). Gap: {gap:.2%}", flush=True)
 
                     for _ in range(perturb_size):
-                        # For small perturbation, we can mix mutation and ruin
-                        if self.mutation_heuristics and random.random() < 0.5:
-                             heuristic = random.choice(self.mutation_heuristics)
-                        elif self.ruin_heuristics:
+                        # FIX: Do NOT use mutation_heuristics (like Simulated Annealing) in a loop!
+                        # SA is a process, not an atomic operator. Running it 200 times is extremely slow.
+                        # Only use atomic Ruin (Delete) or Perturbation (Flip) operators here.
+                        
+                        if self.ruin_heuristics and random.random() < 0.7:
                              heuristic = random.choice(self.ruin_heuristics)
+                             # Avoid batch ruin in loop
+                             while "batch" in heuristic.__name__ and len(self.ruin_heuristics) > 1:
+                                 heuristic = random.choice(self.ruin_heuristics)
                         else:
-                             heuristic = random.choice(self.perturbation_heuristics)
+                             # Fallback to perturbation (random flip)
+                             # Filter out SA from perturbation_heuristics if present
+                             valid_perturb = [h for h in self.perturbation_heuristics if "simulated_annealing" not in h.__name__]
+                             if valid_perturb:
+                                 heuristic = random.choice(valid_perturb)
+                             elif self.ruin_heuristics:
+                                 heuristic = random.choice(self.ruin_heuristics)
+                             else:
+                                 break # Nothing to do
                              
                         env.run_heuristic(heuristic)
                     
@@ -805,9 +934,13 @@ class PhasedSearchUCBBestHyperHeuristic:
                     if node_num < 2000:
                         tabu_interval = 100
                     
+                    # FIX: Ensure Tabu triggers BEFORE max_no_improve (which is 300 for large graphs)
+                    if node_num > 5000:
+                        tabu_interval = 100
+
                     # Inject Tabu every 'tabu_interval' steps of stagnation
                     if no_improve_steps > 0 and no_improve_steps % tabu_interval == 0:
-                        # print(f"Run:{run_id} Stagnation detected ({no_improve_steps}/{max_no_improve}). Injecting Tabu Search.")
+                        print(f"Run:{run_id} Stagnation detected ({no_improve_steps}/{max_no_improve}). Injecting Tabu Search.", flush=True)
                         env.run_heuristic(self.tabu_heuristic)
                         current_steps += 1
                         # Check if Tabu helped
@@ -850,6 +983,10 @@ class PhasedSearchUCBBestHyperHeuristic:
                 current_steps += 1
                 total_ucb_steps += 1
                 
+                # Heartbeat logging for debugging speed
+                if current_steps % 100 == 0:
+                     print(f"Run:{run_id} Step:{current_steps} NoImprove:{no_improve_steps} Val:{env.key_value} Best:{current_best}", flush=True)
+                
                 # Check improvement and Update UCB
                 improvement = max(0, env.key_value - last_value)
                 h_name = selected_heuristic.__name__
@@ -860,8 +997,12 @@ class PhasedSearchUCBBestHyperHeuristic:
                     last_value = env.key_value
                     no_improve_steps = 0
                     polishing_attempted = False # Reset polishing state on any improvement
+                    perturbation_count = 0 # Reset perturbation escalation on any improvement
                     if env.is_valid_solution and env.key_value > current_best:
                         current_best = env.key_value
+                        # Save intermediate result immediately
+                        env.dump_result(result_file=f"intermediate_result.{int(current_best)}.{experiment}.{run_id}.txt")
+                        
                         selected_nodes = len(env.current_solution.set_a) + len(env.current_solution.set_b)
                         end = datetime.now()
                         time_cost = (end - begin).total_seconds()
@@ -890,7 +1031,7 @@ class PhasedSearchUCBBestHyperHeuristic:
                         should_save = False
                         if pool_best == 0:
                             should_save = True
-                        elif env.key_value >= pool_best:
+                        elif env.key_value >= pool_best * 0.99:
                             should_save = True
                         elif env.key_value >= pool_best * 0.995:
                             # Probabilistic acceptance for sub-optimal solutions
@@ -902,8 +1043,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                             if random.random() < acceptance_prob:
                                 should_save = True
                         
-                        if should_save and current_steps > 1:
-                             if (current_time - last_write_time > write_interval) or (env.key_value > pool_best):
+                        if should_save and current_steps > 0:
+                             if self.shared_pool_dir and ((current_time - last_write_time > write_interval) or (env.key_value > pool_best)):
                                  fname = f"current_best.{int(env.key_value)}.{experiment}.{run_id}"
                                  path = os.path.join(self.shared_pool_dir, fname)
                                  env.dump_best_solution(path)
@@ -917,7 +1058,11 @@ class PhasedSearchUCBBestHyperHeuristic:
                     no_improve_steps += 1
 
                 # Logging
-                current_best = max(current_best, env.key_value)
+                    if env.key_value > current_best:
+                        pass # Moved intermediate dump logic upstream to avoid redundancy bugs
+                        # current_best = env.key_value
+                        # # Save intermediate result to allow resuming/analysis if interrupted
+                        # env.dump_result(result_file=f"intermediate_result.{int(current_best)}.{experiment}.{run_id}.txt")
 
                 if env.key_value == env.best_known:
                     if env.is_complete_solution and env.is_valid_solution:
@@ -932,5 +1077,8 @@ class PhasedSearchUCBBestHyperHeuristic:
                         found_best = True
                         # Don't stop, try to improve more!
                         env.best_known = env.key_value # Update local best known to keep pushing
+
+        # Save the final result regardless of whether it broke the record
+        env.dump_result(result_file=f"final_result.{experiment}.{run_id}.txt")
 
         return found_best
