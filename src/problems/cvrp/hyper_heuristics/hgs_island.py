@@ -677,7 +677,7 @@ class HGSIslandHyperHeuristic:
         
         # Only adapt after enough observations
         if len(self._feasibility_history) < 10:
-            return
+            return False
             
         current_ratio = sum(self._feasibility_history) / len(self._feasibility_history)
         current_pf = getattr(env, 'penalty_factor', 200.0)
@@ -689,10 +689,12 @@ class HGSIslandHyperHeuristic:
             # Too few feasible → increase penalty to push back
             new_pf = min(max_penalty, current_pf * adapt_factor)
         else:
-            return  # Within target range, no adjustment needed
+            return False  # Within target range, no adjustment needed
         
         env.penalty_factor = new_pf
         env.problem_state["capacity_penalty_factor"] = new_pf
+        return True
+
 
     # =====================================================================
     # HGS-Inspired: Survivor Selection with Diversity
@@ -802,7 +804,13 @@ class HGSIslandHyperHeuristic:
             self.current_run_steps += 1
             
             # --- HGS: Adapt penalty factor before improvement ---
-            self._adapt_penalty_factor(env)
+            penalty_changed = self._adapt_penalty_factor(env)
+            if penalty_changed and best_wrapper is not None:
+                # Evaluate the best_wrapper under the new penalty landscape
+                curr_sol_wrapper = env.export_solution_wrapper()
+                env.import_solution_wrapper(best_wrapper)
+                current_best = env.key_value
+                env.import_solution_wrapper(curr_sol_wrapper)
             
             # --- Phase B: Repair / Improve ---
             improved = self._run_improvement_phase(env)

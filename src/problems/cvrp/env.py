@@ -137,14 +137,19 @@ class Env(BaseEnv):
         return max(0, load - capacity) * pf
 
     def _is_invalid_operator(self, operator: BaseOperator) -> bool:
-        if not operator: return True
-        if getattr(operator, "node", None) == self.instance_data["depot"]: return True
-        if getattr(operator, "nodes", None) and self.instance_data["depot"] in operator.nodes: return True
-        if isinstance(operator, InsertOperator) and operator.position == 0: return True
-        if isinstance(operator, RelocateOperator) and (operator.source_position == 0 or operator.target_position == 0): return True
-        if isinstance(operator, SwapOperator) and (operator.position1 == 0 or operator.position2 == 0): return True
-        if isinstance(operator, SwapStarOperator) and (operator.best_pos_for_1_in_2 == 0 or operator.best_pos_for_2_in_1 == 0): return True
-        if isinstance(operator, ReverseSegmentOperator):
+        if operator is None: return True
+        
+        op_type = type(operator)
+        
+        # Check depot interactions without dict lookups and slow getattr if possible
+        if hasattr(operator, "node") and operator.node == self.instance_data["depot"]: return True
+        if hasattr(operator, "nodes") and self.instance_data["depot"] in operator.nodes: return True
+
+        if op_type is InsertOperator and operator.position == 0: return True
+        if op_type is RelocateOperator and (operator.source_position == 0 or operator.target_position == 0): return True
+        if op_type is SwapOperator and (operator.position1 == 0 or operator.position2 == 0): return True
+        if op_type is SwapStarOperator and (operator.best_pos_for_1_in_2 == 0 or operator.best_pos_for_2_in_1 == 0): return True
+        if op_type is ReverseSegmentOperator:
             for s, e in operator.segments:
                 if s == 0: return True
         return False

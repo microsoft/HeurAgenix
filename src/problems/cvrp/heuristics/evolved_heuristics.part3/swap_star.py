@@ -24,17 +24,17 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
     def evaluate_best_insertion(route, node_to_insert, node_to_remove):
         temp_r = [n for n in route if n != node_to_remove]
         n_temp = len(temp_r)
-        if n_temp == 0: return 2 * distance_matrix[depot][node_to_insert], 1
-        best_add_cost = float('inf')
-        best_pos = 1
-        for k in range(1, n_temp + 1):
-            prev_n = temp_r[k - 1]
-            next_n = depot if k == n_temp else temp_r[k]
-            add_cost = -distance_matrix[prev_n][next_n] + distance_matrix[prev_n][node_to_insert] + distance_matrix[node_to_insert][next_n]
-            if add_cost < best_add_cost:
-                best_add_cost = add_cost
-                best_pos = k
-        return best_add_cost, best_pos
+        if n_temp == 0:
+            return 2 * distance_matrix[depot][node_to_insert], 1
+        
+        # Vectorized with numpy
+        prev_nodes = np.array(temp_r, dtype=np.int32)
+        next_nodes = np.array(temp_r[1:] + [depot], dtype=np.int32)
+        
+        add_costs = -distance_matrix[prev_nodes, next_nodes] +                     distance_matrix[prev_nodes, node_to_insert] +                     distance_matrix[node_to_insert, next_nodes]
+                    
+        min_idx = np.argmin(add_costs)
+        return add_costs[min_idx], int(min_idx + 1)
 
     if nearest_neighbors is not None:
         for node1 in range(1, len(distance_matrix)):
@@ -57,10 +57,7 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
                 rem_cost_2 = distance_matrix[prev2][node2] + distance_matrix[node2][next2] - distance_matrix[prev2][next2]
                 
                 add_1, pos1 = evaluate_best_insertion(route1, node2, node1)
-                if add_1 == float('inf'): continue
-                
                 add_2, pos2 = evaluate_best_insertion(route2, node1, node2)
-                if add_2 == float('inf'): continue
                 
                 delta_dist = add_1 + add_2 - rem_cost_1 - rem_cost_2
                 
