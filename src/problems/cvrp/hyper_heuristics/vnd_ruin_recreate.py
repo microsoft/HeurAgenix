@@ -309,6 +309,12 @@ class VNDRuinRecreateHyperHeuristic:
             pass
 
     def _apply_breakout(self, env: Env, strategy: str):
+        # [DYNAMIC PENALTY] Temporarily drop the capacity penalty.
+        # This acts as an "Infeasible Valley Crossing" gate.
+        if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
+            env.problem_state["capacity_penalty_factor"] = 2.0
+            self.dynamic_penalty_mode = True
+
         if strategy == "targeted_ruin":
             # [L1 - Targeted Small Ruin & Recreate]
             # Precise 5%-15% geographic/cost ruin followed by regret insertion.
@@ -646,7 +652,19 @@ class VNDRuinRecreateHyperHeuristic:
             self.current_run_steps += 1
             
             # --- Phase B: Repair / Improve ---
-            improved = self._run_improvement_phase(env)
+            # [DYNAMIC PENALTY LADDER] If we came from an infeasible-friendly breakout
+            if getattr(self, 'dynamic_penalty_mode', False):
+                penalties = [10.0, 50.0, 100.0, 200.0]
+                for p in penalties:
+                    env.problem_state["capacity_penalty_factor"] = p
+                    env.current_solution.total_cost = env.get_key_value(recalculate=True)
+                    self._run_improvement_phase(env)
+                self.dynamic_penalty_mode = False
+                improved = True
+            else:
+                env.problem_state["capacity_penalty_factor"] = 200.0
+                env.current_solution.total_cost = env.get_key_value(recalculate=True)
+                improved = self._run_improvement_phase(env)
             
             # [CRITICAL SECURITY CHECK] Prevent CVRP Invalid Route Exploit
             # If the breakout/repair failed to visit all nodes, the cost drops artificially to 170.

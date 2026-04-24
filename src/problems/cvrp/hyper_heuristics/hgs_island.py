@@ -104,7 +104,7 @@ class HGSIslandHyperHeuristic:
         breakout_map = {
             "mass_ruin": ["radial_ruin_3c4d", "random_ruin_1a2b", "sisr_ruin", "sisr_ruin_4a5b"],
             "recreate": ["regret_insertion_2f3a", "min_cost_insertion_048f", "min_cost_insertion_3b2b"],
-            "crossover": ["route_based_crossover_9f8a"]
+            "crossover": ["route_based_crossover_9f8a", "hgs_giant_tour_crossover"]
         }
 
         # 1. Classify standard pool
@@ -339,6 +339,11 @@ class HGSIslandHyperHeuristic:
             pass
 
     def _apply_breakout(self, env: Env, strategy: str):
+        # [DYNAMIC PENALTY LADDER START] Sharp penalty drop to cross infeasible valley!
+        if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
+            env.problem_state["capacity_penalty_factor"] = 2.0
+            self._penalty_ladder_active = True
+
         if strategy == "targeted_ruin":
             # [L1 - Targeted Small Ruin & Recreate]
             # Precise 5%-15% geographic/cost ruin followed by regret insertion.
