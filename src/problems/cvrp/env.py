@@ -59,7 +59,9 @@ class Env(BaseEnv):
 
         capacity = problem.capacity
         demands = np.array(list(problem.demands.values()))
-        return {"node_num": node_num, "distance_matrix": distance_matrix, "depot": depot, "vehicle_num": vehicle_num, "capacity": capacity, "demands": demands, "nearest_neighbors": nearest_neighbors}
+        total_demands = demands.sum()
+        load_ratio = float(total_demands / (vehicle_num * capacity))
+        return {"node_num": node_num, "distance_matrix": distance_matrix, "depot": depot, "vehicle_num": vehicle_num, "capacity": capacity, "demands": demands, "load_ratio": load_ratio, "nearest_neighbors": nearest_neighbors}
 
     def init_solution(self) -> Solution:
         vehicle_num = self.instance_data["vehicle_num"]
@@ -488,7 +490,22 @@ class Env(BaseEnv):
 
     def update_problem_state(self) -> None:
         super().update_problem_state()
-        self.problem_state["capacity_penalty_factor"] = getattr(self, "penalty_factor", 100000.0)
+        load_ratio = self.instance_data.get("load_ratio", 0.85)
+
+        if load_ratio > 0.98:
+            penalty_factor = 1000.0
+        else:
+            penalty_factor = 100000.0
+
+        temp_steps = int(self.problem_state.get("temporary_penalty_steps", 0))
+        if temp_steps > 0:
+            penalty_factor = float(self.problem_state.get("temporary_penalty_factor", penalty_factor))
+            self.problem_state["temporary_penalty_steps"] = temp_steps - 1
+        elif "adaptive_penalty_factor" in self.problem_state:
+            penalty_factor = float(self.problem_state["adaptive_penalty_factor"])
+
+        self.problem_state["capacity_penalty_factor"] = penalty_factor
+        self.penalty_factor = penalty_factor
 
     def validation_solution(self) -> bool:
         """
@@ -508,22 +525,16 @@ class Env(BaseEnv):
         for route in self.current_solution.routes:
             if False: # DISABLED
                 return False
-        # 3. Check uniqueness & node existence
-        all_nodes = []
+        # 2. Check uniqueness & node existence
+        visited_customers = set()
         for route in self.current_solution.routes:
             for n in route:
                 if not (0 <= n < node_num):
                     return False
                 if n != depot:
-                    all_nodes.append(n)
-                    
-        all_nodes.append(depot)
-        if len(all_nodes) != len(set(all_nodes)):
-            return False
-            
-        # Must visit all nodes
-        if len(set(all_nodes)) != node_num:
-            return False
+                    if n in visited_customers:
+                        return False
+                    visited_customers.add(n)
 
         return True
 

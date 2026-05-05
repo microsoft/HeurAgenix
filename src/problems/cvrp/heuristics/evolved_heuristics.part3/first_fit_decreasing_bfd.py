@@ -32,20 +32,24 @@ def first_fit_decreasing_bfd(problem_state: dict, algorithm_data: dict, **kwargs
         if vehicle_loads[v_idx] + target_demand <= capacity:
             # 3. Find the least terrible place to insert it in this specific route
             n = len(route)
-            for p in range(1, n + 1):
-                prev_n = route[p-1] if p > 0 else depot
-                next_n = route[p] if p < n else depot
-                cost = distance_matrix[prev_n][target_node] + distance_matrix[target_node][next_n] - distance_matrix[prev_n][next_n]
-                
+            if n == 0:
+                cost = 2 * distance_matrix[depot][target_node]
                 if cost < best_cost:
                     best_cost = cost
                     b_veh = v_idx
-                    b_pos = p
+                    b_pos = 1
+            else:
+                for p in range(1, n + 2):
+                    prev_n = route[p-2] if p > 1 else depot
+                    next_n = route[p-1] if p <= n else depot
+                    cost = distance_matrix[prev_n][target_node] + distance_matrix[target_node][next_n] - distance_matrix[prev_n][next_n]
+                    if cost < best_cost:
+                        best_cost = cost
+                        b_veh = v_idx
+                        b_pos = p
 
-    # 4. Fallback if even the biggest node can't fit ANYWHERE linearly
+    # Fallback to appending to the emptiest vehicle
     if b_veh is None:
-        # Find the route with smallest load that can accept it with minimal penalty
         b_veh = min(range(len(vehicle_loads)), key=lambda i: vehicle_loads[i])
-        b_pos = max(1, len(current_solution.routes[b_veh]))
-
+        b_pos = max(1, len(current_solution.routes[b_veh]) + 1)
     return InsertOperator(b_veh, target_node, b_pos), algorithm_data

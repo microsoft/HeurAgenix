@@ -19,19 +19,22 @@ def swap_star(problem_state: dict, algorithm_data: dict, **kwargs) -> tuple[Swap
     node_to_route_idx = {}
     for r_idx, route in enumerate(routes):
         for idx, node in enumerate(route):
-            node_to_route_idx[node] = (r_idx, idx)
+            if node != depot:
+                node_to_route_idx[node] = (r_idx, idx)
 
     def evaluate_best_insertion(route, node_to_insert, node_to_remove):
-        temp_r = [n for n in route if n != node_to_remove]
+        temp_r = [n for n in route if n != node_to_remove and n != depot]
         n_temp = len(temp_r)
         if n_temp == 0:
             return 2 * distance_matrix[depot][node_to_insert], 1
         
         # Vectorized with numpy
-        prev_nodes = np.array(temp_r, dtype=np.int32)
-        next_nodes = np.array(temp_r[1:] + [depot], dtype=np.int32)
+        prev_nodes = np.array([depot] + temp_r, dtype=np.int32)
+        next_nodes = np.array(temp_r + [depot], dtype=np.int32)
         
-        add_costs = -distance_matrix[prev_nodes, next_nodes] +                     distance_matrix[prev_nodes, node_to_insert] +                     distance_matrix[node_to_insert, next_nodes]
+        add_costs = -distance_matrix[prev_nodes, next_nodes] + \
+                    distance_matrix[prev_nodes, node_to_insert] + \
+                    distance_matrix[node_to_insert, next_nodes]
                     
         min_idx = np.argmin(add_costs)
         return add_costs[min_idx], int(min_idx + 1)
