@@ -94,6 +94,12 @@ class Env(BaseEnv):
             if load > capacity:
                 total_current_cost += (load - capacity) * penalty_factor
                 
+        # Unvisited and duplicate node penalty
+        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
+        actual_len = sum(len(route) for route in solution.routes)
+        if actual_len != expected_len:
+            total_current_cost += abs(expected_len - actual_len) * 100000.0
+                
         return total_current_cost
 
     def get_key_value(self, recalculate: bool=False) -> float:
@@ -104,7 +110,7 @@ class Env(BaseEnv):
         if isinstance(recalculate, object) and not isinstance(recalculate, bool):
             recalculate = True
             
-        if not recalculate and self.current_solution.total_cost is not None:
+        if not recalculate and getattr(self.current_solution, 'total_cost', None) is not None:
             return self.current_solution.total_cost
             
         solution = self.current_solution
@@ -113,6 +119,13 @@ class Env(BaseEnv):
             route = solution.routes[vehicle_index]
             if len(route) == 0: continue
             total_current_cost += self._get_route_cost(route) + self._get_route_penalty(route)
+            
+        # Unvisited and duplicate node penalty
+        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
+        actual_len = sum(len(route) for route in solution.routes)
+        if actual_len != expected_len:
+            total_current_cost += abs(expected_len - actual_len) * 100000.0
+            
         return total_current_cost
 
     def _get_route_cost(self, route: list[int]) -> float:
@@ -344,6 +357,7 @@ class Env(BaseEnv):
         # ALWAYS Fallback to O(L) local route recalculation for Penalized tracking
         # The penalty delta cannot easily be modeled without tracking the loads anyway
         old_cost = sum(self._get_route_cost(solution.routes[vid]) + self._get_route_penalty(solution.routes[vid]) for vid in affected_vehicles)
+        old_actual_len = sum(len(route) for route in solution.routes)
             
         # 3. Apply the IN-PLACE structural modifications AND Update Loads
         if isinstance(operator, AppendOperator):
@@ -480,30 +494,31 @@ class Env(BaseEnv):
 
         # 4. Update Cost
         new_cost = sum(self._get_route_cost(solution.routes[vid]) + self._get_route_penalty(solution.routes[vid]) for vid in affected_vehicles)
+        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
+        new_actual_len = sum(len(route) for route in solution.routes)
+        
         if solution.total_cost is None:
             solution.total_cost = self.get_key_value(recalculate=True)
         else:
-            solution.total_cost += (new_cost - old_cost)
+            old_length_penalty = abs(expected_len - old_actual_len) * 100000.0
+            new_length_penalty = abs(expected_len - new_actual_len) * 100000.0
+            solution.total_cost += (new_cost - old_cost) + (new_length_penalty - old_length_penalty)
             
         self.update_problem_state()
         return True
 
     def update_problem_state(self) -> None:
         super().update_problem_state()
-        load_ratio = self.instance_data.get("load_ratio", 0.85)
-
-        if load_ratio > 0.98:
-            penalty_factor = 1000.0
-        else:
-            penalty_factor = 100000.0
-
+        
+        # Start with the current instance penalty factor
+        penalty_factor = getattr(self, "penalty_factor", 200.0)
+        
+        # Override with temporary decaying penalties if active
         temp_steps = int(self.problem_state.get("temporary_penalty_steps", 0))
         if temp_steps > 0:
             penalty_factor = float(self.problem_state.get("temporary_penalty_factor", penalty_factor))
             self.problem_state["temporary_penalty_steps"] = temp_steps - 1
-        elif "adaptive_penalty_factor" in self.problem_state:
-            penalty_factor = float(self.problem_state["adaptive_penalty_factor"])
-
+            
         self.problem_state["capacity_penalty_factor"] = penalty_factor
         self.penalty_factor = penalty_factor
 
