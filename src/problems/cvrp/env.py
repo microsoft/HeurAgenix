@@ -528,19 +528,20 @@ class Env(BaseEnv):
         """
         depot = self.instance_data["depot"]
         node_num = self.instance_data["node_num"]
+        demands = self.instance_data['demands']
+        capacity = self.instance_data['capacity']
         
         # 1. Check include depot
         for route in self.current_solution.routes:
             if depot not in route:
                 return False
 
-        # 2. Check load capacity constraints (DISABLED for Infeasible Penalty Search)
-        capacity = self.instance_data['capacity']
-        demands = self.instance_data['demands']
+        # 2. Check load capacity constraints
         for route in self.current_solution.routes:
-            if False: # DISABLED
+            if sum(demands[n] for n in route) > capacity + 1e-9:
                 return False
-        # 2. Check uniqueness & node existence
+
+        # 3. Check uniqueness & node existence
         visited_customers = set()
         for route in self.current_solution.routes:
             for n in route:
@@ -550,6 +551,10 @@ class Env(BaseEnv):
                     if n in visited_customers:
                         return False
                     visited_customers.add(n)
+
+        # 4. Ensure every customer is visited exactly once
+        if len(visited_customers) != node_num - 1:
+            return False
 
         return True
 

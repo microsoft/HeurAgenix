@@ -261,6 +261,28 @@ class HGSIslandHyperHeuristic:
             for route in env.current_solution.routes
         )
 
+    def _is_better_solution(self, env: Env, best_is_feasible: bool, best_value: float) -> tuple[bool, bool, float, float | None]:
+        """
+        Feasibility-first comparison:
+        - Any feasible solution is better than infeasible best.
+        - Among feasible solutions, compare pure distance cost.
+        - Among infeasible solutions (only when no feasible best yet), compare penalized objective.
+        """
+        current_feasible = self._is_feasible(env)
+        current_pure = self._get_pure_distance_cost(env) if current_feasible else None
+        current_metric = current_pure if current_feasible else env.key_value
+
+        if current_feasible and not best_is_feasible:
+            return True, current_feasible, current_metric, current_pure
+
+        if current_feasible and best_is_feasible:
+            return (current_metric < best_value - 1e-3), current_feasible, current_metric, current_pure
+
+        if (not current_feasible) and (not best_is_feasible):
+            return (current_metric < best_value - 1e-3), current_feasible, current_metric, current_pure
+
+        return False, current_feasible, current_metric, current_pure
+
     def _add_to_local_pool(self, env: Env, current_best: float):
         """Add solution to elite pool with strict diversity check. Only stores feasible solutions with pure distance cost."""
         # HGS: Only add feasible solutions to elite pool
@@ -339,9 +361,14 @@ class HGSIslandHyperHeuristic:
             pass
 
     def _apply_breakout(self, env: Env, strategy: str):
-        # [DYNAMIC PENALTY LADDER START] Sharp penalty drop to cross infeasible valley!
+        # [DYNAMIC PENALTY LADDER START] Controlled, short-lived penalty drop.
         if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
-            env.problem_state["capacity_penalty_factor"] = 2.0
+            base_pf = float(getattr(env, "penalty_factor", 200.0))
+            temp_pf = max(80.0, base_pf * 0.45)
+            env.problem_state["temporary_penalty_factor"] = temp_pf
+            env.problem_state["temporary_penalty_steps"] = 8
+            env.problem_state["capacity_penalty_factor"] = temp_pf
+            env.penalty_factor = temp_pf
             self._penalty_ladder_active = True
 
         if strategy == "targeted_ruin":
@@ -382,6 +409,10 @@ class HGSIslandHyperHeuristic:
                 
             if not env.is_complete_solution:
                 self.logger("Recreate could not complete solution. Rolling back.")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+            if not env.validation_solution():
+                self.logger("Targeted ruin produced invalid structure. Rolling back.")
                 env.import_solution_wrapper(backup_wrapper)
                 return
                 
@@ -443,6 +474,10 @@ class HGSIslandHyperHeuristic:
                     if not env.is_complete_solution:
                         env.import_solution_wrapper(backup_wrapper)
                         return
+                    if not env.validation_solution():
+                        self.logger("Direct-import branch produced invalid structure. Rolling back.")
+                        env.import_solution_wrapper(backup_wrapper)
+                        return
             else:
                 # === CROSSOVER INJECTION (original L2) ===
                 candidates.sort(key=lambda x: x[0], reverse=True)
@@ -491,6 +526,10 @@ class HGSIslandHyperHeuristic:
                     self.logger("Recreate could not complete solution after crossover. Rolling back.")
                     env.import_solution_wrapper(backup_wrapper)
                     return
+                if not env.validation_solution():
+                    self.logger("Crossover branch produced invalid structure. Rolling back.")
+                    env.import_solution_wrapper(backup_wrapper)
+                    return
                 
         elif strategy == "macro_route_ruin":
             # [L3 - Macro / Route-Ejection Ruin]
@@ -528,6 +567,10 @@ class HGSIslandHyperHeuristic:
                 
             if not env.is_complete_solution:
                 self.logger("Macro Recreate could not complete solution. Rolling back.")
+                env.import_solution_wrapper(backup_wrapper)
+                return
+            if not env.validation_solution():
+                self.logger("Macro ruin produced invalid structure. Rolling back.")
                 env.import_solution_wrapper(backup_wrapper)
                 return
                 
@@ -656,7 +699,7 @@ class HGSIslandHyperHeuristic:
         """
         target_feasible_ratio = 0.25  # HGS default: aim for ~25% feasible
         adapt_factor = 1.2  # Moderate adjustment (HGS uses 1.2)
-        min_penalty = 50.0   # Don't go too low — prevents infeasible cost < feasible cost
+        min_penalty = 120.0  # Keep enough pressure in tight X-series instances
         max_penalty = 5000.0
         
         # Check current solution feasibility
@@ -792,7 +835,8 @@ class HGSIslandHyperHeuristic:
             self.logger("Critical Failure: Unable to construct valid solution after retries.")
             return False
 
-        current_best = env.key_value
+        best_is_feasible = self._is_feasible(env)
+        current_best = self._get_pure_distance_cost(env) if best_is_feasible else env.key_value
         best_wrapper = env.export_solution_wrapper()
         no_improve_steps = 0
         self.current_run_steps = 0
@@ -827,13 +871,12 @@ class HGSIslandHyperHeuristic:
             # Evaluate if a Breakthrough occurred
             # CVRP is a Min problem, so a lower cost is better
             
-            if env.key_value < current_best - 1e-3: # Meaningful Cost decreased
+            is_better, is_sol_feas, candidate_metric, pure_cost = self._is_better_solution(env, best_is_feasible, current_best)
+            if is_better:
                 old_best = current_best
-                current_best = env.key_value
+                current_best = candidate_metric
+                best_is_feasible = is_sol_feas
                 best_wrapper = env.export_solution_wrapper()
-                
-                is_sol_feas = self._is_feasible(env)
-                pure_cost = self._get_pure_distance_cost(env) if is_sol_feas else None
                 
                 if is_sol_feas and (not hasattr(self, 'global_best_cost') or pure_cost < self.global_best_cost):
                     self.global_best_cost = pure_cost
@@ -852,7 +895,7 @@ class HGSIslandHyperHeuristic:
                 
                 # Log state (aligned format)
                 feas_tag = "" if is_sol_feas else " [INFEASIBLE]"
-                cost_display = f"{pure_cost:.0f}" if is_sol_feas else f"{env.key_value:.0f}*"
+                cost_display = f"{pure_cost:.0f}" if is_sol_feas else f"{candidate_metric:.0f}*"
                 self.logger(f"Step:{self.current_run_steps} NEW LOCAL BEST: {cost_display}{feas_tag}")
                 
                 # Check Global Breakthrough — ONLY for feasible solutions using pure distance
@@ -920,7 +963,7 @@ class HGSIslandHyperHeuristic:
             
             if no_improve_steps > patience:
                 # [Dynamic Retry Setting] Faster escalation to L2+ where elite pool is leveraged
-                max_retries_per_phase = max(12, int(node_num * 0.2))
+                max_retries_per_phase = max(8, int(node_num * 0.1))
                 self.phase_retries += 1
                 
                 # Check relation to Elite Pool (Global Best)
@@ -1017,7 +1060,8 @@ class HGSIslandHyperHeuristic:
                         self.logger("Leader Mode: Retaining high 'current_best' baseline to force meaningful improvement across Soft Restarts.")
                     else:
                         self.logger("Follower Mode: Resetting 'current_best' to allow local hill climbing.")
-                        current_best = env.key_value
+                        best_is_feasible = self._is_feasible(env)
+                        current_best = self._get_pure_distance_cost(env) if best_is_feasible else env.key_value
                         best_wrapper = env.export_solution_wrapper()
                         self.stagnation_level = 0
                         self.phase_retries = 0
