@@ -91,14 +91,8 @@ class HGSIslandHyperHeuristic:
         }
         
         improvement_names = {
-            "saving_algorithm_710e",
-            "two_opt_0554",
-            "three_opt_e8d7",
-            "node_shift_between_routes_7b8a",
-            "variable_neighborhood_search_614b",
-            "giant_tour_dp_split",
-            "swap_star",
-            "or_opt_segment_relocate"
+            "hgs_fast_local_search",
+            "giant_tour_dp_split"
         }
         
         breakout_map = {
@@ -290,6 +284,18 @@ class HGSIslandHyperHeuristic:
             return False
             
         pure_cost = self._get_pure_distance_cost(env)
+
+        # Quality gate: avoid flooding pool with weak feasible solutions after rebuild.
+        # Keep only near-competitive solutions so L2 injection stays high-quality.
+        if self.elite_pool:
+            pool_best = self.elite_pool[0]['value']
+            dynamic_margin = max(220.0, pool_best * 0.012)
+            if pure_cost > pool_best + dynamic_margin:
+                return False
+        if hasattr(self, 'global_best_cost') and self.global_best_cost is not None:
+            if pure_cost > self.global_best_cost + 350.0:
+                return False
+
         fingerprint = self._get_cvrp_fingerprint(env)
         
                 # Check against existing to maintain strict diversity (radius = 8 edges)
@@ -802,12 +808,14 @@ class HGSIslandHyperHeuristic:
             prev_unvisited = 1000
             stagnation_counter = 0
 
+            # Pick ONE random constructive heuristic to build the entire solution in this attempt (prevents chaotic mixed routes)
+            if not self.constructive_heuristics:
+                self.logger("Critical Failure: No constructive heuristics found.")
+                return False
+            current_h = random.choice(self.constructive_heuristics)
+
             # CVRP construct loop until solution is complete (all nodes visited and legally routed)
             while not env.is_complete_solution and construction_steps < 1000:
-                if not self.constructive_heuristics:
-                    self.logger("Critical Failure: No constructive heuristics found.")
-                    return False
-                
                 unvisited_count = len(env.problem_state.get("unvisited_nodes", []))
                 
                 # Check if we are stuck in a bin-packing local optimum
@@ -829,12 +837,10 @@ class HGSIslandHyperHeuristic:
                         pass
                     stagnation_counter = 0 # reset after applying ruin
                 else:
-                    # Pick a random constructive heuristic
-                    h = random.choice(self.constructive_heuristics)
+                    # Keep using the same constructive heuristic for the whole phase
                     try:
-                        env.run_heuristic(h)
+                        env.run_heuristic(current_h)
                     except Exception as e:
-                        # Log silently or ignore to keep building
                         pass
 
                 construction_steps += 1
