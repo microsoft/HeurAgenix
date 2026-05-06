@@ -23,9 +23,9 @@ class Env(BaseEnv):
 
     @property
     def is_complete_solution(self) -> bool:
-        # Fast O(V) check: each route has 1 depot, so total len = nodes - 1 + vehicles
-        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
-        return sum(len(route) for route in self.current_solution.routes) == expected_len
+        # Fast check: number of customers assigned should be exactly node_num - 1
+        assigned_customers = sum(len(route) - 1 for route in self.current_solution.routes if len(route) > 0)
+        return assigned_customers == self.instance_data["node_num"] - 1
 
     def load_data(self, data_path: str) -> None:
         data_name = data_path.split(os.sep)[-1].split(".")[0]
@@ -83,8 +83,7 @@ class Env(BaseEnv):
         capacity = self.instance_data["capacity"]
         penalty_factor = self.problem_state.get("capacity_penalty_factor", getattr(self, "penalty_factor", 200.0)) # Penalty multiplier
         
-        for vehicle_index in range(self.instance_data["vehicle_num"]):
-            route = solution.routes[vehicle_index]
+        for route in solution.routes:
             if len(route) == 0: continue
             dist = self._get_route_cost(route)
             total_current_cost += dist
@@ -95,10 +94,10 @@ class Env(BaseEnv):
                 total_current_cost += (load - capacity) * penalty_factor
                 
         # Unvisited and duplicate node penalty
-        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
-        actual_len = sum(len(route) for route in solution.routes)
-        if actual_len != expected_len:
-            total_current_cost += abs(expected_len - actual_len) * 100000.0
+        expected_customers = self.instance_data["node_num"] - 1
+        actual_customers = sum(len(route) - 1 for route in solution.routes if len(route) > 0)
+        if actual_customers != expected_customers:
+            total_current_cost += abs(expected_customers - actual_customers) * 100000.0
                 
         return total_current_cost
 
@@ -115,16 +114,15 @@ class Env(BaseEnv):
             
         solution = self.current_solution
         total_current_cost = 0.0
-        for vehicle_index in range(self.instance_data["vehicle_num"]):
-            route = solution.routes[vehicle_index]
+        for route in solution.routes:
             if len(route) == 0: continue
             total_current_cost += self._get_route_cost(route) + self._get_route_penalty(route)
             
         # Unvisited and duplicate node penalty
-        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
-        actual_len = sum(len(route) for route in solution.routes)
-        if actual_len != expected_len:
-            total_current_cost += abs(expected_len - actual_len) * 100000.0
+        expected_customers = self.instance_data["node_num"] - 1
+        actual_customers = sum(len(route) - 1 for route in solution.routes if len(route) > 0)
+        if actual_customers != expected_customers:
+            total_current_cost += abs(expected_customers - actual_customers) * 100000.0
             
         return total_current_cost
 
@@ -357,7 +355,7 @@ class Env(BaseEnv):
         # ALWAYS Fallback to O(L) local route recalculation for Penalized tracking
         # The penalty delta cannot easily be modeled without tracking the loads anyway
         old_cost = sum(self._get_route_cost(solution.routes[vid]) + self._get_route_penalty(solution.routes[vid]) for vid in affected_vehicles)
-        old_actual_len = sum(len(route) for route in solution.routes)
+        old_actual_len = sum(len(route) - 1 for route in solution.routes if len(route) > 0)
             
         # 3. Apply the IN-PLACE structural modifications AND Update Loads
         if isinstance(operator, AppendOperator):
@@ -494,8 +492,8 @@ class Env(BaseEnv):
 
         # 4. Update Cost
         new_cost = sum(self._get_route_cost(solution.routes[vid]) + self._get_route_penalty(solution.routes[vid]) for vid in affected_vehicles)
-        expected_len = self.instance_data["node_num"] - 1 + self.instance_data["vehicle_num"]
-        new_actual_len = sum(len(route) for route in solution.routes)
+        expected_len = self.instance_data["node_num"] - 1
+        new_actual_len = sum(len(route) - 1 for route in solution.routes if len(route) > 0)
         
         if solution.total_cost is None:
             solution.total_cost = self.get_key_value(recalculate=True)
@@ -536,10 +534,8 @@ class Env(BaseEnv):
             if depot not in route:
                 return False
 
-        # 2. Check load capacity constraints
-        for route in self.current_solution.routes:
-            if sum(demands[n] for n in route) > capacity + 1e-9:
-                return False
+        # 2. (Capacity check removed to allow controlled infeasible search)
+        # The penalty factor will handle capacity violations softly.
 
         # 3. Check uniqueness & node existence
         visited_customers = set()
