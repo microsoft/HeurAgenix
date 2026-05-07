@@ -92,7 +92,8 @@ class HGSIslandHyperHeuristic:
         
         improvement_names = {
             "hgs_fast_local_search",
-            "giant_tour_dp_split"
+            "giant_tour_dp_split",
+            "cross_route_2opt"
         }
         
         breakout_map = {
