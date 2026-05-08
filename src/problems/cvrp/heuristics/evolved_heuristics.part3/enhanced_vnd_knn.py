@@ -224,7 +224,9 @@ def enhanced_vnd_knn(problem_state: dict, algorithm_data: dict, **kwargs) -> tup
                             # Apply or-opt
                             seg_copy = u_route[seg_start:seg_start + seg_len]
                             del u_route[seg_start:seg_start + seg_len]
-                            v_route.insert(v_pos + 1, *seg_copy)
+                            # Insert a segment (len 1/2/3) into destination route.
+                            # list.insert accepts exactly one element, so use slice insertion for segments.
+                            v_route[v_pos + 1:v_pos + 1] = seg_copy
                             
                             loads[u_vid] -= seg_cost
                             loads[v_vid] += seg_cost
