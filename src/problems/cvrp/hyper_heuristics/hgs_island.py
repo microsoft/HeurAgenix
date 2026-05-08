@@ -24,6 +24,8 @@ class HGSIslandHyperHeuristic:
         
         # Heuristics lists
         self.constructive_heuristics = []
+        self.fast_improvement_heuristics = []
+        self.heavy_improvement_heuristics = []
         self.improvement_heuristics = []
         self.ruin_heuristics = []
         self.breakout_heuristics = {}
@@ -58,6 +60,7 @@ class HGSIslandHyperHeuristic:
         # Minimum distance ratio for diversity checks (0.05 = 5% of nodes)
         self.MIN_DIST_RATIO_MIGRATION = 0.05 
         self.MIN_DIST_RATIO_RELINKING = 0.05
+        self.REBUILD_SEED_COUNT = 4
         
         # Initialize Base Pool Directory
         if self.shared_pool_dir:
@@ -90,11 +93,17 @@ class HGSIslandHyperHeuristic:
             "first_fit_decreasing_bfd",
         }
         
-        improvement_names = {
+        fast_improvement_names = {
             "enhanced_vnd_knn",   # [P0] K-NN based VND — primary improvement engine
             "hgs_fast_local_search",
+            "segment_exchange_tail_search",
             "giant_tour_dp_split",
             "cross_route_2opt"
+        }
+        
+        heavy_improvement_names = {
+            "swap_star",
+            "or_opt_segment_relocate"
         }
         
         breakout_map = {
@@ -110,7 +119,11 @@ class HGSIslandHyperHeuristic:
             
             if base_name in constructive_names:
                 self.constructive_heuristics.append(func)
-            elif base_name in improvement_names:
+            elif base_name in fast_improvement_names:
+                self.fast_improvement_heuristics.append(func)
+                self.improvement_heuristics.append(func)
+            elif base_name in heavy_improvement_names:
+                self.heavy_improvement_heuristics.append(func)
                 self.improvement_heuristics.append(func)
             
             # Map to breakout dictionary
@@ -136,13 +149,18 @@ class HGSIslandHyperHeuristic:
         Phase B: VND (Variable Neighborhood Descent) with time safety valve.
         Continuously apply improvement operators until local optimum or time limit.
         """
-        if not self.improvement_heuristics: return False
+        if not self.fast_improvement_heuristics: return False
         
         max_vnd_loops = 500  # Hard cap per VND call
         total_improved = False
         start_time = time.time()
         
-        heuristics_queue = list(self.improvement_heuristics)
+        current_cost = self._get_pure_distance_cost(env) if self._is_feasible(env) else env.key_value
+        is_near_bk = self._is_feasible(env) and hasattr(env, "best_known") and env.best_known is not None and current_cost <= env.best_known + 60.0
+        
+        heuristics_queue = list(self.fast_improvement_heuristics)
+        if is_near_bk:
+            heuristics_queue.extend(self.heavy_improvement_heuristics)
         
         for loop_idx in range(max_vnd_loops):
             # Time safety valve
@@ -180,6 +198,24 @@ class HGSIslandHyperHeuristic:
                 break
                 
         return total_improved
+
+    def _get_retry_budget(self, env: Env, current_best: float, best_is_feasible: bool) -> int:
+        """
+        Near the best known solution we should avoid over-escalating into rebuilds.
+        Give high-quality trajectories more chances to intensify before macro restarts.
+        """
+        node_num = env.instance_data.get("node_num", 80)
+        base_budget = max(6, int(node_num * 0.06))
+
+        if not best_is_feasible or getattr(env, "best_known", None) is None:
+            return base_budget
+
+        gap_to_bk = max(0.0, current_best - env.best_known)
+        if gap_to_bk <= 220.0:
+            return max(base_budget, 14)
+        if gap_to_bk <= 450.0:
+            return max(base_budget, 10)
+        return base_budget
         
 
     def _scan_pool_epochs(self):
@@ -444,8 +480,10 @@ class HGSIslandHyperHeuristic:
                 self.logger("Elite pool too small for Crossover. Falling back to L1 targeted_ruin.")
                 return self._apply_breakout(env, "targeted_ruin")
             
+            current_is_near_bk = self._is_feasible(env) and self._get_pure_distance_cost(env) <= env.best_known + 120.0
+
             # Strategy mix: 50% crossover, 50% direct elite import + perturbation
-            use_direct_import = (random.random() < 0.5)
+            use_direct_import = (random.random() < (0.8 if current_is_near_bk else 0.5))
             
             # Find best elite that is different from current solution
             fingerprint = self._get_cvrp_fingerprint(env)
@@ -465,7 +503,7 @@ class HGSIslandHyperHeuristic:
                 # === DIRECT ELITE IMPORT === 
                 # Pick the BEST quality elite (not most distant) and start VND from there
                 # This is the key HGS mechanism: educate offspring from best parents
-                best_candidates = sorted(candidates, key=lambda x: x[1]['value'])[:5]
+                best_candidates = sorted(candidates, key=lambda x: x[1]['value'])[:(3 if current_is_near_bk else 5)]
                 _, target_elite = random.choice(best_candidates)
                 
                 backup_wrapper = env.export_solution_wrapper()
@@ -474,7 +512,7 @@ class HGSIslandHyperHeuristic:
                 env.run_operator(op)
                 
                 # Apply small perturbation (5-10% ruin) so VND can find new improving moves
-                ratio = random.uniform(0.05, 0.10)
+                ratio = random.uniform(0.03, 0.06) if current_is_near_bk else random.uniform(0.05, 0.10)
                 ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
                 recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
                 
@@ -980,14 +1018,10 @@ class HGSIslandHyperHeuristic:
             # For CVRP, since we run a full VND loop in Phase B that exhausts all improvement moves, 
             # we reach a local optimum almost instantly. 
             # Thus, patience should be zero to avoid wasting cycles checking an already converged solution.
-            node_num = env.instance_data.get("node_num", 80) if hasattr(env, 'instance_data') else 80
             patience = 0
             
             if no_improve_steps > patience:
-                # [Dynamic Retry Setting] Faster escalation to L2+ where elite pool is leveraged
-                # [HGS-inspired] Faster L2 escalation: L1 ruin is less powerful than OX crossover.
-                # Reducing L1 patience from 10 to 4 so we spend more time in high-quality crossover (L2).
-                max_retries_per_phase = max(4, int(node_num * 0.04))
+                max_retries_per_phase = self._get_retry_budget(env, current_best, best_is_feasible)
                 self.phase_retries += 1
                 
                 # Check relation to Elite Pool (Global Best)
@@ -999,7 +1033,14 @@ class HGSIslandHyperHeuristic:
                      if current_best <= global_best_val + 1e-3:
                          is_attacking_global_best = True
 
-                if self.stagnation_level == 0:
+                close_to_known_best = best_is_feasible and current_best <= env.best_known + 220.0
+
+                if close_to_known_best and len(self.elite_pool) >= 2:
+                    if self.stagnation_level < 2:
+                        self.stagnation_level = 2
+                        self.phase_retries = 1
+                    strategy = "elite_route_injection"
+                elif self.stagnation_level == 0:
                     self.stagnation_level = 1
                     self.phase_retries = 1
                     strategy = "targeted_ruin"
@@ -1017,10 +1058,10 @@ class HGSIslandHyperHeuristic:
                     # Upgrade to L3
                     self.stagnation_level = 3
                     self.phase_retries = 1
-                    strategy = "macro_route_ruin"
+                    strategy = "soft_restart" if close_to_known_best else "macro_route_ruin"
                     self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L2 retries)")
                 elif self.stagnation_level == 3 and self.phase_retries <= max_retries_per_phase:
-                    strategy = "macro_route_ruin"
+                    strategy = "soft_restart" if close_to_known_best else "macro_route_ruin"
                 elif self.stagnation_level == 3 and self.phase_retries > max_retries_per_phase:
                     # Upgrade to L4
                     self.stagnation_level = 4
@@ -1037,7 +1078,15 @@ class HGSIslandHyperHeuristic:
                     
                 # Evaluate Hard Restarts explicitly
                 if self.stagnation_level >= 5:
-                    if is_attacking_global_best:
+                    if close_to_known_best:
+                        self.logger(
+                            f"Step:{self.current_run_steps} L5 suppressed near BK "
+                            f"(Best={current_best:.0f}, BK={env.best_known:.0f}). Holding trajectory."
+                        )
+                        strategy = "elite_route_injection" if len(self.elite_pool) >= 2 else "soft_restart"
+                        self.stagnation_level = 2 if strategy == "elite_route_injection" else 4
+                        self.phase_retries = 1
+                    elif is_attacking_global_best:
                         self.logger(f"Step:{self.current_run_steps} Exhausted L4 ({max_retries_per_phase} retries). Triggering L5 (Global Rebuild).")
                         
                         # 1. Intent check and preemptive creation (Concurrency Control)
@@ -1108,6 +1157,30 @@ class HGSIslandHyperHeuristic:
                     return result
                 
                 self.logger(f" GLOBAL HARD RESTART TRIGGERED (Epoch {self.pool_id}_{self.pool_type}) - Continue")
+
+                rebuild_seed_entries = []
+                if self.elite_pool:
+                    for elite in self.elite_pool[:self.REBUILD_SEED_COUNT]:
+                        rebuild_seed_entries.append({
+                            'value': elite['value'],
+                            'fingerprint': elite['fingerprint'],
+                            'routes': [list(route) for route in elite['routes']],
+                            'timestamp': elite['timestamp'],
+                        })
+
+                if hasattr(self, 'global_best_wrapper') and getattr(self, 'global_best_wrapper') is not None:
+                    env.import_solution_wrapper(self.global_best_wrapper)
+                    if self._is_feasible(env):
+                        global_seed = {
+                            'value': self._get_pure_distance_cost(env),
+                            'fingerprint': self._get_cvrp_fingerprint(env),
+                            'routes': [list(route) for route in env.current_solution.routes],
+                            'timestamp': time.time(),
+                        }
+                        if not rebuild_seed_entries:
+                            rebuild_seed_entries.append(global_seed)
+                        elif self._get_cvrp_distance(rebuild_seed_entries[0]['fingerprint'], global_seed['fingerprint']) >= 4:
+                            rebuild_seed_entries.insert(0, global_seed)
                 
                 # [L5 CORE: Reset Environment Logic for CVRP - Scorched Earth]
                 env.reset()
@@ -1115,13 +1188,15 @@ class HGSIslandHyperHeuristic:
                 # pool_id already incremented in Phase D breakout block using Atomic Filesys Create
                 
                 self.elite_pool = [] # Destroy all locally accumulated Elite solutions
-                
-                # [CRITICAL FIX]: Immediately seed the new epoch with our absolute global best
-                if hasattr(self, 'global_best_wrapper') and getattr(self, 'global_best_wrapper') is not None:
-                    # Temporarily load it into env to get the fingerprint and add it
-                    env.import_solution_wrapper(self.global_best_wrapper)
-                    self._add_to_local_pool(env, self.global_best_cost)
-                    env.reset() # Re-reset env context to actually restart
+
+                for entry in rebuild_seed_entries[:self.REBUILD_SEED_COUNT]:
+                    try:
+                        env.run_operator(ReplaceSolutionOperator(routes=[list(route) for route in entry['routes']]))
+                        self._add_to_local_pool(env, entry['value'])
+                    except Exception:
+                        continue
+
+                env.reset()
                     
                 self.pending_rebuild = False
                 continue
