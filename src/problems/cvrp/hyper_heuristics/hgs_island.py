@@ -87,17 +87,18 @@ class HGSIslandHyperHeuristic:
             "min_cost_insertion_3b2b",
             "random_bfdc",
             "regret_insertion_2f3a", # Include strong operator for tight capacities
-            "first_fit_decreasing_bfd"
+            "first_fit_decreasing_bfd",
         }
         
         improvement_names = {
+            "enhanced_vnd_knn",   # [P0] K-NN based VND — primary improvement engine
             "hgs_fast_local_search",
             "giant_tour_dp_split",
             "cross_route_2opt"
         }
         
         breakout_map = {
-            "mass_ruin": ["radial_ruin_3c4d", "random_ruin_1a2b", "sisr_ruin", "sisr_ruin_4a5b"],
+            "mass_ruin": ["advanced_sisr_ruin", "sisr_ruin", "sisr_ruin_4a5b", "radial_ruin_3c4d", "random_ruin_1a2b"],
             "recreate": ["regret_insertion_2f3a", "min_cost_insertion_048f", "min_cost_insertion_3b2b"],
             "crossover": ["route_based_crossover_9f8a", "hgs_giant_tour_crossover"]
         }
@@ -984,7 +985,9 @@ class HGSIslandHyperHeuristic:
             
             if no_improve_steps > patience:
                 # [Dynamic Retry Setting] Faster escalation to L2+ where elite pool is leveraged
-                max_retries_per_phase = max(8, int(node_num * 0.1))
+                # [HGS-inspired] Faster L2 escalation: L1 ruin is less powerful than OX crossover.
+                # Reducing L1 patience from 10 to 4 so we spend more time in high-quality crossover (L2).
+                max_retries_per_phase = max(4, int(node_num * 0.04))
                 self.phase_retries += 1
                 
                 # Check relation to Elite Pool (Global Best)
