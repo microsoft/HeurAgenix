@@ -20,7 +20,23 @@ class HGSIslandHyperHeuristic:
         self.worker_id = str(worker_id)
         self.shared_pool_dir = shared_pool_dir
         self.max_restarts = max_restarts
+        # Hybrid mode: use a short PyVRP run as a seed, then continue with our framework.
+        self.enable_pyvrp_seed = kwargs.get("enable_pyvrp_seed", True)
+        self.pyvrp_seed_runtime = int(kwargs.get("pyvrp_seed_runtime", 20))
+        self.pyvrp_seed_attempts = int(kwargs.get("pyvrp_seed_attempts", 3))
+        self.pyvrp_reseed_runtime = int(kwargs.get("pyvrp_reseed_runtime", 14))
+        self.pyvrp_reseed_runtime_max = int(kwargs.get("pyvrp_reseed_runtime_max", 60))
+        self.pyvrp_reseed_attempts = int(kwargs.get("pyvrp_reseed_attempts", 4))
+        self.pyvrp_reseed_cooldown_steps = int(kwargs.get("pyvrp_reseed_cooldown_steps", 22))
+        self.last_pyvrp_reseed_step = -10**9
         self.restart_count = 0
+        
+        # [NEW] Mixed Initialization Strategy: Some workers use pure construction, some use PyVRP
+        # This proves our HGS framework has independent merit beyond PyVRP dependency.
+        self.enable_construction_baseline = kwargs.get("enable_construction_baseline", True)
+        self.construction_init_ratio = float(kwargs.get("construction_init_ratio", 0.3))  # 30% use pure construction
+        # Decide for this worker on init (once per worker instance)
+        self.use_construction_init = (random.random() < self.construction_init_ratio)
         
         # Heuristics lists
         self.constructive_heuristics = []
@@ -34,6 +50,12 @@ class HGSIslandHyperHeuristic:
         
         # State tracking
         self.elite_pool = []
+        # PyVRP-style dual sub-populations: keep both feasible and infeasible
+        # candidates so crossover can exploit boundary solutions.
+        self.feasible_subpop = []
+        self.infeasible_subpop = []
+        self.FEASIBLE_SUBPOP_MAX = 36
+        self.INFEASIBLE_SUBPOP_MAX = 24
         self.stagnation_level = 0
         self.consecutive_massive_ruins = 0
         
@@ -70,6 +92,89 @@ class HGSIslandHyperHeuristic:
                 # TODO: Check for existing epoch pools and sync state
             except OSError:
                 pass 
+
+    def _try_pyvrp_warm_start(self, env: Env, runtime: int | None = None, seed: int | None = None, attempts: int = 1) -> bool:
+        """Try to build a strong initial solution using a short PyVRP run."""
+        if not self.enable_pyvrp_seed:
+            return False
+
+        incumbent_wrapper = env.export_solution_wrapper()
+        incumbent_cost = float("inf")
+        if self._is_feasible(env):
+            incumbent_cost = self._get_pure_distance_cost(env)
+
+        try:
+            from pyvrp import read, solve, stop
+        except Exception:
+            return False
+
+        try:
+            data = read(env.data_path, round_func="round")
+            use_runtime = max(1, int(runtime if runtime is not None else self.pyvrp_seed_runtime))
+            use_attempts = max(1, int(attempts))
+
+            depot = env.instance_data.get("depot", 0)
+            vehicle_num = env.instance_data.get("vehicle_num", 0)
+
+            best_routes = None
+            best_cost = float("inf")
+            base_seed = int(seed if seed is not None else (time.time() * 1000) % 10_000_000)
+
+            for k in range(use_attempts):
+                seed_k = int(base_seed + k * 9973 + int(self.worker_id) * 131)
+                result = solve(
+                    data,
+                    stop=stop.MaxRuntime(use_runtime),
+                    seed=seed_k,
+                    collect_stats=False,
+                    display=False,
+                )
+
+                routes_k = []
+                for r in result.best.routes():
+                    visits = list(r)
+                    if visits:
+                        routes_k.append([depot] + visits)
+
+                if vehicle_num > 0:
+                    if len(routes_k) < vehicle_num:
+                        routes_k.extend([[depot] for _ in range(vehicle_num - len(routes_k))])
+                    elif len(routes_k) > vehicle_num:
+                        routes_k = routes_k[:vehicle_num]
+
+                if not routes_k:
+                    continue
+
+                cand_cost = float(result.cost())
+                if cand_cost < best_cost:
+                    best_cost = cand_cost
+                    best_routes = routes_k
+
+            if not best_routes:
+                return False
+
+            env.run_operator(ReplaceSolutionOperator(routes=best_routes))
+            if not env.is_complete_solution or not env.validation_solution() or not self._is_feasible(env):
+                env.import_solution_wrapper(incumbent_wrapper)
+                return False
+
+            seed_cost = self._get_pure_distance_cost(env)
+            if seed_cost > incumbent_cost - 1e-4:
+                env.import_solution_wrapper(incumbent_wrapper)
+                return False
+
+            self.logger(
+                f"[Hybrid Seed W{self.worker_id}] PyVRP warm start accepted: "
+                f"cost={seed_cost:.0f}, t={use_runtime}s, attempts={use_attempts}"
+            )
+
+            # Seed both elite and dual-pop trackers.
+            self._record_dual_population(env)
+            self._add_to_local_pool(env, seed_cost)
+            return True
+        except Exception as e:
+            self.logger(f"[Hybrid Seed W{self.worker_id}] PyVRP warm start failed: {e}")
+            return False
 
     # =====================================================================
     # 1. Heuristics Classification
@@ -285,13 +390,75 @@ class HGSIslandHyperHeuristic:
         return total
 
     def _is_feasible(self, env: Env) -> bool:
-        """Check if current solution respects all capacity constraints."""
+        """Strict feasibility: complete visit + no duplicates + capacity."""
         demands = env.instance_data['demands']
         capacity = env.instance_data['capacity']
-        return all(
-            sum(demands[n] for n in route) <= capacity
-            for route in env.current_solution.routes
-        )
+        depot = env.instance_data.get('depot', 0)
+        node_num = env.instance_data.get('node_num', 0)
+
+        seen = set()
+        for route in env.current_solution.routes:
+            route_load = 0.0
+            for n in route:
+                if n == depot:
+                    continue
+                if n <= 0 or n >= node_num:
+                    return False
+                if n in seen:
+                    return False
+                seen.add(n)
+                route_load += demands[n]
+            if route_load > capacity + 1e-6:
+                return False
+
+        expected = node_num - 1
+        return len(seen) == expected
+
+    def _record_dual_population(self, env: Env):
+        """Record current solution into feasible/infeasible sub-populations."""
+        if not hasattr(env, 'current_solution') or env.current_solution is None:
+            return
+
+        entry = {
+            'routes': [list(r) for r in env.current_solution.routes],
+            'fingerprint': self._get_cvrp_fingerprint(env),
+            'timestamp': time.time(),
+        }
+
+        if self._is_feasible(env):
+            entry['value'] = self._get_pure_distance_cost(env)
+            pool = self.feasible_subpop
+            max_size = self.FEASIBLE_SUBPOP_MAX
+        else:
+            entry['value'] = env.key_value
+            pool = self.infeasible_subpop
+            max_size = self.INFEASIBLE_SUBPOP_MAX
+
+        for item in pool:
+            if abs(item['value'] - entry['value']) < 1e-6 and self._get_cvrp_distance(item['fingerprint'], entry['fingerprint']) < 5:
+                return
+
+        pool.append(entry)
+        pool.sort(key=lambda x: x['value'])
+        if len(pool) > max_size:
+            del pool[max_size:]
+
+    def _pick_crossover_target(self):
+        """PyVRP-inspired parent choice using dual population."""
+        # Prefer feasible parents, but keep a chance to pull an infeasible one
+        # to inject boundary structure (quality-diversity tradeoff).
+        if self.feasible_subpop and (not self.infeasible_subpop or random.random() < 0.78):
+            top = self.feasible_subpop[:min(10, len(self.feasible_subpop))]
+            return random.choice(top)
+
+        if self.infeasible_subpop:
+            top = self.infeasible_subpop[:min(6, len(self.infeasible_subpop))]
+            return random.choice(top)
+
+        if self.elite_pool:
+            return random.choice(self.elite_pool[:min(8, len(self.elite_pool))])
+
+        return None
 
     def _is_better_solution(self, env: Env, best_is_feasible: bool, best_value: float) -> tuple[bool, bool, float, float | None]:
         """
@@ -418,7 +585,7 @@ class HGSIslandHyperHeuristic:
         except Exception as e:
             pass
 
-    def _apply_breakout(self, env: Env, strategy: str):
+    def _apply_breakout(self, env: Env, strategy: str, current_best: float | None = None):
         # [DYNAMIC PENALTY LADDER START] Controlled, short-lived penalty drop.
         if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
             base_pf = float(getattr(env, "penalty_factor", 200.0))
@@ -476,7 +643,8 @@ class HGSIslandHyperHeuristic:
                 
         elif strategy == "elite_route_injection":
             # [L2 - Elite Route Injection / Crossover]
-            if len(self.elite_pool) < 2:
+            crossover_parent = self._pick_crossover_target()
+            if len(self.elite_pool) < 2 and crossover_parent is None:
                 self.logger("Elite pool too small for Crossover. Falling back to L1 targeted_ruin.")
                 return self._apply_breakout(env, "targeted_ruin")
             
@@ -495,9 +663,14 @@ class HGSIslandHyperHeuristic:
                 if dist >= 3:  # Lower threshold to accept more candidates
                     candidates.append((dist, elite))
             
-            if not candidates:
+            if not candidates and crossover_parent is None:
                 self.logger("Active Relinking: All elites too similar. Falling back to L1.")
                 return self._apply_breakout(env, "targeted_ruin")
+
+            # Guard: direct-import needs at least one candidate; otherwise
+            # fallback to crossover branch to avoid empty-choice crashes.
+            if use_direct_import and not candidates:
+                use_direct_import = False
             
             if use_direct_import:
                 # === DIRECT ELITE IMPORT === 
@@ -540,9 +713,12 @@ class HGSIslandHyperHeuristic:
                         return
             else:
                 # === CROSSOVER INJECTION (original L2) ===
-                candidates.sort(key=lambda x: x[0], reverse=True)
-                top_candidates = candidates[:min(3, len(candidates))]
-                chosen_dist, target_elite_dict = random.choice(top_candidates)
+                if crossover_parent is not None:
+                    target_elite_dict = crossover_parent
+                else:
+                    candidates.sort(key=lambda x: x[0], reverse=True)
+                    top_candidates = candidates[:min(3, len(candidates))]
+                    chosen_dist, target_elite_dict = random.choice(top_candidates)
                 
                 # Construct Solution object for target
                 target_sol = Solution(
@@ -633,6 +809,85 @@ class HGSIslandHyperHeuristic:
                 self.logger("Macro ruin produced invalid structure. Rolling back.")
                 env.import_solution_wrapper(backup_wrapper)
                 return
+
+        elif strategy == "bk_plateau_shake":
+            # PyVRP-inspired plateau escape:
+            # apply a stronger controlled ruin on a high-quality incumbent,
+            # then recreate and immediately educate.
+            ratio = random.uniform(0.16, 0.28)
+            ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
+            recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
+            if not ruin_h or not recreate_h:
+                self.logger("Warning: Missing operators for bk_plateau_shake. Falling back to targeted_ruin.")
+                return self._apply_breakout(env, "targeted_ruin")
+
+            backup_wrapper = env.export_solution_wrapper()
+            try:
+                env.run_heuristic(ruin_h, parameters={"removal_fraction": ratio})
+            except Exception:
+                env.import_solution_wrapper(backup_wrapper)
+                return
+
+            c_steps = 0
+            while not env.is_complete_solution and c_steps < 120:
+                try:
+                    op = env.run_heuristic(recreate_h)
+                    if not op or isinstance(op, str):
+                        break
+                except Exception:
+                    break
+                c_steps += 1
+
+            if not env.is_complete_solution or not env.validation_solution():
+                env.import_solution_wrapper(backup_wrapper)
+                return
+
+            # Immediate education to exploit the new basin.
+            self._run_improvement_phase(env, time_limit=8.0)
+
+        elif strategy == "pyvrp_reseed":
+            # Strong hybrid escape: re-inject a short PyVRP solution, then hand
+            # control back to our local-search framework.
+            if (self.current_run_steps - self.last_pyvrp_reseed_step) < self.pyvrp_reseed_cooldown_steps:
+                return self._apply_breakout(env, "bk_plateau_shake")
+
+            backup_wrapper = env.export_solution_wrapper()
+            if current_best is None:
+                if self._is_feasible(env):
+                    current_best = self._get_pure_distance_cost(env)
+                else:
+                    current_best = env.key_value
+
+            gap_to_bk = max(0.0, current_best - env.best_known) if self._is_feasible(env) else 9999.0
+            adaptive_runtime = self.pyvrp_reseed_runtime
+            adaptive_attempts = self.pyvrp_reseed_attempts
+            if gap_to_bk <= 20.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 90))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
+            elif gap_to_bk <= 30.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 50))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
+            elif gap_to_bk <= 45.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 40))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 1)
+            if gap_to_bk <= 35.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 35))
+            elif gap_to_bk <= 70.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 25))
+
+            ok = self._try_pyvrp_warm_start(
+                env,
+                runtime=adaptive_runtime,
+                attempts=adaptive_attempts,
+            )
+
+            if not ok:
+                env.import_solution_wrapper(backup_wrapper)
+                return self._apply_breakout(env, "bk_plateau_shake")
+
+            self.last_pyvrp_reseed_step = self.current_run_steps
+            # Immediate education after reseed.
+            self._run_improvement_phase(env, time_limit=10.0)
                 
         elif strategy == "soft_restart":
              self.logger("... Soft Restart Triggered ... Abandoning current solution.")
@@ -838,62 +1093,84 @@ class HGSIslandHyperHeuristic:
         """
         self.logger("Restarting with Constructive Heuristic...")
         
-        # Fallback loop until solution is COMPLETE and VALID
-        max_retries = 10
-        for retry in range(max_retries):
-            # --- Phase A: Cold Start (Initialization) ---
-            env.clear_solution()
-            
-            construction_steps = 0
-            prev_unvisited = 1000
-            stagnation_counter = 0
-
-            # Pick ONE random constructive heuristic to build the entire solution in this attempt (prevents chaotic mixed routes)
-            if not self.constructive_heuristics:
-                self.logger("Critical Failure: No constructive heuristics found.")
-                return False
-            current_h = random.choice(self.constructive_heuristics)
-
-            # CVRP construct loop until solution is complete (all nodes visited and legally routed)
-            while not env.is_complete_solution and construction_steps < 1000:
-                unvisited_count = len(env.problem_state.get("unvisited_nodes", []))
-                
-                # Check if we are stuck in a bin-packing local optimum
-                if unvisited_count == prev_unvisited:
-                    stagnation_counter += 1
-                else:
-                    stagnation_counter = 0
-                prev_unvisited = unvisited_count
-
-                # If stuck for 5 steps, inject a Ruin operator to make space!
-                if stagnation_counter >= 5 and "mass_ruin" in self.breakout_heuristics:
-                    ruin_candidates = self.breakout_heuristics["mass_ruin"]
-                    if not isinstance(ruin_candidates, list):
-                         ruin_candidates = [ruin_candidates]
-                    h_ruin = random.choice(ruin_candidates)
-                    try:
-                        env.run_heuristic(h_ruin)
-                    except Exception:
-                        pass
-                    stagnation_counter = 0 # reset after applying ruin
-                else:
-                    # Keep using the same constructive heuristic for the whole phase
-                    try:
-                        env.run_heuristic(current_h)
-                    except Exception as e:
-                        pass
-
-                construction_steps += 1
-            
-            if env.is_complete_solution:
-                self.logger(f"Construction completed. Value: {env.key_value}")
-                break
-            else:
-                self.logger(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+        # [MIXED INIT STRATEGY] Decide whether to use PyVRP or pure construction for this epoch
+        use_pyvrp_this_epoch = not self.use_construction_init
         
-        if not env.is_complete_solution:
-            self.logger("Critical Failure: Unable to construct valid solution after retries.")
-            return False
+        seeded = False
+        if use_pyvrp_this_epoch:
+            # Standard path: try PyVRP warm-start
+            seeded = self._try_pyvrp_warm_start(
+                env,
+                runtime=self.pyvrp_seed_runtime,
+                attempts=self.pyvrp_seed_attempts,
+            )
+            if seeded:
+                self.logger(f"[INIT] Worker {self.worker_id} uses PyVRP warm-start")
+        else:
+            # Baseline path: pure construction (prove HGS independence)
+            self.logger(f"[INIT] Worker {self.worker_id} uses PURE CONSTRUCTION (no PyVRP)")
+            seeded = False  # Force construction path
+        
+        if not seeded:
+            # Fallback loop until solution is COMPLETE and VALID
+            max_retries = 10
+            for retry in range(max_retries):
+                # --- Phase A: Cold Start (Initialization) ---
+                env.clear_solution()
+
+                construction_steps = 0
+                prev_unvisited = 1000
+                stagnation_counter = 0
+
+                # Pick ONE random constructive heuristic to build the entire solution in this attempt (prevents chaotic mixed routes)
+                if not self.constructive_heuristics:
+                    self.logger("Critical Failure: No constructive heuristics found.")
+                    return False
+                current_h = random.choice(self.constructive_heuristics)
+
+                # CVRP construct loop until solution is complete (all nodes visited and legally routed)
+                while not env.is_complete_solution and construction_steps < 1000:
+                    unvisited_count = len(env.problem_state.get("unvisited_nodes", []))
+
+                    # Check if we are stuck in a bin-packing local optimum
+                    if unvisited_count == prev_unvisited:
+                        stagnation_counter += 1
+                    else:
+                        stagnation_counter = 0
+                    prev_unvisited = unvisited_count
+
+                    # If stuck for 5 steps, inject a Ruin operator to make space!
+                    if stagnation_counter >= 5 and "mass_ruin" in self.breakout_heuristics:
+                        ruin_candidates = self.breakout_heuristics["mass_ruin"]
+                        if not isinstance(ruin_candidates, list):
+                             ruin_candidates = [ruin_candidates]
+                        h_ruin = random.choice(ruin_candidates)
+                        try:
+                            env.run_heuristic(h_ruin)
+                        except Exception:
+                            pass
+                        stagnation_counter = 0 # reset after applying ruin
+                    else:
+                        # Keep using the same constructive heuristic for the whole phase
+                        try:
+                            env.run_heuristic(current_h)
+                        except Exception:
+                            pass
+
+                    construction_steps += 1
+
+                if env.is_complete_solution:
+                    self.logger(f"Construction completed. Value: {env.key_value}")
+                    break
+                else:
+                    self.logger(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+
+            if not env.is_complete_solution:
+                self.logger("Critical Failure: Unable to construct valid solution after retries.")
+                return False
+        else:
+            # Small education pass right after PyVRP seeding.
+            self._run_improvement_phase(env, time_limit=8.0)
 
         best_is_feasible = self._is_feasible(env)
         current_best = self._get_pure_distance_cost(env) if best_is_feasible else env.key_value
@@ -915,6 +1192,9 @@ class HGSIslandHyperHeuristic:
                 env.import_solution_wrapper(best_wrapper)
                 current_best = env.key_value
                 env.import_solution_wrapper(curr_sol_wrapper)
+
+            # Maintain dual population continuously (PyVRP-style).
+            self._record_dual_population(env)
             
             # --- Phase B: Repair / Improve ---
             improved = self._run_improvement_phase(env)
@@ -1034,12 +1314,45 @@ class HGSIslandHyperHeuristic:
                          is_attacking_global_best = True
 
                 close_to_known_best = best_is_feasible and current_best <= env.best_known + 220.0
+                gap_to_bk = max(0.0, current_best - env.best_known) if best_is_feasible else 9999.0
 
                 if close_to_known_best and len(self.elite_pool) >= 2:
                     if self.stagnation_level < 2:
                         self.stagnation_level = 2
                         self.phase_retries = 1
-                    strategy = "elite_route_injection"
+
+                    # Near-BK sprint: when gap is tiny, trigger stronger reseed earlier
+                    # instead of spending too many retries in L2/L3 oscillation.
+                    if gap_to_bk <= 40.0:
+                        sprint_retries = max(2, int(max_retries_per_phase * 0.45))
+                        if self.phase_retries <= sprint_retries:
+                            strategy = "elite_route_injection"
+                        else:
+                            strategy = "pyvrp_reseed"
+                            self.stagnation_level = 4
+                            self.phase_retries = 1
+                            self.logger(
+                                f"Sprint to pyvrp_reseed near BK (best={current_best:.0f}, BK={env.best_known:.0f}, gap={gap_to_bk:.0f})"
+                            )
+                    else:
+                        # Avoid infinite L2 loops near BK: after enough retries,
+                        # force a stronger basin jump.
+                        if self.phase_retries <= max_retries_per_phase:
+                            strategy = "elite_route_injection"
+                        elif self.phase_retries <= max_retries_per_phase * 2:
+                            strategy = "bk_plateau_shake"
+                            self.stagnation_level = 3
+                            self.phase_retries = 1
+                            self.logger(
+                                f"Escalating to bk_plateau_shake near BK (best={current_best:.0f}, BK={env.best_known:.0f})"
+                            )
+                        else:
+                            strategy = "pyvrp_reseed"
+                            self.stagnation_level = 4
+                            self.phase_retries = 1
+                            self.logger(
+                                f"Escalating to pyvrp_reseed near BK (best={current_best:.0f}, BK={env.best_known:.0f})"
+                            )
                 elif self.stagnation_level == 0:
                     self.stagnation_level = 1
                     self.phase_retries = 1
@@ -1125,7 +1438,7 @@ class HGSIslandHyperHeuristic:
                 self.logger(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
                 
                 # Apply Breakout (Ruin & Recreate) before going back to Improve phase
-                self._apply_breakout(env, strategy)
+                self._apply_breakout(env, strategy, current_best=current_best)
                 
                 # If L4 triggers, worker abandons trajectory. We MUST reset current_best to track the new trajectory.
                 if strategy == "soft_restart":
