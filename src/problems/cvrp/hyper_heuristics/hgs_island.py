@@ -5,7 +5,7 @@ import glob
 import pickle
 import hashlib
 from src.problems.cvrp.env import Env
-from src.problems.cvrp.components import Solution, ReplaceSolutionOperator
+
 from src.util.util import load_function
 
 class HGSIslandHyperHeuristic:
@@ -103,57 +103,28 @@ class HGSIslandHyperHeuristic:
         if self._is_feasible(env):
             incumbent_cost = self._get_pure_distance_cost(env)
 
-        try:
-            from pyvrp import read, solve, stop
-        except Exception:
+        # Retrieve the encapsulated heuristic
+        pyvrp_heuristic = self.breakout_heuristics.get("pyvrp_blackbox")
+        if pyvrp_heuristic is None:
+            self.logger(f"[Hybrid Seed W{self.worker_id}] PyVRP heuristic not loaded.")
             return False
 
+        use_runtime = max(1, int(runtime if runtime is not None else self.pyvrp_seed_runtime))
+        use_attempts = max(1, int(attempts))
+
         try:
-            data = read(env.data_path, round_func="round")
-            use_runtime = max(1, int(runtime if runtime is not None else self.pyvrp_seed_runtime))
-            use_attempts = max(1, int(attempts))
+            # Run the heuristic to generate and replace solution
+            env.run_heuristic(
+                pyvrp_heuristic, 
+                parameters={
+                    "data_path": getattr(env, "data_path", ""),
+                    "runtime": use_runtime,
+                    "attempts": use_attempts,
+                    "seed": seed,
+                    "worker_id": self.worker_id
+                }
+            )
 
-            depot = env.instance_data.get("depot", 0)
-            vehicle_num = env.instance_data.get("vehicle_num", 0)
-
-            best_routes = None
-            best_cost = float("inf")
-            base_seed = int(seed if seed is not None else (time.time() * 1000) % 10_000_000)
-
-            for k in range(use_attempts):
-                seed_k = int(base_seed + k * 9973 + int(self.worker_id) * 131)
-                result = solve(
-                    data,
-                    stop=stop.MaxRuntime(use_runtime),
-                    seed=seed_k,
-                    collect_stats=False,
-                    display=False,
-                )
-
-                routes_k = []
-                for r in result.best.routes():
-                    visits = list(r)
-                    if visits:
-                        routes_k.append([depot] + visits)
-
-                if vehicle_num > 0:
-                    if len(routes_k) < vehicle_num:
-                        routes_k.extend([[depot] for _ in range(vehicle_num - len(routes_k))])
-                    elif len(routes_k) > vehicle_num:
-                        routes_k = routes_k[:vehicle_num]
-
-                if not routes_k:
-                    continue
-
-                cand_cost = float(result.cost())
-                if cand_cost < best_cost:
-                    best_cost = cand_cost
-                    best_routes = routes_k
-
-            if not best_routes:
-                return False
-
-            env.run_operator(ReplaceSolutionOperator(routes=best_routes))
             if not env.is_complete_solution or not env.validation_solution() or not self._is_feasible(env):
                 env.import_solution_wrapper(incumbent_wrapper)
                 return False
@@ -218,6 +189,7 @@ class HGSIslandHyperHeuristic:
         }
 
         # 1. Classify standard pool
+        from src.util.util import load_function
         for h_name in self.heuristic_pool_names:
             base_name = os.path.basename(h_name).replace(".py", "")
             func = load_function(h_name, problem=self.problem)
@@ -237,6 +209,20 @@ class HGSIslandHyperHeuristic:
                     if key not in self.breakout_heuristics:
                         self.breakout_heuristics[key] = []
                     self.breakout_heuristics[key].append(func)
+
+        # Force load pyvrp_blackbox if not collected via variations
+        try:
+            pyvrp_func = load_function("src/problems/cvrp/heuristics/evolved_heuristics.part3/pyvrp_blackbox.py", problem=self.problem)
+            self.breakout_heuristics["pyvrp_blackbox"] = pyvrp_func
+        except Exception as e:
+            self.logger(f"Could not load pyvrp_blackbox: {e}")
+
+        # Force load direct_replace_solution to eliminate direct ReplaceSolutionOperator usage
+        try:
+            direct_replace_func = load_function("src/problems/cvrp/heuristics/evolved_heuristics.part3/direct_replace_solution.py", problem=self.problem)
+            self.breakout_heuristics["direct_replace_solution"] = direct_replace_func
+        except Exception as e:
+            self.logger(f"Could not load direct_replace_solution: {e}")
         
     def _get_pool_path(self, pool_id, pool_type):
         """Returns the directory path for a specific Epoch Pool."""
@@ -681,8 +667,14 @@ class HGSIslandHyperHeuristic:
                 
                 backup_wrapper = env.export_solution_wrapper()
                 
-                op = ReplaceSolutionOperator(routes=[list(r) for r in target_elite['routes']])
-                env.run_operator(op)
+                target_routes = [list(r) for r in target_elite['routes']]
+                direct_h = self.breakout_heuristics.get("direct_replace_solution")
+                if direct_h:
+                    env.run_heuristic(direct_h, parameters={"target_routes": target_routes})
+                else:
+                    self.logger("Error: direct_replace_solution missing, rollback.")
+                    env.import_solution_wrapper(backup_wrapper)
+                    return
                 
                 # Apply small perturbation (5-10% ruin) so VND can find new improving moves
                 ratio = random.uniform(0.03, 0.06) if current_is_near_bk else random.uniform(0.05, 0.10)
@@ -720,12 +712,11 @@ class HGSIslandHyperHeuristic:
                     top_candidates = candidates[:min(3, len(candidates))]
                     chosen_dist, target_elite_dict = random.choice(top_candidates)
                 
-                # Construct Solution object for target
-                target_sol = Solution(
-                    routes=target_elite_dict['routes'],
-                    depot=env.problem_state.get('depot', 0),
-                    total_cost=target_elite_dict['value']
-                )
+                # Pass target routes cleanly without direct Solution class dependencies
+                class TargetSolutionStub:
+                    def __init__(self, routes):
+                        self.routes = routes
+                target_sol = TargetSolutionStub(target_elite_dict['routes'])
                 
                 # Select operators
                 crossover_h = random.choice(self.breakout_heuristics["crossover"]) if "crossover" in self.breakout_heuristics else None
@@ -915,9 +906,14 @@ class HGSIslandHyperHeuristic:
                        force_constructive = True
                   else:
                        # 2. Re-import selected Elite into Environment
-                       op = ReplaceSolutionOperator(routes=[list(r) for r in target_elite['routes']])
-                       env.run_operator(op)
-                       self.logger(f"Restarted from Distant Elite (Val: {target_elite['value']}, Dist: {target_dist})")
+                       target_routes = [list(r) for r in target_elite['routes']]
+                       direct_h = self.breakout_heuristics.get("direct_replace_solution")
+                       if direct_h:
+                           env.run_heuristic(direct_h, parameters={"target_routes": target_routes})
+                           self.logger(f"Restarted from Distant Elite (Val: {target_elite['value']}, Dist: {target_dist})")
+                       else:
+                           self.logger(f"Error: direct_replace_solution missing. Forcing constructive.")
+                           force_constructive = True
              else:
                   force_constructive = True
                   
@@ -1504,8 +1500,12 @@ class HGSIslandHyperHeuristic:
 
                 for entry in rebuild_seed_entries[:self.REBUILD_SEED_COUNT]:
                     try:
-                        env.run_operator(ReplaceSolutionOperator(routes=[list(route) for route in entry['routes']]))
-                        self._add_to_local_pool(env, entry['value'])
+                        direct_h = self.breakout_heuristics.get("direct_replace_solution")
+                        if direct_h:
+                            env.run_heuristic(direct_h, parameters={"target_routes": [list(route) for route in entry['routes']]})
+                            self._add_to_local_pool(env, entry['value'])
+                        else:
+                            self.logger("Error: direct_replace_solution missing during rebuild.")
                     except Exception:
                         continue
 
