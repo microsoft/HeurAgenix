@@ -5,7 +5,7 @@ import glob
 import pickle
 import hashlib
 from src.problems.cvrp.env import Env
-from src.problems.cvrp.components import Solution, ReplaceSolutionOperator
+
 from src.util.util import load_function
 
 class HGSIslandHyperHeuristic:
@@ -20,7 +20,30 @@ class HGSIslandHyperHeuristic:
         self.worker_id = str(worker_id)
         self.shared_pool_dir = shared_pool_dir
         self.max_restarts = max_restarts
+        # Hybrid mode: use a short PyVRP run as a seed, then continue with our framework.
+        # 屏蔽pyVRP相关参数
+        self.enable_pyvrp_seed = False
+        self.pyvrp_seed_runtime = 0
+        self.pyvrp_seed_attempts = 0
+        self.pyvrp_reseed_runtime = 0
+        self.pyvrp_reseed_runtime_max = 0
+        self.pyvrp_reseed_attempts = 0
+        self.pyvrp_reseed_cooldown_steps = 0
+        self.last_pyvrp_reseed_step = -10**9
+        # Optional partial use: only for near-BK micro polish, not full initialization.
+        self.enable_micro_pyvrp_polish = bool(kwargs.get("enable_micro_pyvrp_polish", True))
+        self.micro_pyvrp_runtime = int(kwargs.get("micro_pyvrp_runtime", 120))
+        self.micro_pyvrp_attempts = int(kwargs.get("micro_pyvrp_attempts", 4))
+        self.micro_pyvrp_max_calls = int(kwargs.get("micro_pyvrp_max_calls", 24))
+        self.micro_pyvrp_calls = 0
         self.restart_count = 0
+        
+        # [NEW] Mixed Initialization Strategy: Some workers use pure construction, some use PyVRP
+        # This proves our HGS framework has independent merit beyond PyVRP dependency.
+        self.enable_construction_baseline = kwargs.get("enable_construction_baseline", True)
+        self.construction_init_ratio = float(kwargs.get("construction_init_ratio", 0.3))  # 30% use pure construction
+        # Decide for this worker on init (once per worker instance)
+        self.use_construction_init = (random.random() < self.construction_init_ratio)
         
         # Heuristics lists
         self.constructive_heuristics = []
@@ -34,6 +57,12 @@ class HGSIslandHyperHeuristic:
         
         # State tracking
         self.elite_pool = []
+        # PyVRP-style dual sub-populations: keep both feasible and infeasible
+        # candidates so crossover can exploit boundary solutions.
+        self.feasible_subpop = []
+        self.infeasible_subpop = []
+        self.FEASIBLE_SUBPOP_MAX = 36
+        self.INFEASIBLE_SUBPOP_MAX = 24
         self.stagnation_level = 0
         self.consecutive_massive_ruins = 0
         
@@ -70,6 +99,58 @@ class HGSIslandHyperHeuristic:
                 # TODO: Check for existing epoch pools and sync state
             except OSError:
                 pass 
+
+    def _try_pyvrp_warm_start(self, env: Env, runtime: int | None = None, seed: int | None = None, attempts: int = 1) -> bool:
+        # 已屏蔽pyVRP，直接返回False
+        return False
+
+    def _try_micro_pyvrp_polish(self, env: Env, current_best: float | None = None) -> bool:
+        """Use a tiny PyVRP call as a late-stage polisher near BK (limited times)."""
+        if not self.enable_micro_pyvrp_polish:
+            return False
+        if self.micro_pyvrp_calls >= self.micro_pyvrp_max_calls:
+            return False
+        pyvrp_heuristic = self.breakout_heuristics.get("pyvrp_blackbox")
+        if pyvrp_heuristic is None:
+            return False
+        if not self._is_feasible(env):
+            return False
+
+        if current_best is None:
+            current_best = self._get_pure_distance_cost(env)
+
+        backup_wrapper = env.export_solution_wrapper()
+        try:
+            env.run_heuristic(
+                pyvrp_heuristic,
+                parameters={
+                    "data_path": getattr(env, "data_path", ""),
+                    "runtime": max(1, self.micro_pyvrp_runtime),
+                    "attempts": max(1, self.micro_pyvrp_attempts),
+                    "seed": None,
+                    "worker_id": self.worker_id,
+                }
+            )
+            if not env.is_complete_solution or not env.validation_solution() or (not self._is_feasible(env)):
+                env.import_solution_wrapper(backup_wrapper)
+                return False
+
+            new_cost = self._get_pure_distance_cost(env)
+            if new_cost < current_best - 1e-3:
+                self.micro_pyvrp_calls += 1
+                self.last_pyvrp_reseed_step = self.current_run_steps
+                self.logger(
+                    f"[MicroPyVRP] accepted polish: {current_best:.0f} -> {new_cost:.0f} "
+                    f"(runtime={self.micro_pyvrp_runtime}s, calls={self.micro_pyvrp_calls}/{self.micro_pyvrp_max_calls})"
+                )
+                return True
+
+            env.import_solution_wrapper(backup_wrapper)
+            return False
+        except Exception as e:
+            env.import_solution_wrapper(backup_wrapper)
+            self.logger(f"[MicroPyVRP] polish failed: {e}")
+            return False
 
     # =====================================================================
     # 1. Heuristics Classification
@@ -113,6 +194,7 @@ class HGSIslandHyperHeuristic:
         }
 
         # 1. Classify standard pool
+        from src.util.util import load_function
         for h_name in self.heuristic_pool_names:
             base_name = os.path.basename(h_name).replace(".py", "")
             func = load_function(h_name, problem=self.problem)
@@ -132,6 +214,21 @@ class HGSIslandHyperHeuristic:
                     if key not in self.breakout_heuristics:
                         self.breakout_heuristics[key] = []
                     self.breakout_heuristics[key].append(func)
+
+        # Optional: only load pyvrp_blackbox for near-BK micro polish.
+        if self.enable_micro_pyvrp_polish:
+            try:
+                pyvrp_func = load_function("src/problems/cvrp/heuristics/evolved_heuristics.part3/pyvrp_blackbox.py", problem=self.problem)
+                self.breakout_heuristics["pyvrp_blackbox"] = pyvrp_func
+            except Exception as e:
+                self.logger(f"Could not load pyvrp_blackbox: {e}")
+
+        # Force load direct_replace_solution to eliminate direct ReplaceSolutionOperator usage
+        try:
+            direct_replace_func = load_function("src/problems/cvrp/heuristics/evolved_heuristics.part3/direct_replace_solution.py", problem=self.problem)
+            self.breakout_heuristics["direct_replace_solution"] = direct_replace_func
+        except Exception as e:
+            self.logger(f"Could not load direct_replace_solution: {e}")
         
     def _get_pool_path(self, pool_id, pool_type):
         """Returns the directory path for a specific Epoch Pool."""
@@ -156,8 +253,9 @@ class HGSIslandHyperHeuristic:
         start_time = time.time()
         
         current_cost = self._get_pure_distance_cost(env) if self._is_feasible(env) else env.key_value
-        is_near_bk = self._is_feasible(env) and hasattr(env, "best_known") and env.best_known is not None and current_cost <= env.best_known + 60.0
-        
+        _pool_best_vnd = min((s["value"] for s in self.elite_pool), default=float('inf')) if self.elite_pool else float('inf')
+        is_near_bk = self._is_feasible(env) and current_cost <= _pool_best_vnd + 150.0
+
         heuristics_queue = list(self.fast_improvement_heuristics)
         if is_near_bk:
             heuristics_queue.extend(self.heavy_improvement_heuristics)
@@ -207,13 +305,15 @@ class HGSIslandHyperHeuristic:
         node_num = env.instance_data.get("node_num", 80)
         base_budget = max(6, int(node_num * 0.06))
 
-        if not best_is_feasible or getattr(env, "best_known", None) is None:
+        if not best_is_feasible:
             return base_budget
-
-        gap_to_bk = max(0.0, current_best - env.best_known)
-        if gap_to_bk <= 220.0:
+        pool_best_rb = min((s["value"] for s in self.elite_pool), default=float('inf')) if self.elite_pool else float('inf')
+        if pool_best_rb == float('inf'):
+            return base_budget
+        gap_to_pool = max(0.0, current_best - pool_best_rb)
+        if gap_to_pool <= 30.0:
             return max(base_budget, 14)
-        if gap_to_bk <= 450.0:
+        if gap_to_pool <= 100.0:
             return max(base_budget, 10)
         return base_budget
         
@@ -285,13 +385,75 @@ class HGSIslandHyperHeuristic:
         return total
 
     def _is_feasible(self, env: Env) -> bool:
-        """Check if current solution respects all capacity constraints."""
+        """Strict feasibility: complete visit + no duplicates + capacity."""
         demands = env.instance_data['demands']
         capacity = env.instance_data['capacity']
-        return all(
-            sum(demands[n] for n in route) <= capacity
-            for route in env.current_solution.routes
-        )
+        depot = env.instance_data.get('depot', 0)
+        node_num = env.instance_data.get('node_num', 0)
+
+        seen = set()
+        for route in env.current_solution.routes:
+            route_load = 0.0
+            for n in route:
+                if n == depot:
+                    continue
+                if n <= 0 or n >= node_num:
+                    return False
+                if n in seen:
+                    return False
+                seen.add(n)
+                route_load += demands[n]
+            if route_load > capacity + 1e-6:
+                return False
+
+        expected = node_num - 1
+        return len(seen) == expected
+
+    def _record_dual_population(self, env: Env):
+        """Record current solution into feasible/infeasible sub-populations."""
+        if not hasattr(env, 'current_solution') or env.current_solution is None:
+            return
+
+        entry = {
+            'routes': [list(r) for r in env.current_solution.routes],
+            'fingerprint': self._get_cvrp_fingerprint(env),
+            'timestamp': time.time(),
+        }
+
+        if self._is_feasible(env):
+            entry['value'] = self._get_pure_distance_cost(env)
+            pool = self.feasible_subpop
+            max_size = self.FEASIBLE_SUBPOP_MAX
+        else:
+            entry['value'] = env.key_value
+            pool = self.infeasible_subpop
+            max_size = self.INFEASIBLE_SUBPOP_MAX
+
+        for item in pool:
+            if abs(item['value'] - entry['value']) < 1e-6 and self._get_cvrp_distance(item['fingerprint'], entry['fingerprint']) < 5:
+                return
+
+        pool.append(entry)
+        pool.sort(key=lambda x: x['value'])
+        if len(pool) > max_size:
+            del pool[max_size:]
+
+    def _pick_crossover_target(self):
+        """PyVRP-inspired parent choice using dual population."""
+        # Prefer feasible parents, but keep a chance to pull an infeasible one
+        # to inject boundary structure (quality-diversity tradeoff).
+        if self.feasible_subpop and (not self.infeasible_subpop or random.random() < 0.78):
+            top = self.feasible_subpop[:min(10, len(self.feasible_subpop))]
+            return random.choice(top)
+
+        if self.infeasible_subpop:
+            top = self.infeasible_subpop[:min(6, len(self.infeasible_subpop))]
+            return random.choice(top)
+
+        if self.elite_pool:
+            return random.choice(self.elite_pool[:min(8, len(self.elite_pool))])
+
+        return None
 
     def _is_better_solution(self, env: Env, best_is_feasible: bool, best_value: float) -> tuple[bool, bool, float, float | None]:
         """
@@ -418,11 +580,11 @@ class HGSIslandHyperHeuristic:
         except Exception as e:
             pass
 
-    def _apply_breakout(self, env: Env, strategy: str):
+    def _apply_breakout(self, env: Env, strategy: str, current_best: float | None = None):
         # [DYNAMIC PENALTY LADDER START] Controlled, short-lived penalty drop.
         if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
             base_pf = float(getattr(env, "penalty_factor", 200.0))
-            temp_pf = max(80.0, base_pf * 0.45)
+            temp_pf = max(1.0, base_pf * 0.45)  # Floor lowered to match min_penalty
             env.problem_state["temporary_penalty_factor"] = temp_pf
             env.problem_state["temporary_penalty_steps"] = 8
             env.problem_state["capacity_penalty_factor"] = temp_pf
@@ -476,11 +638,14 @@ class HGSIslandHyperHeuristic:
                 
         elif strategy == "elite_route_injection":
             # [L2 - Elite Route Injection / Crossover]
-            if len(self.elite_pool) < 2:
+            crossover_parent = self._pick_crossover_target()
+            if len(self.elite_pool) < 2 and crossover_parent is None:
                 self.logger("Elite pool too small for Crossover. Falling back to L1 targeted_ruin.")
                 return self._apply_breakout(env, "targeted_ruin")
             
-            current_is_near_bk = self._is_feasible(env) and self._get_pure_distance_cost(env) <= env.best_known + 120.0
+            _cur_cost_inj = self._get_pure_distance_cost(env) if self._is_feasible(env) else float('inf')
+            _pool_best_inj = min((s["value"] for s in self.elite_pool), default=float('inf')) if self.elite_pool else float('inf')
+            current_is_near_bk = self._is_feasible(env) and _cur_cost_inj <= _pool_best_inj + 80.0
 
             # Strategy mix: 50% crossover, 50% direct elite import + perturbation
             use_direct_import = (random.random() < (0.8 if current_is_near_bk else 0.5))
@@ -495,9 +660,14 @@ class HGSIslandHyperHeuristic:
                 if dist >= 3:  # Lower threshold to accept more candidates
                     candidates.append((dist, elite))
             
-            if not candidates:
+            if not candidates and crossover_parent is None:
                 self.logger("Active Relinking: All elites too similar. Falling back to L1.")
                 return self._apply_breakout(env, "targeted_ruin")
+
+            # Guard: direct-import needs at least one candidate; otherwise
+            # fallback to crossover branch to avoid empty-choice crashes.
+            if use_direct_import and not candidates:
+                use_direct_import = False
             
             if use_direct_import:
                 # === DIRECT ELITE IMPORT === 
@@ -508,8 +678,14 @@ class HGSIslandHyperHeuristic:
                 
                 backup_wrapper = env.export_solution_wrapper()
                 
-                op = ReplaceSolutionOperator(routes=[list(r) for r in target_elite['routes']])
-                env.run_operator(op)
+                target_routes = [list(r) for r in target_elite['routes']]
+                direct_h = self.breakout_heuristics.get("direct_replace_solution")
+                if direct_h:
+                    env.run_heuristic(direct_h, parameters={"target_routes": target_routes})
+                else:
+                    self.logger("Error: direct_replace_solution missing, rollback.")
+                    env.import_solution_wrapper(backup_wrapper)
+                    return
                 
                 # Apply small perturbation (5-10% ruin) so VND can find new improving moves
                 ratio = random.uniform(0.03, 0.06) if current_is_near_bk else random.uniform(0.05, 0.10)
@@ -540,16 +716,18 @@ class HGSIslandHyperHeuristic:
                         return
             else:
                 # === CROSSOVER INJECTION (original L2) ===
-                candidates.sort(key=lambda x: x[0], reverse=True)
-                top_candidates = candidates[:min(3, len(candidates))]
-                chosen_dist, target_elite_dict = random.choice(top_candidates)
+                if crossover_parent is not None:
+                    target_elite_dict = crossover_parent
+                else:
+                    candidates.sort(key=lambda x: x[0], reverse=True)
+                    top_candidates = candidates[:min(3, len(candidates))]
+                    chosen_dist, target_elite_dict = random.choice(top_candidates)
                 
-                # Construct Solution object for target
-                target_sol = Solution(
-                    routes=target_elite_dict['routes'],
-                    depot=env.problem_state.get('depot', 0),
-                    total_cost=target_elite_dict['value']
-                )
+                # Pass target routes cleanly without direct Solution class dependencies
+                class TargetSolutionStub:
+                    def __init__(self, routes):
+                        self.routes = routes
+                target_sol = TargetSolutionStub(target_elite_dict['routes'])
                 
                 # Select operators
                 crossover_h = random.choice(self.breakout_heuristics["crossover"]) if "crossover" in self.breakout_heuristics else None
@@ -633,6 +811,49 @@ class HGSIslandHyperHeuristic:
                 self.logger("Macro ruin produced invalid structure. Rolling back.")
                 env.import_solution_wrapper(backup_wrapper)
                 return
+
+        elif strategy == "bk_plateau_shake":
+            # PyVRP-inspired plateau escape:
+            # apply a stronger controlled ruin on a high-quality incumbent,
+            # then recreate and immediately educate.
+            ratio = random.uniform(0.16, 0.28)
+            ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
+            recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
+            if not ruin_h or not recreate_h:
+                self.logger("Warning: Missing operators for bk_plateau_shake. Falling back to targeted_ruin.")
+                return self._apply_breakout(env, "targeted_ruin")
+
+            backup_wrapper = env.export_solution_wrapper()
+            try:
+                env.run_heuristic(ruin_h, parameters={"removal_fraction": ratio})
+            except Exception:
+                env.import_solution_wrapper(backup_wrapper)
+                return
+
+            c_steps = 0
+            while not env.is_complete_solution and c_steps < 120:
+                try:
+                    op = env.run_heuristic(recreate_h)
+                    if not op or isinstance(op, str):
+                        break
+                except Exception:
+                    break
+                c_steps += 1
+
+            if not env.is_complete_solution or not env.validation_solution():
+                env.import_solution_wrapper(backup_wrapper)
+                return
+
+            # Immediate education to exploit the new basin.
+            self._run_improvement_phase(env, time_limit=8.0)
+
+        elif strategy == "pyvrp_reseed":
+            # Partial usage only: near-BK tiny polish; fallback to internal shake.
+            polished = self._try_micro_pyvrp_polish(env, current_best=current_best)
+            if polished:
+                self._run_improvement_phase(env, time_limit=6.0)
+                return
+            return self._apply_breakout(env, "bk_plateau_shake")
                 
         elif strategy == "soft_restart":
              self.logger("... Soft Restart Triggered ... Abandoning current solution.")
@@ -660,9 +881,14 @@ class HGSIslandHyperHeuristic:
                        force_constructive = True
                   else:
                        # 2. Re-import selected Elite into Environment
-                       op = ReplaceSolutionOperator(routes=[list(r) for r in target_elite['routes']])
-                       env.run_operator(op)
-                       self.logger(f"Restarted from Distant Elite (Val: {target_elite['value']}, Dist: {target_dist})")
+                       target_routes = [list(r) for r in target_elite['routes']]
+                       direct_h = self.breakout_heuristics.get("direct_replace_solution")
+                       if direct_h:
+                           env.run_heuristic(direct_h, parameters={"target_routes": target_routes})
+                           self.logger(f"Restarted from Distant Elite (Val: {target_elite['value']}, Dist: {target_dist})")
+                       else:
+                           self.logger(f"Error: direct_replace_solution missing. Forcing constructive.")
+                           force_constructive = True
              else:
                   force_constructive = True
                   
@@ -757,9 +983,9 @@ class HGSIslandHyperHeuristic:
         
         Reference: Vidal et al. (2012) "A hybrid genetic search for the CVRP"
         """
-        target_feasible_ratio = 0.25  # HGS default: aim for ~25% feasible
+        target_feasible_ratio = 0.5   # HGS default: aim for ~50% feasible (Vidal 2012)
         adapt_factor = 1.2  # Moderate adjustment (HGS uses 1.2)
-        min_penalty = 120.0  # Keep enough pressure in tight X-series instances
+        min_penalty = 5.0   # Floor: prevents route-merging while allowing moderate infeasibility
         max_penalty = 5000.0
         
         # Check current solution feasibility
@@ -838,62 +1064,72 @@ class HGSIslandHyperHeuristic:
         """
         self.logger("Restarting with Constructive Heuristic...")
         
-        # Fallback loop until solution is COMPLETE and VALID
-        max_retries = 10
-        for retry in range(max_retries):
-            # --- Phase A: Cold Start (Initialization) ---
-            env.clear_solution()
-            
-            construction_steps = 0
-            prev_unvisited = 1000
-            stagnation_counter = 0
-
-            # Pick ONE random constructive heuristic to build the entire solution in this attempt (prevents chaotic mixed routes)
-            if not self.constructive_heuristics:
-                self.logger("Critical Failure: No constructive heuristics found.")
-                return False
-            current_h = random.choice(self.constructive_heuristics)
-
-            # CVRP construct loop until solution is complete (all nodes visited and legally routed)
-            while not env.is_complete_solution and construction_steps < 1000:
-                unvisited_count = len(env.problem_state.get("unvisited_nodes", []))
-                
-                # Check if we are stuck in a bin-packing local optimum
-                if unvisited_count == prev_unvisited:
-                    stagnation_counter += 1
-                else:
-                    stagnation_counter = 0
-                prev_unvisited = unvisited_count
-
-                # If stuck for 5 steps, inject a Ruin operator to make space!
-                if stagnation_counter >= 5 and "mass_ruin" in self.breakout_heuristics:
-                    ruin_candidates = self.breakout_heuristics["mass_ruin"]
-                    if not isinstance(ruin_candidates, list):
-                         ruin_candidates = [ruin_candidates]
-                    h_ruin = random.choice(ruin_candidates)
-                    try:
-                        env.run_heuristic(h_ruin)
-                    except Exception:
-                        pass
-                    stagnation_counter = 0 # reset after applying ruin
-                else:
-                    # Keep using the same constructive heuristic for the whole phase
-                    try:
-                        env.run_heuristic(current_h)
-                    except Exception as e:
-                        pass
-
-                construction_steps += 1
-            
-            if env.is_complete_solution:
-                self.logger(f"Construction completed. Value: {env.key_value}")
-                break
-            else:
-                self.logger(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+        # [MIXED INIT STRATEGY] Decide whether to use PyVRP or pure construction for this epoch
+        # 只允许pure construction初始化
+        use_pyvrp_this_epoch = False
+        seeded = False
+        self.logger(f"[INIT] Worker {self.worker_id} uses PURE CONSTRUCTION (no PyVRP)")
         
-        if not env.is_complete_solution:
-            self.logger("Critical Failure: Unable to construct valid solution after retries.")
-            return False
+        if not seeded:
+            # Fallback loop until solution is COMPLETE and VALID
+            max_retries = 10
+            for retry in range(max_retries):
+                # --- Phase A: Cold Start (Initialization) ---
+                env.clear_solution()
+
+                construction_steps = 0
+                prev_unvisited = 1000
+                stagnation_counter = 0
+
+                # Pick ONE random constructive heuristic to build the entire solution in this attempt (prevents chaotic mixed routes)
+                if not self.constructive_heuristics:
+                    self.logger("Critical Failure: No constructive heuristics found.")
+                    return False
+                current_h = random.choice(self.constructive_heuristics)
+
+                # CVRP construct loop until solution is complete (all nodes visited and legally routed)
+                while not env.is_complete_solution and construction_steps < 1000:
+                    unvisited_count = len(env.problem_state.get("unvisited_nodes", []))
+
+                    # Check if we are stuck in a bin-packing local optimum
+                    if unvisited_count == prev_unvisited:
+                        stagnation_counter += 1
+                    else:
+                        stagnation_counter = 0
+                    prev_unvisited = unvisited_count
+
+                    # If stuck for 5 steps, inject a Ruin operator to make space!
+                    if stagnation_counter >= 5 and "mass_ruin" in self.breakout_heuristics:
+                        ruin_candidates = self.breakout_heuristics["mass_ruin"]
+                        if not isinstance(ruin_candidates, list):
+                             ruin_candidates = [ruin_candidates]
+                        h_ruin = random.choice(ruin_candidates)
+                        try:
+                            env.run_heuristic(h_ruin)
+                        except Exception:
+                            pass
+                        stagnation_counter = 0 # reset after applying ruin
+                    else:
+                        # Keep using the same constructive heuristic for the whole phase
+                        try:
+                            env.run_heuristic(current_h)
+                        except Exception:
+                            pass
+
+                    construction_steps += 1
+
+                if env.is_complete_solution:
+                    self.logger(f"Construction completed. Value: {env.key_value}")
+                    break
+                else:
+                    self.logger(f"Construction failed or incomplete (Value: {env.key_value}). Retrying ({retry+1}/{max_retries})...")
+
+            if not env.is_complete_solution:
+                self.logger("Critical Failure: Unable to construct valid solution after retries.")
+                return False
+        else:
+            # Small education pass right after PyVRP seeding.
+            self._run_improvement_phase(env, time_limit=8.0)
 
         best_is_feasible = self._is_feasible(env)
         current_best = self._get_pure_distance_cost(env) if best_is_feasible else env.key_value
@@ -915,6 +1151,9 @@ class HGSIslandHyperHeuristic:
                 env.import_solution_wrapper(best_wrapper)
                 current_best = env.key_value
                 env.import_solution_wrapper(curr_sol_wrapper)
+
+            # Maintain dual population continuously (PyVRP-style).
+            self._record_dual_population(env)
             
             # --- Phase B: Repair / Improve ---
             improved = self._run_improvement_phase(env)
@@ -952,6 +1191,8 @@ class HGSIslandHyperHeuristic:
                 else:
                     self.stagnation_level = 0
                     self.phase_retries = 0
+
+                # Polish is triggered only via stagnation ladder (L4), not here.
                 
                 # Log state (aligned format)
                 feas_tag = "" if is_sol_feas else " [INFEASIBLE]"
@@ -1033,13 +1274,43 @@ class HGSIslandHyperHeuristic:
                      if current_best <= global_best_val + 1e-3:
                          is_attacking_global_best = True
 
-                close_to_known_best = best_is_feasible and current_best <= env.best_known + 220.0
+                close_to_pool_best = best_is_feasible and current_best <= global_best_val + 140.0
 
-                if close_to_known_best and len(self.elite_pool) >= 2:
+                if close_to_pool_best and len(self.elite_pool) >= 2:
                     if self.stagnation_level < 2:
                         self.stagnation_level = 2
                         self.phase_retries = 1
-                    strategy = "elite_route_injection"
+
+                    # Use stagnation_level to track sub-level, so phase_retries reset doesn't cycle back.
+                    if self.stagnation_level == 2 and self.phase_retries <= max_retries_per_phase:
+                        strategy = "elite_route_injection"
+                    elif self.stagnation_level == 2 and self.phase_retries > max_retries_per_phase:
+                        strategy = "bk_plateau_shake"
+                        self.stagnation_level = 3
+                        self.phase_retries = 1
+                        self.logger(
+                            f"Escalating to bk_plateau_shake near pool best (best={current_best:.0f}, pool={global_best_val:.0f})"
+                        )
+                    elif self.stagnation_level == 3 and self.phase_retries <= max_retries_per_phase:
+                        strategy = "bk_plateau_shake"
+                    elif self.stagnation_level == 3 and self.phase_retries > max_retries_per_phase:
+                        strategy = "pyvrp_reseed"
+                        self.stagnation_level = 4
+                        self.phase_retries = 1
+                        self.logger(
+                            f"Escalating to pyvrp_reseed near pool best (best={current_best:.0f}, pool={global_best_val:.0f})"
+                        )
+                    elif self.stagnation_level == 4 and self.phase_retries <= max_retries_per_phase:
+                        strategy = "pyvrp_reseed"
+                    elif self.stagnation_level == 4 and self.phase_retries > max_retries_per_phase:
+                        self.stagnation_level = 5
+                        self.phase_retries = 1
+                        self.logger(
+                            f"Escalating to global_rebuild near pool best (best={current_best:.0f}, pool={global_best_val:.0f})"
+                        )
+                        strategy = "pyvrp_reseed"  # overridden by stagnation_level>=5 block below
+                    else:
+                        strategy = "pyvrp_reseed"
                 elif self.stagnation_level == 0:
                     self.stagnation_level = 1
                     self.phase_retries = 1
@@ -1058,18 +1329,18 @@ class HGSIslandHyperHeuristic:
                     # Upgrade to L3
                     self.stagnation_level = 3
                     self.phase_retries = 1
-                    strategy = "soft_restart" if close_to_known_best else "macro_route_ruin"
+                    strategy = "soft_restart" if close_to_pool_best else "macro_route_ruin"
                     self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L2 retries)")
                 elif self.stagnation_level == 3 and self.phase_retries <= max_retries_per_phase:
-                    strategy = "soft_restart" if close_to_known_best else "macro_route_ruin"
+                    strategy = "soft_restart" if close_to_pool_best else "macro_route_ruin"
                 elif self.stagnation_level == 3 and self.phase_retries > max_retries_per_phase:
-                    # Upgrade to L4
+                    # Upgrade to L4: micro polish (falls back to bk_plateau_shake when budget exhausted)
                     self.stagnation_level = 4
                     self.phase_retries = 1
-                    strategy = "soft_restart"
-                    self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L3 retries)")
+                    strategy = "pyvrp_reseed"
+                    self.logger(f"Escalating Stagnation Level to {self.stagnation_level} (Exhausted L3 retries, trying micro polish)")
                 elif self.stagnation_level == 4 and self.phase_retries <= max_retries_per_phase:
-                    strategy = "soft_restart"
+                    strategy = "pyvrp_reseed"
                 else:
                     self.stagnation_level += 1
                     self.phase_retries = 1
@@ -1078,15 +1349,7 @@ class HGSIslandHyperHeuristic:
                     
                 # Evaluate Hard Restarts explicitly
                 if self.stagnation_level >= 5:
-                    if close_to_known_best:
-                        self.logger(
-                            f"Step:{self.current_run_steps} L5 suppressed near BK "
-                            f"(Best={current_best:.0f}, BK={env.best_known:.0f}). Holding trajectory."
-                        )
-                        strategy = "elite_route_injection" if len(self.elite_pool) >= 2 else "soft_restart"
-                        self.stagnation_level = 2 if strategy == "elite_route_injection" else 4
-                        self.phase_retries = 1
-                    elif is_attacking_global_best:
+                    if is_attacking_global_best or close_to_pool_best:
                         self.logger(f"Step:{self.current_run_steps} Exhausted L4 ({max_retries_per_phase} retries). Triggering L5 (Global Rebuild).")
                         
                         # 1. Intent check and preemptive creation (Concurrency Control)
@@ -1125,7 +1388,7 @@ class HGSIslandHyperHeuristic:
                 self.logger(f"Step:{self.current_run_steps} Stagnation L{self.stagnation_level} (Try {self.phase_retries}/{max_retries_per_phase}). Qual={env.key_value:.0f} Act={strategy}")
                 
                 # Apply Breakout (Ruin & Recreate) before going back to Improve phase
-                self._apply_breakout(env, strategy)
+                self._apply_breakout(env, strategy, current_best=current_best)
                 
                 # If L4 triggers, worker abandons trajectory. We MUST reset current_best to track the new trajectory.
                 if strategy == "soft_restart":
@@ -1191,8 +1454,12 @@ class HGSIslandHyperHeuristic:
 
                 for entry in rebuild_seed_entries[:self.REBUILD_SEED_COUNT]:
                     try:
-                        env.run_operator(ReplaceSolutionOperator(routes=[list(route) for route in entry['routes']]))
-                        self._add_to_local_pool(env, entry['value'])
+                        direct_h = self.breakout_heuristics.get("direct_replace_solution")
+                        if direct_h:
+                            env.run_heuristic(direct_h, parameters={"target_routes": [list(route) for route in entry['routes']]})
+                            self._add_to_local_pool(env, entry['value'])
+                        else:
+                            self.logger("Error: direct_replace_solution missing during rebuild.")
                     except Exception:
                         continue
 
