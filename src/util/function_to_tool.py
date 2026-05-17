@@ -17,9 +17,9 @@ BASIC_TYPE_MAP = {
 
 def parse_docstring(doc: Optional[str]) -> Tuple[str, Dict[str, Dict[str, Any]]]:
     """
-    解析你的固定风格 docstring:
-    - 返回 (description, params_info)
-    - description: Args: 之前的文本（去除缩进）
+    Parse the project-specific docstring format:
+    - Returns (description, params_info)
+    - description: text before the "Args:" section (dedented)
     - params_info: { param_name: {"type": "int"/"list[int]"..., "description": "..."} }
     """
     if not doc:

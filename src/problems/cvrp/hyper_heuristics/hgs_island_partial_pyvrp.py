@@ -21,7 +21,7 @@ class HGSIslandHyperHeuristic:
         self.shared_pool_dir = shared_pool_dir
         self.max_restarts = max_restarts
         # Hybrid mode: use a short PyVRP run as a seed, then continue with our framework.
-        # 屏蔽pyVRP相关参数
+        # Disable all PyVRP-related parameters.
         self.enable_pyvrp_seed = False
         self.pyvrp_seed_runtime = 0
         self.pyvrp_seed_attempts = 0
@@ -101,7 +101,7 @@ class HGSIslandHyperHeuristic:
                 pass 
 
     def _try_pyvrp_warm_start(self, env: Env, runtime: int | None = None, seed: int | None = None, attempts: int = 1) -> bool:
-        # 已屏蔽pyVRP，直接返回False
+        # PyVRP warm start is disabled in partial mode; always return False.
         return False
 
     def _try_micro_pyvrp_polish(self, env: Env, current_best: float | None = None) -> bool:
@@ -1065,7 +1065,7 @@ class HGSIslandHyperHeuristic:
         self.logger("Restarting with Constructive Heuristic...")
         
         # [MIXED INIT STRATEGY] Decide whether to use PyVRP or pure construction for this epoch
-        # 只允许pure construction初始化
+        # Only allow pure-construction initialization.
         use_pyvrp_this_epoch = False
         seeded = False
         self.logger(f"[INIT] Worker {self.worker_id} uses PURE CONSTRUCTION (no PyVRP)")
