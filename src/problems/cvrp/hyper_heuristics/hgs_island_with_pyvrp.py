@@ -22,19 +22,20 @@ class HGSIslandHyperHeuristic:
         self.max_restarts = max_restarts
         # Hybrid mode: use a short PyVRP run as a seed, then continue with our framework.
         self.enable_pyvrp_seed = kwargs.get("enable_pyvrp_seed", True)
-        self.pyvrp_seed_runtime = int(kwargs.get("pyvrp_seed_runtime", 20))
-        self.pyvrp_seed_attempts = int(kwargs.get("pyvrp_seed_attempts", 3))
-        self.pyvrp_reseed_runtime = int(kwargs.get("pyvrp_reseed_runtime", 14))
-        self.pyvrp_reseed_runtime_max = int(kwargs.get("pyvrp_reseed_runtime_max", 60))
-        self.pyvrp_reseed_attempts = int(kwargs.get("pyvrp_reseed_attempts", 4))
-        self.pyvrp_reseed_cooldown_steps = int(kwargs.get("pyvrp_reseed_cooldown_steps", 22))
+        # Extreme settings for tight capacity instances
+        self.pyvrp_seed_runtime = int(kwargs.get("pyvrp_seed_runtime", 150))
+        self.pyvrp_seed_attempts = int(kwargs.get("pyvrp_seed_attempts", 6))
+        self.pyvrp_reseed_runtime = int(kwargs.get("pyvrp_reseed_runtime", 120))
+        self.pyvrp_reseed_runtime_max = int(kwargs.get("pyvrp_reseed_runtime_max", 300))
+        self.pyvrp_reseed_attempts = int(kwargs.get("pyvrp_reseed_attempts", 8))
+        self.pyvrp_reseed_cooldown_steps = int(kwargs.get("pyvrp_reseed_cooldown_steps", 6))
         self.last_pyvrp_reseed_step = -10**9
         self.restart_count = 0
         
         # [NEW] Mixed Initialization Strategy: Some workers use pure construction, some use PyVRP
         # This proves our HGS framework has independent merit beyond PyVRP dependency.
-        self.enable_construction_baseline = kwargs.get("enable_construction_baseline", True)
-        self.construction_init_ratio = float(kwargs.get("construction_init_ratio", 0.3))  # 30% use pure construction
+        self.enable_construction_baseline = kwargs.get("enable_construction_baseline", False)
+        self.construction_init_ratio = float(kwargs.get("construction_init_ratio", 0.0))  # all workers favor PyVRP seed
         # Decide for this worker on init (once per worker instance)
         self.use_construction_init = (random.random() < self.construction_init_ratio)
         
@@ -183,7 +184,7 @@ class HGSIslandHyperHeuristic:
         }
         
         breakout_map = {
-            "mass_ruin": ["advanced_sisr_ruin", "sisr_ruin", "sisr_ruin_4a5b", "radial_ruin_3c4d", "random_ruin_1a2b"],
+            "mass_ruin": ["sector_angle_ruin", "route_cluster_ruin", "guided_capacity_ruin", "advanced_sisr_ruin", "sisr_ruin", "sisr_ruin_4a5b", "radial_ruin_3c4d", "random_ruin_1a2b"],
             "recreate": ["regret_insertion_2f3a", "min_cost_insertion_048f", "min_cost_insertion_3b2b"],
             "crossover": ["route_based_crossover_9f8a", "hgs_giant_tour_crossover"]
         }
@@ -296,16 +297,18 @@ class HGSIslandHyperHeuristic:
         Give high-quality trajectories more chances to intensify before macro restarts.
         """
         node_num = env.instance_data.get("node_num", 80)
-        base_budget = max(6, int(node_num * 0.06))
+        base_budget = max(4, int(node_num * 0.03))
 
         if not best_is_feasible or getattr(env, "best_known", None) is None:
             return base_budget
 
         gap_to_bk = max(0.0, current_best - env.best_known)
+        if gap_to_bk <= 3000.0:
+            return min(base_budget, 8)
         if gap_to_bk <= 220.0:
-            return max(base_budget, 14)
+            return min(base_budget, 6)
         if gap_to_bk <= 450.0:
-            return max(base_budget, 10)
+            return min(base_budget, 7)
         return base_budget
         
 
@@ -575,12 +578,8 @@ class HGSIslandHyperHeuristic:
         # [DYNAMIC PENALTY LADDER START] Controlled, short-lived penalty drop.
         if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
             base_pf = float(getattr(env, "penalty_factor", 200.0))
-            temp_pf = max(80.0, base_pf * 0.45)
-            env.problem_state["temporary_penalty_factor"] = temp_pf
-            env.problem_state["temporary_penalty_steps"] = 8
-            env.problem_state["capacity_penalty_factor"] = temp_pf
-            env.penalty_factor = temp_pf
-            self._penalty_ladder_active = True
+            # [Penalty Drop Removed]
+            pass
 
         if strategy == "targeted_ruin":
             # [L1 - Targeted Small Ruin & Recreate]
@@ -678,7 +677,14 @@ class HGSIslandHyperHeuristic:
                 
                 # Apply small perturbation (5-10% ruin) so VND can find new improving moves
                 ratio = random.uniform(0.03, 0.06) if current_is_near_bk else random.uniform(0.05, 0.10)
-                ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
+                if current_is_near_bk:
+                    preferred_ruins = []
+                    for h_name in ("sector_angle_ruin", "route_cluster_ruin", "guided_capacity_ruin"):
+                        if h_name in self.breakout_heuristics:
+                            preferred_ruins.append(self.breakout_heuristics[h_name])
+                    ruin_h = random.choice(preferred_ruins) if preferred_ruins else (random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None)
+                else:
+                    ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
                 recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
                 
                 if ruin_h and recreate_h:
@@ -806,7 +812,11 @@ class HGSIslandHyperHeuristic:
             # apply a stronger controlled ruin on a high-quality incumbent,
             # then recreate and immediately educate.
             ratio = random.uniform(0.16, 0.28)
-            ruin_h = random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None
+            preferred_ruins = []
+            for h_name in ("sector_angle_ruin", "route_cluster_ruin", "guided_capacity_ruin"):
+                if h_name in self.breakout_heuristics:
+                    preferred_ruins.append(self.breakout_heuristics[h_name])
+            ruin_h = random.choice(preferred_ruins) if preferred_ruins else (random.choice(self.breakout_heuristics["mass_ruin"]) if "mass_ruin" in self.breakout_heuristics else None)
             recreate_h = random.choice(self.breakout_heuristics["recreate"]) if "recreate" in self.breakout_heuristics else None
             if not ruin_h or not recreate_h:
                 self.logger("Warning: Missing operators for bk_plateau_shake. Falling back to targeted_ruin.")
@@ -852,19 +862,23 @@ class HGSIslandHyperHeuristic:
             gap_to_bk = max(0.0, current_best - env.best_known) if self._is_feasible(env) else 9999.0
             adaptive_runtime = self.pyvrp_reseed_runtime
             adaptive_attempts = self.pyvrp_reseed_attempts
+            # Aggressive gap-aware reseed policy:
+            # keep reseeds heavy enough to escape deep plateaus, not just near-BK polishing.
             if gap_to_bk <= 20.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 90))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
-            elif gap_to_bk <= 30.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 50))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 180))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 4)
             elif gap_to_bk <= 45.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 40))
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 140))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
+            elif gap_to_bk <= 120.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 120))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
+            elif gap_to_bk <= 600.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 110))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 1)
-            if gap_to_bk <= 35.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 35))
-            elif gap_to_bk <= 70.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 25))
+            elif gap_to_bk <= 2600.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 120))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
 
             ok = self._try_pyvrp_warm_start(
                 env,
@@ -1010,8 +1024,14 @@ class HGSIslandHyperHeuristic:
         """
         target_feasible_ratio = 0.25  # HGS default: aim for ~25% feasible
         adapt_factor = 1.2  # Moderate adjustment (HGS uses 1.2)
-        min_penalty = 120.0  # Keep enough pressure in tight X-series instances
-        max_penalty = 5000.0
+                # Adaptive minimum penalty based on average distance in graph
+        if not hasattr(self, "_adaptive_min_penalty"):
+            dist_matrix = env.instance_data["distance_matrix"]
+            avg_dist = float(dist_matrix.mean())
+            self._adaptive_min_penalty = max(120.0, avg_dist * 0.5) 
+            self.logger(f"Set adaptive min_penalty to {self._adaptive_min_penalty:.2f} (Avg Dist: {avg_dist:.2f})")
+        min_penalty = self._adaptive_min_penalty
+        max_penalty = min_penalty * 40.0 # scale max penalty accordingly
         
         # Check current solution feasibility
         is_feasible = all(
@@ -1309,7 +1329,7 @@ class HGSIslandHyperHeuristic:
                      if current_best <= global_best_val + 1e-3:
                          is_attacking_global_best = True
 
-                close_to_known_best = best_is_feasible and current_best <= env.best_known + 220.0
+                close_to_known_best = best_is_feasible and current_best <= env.best_known + 3000.0
                 gap_to_bk = max(0.0, current_best - env.best_known) if best_is_feasible else 9999.0
 
                 if close_to_known_best and len(self.elite_pool) >= 2:
@@ -1317,9 +1337,20 @@ class HGSIslandHyperHeuristic:
                         self.stagnation_level = 2
                         self.phase_retries = 1
 
-                    # Near-BK sprint: when gap is tiny, trigger stronger reseed earlier
-                    # instead of spending too many retries in L2/L3 oscillation.
-                    if gap_to_bk <= 40.0:
+                    # Sprint mode: when feasible and reasonably close, trigger reseed
+                    # early to avoid spending too long in L1/L2 oscillation.
+                    if gap_to_bk <= 3000.0:
+                        sprint_retries = max(1, int(max_retries_per_phase * 0.25))
+                        if self.phase_retries <= sprint_retries:
+                            strategy = "elite_route_injection"
+                        else:
+                            strategy = "pyvrp_reseed"
+                            self.stagnation_level = 4
+                            self.phase_retries = 1
+                            self.logger(
+                                f"Sprint to pyvrp_reseed (best={current_best:.0f}, BK={env.best_known:.0f}, gap={gap_to_bk:.0f})"
+                            )
+                    elif gap_to_bk <= 40.0:
                         sprint_retries = max(2, int(max_retries_per_phase * 0.45))
                         if self.phase_retries <= sprint_retries:
                             strategy = "elite_route_injection"

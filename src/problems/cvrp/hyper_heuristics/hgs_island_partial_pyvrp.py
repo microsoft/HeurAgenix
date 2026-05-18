@@ -583,13 +583,8 @@ class HGSIslandHyperHeuristic:
     def _apply_breakout(self, env: Env, strategy: str, current_best: float | None = None):
         # [DYNAMIC PENALTY LADDER START] Controlled, short-lived penalty drop.
         if strategy in ["elite_route_injection", "macro_route_ruin", "targeted_ruin"]:
-            base_pf = float(getattr(env, "penalty_factor", 200.0))
-            temp_pf = max(1.0, base_pf * 0.45)  # Floor lowered to match min_penalty
-            env.problem_state["temporary_penalty_factor"] = temp_pf
-            env.problem_state["temporary_penalty_steps"] = 8
-            env.problem_state["capacity_penalty_factor"] = temp_pf
-            env.penalty_factor = temp_pf
-            self._penalty_ladder_active = True
+            # [Penalty Drop Removed]
+            pass
 
         if strategy == "targeted_ruin":
             # [L1 - Targeted Small Ruin & Recreate]
@@ -985,8 +980,15 @@ class HGSIslandHyperHeuristic:
         """
         target_feasible_ratio = 0.5   # HGS default: aim for ~50% feasible (Vidal 2012)
         adapt_factor = 1.2  # Moderate adjustment (HGS uses 1.2)
-        min_penalty = 5.0   # Floor: prevents route-merging while allowing moderate infeasibility
-        max_penalty = 5000.0
+        
+        # Adaptive minimum penalty based on average distance in graph
+        if not hasattr(self, "_adaptive_min_penalty"):
+            dist_matrix = env.instance_data["distance_matrix"]
+            avg_dist = float(dist_matrix.mean())
+            self._adaptive_min_penalty = max(120.0, avg_dist * 0.5) 
+            self.logger(f"Set adaptive min_penalty to {self._adaptive_min_penalty:.2f} (Avg Dist: {avg_dist:.2f})")
+        min_penalty = self._adaptive_min_penalty
+        max_penalty = min_penalty * 40.0 # scale max penalty accordingly
         
         # Check current solution feasibility
         is_feasible = all(
