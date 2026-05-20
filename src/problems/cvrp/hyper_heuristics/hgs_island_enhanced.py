@@ -31,6 +31,10 @@ class HGSIslandHyperHeuristic:
         self.pyvrp_reseed_cooldown_steps = int(kwargs.get("pyvrp_reseed_cooldown_steps", 6))
         self.last_pyvrp_reseed_step = -10**9
         self.restart_count = 0
+
+        # Adaptive warm-start: avoid spending the whole budget in seed stage on
+        # medium/large instances; keep heavy reseed for deep stagnation only.
+        self.adaptive_seed_budget = bool(kwargs.get("adaptive_seed_budget", True))
         
         # [NEW] Mixed Initialization Strategy: Some workers use pure construction, some use PyVRP
         # This proves our HGS framework has independent merit beyond PyVRP dependency.
@@ -147,6 +151,27 @@ class HGSIslandHyperHeuristic:
         except Exception as e:
             self.logger(f"[Hybrid Seed W{self.worker_id}] PyVRP warm start failed: {e}")
             return False
+
+    def _get_adaptive_seed_budget(self, env: Env) -> tuple[int, int]:
+        """
+        Returns (runtime, attempts) for the initial warm-start.
+        Keep a short startup budget so epochs can enter the main search loop,
+        then rely on heavier pyvrp_reseed for late-stage escapes.
+        """
+        runtime = max(1, int(self.pyvrp_seed_runtime))
+        attempts = max(1, int(self.pyvrp_seed_attempts))
+
+        if not self.adaptive_seed_budget:
+            return runtime, attempts
+
+        node_num = int(env.instance_data.get("node_num", 0) or 0)
+        if node_num <= 400:
+            return min(runtime, 25), min(attempts, 2)
+        if node_num <= 800:
+            return min(runtime, 45), min(attempts, 3)
+        if node_num <= 1400:
+            return min(runtime, 70), min(attempts, 3)
+        return min(runtime, 90), min(attempts, 4)
 
     # =====================================================================
     # 1. Heuristics Classification
@@ -865,19 +890,22 @@ class HGSIslandHyperHeuristic:
             # Aggressive gap-aware reseed policy:
             # keep reseeds heavy enough to escape deep plateaus, not just near-BK polishing.
             if gap_to_bk <= 20.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 220))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 5)
+            elif gap_to_bk <= 45.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 200))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 4)
+            elif gap_to_bk <= 120.0:
                 adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 180))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 4)
-            elif gap_to_bk <= 45.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 140))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
-            elif gap_to_bk <= 120.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 120))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
             elif gap_to_bk <= 600.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 110))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 1)
-            elif gap_to_bk <= 2600.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 120))
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 170))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
+            elif gap_to_bk <= 1200.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 160))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
+            elif gap_to_bk <= 3000.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 140))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
 
             ok = self._try_pyvrp_warm_start(
@@ -1115,13 +1143,17 @@ class HGSIslandHyperHeuristic:
         seeded = False
         if use_pyvrp_this_epoch:
             # Standard path: try PyVRP warm-start
+            seed_runtime, seed_attempts = self._get_adaptive_seed_budget(env)
             seeded = self._try_pyvrp_warm_start(
                 env,
-                runtime=self.pyvrp_seed_runtime,
-                attempts=self.pyvrp_seed_attempts,
+                runtime=seed_runtime,
+                attempts=seed_attempts,
             )
             if seeded:
-                self.logger(f"[INIT] Worker {self.worker_id} uses PyVRP warm-start")
+                self.logger(
+                    f"[INIT] Worker {self.worker_id} uses PyVRP warm-start "
+                    f"(runtime={seed_runtime}s, attempts={seed_attempts})"
+                )
         else:
             # Baseline path: pure construction (prove HGS independence)
             self.logger(f"[INIT] Worker {self.worker_id} uses PURE CONSTRUCTION (no PyVRP)")
@@ -1339,8 +1371,19 @@ class HGSIslandHyperHeuristic:
 
                     # Sprint mode: when feasible and reasonably close, trigger reseed
                     # early to avoid spending too long in L1/L2 oscillation.
-                    if gap_to_bk <= 3000.0:
-                        sprint_retries = max(1, int(max_retries_per_phase * 0.25))
+                    if gap_to_bk <= 200.0:
+                        sprint_retries = 1
+                        if self.phase_retries <= sprint_retries:
+                            strategy = "elite_route_injection"
+                        else:
+                            strategy = "pyvrp_reseed"
+                            self.stagnation_level = 4
+                            self.phase_retries = 1
+                            self.logger(
+                                f"Sprint to pyvrp_reseed very near BK (best={current_best:.0f}, BK={env.best_known:.0f}, gap={gap_to_bk:.0f})"
+                            )
+                    elif gap_to_bk <= 1200.0:
+                        sprint_retries = 1
                         if self.phase_retries <= sprint_retries:
                             strategy = "elite_route_injection"
                         else:
@@ -1350,8 +1393,8 @@ class HGSIslandHyperHeuristic:
                             self.logger(
                                 f"Sprint to pyvrp_reseed (best={current_best:.0f}, BK={env.best_known:.0f}, gap={gap_to_bk:.0f})"
                             )
-                    elif gap_to_bk <= 40.0:
-                        sprint_retries = max(2, int(max_retries_per_phase * 0.45))
+                    elif gap_to_bk <= 3000.0:
+                        sprint_retries = max(1, int(max_retries_per_phase * 0.2))
                         if self.phase_retries <= sprint_retries:
                             strategy = "elite_route_injection"
                         else:
