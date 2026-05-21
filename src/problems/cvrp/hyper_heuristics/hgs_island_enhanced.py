@@ -28,7 +28,7 @@ class HGSIslandHyperHeuristic:
         self.pyvrp_reseed_runtime = int(kwargs.get("pyvrp_reseed_runtime", 120))
         self.pyvrp_reseed_runtime_max = int(kwargs.get("pyvrp_reseed_runtime_max", 300))
         self.pyvrp_reseed_attempts = int(kwargs.get("pyvrp_reseed_attempts", 8))
-        self.pyvrp_reseed_cooldown_steps = int(kwargs.get("pyvrp_reseed_cooldown_steps", 6))
+        self.pyvrp_reseed_cooldown_steps = int(kwargs.get("pyvrp_reseed_cooldown_steps", 4))
         self.last_pyvrp_reseed_step = -10**9
         self.restart_count = 0
 
@@ -166,12 +166,12 @@ class HGSIslandHyperHeuristic:
 
         node_num = int(env.instance_data.get("node_num", 0) or 0)
         if node_num <= 400:
-            return min(runtime, 25), min(attempts, 2)
+            return min(runtime, 80), min(attempts, 3)
         if node_num <= 800:
-            return min(runtime, 45), min(attempts, 3)
+            return min(runtime, 90), min(attempts, 3)
         if node_num <= 1400:
-            return min(runtime, 70), min(attempts, 3)
-        return min(runtime, 90), min(attempts, 4)
+            return min(runtime, 100), min(attempts, 4)
+        return min(runtime, 110), min(attempts, 4)
 
     # =====================================================================
     # 1. Heuristics Classification
@@ -887,25 +887,25 @@ class HGSIslandHyperHeuristic:
             gap_to_bk = max(0.0, current_best - env.best_known) if self._is_feasible(env) else 9999.0
             adaptive_runtime = self.pyvrp_reseed_runtime
             adaptive_attempts = self.pyvrp_reseed_attempts
-            # Aggressive gap-aware reseed policy:
-            # keep reseeds heavy enough to escape deep plateaus, not just near-BK polishing.
+            
+            # [PyVRP 优先模式] 终极冲刺：无论何时只要接近 BK 就用最大 reseed
             if gap_to_bk <= 20.0:
+                adaptive_runtime = self.pyvrp_reseed_runtime_max
+                adaptive_attempts = self.pyvrp_reseed_attempts + 6
+            elif gap_to_bk <= 50.0:
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 250))
+                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 5)
+            elif gap_to_bk <= 120.0:
                 adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 220))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 5)
-            elif gap_to_bk <= 45.0:
+            elif gap_to_bk <= 600.0:
                 adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 200))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 4)
-            elif gap_to_bk <= 120.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 180))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 4)
-            elif gap_to_bk <= 600.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 170))
-                adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
             elif gap_to_bk <= 1200.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 160))
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 180))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 3)
             elif gap_to_bk <= 3000.0:
-                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 140))
+                adaptive_runtime = min(self.pyvrp_reseed_runtime_max, max(adaptive_runtime, 160))
                 adaptive_attempts = max(adaptive_attempts, self.pyvrp_reseed_attempts + 2)
 
             ok = self._try_pyvrp_warm_start(

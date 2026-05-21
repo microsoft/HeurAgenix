@@ -164,6 +164,9 @@ def main(
 
     if num_runs is None:
         num_runs = workers
+    else:
+        # Respect user-specified run count as a hard cap on concurrent workers.
+        workers = max(1, min(workers, int(num_runs)))
 
     remaining = list(range(num_runs))
     finished_ids = []
