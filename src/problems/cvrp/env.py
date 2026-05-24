@@ -8,6 +8,19 @@ from src.problems.base.components import BaseOperator
 from src.problems.cvrp.components import Solution, AppendOperator, InsertOperator, SwapOperator, ReverseSegmentOperator, RelocateOperator, BatchRemoveOperator, BatchInsertOperator, MergeRoutesOperator, ReplaceSolutionOperator, RemoveNodesOperator, SwapStarOperator, BlockRelocateOperator
 from src.problems.cvrp.best_known import best_known
 
+AGS_VEHICLE_NUM = {
+    "Antwerp1": 343,
+    "Antwerp2": 120,
+    "Brussels1": 512,
+    "Brussels2": 182,
+    "Flanders1": 684,
+    "Flanders2": 256,
+    "Ghent1": 485,
+    "Ghent2": 110,
+    "Leuven1": 203,
+    "Leuven2": 46,
+}
+
 
 class Env(BaseEnv):
     """CVRP env that stores the instance data, current solution, and problem state to support algorithm."""
@@ -50,6 +63,8 @@ class Env(BaseEnv):
             vehicle_num = int(os.path.basename(data_path).split(".")[0].split("-")[-1][1:])
         elif open(data_path).readlines()[-1].strip().split(" : ")[0] == "VEHICLE":
             vehicle_num = int(open(data_path).readlines()[-1].strip().split(" : ")[-1])
+        elif data_name in AGS_VEHICLE_NUM:
+            vehicle_num = AGS_VEHICLE_NUM[data_name]
         else:
             raise NotImplementedError("Vehicle number error")
         

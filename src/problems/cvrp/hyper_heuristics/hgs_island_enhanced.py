@@ -165,13 +165,39 @@ class HGSIslandHyperHeuristic:
             return runtime, attempts
 
         node_num = int(env.instance_data.get("node_num", 0) or 0)
+        if node_num <= 350:
+            return min(runtime, 25), 1
+        if node_num <= 500:
+            return min(runtime, 35), 1
         if node_num <= 400:
             return min(runtime, 80), min(attempts, 3)
         if node_num <= 800:
-            return min(runtime, 90), min(attempts, 3)
+            return min(runtime, 60), min(attempts, 2)
         if node_num <= 1400:
-            return min(runtime, 100), min(attempts, 4)
-        return min(runtime, 110), min(attempts, 4)
+            return min(runtime, 85), min(attempts, 3)
+        return min(runtime, 100), min(attempts, 4)
+
+    def _should_use_pyvrp_startup(self, env: Env) -> bool:
+        """
+        Use a heterogeneous startup on medium/large instances so not every
+        worker burns the whole early budget inside the same heavy warm-start.
+        """
+        if self.use_construction_init:
+            return False
+
+        node_num = int(env.instance_data.get("node_num", 0) or 0)
+        try:
+            worker_num = int(self.worker_id)
+        except Exception:
+            worker_num = 0
+
+        if node_num <= 350:
+            return (worker_num % 3) != 0
+        if node_num <= 800:
+            return (worker_num % 4) != 0
+        if node_num <= 1600:
+            return (worker_num % 5) != 0
+        return True
 
     # =====================================================================
     # 1. Heuristics Classification
@@ -328,12 +354,12 @@ class HGSIslandHyperHeuristic:
             return base_budget
 
         gap_to_bk = max(0.0, current_best - env.best_known)
-        if gap_to_bk <= 3000.0:
-            return min(base_budget, 8)
         if gap_to_bk <= 220.0:
             return min(base_budget, 6)
         if gap_to_bk <= 450.0:
             return min(base_budget, 7)
+        if gap_to_bk <= 3000.0:
+            return min(base_budget, 8)
         return base_budget
         
 
@@ -1138,7 +1164,7 @@ class HGSIslandHyperHeuristic:
         self.logger("Restarting with Constructive Heuristic...")
         
         # [MIXED INIT STRATEGY] Decide whether to use PyVRP or pure construction for this epoch
-        use_pyvrp_this_epoch = not self.use_construction_init
+        use_pyvrp_this_epoch = self._should_use_pyvrp_startup(env)
         
         seeded = False
         if use_pyvrp_this_epoch:
