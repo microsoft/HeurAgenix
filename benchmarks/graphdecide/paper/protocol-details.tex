@@ -1,0 +1,391 @@
+\section{Task and interaction contracts}
+\label{app:task-details}
+Unless stated otherwise, $G=(V,E)$ is simple, undirected and unweighted, with
+integer vertices $V=\{0,\ldots,n-1\}$, including isolates. Public data contain
+the graph and the query; action identifiers are strings. Generation families,
+reference answers, optimum values, and paired-label annotations are not model
+inputs.
+
+\subsection{Six exact decisions}
+\begin{description}
+ \item[Adjacency.] Decide whether $\{u,v\}\in E$ for distinct supplied vertices.
+ \item[Degree.] Return $d(v)$ from the full choice set $\{0,\ldots,n-1\}$.
+ The growing output cardinality is an explicit size confound.
+ \item[Cycle.] Decide whether any component contains an undirected simple
+ cycle of length at least three.
+ \item[Connectivity.] Decide whether a path connects the supplied vertices.
+ \item[Distance.] Decide whether the shortest-path distance is at most a
+ supplied threshold $h$. Matched challenge pairs have finite distances
+ exactly $h$ and $h+1$, rather than disconnected negative examples.
+ \item[Articulation.] Decide whether deleting a supplied vertex increases
+ the total number of connected components, including on disconnected graphs.
+\end{description}
+
+\subsection{Four irreversible constructions}
+\paragraph{MaxCut.}
+Vertex 0 is fixed in side A. In increasing vertex order, the model assigns
+each remaining vertex to A or B, using $n-1$ decisions. The maximized objective
+is the number of edges crossing the partition. Empty sides are legal.
+
+\paragraph{Manhattan TSP.}
+Distinct integer coordinates define a complete weighted graph with
+$d_{ij}=|x_i-x_j|+|y_i-y_j|$. Starting at 0, the model selects the next unvisited
+vertex for $n-2$ decisions. The final unvisited vertex and edge returning to 0
+are then forced. This deterministic completion is part of the contract,
+not answer repair. The minimized objective is full tour length.
+
+\paragraph{Deterministic normalized linear threshold (LT).}
+On a directed graph, every incoming edge to $v$ has weight
+$1/d^-(v)$ and the threshold is $1/2$, with equality activating.
+The model selects two distinct seeds, which activate simultaneously at time
+zero. Subsequent updates are synchronous and irreversible. A zero-indegree
+nonseed never activates. The maximized objective is final active-set size.
+This fixed-threshold variant is not the random-threshold classical LT model;
+we do not import its submodularity or greedy approximation guarantee.
+
+\paragraph{At-most-two-community modularity.}
+Using the same fixed-0, $n-1$ binary assignment protocol, maximize
+\[
+ Q(c)=\frac{1}{2m}\sum_{u,v}
+ \left(A_{uv}-\frac{d_ud_v}{2m}\right)\mathbf{1}[c_u=c_v].
+\]
+All-A is a valid one-community solution with $Q=0$.
+This is a restricted bipartition task, not unrestricted community detection.
+
+\paragraph{Shared policy.}
+Every tied optimum is accepted; matching a particular reference trajectory
+is unnecessary. Models see their own previous choices, not teacher-forced
+prefixes, except in explicitly separate diagnostic controls. Invalid or
+incomplete episodes remain infeasible, with no imputed objective, retries,
+or silent substitution of an action.
+
+\section{Controlled data generation and verification}
+\label{app:data-details}
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrr}
+\toprule
+Task & Development & Challenge & Decisions per instance\\
+\midrule
+Adjacency & 32 & 80 & 1\\
+Degree & 136 & 400 & 1\\
+Cycle & 30 & 80 & 1\\
+Connectivity & 32 & 80 & 1\\
+Distance & 32 & 80 & 1\\
+Articulation & 30 & 80 & 1\\
+MaxCut & 16 & 40 & $n-1$\\
+TSP & 16 & 40 & $n-2$\\
+Deterministic LT & 16 & 40 & 2\\
+Modularity & 16 & 40 & $n-1$\\
+\midrule
+Total & 356 & 960 & 668 / 1,920 per model\\
+\bottomrule
+\end{tabular}
+\caption{Dataset counts and maximum calls. An additional forty weighted TSP
+instances support wording confirmation and bring the release to 1,356.
+They are not additional rows of the canonical comparison.}
+\label{tab:data}
+\end{table}
+
+\subsection{Size, structure and pairing}
+Development covers each integer $n=5,\ldots,12$ with two repetitions; the
+structural challenge covers $n=8,\ldots,12$ with eight repetitions.
+Each size/repetition requests $n+14$ instances and $4n+8$ maximum calls.
+Size is a consecutive descriptive axis, not a guarantee of increasing
+difficulty or a causal intervention holding every other property fixed.
+
+We use heterogeneous block, core--periphery and geometric procedures for
+query tasks; forests and degree-preserving switches for cycle twins;
+small-world and switched regular bases for cuts; clustered or perturbed-ring
+coordinates for TSP; layered directed acyclic graphs for LT; and heterogeneous
+blocks for modularity. These are finite, overlapping procedures, not uniform
+samples from all graphs or disjoint mathematical families. Degree conditioning
+can change a proposal's original family characteristics.
+
+For adjacency, connectivity and distance, positive and negative queries
+share a graph and have identical unordered endpoint-degree signatures.
+Articulation queries share a graph and equal vertex degrees. Cycle twins
+are different graphs with equal $n$, $m$ and degree multiset but opposite
+labels. All five binary tasks are balanced within the audited cells defined by
+$n$, $m$, degree multiset, query degrees and (where applicable) $h$, giving a 50\% empirical
+lookup ceiling for those cells. This does not rule out unexamined shortcuts.
+For example, component count plus $n,m$ determines undirected cycle existence.
+
+Generation allows at most 128 proposals per cell and records unsupported
+cells rather than weakening constraints. Four development instances are
+missing: one cycle pair and one articulation pair at $n=5$.
+Exhaustion of all 34 unlabeled five-vertex graphs finds one eligible
+forest/cyclic topology pair but two eligible articulation topologies; the
+latter shortfall is therefore a generator-support/budget limitation, not
+a theorem of impossibility. The original 960-instance challenge has no omissions.
+
+\subsection{Identity exclusion and evidence chronology}
+The original challenge excludes an audited pool of 1,040 exact-labeled
+deduplicated records from 121 earlier artifacts. Fingerprints select candidate
+buckets; exact VF2 comparisons determine identity. TSP uses complete weighted
+distance graphs, and LT uses directed topology. Independent checks found no
+prior overlap and no same-task duplicate across nominally independent
+clusters. The 1,040 records are not claimed to be 1,040 isomorphism classes.
+
+Crucially, the common-interface matrix in this paper reuses these already
+inspected banks. Its protocol was frozen before its own calls, but it is
+\emph{not a newly blind test}. Earlier development diagnosed wording and
+conformance issues. A subsequent prospective confirmation excludes these
+banks and retains its own results, including missing cells, rather than replacing
+them after inspecting outcomes (Section~\ref{sec:confirmation}).
+We preserve the chronological distinction
+between original strict experiments, diagnostic controls and the revised
+common-interface matrix.
+
+\paragraph{Meaning of registration and independent checking.}
+Here, ``registered'' or ``preregistered'' means a locally persisted design
+record frozen before the specified calls (and, for the confirmation, before
+generation), not a deposit in an external public preregistration registry.
+Source and artifact hashes detect changes relative to those records; they
+are not third-party timestamps or cryptographic proof of the full chronology.
+Independent verification means separate replay or mathematical computation
+within this project, not replication by an external research group.
+
+\subsection{Independent truth and artifact boundaries}
+New adjacency, distance and articulation oracles were exhaustively checked
+on all 1,024 labeled five-vertex graphs. Every released label, feasible
+reference, baseline and optimum passes independent validation; TSP uses exact
+subset dynamic programming and an independent optimum check, while the small
+partition and seed spaces permit exhaustive verification.
+
+The portable artifact separates five public fields (identifier, task, kind,
+state, query budget), private references, and analysis metadata. Its request
+builder does not read references. Offline scoring is deliberately privileged:
+giving that scorer to a model would change the benchmark. The archive was
+extracted into an isolated Python process and all 1,356 instances were
+verified without importing model clients, Torch or the Copilot SDK.
+
+\section{Evaluation design}
+\label{app:method-details}
+\subsection{Evidence sets and permissible comparisons}
+Table~\ref{tab:evidence-map} distinguishes the complete canonical comparison
+from its four-configuration diagnostic and confirmation subsets.
+Reusing graph instances allows paired comparisons
+but does not add independent test graphs. Freezing a later model's protocol
+before its calls does not make an already inspected bank a blind holdout.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}r>{\raggedright\arraybackslash}p{0.52\textwidth}}
+\toprule
+Evidence set & Cases per method & Interpretation\\
+\midrule
+Original four-configuration matrix & 1,316 & 356 development and 960
+inspected challenge cases.\\
+Prospective confirmation & 952 & Same four configurations; new seed and
+prior-topology exclusion, but unchanged generator procedures and sizes.\\
+Canonical GPT-5.4 & 960 & Reuses the inspected challenge; identical initial
+logical requests, not matched reasoning or compute.\\
+Full cross-family matrix & 960 & Twelve configurations on that same challenge,
+including canonical Astra; ten direct-decision configurations and two
+separately labeled GPT reasoning anchors.\\
+Larger/newer local extension & 960 & Qwen3.8-27B and Qwen2.5-72B-Instruct,
+included in the twelve above; not additional graphs or a scale-only ablation.\\
+Legacy Astra & 960 & Same challenge graphs, different instructions and
+option descriptions; separate protocol.\\
+Expanded local/readout panel & 64 & Reuses selected confirmation cases at
+$n=8,12$; exploratory, not a new blind replication.\\
+\bottomrule
+\end{tabular}
+\caption{Core evidence sets, not a sum of independent graphs. Later
+presentation, probability and deadline controls reuse their explicitly
+named banks. Cases are scheduled episodes, not necessarily completed ones.}
+\label{tab:evidence-map}
+\end{table}
+
+\subsection{Completed common-interface configurations}
+Every method receives the same initial logical request, including explicit
+action descriptions. Questions specify mathematics rather than requiring a
+wire encoding that could conflict with a letter-based readout. TSP explicitly
+names the current endpoint and actual visited prefix.
+
+\begin{description}
+ \item[Jev action.] Native supplied choices under an explicitly registered
+ action-eligibility policy. Expected model, response shape, legal choice,
+ probability keys and finite ranges, confidence and usage must still validate.
+ Probability normalization and choice/argmax disagreement are separately
+ recorded observations, not reasons to replace the supplied action.
+ \item[4B and 9B grammar.] Qwen3.5-4B and Qwen3.5-9B, greedy no-thinking
+ generation, 64-token ceiling and legal-choice grammar, with the existing
+ output parser. Thinking-enabled extensions are reported separately.
+ \item[4B scores.] The existing 4B checkpoint with pinned SemIf-style
+ rendering and exact requested candidate-token log probabilities from vLLM.
+ The chosen action is the conditional argmax over \emph{all} candidates, not
+ a natural top-$K$ approximation. One API-generated token is unused for
+ selection and is counted in resource accounting.
+ \item[27B grammar.] Qwen3.5-27B with the same no-thinking, 64-token,
+ legal-choice grammar policy and a 180-second request deadline.
+ \item[Larger/newer local grammar.] Qwen3.8-27B and Qwen2.5-72B-Instruct
+ use full BF16 weights, greedy legal-choice grammar, a 64-token ceiling
+ and a 180-second deadline. Thinking is explicitly disabled for Qwen3.8;
+ Qwen2.5 uses its standard instruct template without added reasoning.
+ They use two and four RTX A6000 GPUs, respectively. The 72B checkpoint
+ is an older-generation dense model, not a scale-only variant of Qwen3.5/3.8.
+ \item[Trained Jev-like readouts.] Decider-2B v11 and Kev-4B use their
+ pinned upstream native inference paths; Laya uses its encoder and trained
+ choice head in CPU FP32. Lossless context checks remain binding.
+ These are compatible-runtime evaluations, not certifications of identical
+ upstream environments.
+ \item[Reasoning anchors.] GPT-5.4 and Astra use tool-free, default-reasoning
+ clients with 4,096 output tokens and a 180-second deadline. They are
+ separated from the ten direct-decision configurations throughout.
+\end{description}
+No Jev outputs are used to train or distill a replacement model.
+The original four-configuration matrix retained the existing RTX A6000
+services. Later GPU extensions used recorded resource leases and restored
+the original services. The earlier extensions protected 4B/9B;
+the final BF16 extension temporarily leased all four GPUs with authorization
+and restored all original endpoints after completion.
+The 4B generation/scoring methods share a physical-resource lock.
+The checkpoint, renderer, environment and per-call settings are recorded.
+This controls some factors, but the 4B readout comparison also changes rendering
+and cannot identify a pure causal effect of the scoring rule.
+
+\paragraph{A failed reproduction check is retained.}
+On twelve matched CPU SemIf probes, both GPU scoring routes matched every
+chosen action. However, maximum probability errors were 0.0166305 for requested
+token scores and 0.0379656 for teacher forcing, both exceeding the pre-frozen
+0.01 threshold; the routes differed by 0.0213351. Independent token indexing
+and high-precision softmax recomputation found no parser mismatch. The
+numerical cause remains unresolved. Thus ``4B scores'' is an independent
+reference using SemIf rendering, not certified numerical reproduction of
+CPU SemIf, and the failed gate is not relaxed.
+
+\subsection{Metrics and statistical units}
+For an exact task, the primary accuracy is the mean of the size-specific
+accuracies, with invalid/unattempted scheduled cases retained in denominators.
+For degree, macro-size and pooled accuracy differ because there are $n$
+classes per size. The primary construction-quality metric is mean additive
+objective gap over feasible completed episodes, accompanied by feasible
+coverage over all scheduled episodes. Optimum-hit counts are supplementary
+diagnostics, not the primary comparison or a substitute for graded quality.
+For maximization $\gap=f^\star-f$, and for minimization $\gap=f-f^\star$.
+The mean averages per-episode gaps, not graph sizes or success indicators.
+Lower is better, and zero means optimal on the evaluated feasible cases.
+The headline tables use absolute gaps: edges for MaxCut, distance units for
+TSP, activated vertices for LT, and modularity units for community partitioning.
+The separately recorded TSP relative gap divides each episode's gap by its
+positive optimum; an average relative gap must not be inferred by dividing
+aggregate means. Modularity ratios are not used. Different task units are
+never pooled into one quality score.
+
+Generation omissions and model failures have different denominators.
+An ungenerated case is a coverage shortfall, with no model prediction to
+score; confirmation accuracy is conditional on the 952 realized cases,
+not all 960 requested generation slots. Once an instance is generated and
+scheduled for a method, unsupported input, timeout, or invalid output remains
+in that method's scheduled denominator. Such failures do not receive a
+fabricated objective. Conditional gap zero means only that all completed
+solutions are optimal; it does not imply perfect scheduled performance.
+
+For the original four-configuration evidence, uncertainty is estimated by
+2,000 paired bootstrap replicates, stratified by size.
+The full twelve-configuration tables report descriptive point estimates, not
+new all-pairs significance tests.
+Resampling units are the transitive union of graph identity and paired
+construction relations: cycle twins must remain together even though they
+have different graphs. The reported intervals are exploratory pointwise
+percentile intervals conditional on these generators and samples. They are
+not family-wise significance tests; degenerate intervals do not establish
+equivalence or population certainty.
+
+\paragraph{Classical and uniform references.}
+We include greedy cut plus best-improvement vertex flips, nearest-neighbor
+TSP plus best-improvement 2-opt, deterministic-LT marginal greedy, and
+deterministic multistart single-vertex modularity search. These methods can
+revise choices and are quality anchors, not equal-budget online methods.
+For each task we additionally compute the exact expected objective under
+uniform legal sequential actions, rather than relying on one random rollout.
+An all-A, strict-positive-improvement modularity sweep is a weak reference
+that remains at zero; it is not our sole classical comparator.
+
+\section{Coverage and evidence integrity}
+\label{app:coverage-integrity}
+
+
+\paragraph{Complete accounting, including unsupported inputs.}
+Qwen3.5-27B, Qwen3.8-27B, Qwen2.5-72B, Decider and Kev each complete
+960 episodes in 1,920 calls without
+execution failures. Laya completes 951 episodes; nine initial LT inputs fail
+its lossless native context/head limits. Its ledger has 1,911 entries but
+only 1,902 model forwards: pre-inference rejections are not credited as
+inference. GPT-5.4 retains its nine construction timeouts, while canonical
+Astra completes all 960 episodes in 1,920 calls. No failed or unsupported case
+is replaced, retried, truncated, or removed from scheduled denominators
+(Table~\ref{tab:full-coverage}).
+
+\paragraph{Evidence integrity.}
+The original combined offline exporter admits only verified terminal real-model
+lanes, reconstructs 9,600 episode records, and independently checks every feasible
+construction objective. A versioned publication export adds the two completed
+BF16 lanes, whose 1,920 episodes and 320 constructions have separate runner
+verification and independent mathematical replay. The combined presentation
+contains 720 task/size/configuration cells, preserving the original 600.
+No new model calls are made during export.
+Compact tables are generated from the sealed task/size metrics and retain
+macro versus pooled exact accuracy and conditional versus scheduled outcomes.
+Recorded Python-version aggregate roundoff is handled separately from exact
+request, action, episode and count checks. An initially empty process
+metadata capture is preserved alongside a later parent observation that
+verifies the trained supervisor's command, process identity and GPU UUID;
+neither local record constitutes third-party attestation.
+The larger-local extension also checks served tokenization against pinned
+nonthinking rendering. Its earlier startup failure occurred before inference;
+that zero-call attempt is preserved as infrastructure history, not a model
+quality observation. No failed answer is rerun to improve the reported result.
+
+\section{Limitations and responsible use}
+\label{app:extended-limits}
+\paragraph{Diagnostic scale and distribution.}
+Graphs have at most twelve vertices. This enables exhaustive validation and
+continuation analysis but does not establish performance at operational
+scale. Consecutive sizes are neither a size-OOD test nor a universal difficulty
+ordering. Finite generator support, degree conditioning, and matched-pair
+selection change the evaluated distribution. Topology exclusion is relative
+to an auditable local history, not proof of absence from pretraining.
+
+\paragraph{Model and interface coverage.}
+Jev is a closed service; no architecture or training attribution can be
+independently established here. No-thinking Qwen is a bounded baseline,
+not its full reasoning capacity. The Laya, Decider and Kev extensions test
+open trained readouts, not reproductions of Jev's undisclosed architecture.
+Decider/Kev are compatible-runtime upstream-inference evaluations, not complete
+upstream-environment reproductions or broad CPU/GPU numerical-parity claims.
+Fully matched
+rendering across readouts and deployment-matched latency experiments remain
+distinct research questions. The earlier SemIf candidate-token CPU/GPU
+numerical reproduction failure is explicitly unresolved.
+
+\paragraph{Inference and statistical uncertainty.}
+The main common-interface matrix follows inspected development evidence.
+Small numbers of construction clusters, multiple task comparisons and API
+variability limit inference. Pointwise bootstrap intervals do not correct
+selection or multiplicity, and no overall ``best model'' score is defined.
+Repeated requests and option ordering receive diagnostic, not exhaustive,
+coverage. The prospective replication is complete.
+The sealed canonical strong-model anchor is reported separately with its
+own reasoning and serving conditions; it is not a matched-compute comparison.
+Only the original four configurations receive the prospective new-graph
+confirmation. GPT, the larger-local and trained-readout extensions therefore
+do not establish replicated rankings on fresh graphs. Larger graphs, unseen
+generator families, more independent seeds, and specialized graph-trained
+policies remain external-validity extensions, not completed evidence.
+The present scope is a diagnostic benchmark rather than a general solver
+leaderboard; extra inference is not needed to verify the reported small-graph
+outcomes, but would be needed to support those broader claims.
+
+\paragraph{Artifact and societal scope.}
+All model prompts in this release are synthetic graphs, not personal-network
+records. The LT task is an abstract diffusion objective; it does not validate
+manipulation of people or predict real social behavior. The release excludes
+credentials, weights, provider response bodies and hidden reasoning.
+The code and aggregate presentation are released separately from local
+experimental ledgers. A stable archival identifier, raw-evidence distribution
+permissions, author disclosures and any required license decisions must be
+finalized before public submission. We do not
+invent author affiliations, funding, publication approval or acceptance.

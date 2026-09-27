@@ -3,6 +3,23 @@ HeurAgenix is a novel framework based on LLM, designed to generate, evolve, eval
 
 ![Framework Overview](doc/framework.png)
 
+## GraphDecide benchmark
+
+This branch also includes **GraphDecide: Benchmarking Decision Models on Graphs**:
+12 configurations, six exact graph tasks and four sequential optimization tasks
+on 960 shared instances. The existing HeurAgenix framework is preserved.
+
+[Benchmark README and setup](benchmarks/graphdecide/README.md) ·
+[Paper](benchmarks/graphdecide/web/assets/graphdecide-v17.pdf) ·
+[Numeric results](benchmarks/graphdecide/docs/RESULTS.md)
+
+![GraphDecide exact-task results](benchmarks/graphdecide/docs/figures/exact-accuracy.svg)
+![GraphDecide construction gaps](benchmarks/graphdecide/docs/figures/construction-gaps.svg)
+
+GPT default-reasoning references are separate. Construction gaps use
+task-specific units, with feasible coverage retained; colors are scaled per
+column, not a cross-task ranking. See the benchmark README for limitations.
+
 # Prepare
 
 ## Set up environment
@@ -306,4 +323,3 @@ streamlit run doc/app.py
 ```
  
 This command will open a web-based interface where you can visually navigate through the project's architecture and processes. Please note that this visualization is for demonstration purposes only and does not perform any actual optimization tasks.
-

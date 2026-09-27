@@ -1,0 +1,30 @@
+# Single-task evaluation. Thresholds are difficulty levels of the same task.
+# Shared sampling settings match comprehensive.yaml; no additional perturbations.
+# Running this configuration makes live Jev calls and may incur charges.
+schema_version: 1
+
+run:
+  seed: 20260924
+  repetitions: 1
+  max_calls: 3840
+  output_dir: "../results/distance-threshold-v1"
+
+data:
+  datasets: ["facebook", "ca-grqc", "power", "human-ppi"]
+  data_dir: "../data/real"
+
+sampling:
+  method: "connected_frontier"
+  node_counts: [32, 64, 128]
+  samples_per_size: 20
+  max_attempts: 100
+
+tasks:
+  adjacency_questions: 0
+  distance_questions_per_threshold: 4
+  distance_thresholds: [2, 3, 4, 6]
+
+model:
+  provider: "typesafe"
+  model: "jev-1.13.0"
+  timeout_seconds: 30.0

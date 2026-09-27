@@ -1,0 +1,4 @@
+# Isolated inference-only overlay on /fastdata/xianya/vllm-venv (never install torch).
+# Upstream training/server dependencies are deliberately not installed.
+accelerate==1.15.0
+peft==0.21.0

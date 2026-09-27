@@ -1,0 +1,41 @@
+\subsection{Completed canonical GPT-5.4 anchor}
+This separately registered tool-free, default-reasoning GPT-5.4 run uses
+the identical canonical structural-challenge requests and own histories.
+It made 1,840 actual calls, with 9 failed attempts.
+Failures remain in scheduled denominators; no retry or repair was performed.
+\begin{table}[ht]\centering\small
+\begin{tabular}{lrrr}
+\toprule
+Exact task & GPT-5.4 (\%) & Jev (\%) & 95\% interval (pp) \\
+\midrule
+Adjacency & 100.00 & 100.00 & [0.00, 0.00] \\
+Degree & 100.00 & 61.43 & [33.75, 43.30] \\
+Cycle & 100.00 & 66.25 & [27.50, 40.00] \\
+Connectivity & 100.00 & 85.00 & [8.75, 22.50] \\
+Distance & 100.00 & 58.75 & [35.00, 46.25] \\
+Articulation & 100.00 & 65.00 & [26.25, 43.75] \\
+\bottomrule
+\end{tabular}
+
+\caption{Canonical exact macro-size accuracy. Intervals are paired,
+size-stratified pointwise GPT-minus-Jev differences, not family-wise tests.}
+\end{table}
+\begin{table}[ht]\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+Task & GPT feasible & GPT optima & Jev optima & GPT gap \\
+\midrule
+MaxCut & 36/40 & 36/40 & 0/40 & 0.000 \\
+TSP & 39/40 & 39/40 & 3/40 & 0.000 \\
+Deterministic LT & 40/40 & 40/40 & 23/40 & 0.000 \\
+Modularity & 36/40 & 36/40 & 7/40 & 0.000 \\
+\bottomrule
+\end{tabular}
+
+\caption{Canonical construction results. Gaps condition on GPT feasible
+completion and have different units across rows; they are not a pooled score.}
+\end{table}
+Observed median/p95 GPT request latency was 7220.20/96561.70 ms.
+Reasoning budget and hosting differ from the small no-thinking local baselines.
+These are inspected-bank common-protocol anchors, not the prospective new-seed
+confirmation or a matched-compute architectural comparison.

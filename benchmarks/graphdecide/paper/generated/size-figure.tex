@@ -1,0 +1,32 @@
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 2,horizontal sep=1.3cm,vertical sep=1.4cm},
+width=.46\textwidth,height=4.8cm,xlabel={Number of vertices},
+xmin=7.8,xmax=12.2,xtick={8,9,10,11,12},ymin=0,ymax=100,grid=major,
+legend style={font=\scriptsize},legend columns=2]
+\nextgroupplot[title={Degree},ylabel={Accuracy (\%)},legend to name=modellegend]
+\addplot+[blue,mark=*] coordinates {(8,70.31250000) (9,70.83333333) (10,62.50000000) (11,54.54545455) (12,48.95833333)};
+\addlegendentry{Jev action}
+\addplot+[orange,mark=square*] coordinates {(8,17.18750000) (9,22.22222222) (10,18.75000000) (11,13.63636364) (12,19.79166667)};
+\addlegendentry{4B grammar}
+\addplot+[teal,mark=triangle*] coordinates {(8,28.12500000) (9,30.55555556) (10,27.50000000) (11,22.72727273) (12,26.04166667)};
+\addlegendentry{9B grammar}
+\addplot+[violet,mark=diamond*] coordinates {(8,20.31250000) (9,31.94444444) (10,33.75000000) (11,13.63636364) (12,19.79166667)};
+\addlegendentry{4B scores}
+\nextgroupplot[title={Connectivity},ylabel={Accuracy (\%)}]
+\addplot+[blue,mark=*] coordinates {(8,75.00000000) (9,87.50000000) (10,87.50000000) (11,93.75000000) (12,81.25000000)};
+\addplot+[orange,mark=square*] coordinates {(8,50.00000000) (9,50.00000000) (10,50.00000000) (11,50.00000000) (12,50.00000000)};
+\addplot+[teal,mark=triangle*] coordinates {(8,50.00000000) (9,56.25000000) (10,50.00000000) (11,62.50000000) (12,50.00000000)};
+\addplot+[violet,mark=diamond*] coordinates {(8,50.00000000) (9,50.00000000) (10,50.00000000) (11,50.00000000) (12,56.25000000)};
+\nextgroupplot[title={TSP},ylabel={Optimum hits (\%)}]
+\addplot+[blue,mark=*] coordinates {(8,12.50000000) (9,12.50000000) (10,0.00000000) (11,0.00000000) (12,12.50000000)};
+\addplot+[orange,mark=square*] coordinates {(8,0.00000000) (9,0.00000000) (10,0.00000000) (11,0.00000000) (12,0.00000000)};
+\addplot+[teal,mark=triangle*] coordinates {(8,0.00000000) (9,0.00000000) (10,0.00000000) (11,0.00000000) (12,0.00000000)};
+\addplot+[violet,mark=diamond*] coordinates {(8,0.00000000) (9,0.00000000) (10,0.00000000) (11,0.00000000) (12,0.00000000)};
+\nextgroupplot[title={Deterministic LT},ylabel={Optimum hits (\%)}]
+\addplot+[blue,mark=*] coordinates {(8,75.00000000) (9,62.50000000) (10,37.50000000) (11,62.50000000) (12,50.00000000)};
+\addplot+[orange,mark=square*] coordinates {(8,62.50000000) (9,25.00000000) (10,37.50000000) (11,25.00000000) (12,12.50000000)};
+\addplot+[teal,mark=triangle*] coordinates {(8,25.00000000) (9,12.50000000) (10,12.50000000) (11,12.50000000) (12,0.00000000)};
+\addplot+[violet,mark=diamond*] coordinates {(8,25.00000000) (9,0.00000000) (10,0.00000000) (11,0.00000000) (12,12.50000000)};
+\end{groupplot}
+\end{tikzpicture}
+\par\ref{modellegend}

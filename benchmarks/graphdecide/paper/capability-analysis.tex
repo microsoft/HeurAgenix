@@ -1,0 +1,90 @@
+\section{Capability profile and diagnostic interpretation}
+\label{sec:capability}
+\subsection{RQ1: Discrimination is task dependent}
+The benchmark distinguishes several capabilities rather than defining one
+hardness scale. On the canonical challenge, Jev answers every adjacency
+query correctly, whereas Kev reaches 78.75\%, Decider 58.75\%, and Laya 50\%.
+Jev's degree macro accuracy is 61.43\%, versus 19.88\% for Kev, and its
+connectivity accuracy is 85\%, versus 58.75\%.
+Conversely, distance accuracy is 58.75\% for Jev and 42.5--52.5\% for the
+earlier direct configurations; the added Qwen3.8-27B and Qwen2.5-72B
+score 48.75\% and 60\%, respectively. Close scores around the balanced binary
+baseline do not support a stable fine-grained ranking.
+
+Consecutive graph sizes offer descriptive resolution, not identified
+capacity thresholds. Jev degree accuracy is 70.3\% at eight vertices and
+49.0\% at twelve; cycle accuracy is 81.25\% and 50\%, respectively, with
+nonmonotone intermediate values. Connectivity does not exhibit the same
+decline, and adjacency remains perfect throughout. The degree task also
+increases its number of classes with size. These observations cannot be
+reduced to ``Jev fails at twelve vertices.'' Each binary size cell contains
+only sixteen queries in eight pairs; each construction cell has eight
+episodes. We therefore do not assign empirically fitted reliability bands
+or claim a statistically identified breakpoint.
+
+\subsection{RQ2: Construction needs graded quality and actual histories}
+Mean objective gap is the primary construction-quality comparison.
+TSP illustrates its discrimination: Jev's gap is 45.85, versus 100.90
+for Qwen3.5-27B and 349.65 for Kev. LT supplies a complementary regime:
+Qwen3.5-27B has a smaller gap than Jev (0.425 versus 0.600), while Kev and
+Jev tie at 0.600. Community gaps favor Jev over those two configurations
+(0.1694 versus 0.2810 and 0.2502). All three complete the same forty
+episodes per task; comparisons involving incomplete configurations must
+also account for coverage. Optimum-hit counts can conceal large quality
+differences or suggest an ordering absent from mean gaps, so we retain
+them only as supplementary diagnostics.
+The added Qwen3.8-27B and Qwen2.5-72B have larger mean gaps than Jev on
+all four constructions. This supports a task-specific direct-decision
+advantage over those configurations, not equivalence to a general 72B model.
+The 72B baseline differs in generation as well as scale, and no matched
+latency or training-data control isolates the cause.
+
+Absolute usefulness requires non-neural references. In the original
+four-configuration challenge, all neural MaxCut gaps exceed the exact
+uniform-policy expected gap (Jev: 8.150, uniform: 5.325); classical cut
+search has mean gap 0.450. Nearest-neighbor plus 2-opt has mean TSP gap
+0.200 versus Jev's 45.850.
+These algorithms may revise earlier choices and are quality references,
+not equal-budget online competitors (Appendix~\ref{app:original-results}).
+
+Exact continuation analysis explains where completed trajectories become
+irreversibly suboptimal. On 640 constructions of the original four
+configurations, the sum of stepwise continuation losses equals the final
+objective gap for all 4,480 decisions. For TSP, optimality is already lost
+at the first choice in 3/40 Jev episodes, compared with 22/40 grammar-4B
+episodes. Later valid actions need not recover the lost optimum.
+This analysis uses actual model histories after inference; favorable
+oracle-prefix choices are not substituted for rollout performance
+(Appendix~\ref{sec:regret}).
+
+\subsection{RQ3: Replication and controls constrain the interpretation}
+The prospective 952-instance, topology-excluded confirmation covers the
+original four configurations, not all twelve. All four again have larger
+MaxCut gaps than the uniform legal policy; Jev
+retains perfect adjacency accuracy. Individual rankings do change, so this
+supports selected qualitative findings rather than every canonical
+point estimate (Appendix~\ref{sec:confirmation}).
+
+Controls distinguish behavioral weakness from several identifiable
+artifacts. Full native-score and action replay retains Laya's constant-yes
+outcome; its selected option-reversal pilot argues against a simple
+first-option explanation, not against every possible prompting effect.
+For the original local baselines, identical aggregate accuracy can conceal
+complete semantic-choice reversal. At a fixed token prefix, 4B score argmax
+and masked greedy generation agree on 100/100 states, preventing attribution
+of the main pipeline's gains to argmax alone. Jev's above-chance distance
+accuracy also coexists with probability losses worse than uniform on the
+common-valid probability-audit rows. These checks address distinct failure
+modes; they are not a proof of freedom from all implementation errors
+(Appendix~\ref{sec:controls}).
+
+\paragraph{What the current boundary evidence establishes.}
+The suite contains positive controls, partially successful structural
+decisions, and construction failures with measurable quality differences.
+This is enough to characterize task-dependent strengths and weaknesses
+within the tested protocols. It does not locate the onset of every failure
+or establish size generalization. Additional research should preferentially
+confirm the open readouts on fresh graphs and resolve transition regions
+with controlled structure, including simpler cases where necessary.
+Increasing graph size merely because Astra remains successful is not a
+requirement of this diagnostic objective.

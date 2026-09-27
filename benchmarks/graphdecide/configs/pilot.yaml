@@ -1,0 +1,29 @@
+# Paths are relative to this config, NOT the shell working directory.
+# Running this configuration directly evaluates Jev and may incur API charges.
+schema_version: 1
+
+run:
+  seed: 20260923
+  repetitions: 1                 # Model calls per question; not majority voting.
+  max_calls: 300                 # Hard preflight ceiling; no automatic retries.
+  output_dir: "../results/pilot"
+
+data:
+  datasets: ["facebook", "ca-grqc", "power", "human-ppi"]
+  data_dir: "../data/real"
+
+sampling:
+  method: "connected_frontier"   # Connected node selection, then ALL induced edges.
+  node_counts: [16, 32, 64]
+  samples_per_size: 5            # Per source AND per size: 4 * 3 * 5 = 60 graphs.
+  max_attempts: 100              # Only retry duplicate node sets, not difficult tasks.
+
+tasks:
+  adjacency_questions: 2        # Per graph, half yes / half no; 0 disables.
+  distance_questions_per_threshold: 2  # Per graph AND threshold, half yes/no.
+  distance_thresholds: [2]      # Positive d=k, negative d=k+1; k >= 2.
+
+model:
+  provider: "typesafe"           # Official Jev API; key from TYPESAFE_API_KEY only.
+  model: "jev-latest"            # Prefer a pinned ID when available; resolved ID logged.
+  timeout_seconds: 30.0          # Total per-call deadline, including network I/O.

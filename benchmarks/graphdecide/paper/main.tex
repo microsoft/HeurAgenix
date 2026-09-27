@@ -1,0 +1,434 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,array,booktabs,graphicx}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\newcommand{\bench}{GraphDecide}
+\newcommand{\gap}{\operatorname{gap}}
+\input{generated-expanded-pilot/numbers.tex}
+\title{\bench: Benchmarking Decision Models on Graphs}
+\author{Xianliang Yang\textsuperscript{1}\quad
+Yapu Zhang\textsuperscript{2}\quad
+Li Zhao\textsuperscript{1}\thanks{Corresponding author: \href{mailto:lizo@microsoft.com}{lizo@microsoft.com}.}\\[0.4em]
+\small\textsuperscript{1}Microsoft\quad
+\textsuperscript{2}Beijing University of Technology\\[0.3em]
+\small\href{mailto:xianya@microsoft.com}{\texttt{xianya@microsoft.com}}\quad
+\href{mailto:zhangyapu@bjut.edu.cn}{\texttt{zhangyapu@bjut.edu.cn}}\\
+\small\href{mailto:lizo@microsoft.com}{\texttt{lizo@microsoft.com}}}
+\hypersetup{
+ pdftitle={GraphDecide: Benchmarking Decision Models on Graphs},
+ pdfauthor={Xianliang Yang, Yapu Zhang, Li Zhao}
+}
+\date{September 27, 2026}
+\begin{document}
+\maketitle
+
+\input{main-text}
+\clearpage
+\bibliographystyle{plainnat}
+{\raggedright\bibliography{references,expanded-references}}
+
+\clearpage
+\appendix
+\input{protocol-details}
+\input{related_work}
+\input{capability-analysis}
+\section{Supplementary construction optimum-hit counts}
+\label{app:construction-hits}
+The primary construction comparison uses mean objective gaps and feasible
+coverage (Table~\ref{tab:full-gaps}). Counts below are retained for continuity
+with the frozen experiment outputs; they are not the primary quality metric.
+\begin{table}[ht]
+\centering\small
+\input{generated-twelve-model/optimal.tex}
+\caption{Supplementary complete canonical optimum hits over all forty
+scheduled episodes per task. All tied optima are accepted. Laya's nine LT
+input rejects and GPT-5.4's nine timeouts remain in denominators.}
+\label{tab:full-optimal}
+\end{table}
+\input{original-results}
+\input{confirmation-details}
+\input{interface-controls}
+\section{Exact contracts, invariants and budgets}
+\label{app:contracts}
+Node relabeling does not change truth, but rendering may affect model outputs.
+Cycle twins match degree sequences, not component count: $m>n-c(G)$ is an
+exact cycle test for the stated undirected contract. Distance pairs share
+their threshold and finite distances $h,h+1$. Articulation compares total
+component counts before and after deletion; isolated vertices are not
+articulation points under this definition.
+
+For LT, normalized incoming weights and a fixed one-half threshold are applied
+synchronously to the two initially chosen seeds. Seeds are not activated one
+at a time with diffusion between selections. For TSP, prefix cost, the current
+endpoint, all remaining cities, and final return to 0 enter continuation
+values. For partitions, vertex 0 fixes complement symmetry without excluding
+any attainable objective; empty sides remain legal. Modularity search is over
+at most two groups, including one group. Histories must contain legal,
+exact-string action IDs, not a repaired subset of malformed model output.
+
+Reference values are obtained by exhaustive partitions/seed pairs or exact
+TSP dynamic programming and checked independently. Uniform cut expectation is
+$m/2$; uniform TSP expectation is $2\sum_{\{u,v\}}d_{uv}/(n-1)$.
+Uniform LT averages all distinct unordered seed pairs. For uniform binary
+modularity with one fixed vertex, expected modularity is
+$-\sum_v d_v^2/(8m^2)$. These are expectations of random legal policies,
+not attainable objective guarantees for one particular rollout.
+
+\paragraph{Why the LT guarantee cannot be imported.}
+Consider vertices $a,b,d,c$ with edges $a\to c$, $b\to c$, $d\to c$.
+Each edge has weight $1/3$ and $c$ requires at least two active parents.
+Writing $\sigma(S)$ for final spread including seeds,
+$\sigma(\varnothing)=0$, $\sigma(\{a\})=\sigma(\{b\})=1$, and
+$\sigma(\{a,b\})=3$. The marginal gain of adding $b$ is 1 at the empty set
+but 2 at $\{a\}$, violating diminishing returns. This four-vertex example
+uses the benchmark's exact deterministic diffusion semantics and illustrates
+why the randomized-threshold theorem does not apply.
+
+\section{Paired uncertainty for the inspected matrix}
+\centering
+\input{generated/intervals.tex}
+\par\raggedright
+\smallskip
+Differences are Jev action minus 4B grammar in percentage points: exact
+accuracy for the first six rows and optimum-hit rate for the last four.
+Resampling uses paired identity/construction clusters within each size.
+Forty clusters means eight per size for these paired binary and optimization
+tasks. Degree has 400 clusters. The MaxCut zero-width interval reflects
+the observed all-zero optimum-hit difference, not established equivalence
+of the underlying models or equal gap quality.
+
+\section{Paired uncertainty for prospective confirmation}
+\centering
+\input{generated-confirmatory/intervals.tex}
+\par\raggedright
+\smallskip
+Conventions are the same as the preceding appendix, but these are new graphs
+under the pre-inference registration. Cycle has 36 paired clusters, with four
+at size 8 and eight at each other size. No missing pair is assigned a
+synthetic model prediction. The construction tasks retain forty clusters each.
+
+\section{Presentation-control detail}
+\begin{table}[ht]
+\centering\scriptsize
+\resizebox{\textwidth}{!}{\input{generated-robustness/arm-accuracy.tex}}
+\caption{Correct cases / scheduled cases in each arm. Counts are not
+independent across arms or paired queries. An unchanged aggregate accuracy
+does not imply unchanged semantic choices.}
+\end{table}
+\begin{table}[ht]
+\centering\scriptsize
+\input{generated-robustness/choice-flips.tex}
+\caption{Choice flips relative to the original arm / both-valid pairs.
+There are no invalid actions in this completed panel. Edge counts include the
+two retained unchanged inputs; their separate strata are in the artifact.}
+\end{table}
+
+\section{Probability-loss detail}
+\begin{table}[ht]
+\centering\small
+\input{generated-robustness/log-loss.tex}
+\caption{Logarithmic loss on the common-valid rows from
+Table~\ref{tab:brier}, in natural-log units. A positive-infinity entry means at
+least one true label received exactly zero probability, not a missing value.
+Finite-only averaging is not substituted for an infinite loss.}
+\end{table}
+The artifact includes all five reliability-bin counts and conditional
+accuracies for each task and method, along with all-scheduled action accuracy,
+own-valid and common-valid denominators. Vector eligibility is not assumed
+independent of task difficulty. The 4B vectors are conditional option-logit
+scores, not calibrated posterior probabilities by definition.
+
+\section{Completed expanded-model exploratory panel}
+\label{app:larger-local}
+The selected graphs are reused from the confirmation bank; opaque-ID selection
+within prespecified pairs/strata does not make this a new held-out evaluation.
+The 27B configurations use tensor parallelism across two RTX A6000s.
+Initial public requests are identical across compared configurations, but
+provider interfaces differ and subsequent requests follow each method's own
+history. The grammar and trained-native lanes complete all selected episodes;
+the thinking lanes have the explicit failures below. Each original historical
+lane is fully replayed before subsetting. Terminal candidate requests, actions,
+all 64 score rows and summaries are independently replayed and hash-attested.
+NetworkX/Fraction checks reproduce every feasible construction objective.
+The paper builder verifies every export seal and source hash, recomputes the
+CSV denominators and metrics, and requires identical reused reference
+trajectories across all exports. No failed episode is removed.
+
+\begin{table}[ht]
+\centering\small
+\input{generated-expanded-pilot/exact.tex}
+\caption{Exact correct/scheduled answers on the same selected panel.
+Each task has four cases at each of $n=8,12$.
+G denotes the 64-token no-thinking grammar setting; T denotes unconstrained
+thinking with an 8,192-token cap and 180-second deadline.
+Jev is a reused reference, not fresh inference. Thinking timeouts remain
+in the denominators; these are descriptive counts, not a population ranking.}
+\label{tab:expanded-exact}
+\end{table}
+\begin{table}[ht]
+\centering\small
+\input{generated-expanded-pilot/coverage.tex}
+\caption{Completion coverage, separate from correctness. ``Failed'' counts
+episodes with an execution failure, all timeouts in the two thinking lanes.
+``Exact returned'' counts feasible exact episodes, not correct answers.
+Every configuration retains all 64 scheduled episodes. All grammar/native
+lanes use 160 calls; 27B T and 9B T use 66 and 64, respectively, because
+timeouts terminate individual trajectories without retries.}
+\label{tab:expanded-coverage}
+\end{table}
+
+\begin{table}[ht]
+\centering\small
+\textbf{Feasible / scheduled}\par\medskip
+\input{generated-expanded-pilot/construction-feasible.tex}
+\par\medskip\textbf{Optimum hits / scheduled}\par\medskip
+\input{generated-expanded-pilot/construction-optima.tex}
+\caption{Four constructions per task (two at each size). Feasibility and
+all-scheduled optimum-hit rates are distinct outcomes. The thinking lanes'
+0/4 optimum counts arise from zero completed constructions, not four observed
+suboptimal solutions. Labels follow Table~\ref{tab:expanded-exact}.}
+\label{tab:expanded-construction}
+\end{table}
+\begin{table}[ht]
+\centering\small
+\input{generated-expanded-pilot/construction-gaps.tex}
+\caption{Mean absolute objective gap conditional on feasibility, lower being
+better. Each numeric cell has four feasible episodes; each dash denotes zero
+feasible episodes and an undefined mean, not zero gap.
+Units are cut edges, tour cost, active vertices and modularity respectively;
+they are never pooled. Kev improves the modularity gap over Jev despite lower
+exact-task accuracy.}
+\label{tab:expanded-gaps}
+\end{table}
+
+\paragraph{Deadline and output-budget interpretation.}
+The 8,192-token cap is not a guarantee of that much decoding before the
+180-second wall deadline. For example, 21.3 generated tokens/second permits
+only about 3,834 tokens in 180 seconds even before other overhead; this
+illustrative arithmetic is not a controlled speed comparison. A separately
+registered posthoc 9B control has now completed on all sixteen constructions;
+only the deadline changes to 600 seconds, with the 8,192-token cap unchanged
+(at most 112 calls). All sixteen first-step attempts end with
+\texttt{finish\_length}, each recording exactly 8,192 output tokens and
+approximately 239 seconds of client-observed latency, below the relaxed
+deadline. No response finishes normally, so no action advances a trajectory.
+We do not salvage a choice from truncated final content, retry, or raise the
+token cap. All sixteen constructions remain infeasible. Thus, under this
+registered contract, relaxing the wall deadline exposes a token-limit
+failure rather than a feasible solution-quality estimate.
+This is not evidence that the model cannot construct solutions under another
+prompt, budget or reasoning configuration. Original failures remain unchanged.
+
+\begin{table}[ht]
+\centering\small
+\input{generated-deadline-control/deadline.tex}
+\caption{Completed timeout-only Qwen9 control on the same sixteen constructions.
+All four cases per task remain in denominators. The 180-second arm has
+wall-timeout failures; the 600-second arm has token-limit failures.
+Conditional objective gaps are undefined in both arms, not zero.}
+\label{tab:deadline-control}
+\end{table}
+
+\paragraph{Pinned trained methods and compatibility.}
+Decider uses its genuine one-pass restricted-letter readout, BF16 weights and
+eager inference. The v11 checkpoint requires source version 1.4.0
+(commit \texttt{15ab28e8}); its plain-choice temperature is 1.164, not the
+global fallback 1.145. Kev uses the pinned upstream pointer head and
+LoRA-merged FP32 backbone (source commit \texttt{569ea449}), with temperature
+2.406050072164233 and an independently pinned Qwen3.5-4B-Base.
+Model-card and code revisions are cited separately
+\cite{decider2026model,decider2026code,kev2026model,kev2026code}.
+All 34 registered checkpoint/tokenizer/configuration files are hash-checked;
+temperatures are independently derived from the Decider configuration and
+restricted CPU loading of the Kev head metadata, rather than trusted solely
+from GPU runtime claims. Complete requests retain all original semantic
+option IDs and descriptions, with an 8,192-token lossless context gate.
+
+The compatible shared runtime uses Python 3.12, Torch 2.13.0, Transformers
+5.17.0 and NumPy 2.3.5, with an isolated Accelerate 1.15.0/PEFT 0.21.0 overlay.
+These are not the full declared upstream environments: Kev specifies
+Torch below 2.9 and NumPy at least 2.5.3, while Decider specifies NumPy below 2.
+Unavailable fused kernels use native reference paths. Dtype and deployment
+are not matched across methods; no latency ranking or full-environment
+reproduction is claimed. Released temperature fitting is not a calibration
+guarantee on this selected graph panel.
+
+\paragraph{A limited CPU/GPU numeric check.}
+A separate posthoc control, registered before its fresh CPU forwards, repeats
+the first $n=8$ adjacency and first $n=12$ degree request for each trained model.
+All four forwards pass the fixed gate of maximum absolute probability
+difference at most 0.01 plus native-choice agreement. In adjacency/degree order,
+the differences are approximately $1.49\times10^{-8}$ and 0.002753 for Decider,
+and $1.19\times10^{-7}$ and $2.91\times10^{-7}$ for Kev. Option keys, argmaxes
+and input-token counts also agree. The original serialized public inputs are
+reconstructed without changing values or options; CPU workers use four threads
+with CUDA uninitialized, and no new GPU inference is performed.
+This is compatibility on only two requests per model, not exact equality,
+broad device parity, a quality/calibration guarantee or full-environment reproduction.
+Agreement also reproduces the incorrect degree choices; it does not make
+them correct. The earlier SemIf candidate-token failed numerical gate is
+a distinct experiment and remains unresolved.
+
+\paragraph{Validated failures versus mathematical errors.}
+Both trained methods' eight degree predictions vary and remain within the
+full legal eight-/twelve-class sets. Recorded option-to-probability mappings
+and own-history replay agree, and neither prediction vector is explained by
+a global $+1$ or $-1$ answer offset. On MaxCut, both always assign every new
+vertex to B; vertex 0 remains fixed in A. Decider assigns all community
+vertices to A, yielding verified zero modularity. These feasible objective
+and exact-answer errors are not parser failures. Conversely, thinking
+construction timeouts provide no realized completed objective. The four-case
+construction denominators remain too small for formal significance or
+universal capability claims.
+
+\section{Encoder-based typed-decision pilot}
+\label{app:laya}
+The checkpoint and inference code are pinned separately. F16 checkpoint
+weights are loaded by the upstream CPU path into FP32 without AMP; this is
+not a GPU timing or equal-precision comparison. Four CPU threads are used,
+with a 30-second forward deadline and a separate 30-minute worker budget.
+Initial coverage is 62/64. Both unsupported LT cases exceed the native
+option-head budget; one also exceeds the total context limit.
+All 64 remain in scheduled denominators, giving 0/16 Laya and 2/16 Jev
+construction optimum hits overall. Unsupported inputs are not wrong
+predictions. Table quality comparisons use the fourteen initially supported
+constructions, not a retrospectively chosen easy subset.
+
+\begin{table}[ht]
+\centering\small
+\input{generated-laya-cpu/exact.tex}
+\caption{Laya CPU exact-task results on the exploratory panel. All eight
+instances per task fit losslessly. Historical Jev is independently replayed;
+these small differences are not a population ranking.}
+\end{table}
+\begin{table}[ht]
+\centering\small
+\resizebox{\textwidth}{!}{\input{generated-laya-cpu/construction.tex}}
+\caption{Initial Laya coverage out of four scheduled constructions per task,
+followed by optimum hits and mean additive gaps on exactly that supported
+subset for both methods. LT quality uses only the two $n=8$ instances.
+Lower gaps are better, but their units differ across tasks.}
+\end{table}
+
+The native API rounds probabilities to four decimals and distinguishes
+entropy concentration from maximum option probability. Rounded vectors
+are preserved without renormalization or temperature fitting; neither
+confidence definition is assumed calibrated.
+The inference ledger was fully persisted, but an in-memory postprocessor
+failed on tuple-versus-JSON-list representation in public requests.
+A separate finalizer replayed the durable JSON ledger without changing
+inference, the frozen source, registration or original error records.
+All 64 scores and fourteen feasible construction objectives were
+independently checked. The exact supervisor wall timer was unavailable
+after that failure and remains missing rather than reconstructed as a
+benchmark latency.
+
+\paragraph{Posthoc constant-answer diagnostic.}
+After observing the all-\texttt{yes} pattern, we registered a separate control:
+for each binary task at $n=8$, choose the lexicographically first positive and
+negative instance, then evaluate each in original and reversed option order.
+Semantic IDs and descriptions are retained, and labels are not model inputs.
+All twenty calls complete: original order yields ten \texttt{yes} choices
+at index zero; reversed order yields ten \texttt{yes} choices at index one.
+Both orders score 5/10. Semantic choices agree on 10/10 pairs, whereas
+positional indices agree on 0/10. Original-order repeats reproduce the
+initial-run logits exactly, and all forty initial binary logit vectors are
+distinct. Full native mask-to-ID checks and an independent ledger verifier
+support a semantic-\texttt{yes} preference rather than a fixed-first-position
+or observed mapping error in these states. Reversal still changes score
+values, so this is not a general absence-of-position-bias claim.
+The ten paired states are adaptively selected diagnostics, not twenty
+independent examples or a replacement for the initial results.
+A histogram-key JSON representation issue in the diagnostic replay helper
+was independently resolved offline, without further inference or alteration
+of the registered source and original outputs.
+
+\section{Reproduction and provenance}
+The data package has SHA-256
+\begin{quote}\footnotesize\ttfamily
+5c1fa041c319b6682586134dba5f3219a68152ba377a24c4b888d2c23b57851a
+\end{quote}
+and contains 1,356 instances with model-visible and privileged reference files
+separated. Run the included \texttt{release\_api.py} in an isolated process
+to verify data, construct a request, or score a completed history.
+NetworkX 3.6.1 and Python 3.11 or later suffice for the offline artifact.
+The separate 952-instance prospective bundle has SHA-256
+\begin{quote}\footnotesize\ttfamily
+a1c468b79e8033981b501d346a91c481d4bac1635a765391c0b816b105255e9c
+\end{quote}
+and does not overwrite the earlier release. The two bundles contain 2,308
+instance records in total; this is not a count of independent graph topologies.
+
+A separate portable action-results package contains all 9,072 primary model
+episodes and 18,000 decisions across twelve lanes. It reconstructs each
+own-history public request, checks its hash and legal action, and recomputes
+mathematical scores and taskwise aggregates using the bundled scorer.
+Independent extractions replay identically in Python 3.11 and 3.12 with
+network operations and original-workspace reads denied; no provider SDK,
+weights or endpoint is required. This package verifies completed mathematical
+traces, not transport conformance, timing, probability reliability, classical
+heuristic search or bootstrap intervals. Its exporter refuses incomplete or
+mock lanes rather than removing failures. Derived floating-point comparisons
+use absolute $10^{-12}$ tolerance; IDs, actions, counts and statuses remain
+exact. Its SHA-256 is
+\begin{quote}\footnotesize\ttfamily
+acdf7c9f07f4df806f90a6d40a54a3aa15600c1b294a270bbc914fd9623942ab
+\end{quote}
+
+That portable package covers the primary matrices only. The later GPT,
+Astra, expanded-model and diagnostic ledgers are separately preserved and
+verified in the local project; they are not silently included in its
+9,072-episode replay claim. The manuscript source archive includes their
+generated tables and provenance so that the PDF can be rebuilt offline,
+but is not a complete raw-evidence replay package for those extensions.
+Preparing and checking their distributable evidence, subject to permissions,
+remains a public-release requirement.
+
+The original four-configuration tables and size figure are generated by
+\texttt{scripts/build\_paper\_evidence.py} from sealed real-run attempts, not
+hand-entered scores. It refuses mock/injected runs, checks artifact hashes,
+replays every request/history and score, validates token argmax/accounting,
+and checks equality of initial public requests across methods. It recomputes
+classical references and exact on-policy continuation loss without any model
+calls. The generated provenance file includes source and artifact digests.
+
+The twelve-configuration main tables and public website aggregates are
+generated offline by
+\texttt{scripts/export\_twelve\_model\_publication.py}.
+This versioned presentation combines the original sealed ten-configuration
+export with the separately verified BF16 extension; it does not overwrite
+either experiment. The source archive includes both sets of generated tables.
+The extension pins \texttt{Qwen/Qwen3.8-27B} to revision
+\begin{quote}\footnotesize\ttfamily
+1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
+\end{quote}
+and \texttt{Qwen/Qwen2.5-72B-Instruct} to revision
+\begin{quote}\footnotesize\ttfamily
+495f39366efef23836d0cfae4fbe635880d2be31
+\end{quote}
+Full BF16 checkpoint admission, bounded no-thinking requests, actual
+served-tokenizer checks and restored-service receipts are retained locally.
+The successful extension uses 3,840 inference calls in total. Its earlier
+zero-call infrastructure attempt is not an extra quality sample.
+Neither this exporter nor rebuilding the manuscript requires live inference.
+
+Earlier runner validation passed 72 targeted integration tests in both
+Python 3.11 and 3.12. Original-run per-instance scores compare exactly. Only aggregate
+float comparisons permit absolute $10^{-12}$ roundoff, addressing the
+approximately $5\times10^{-17}$ difference from Python summation changes.
+This numerical bookkeeping tolerance is unrelated to the failed 0.01
+CPU/GPU probability reproduction gate.
+
+The full experimental record retains strict legacy, state-explicit,
+action-observation, and common-interface protocols separately. Pending runs
+have no final accuracy; interrupted episodes remain in scheduled denominators.
+The manuscript build does not require inference credentials or model services.
+\end{document}

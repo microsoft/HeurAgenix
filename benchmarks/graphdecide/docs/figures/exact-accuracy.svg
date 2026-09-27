@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="790" viewBox="0 0 1120 790" role="img" aria-labelledby="title desc">
+<title id="title">Exact graph decisions</title><desc id="desc">Macro-size accuracy (%), higher is better. Counts are shared across models. Twelve configurations on 960 shared cases. GPT uses a separate reasoning budget. Exact numeric tables are available in RESULTS.md.</desc>
+<rect width="1120" height="790" rx="12" fill="#faf9f6"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#172c35">
+<text x="24" y="34" font-size="24" font-weight="bold">Exact graph decisions</text>
+<text x="24" y="60" font-size="14">Macro-size accuracy (%), higher is better. Counts are shared across models.</text>
+<text x="338.8" y="93" text-anchor="middle" font-size="14" font-weight="bold">Adjacency</text>
+<text x="476.5" y="93" text-anchor="middle" font-size="14" font-weight="bold">Degree</text>
+<text x="614.2" y="93" text-anchor="middle" font-size="14" font-weight="bold">Cycle</text>
+<text x="751.8" y="93" text-anchor="middle" font-size="14" font-weight="bold">Connectivity</text>
+<text x="889.5" y="93" text-anchor="middle" font-size="14" font-weight="bold">Distance</text>
+<text x="1027.2" y="93" text-anchor="middle" font-size="14" font-weight="bold">Articulation</text>
+<text x="24" y="135" font-size="15" font-weight="bold">Jev</text>
+<rect x="270.0" y="110" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="335.8" y="135" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="407.7" y="110" width="131.7" height="43" rx="4" fill="#b7dace"/>
+<text x="473.5" y="135" text-anchor="middle" font-size="16">61.43%</text>
+<rect x="545.3" y="110" width="131.7" height="43" rx="4" fill="#b2d7cb"/>
+<text x="611.2" y="135" text-anchor="middle" font-size="16">66.25%</text>
+<rect x="683.0" y="110" width="131.7" height="43" rx="4" fill="#9ecec0"/>
+<text x="748.8" y="135" text-anchor="middle" font-size="16">85.00%</text>
+<rect x="820.7" y="110" width="131.7" height="43" rx="4" fill="#b9dbcf"/>
+<text x="886.5" y="135" text-anchor="middle" font-size="16">58.75%</text>
+<rect x="958.3" y="110" width="131.7" height="43" rx="4" fill="#b3d8cc"/>
+<text x="1024.2" y="135" text-anchor="middle" font-size="16">65.00%</text>
+<text x="24" y="183" font-size="15" font-weight="normal">Qwen3.5-4B grammar</text>
+<rect x="270.0" y="158" width="131.7" height="43" rx="4" fill="#b8dacf"/>
+<text x="335.8" y="183" text-anchor="middle" font-size="16">60.00%</text>
+<rect x="407.7" y="158" width="131.7" height="43" rx="4" fill="#e3eee7"/>
+<text x="473.5" y="183" text-anchor="middle" font-size="16">18.32%</text>
+<rect x="545.3" y="158" width="131.7" height="43" rx="4" fill="#bdddd2"/>
+<text x="611.2" y="183" text-anchor="middle" font-size="16">55.00%</text>
+<rect x="683.0" y="158" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="748.8" y="183" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="820.7" y="158" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="886.5" y="183" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="958.3" y="158" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="1024.2" y="183" text-anchor="middle" font-size="16">50.00%</text>
+<text x="24" y="231" font-size="15" font-weight="normal">Qwen3.5-9B grammar</text>
+<rect x="270.0" y="206" width="131.7" height="43" rx="4" fill="#b9dbcf"/>
+<text x="335.8" y="231" text-anchor="middle" font-size="16">58.75%</text>
+<rect x="407.7" y="206" width="131.7" height="43" rx="4" fill="#daeae2"/>
+<text x="473.5" y="231" text-anchor="middle" font-size="16">26.99%</text>
+<rect x="545.3" y="206" width="131.7" height="43" rx="4" fill="#c1ded4"/>
+<text x="611.2" y="231" text-anchor="middle" font-size="16">51.25%</text>
+<rect x="683.0" y="206" width="131.7" height="43" rx="4" fill="#bfddd2"/>
+<text x="748.8" y="231" text-anchor="middle" font-size="16">53.75%</text>
+<rect x="820.7" y="206" width="131.7" height="43" rx="4" fill="#cae3d9"/>
+<text x="886.5" y="231" text-anchor="middle" font-size="16">42.50%</text>
+<rect x="958.3" y="206" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="1024.2" y="231" text-anchor="middle" font-size="16">50.00%</text>
+<text x="24" y="279" font-size="15" font-weight="normal">Qwen3.5-27B grammar</text>
+<rect x="270.0" y="254" width="131.7" height="43" rx="4" fill="#90c8b8"/>
+<text x="335.8" y="279" text-anchor="middle" font-size="16">98.75%</text>
+<rect x="407.7" y="254" width="131.7" height="43" rx="4" fill="#c5e0d6"/>
+<text x="473.5" y="279" text-anchor="middle" font-size="16">47.70%</text>
+<rect x="545.3" y="254" width="131.7" height="43" rx="4" fill="#b4d8cc"/>
+<text x="611.2" y="279" text-anchor="middle" font-size="16">63.75%</text>
+<rect x="683.0" y="254" width="131.7" height="43" rx="4" fill="#a4d1c3"/>
+<text x="748.8" y="279" text-anchor="middle" font-size="16">80.00%</text>
+<rect x="820.7" y="254" width="131.7" height="43" rx="4" fill="#c0ded3"/>
+<text x="886.5" y="279" text-anchor="middle" font-size="16">52.50%</text>
+<rect x="958.3" y="254" width="131.7" height="43" rx="4" fill="#c5e0d6"/>
+<text x="1024.2" y="279" text-anchor="middle" font-size="16">47.50%</text>
+<text x="24" y="327" font-size="15" font-weight="normal">Qwen3.8-27B BF16</text>
+<rect x="270.0" y="302" width="131.7" height="43" rx="4" fill="#99ccbd"/>
+<text x="335.8" y="327" text-anchor="middle" font-size="16">90.00%</text>
+<rect x="407.7" y="302" width="131.7" height="43" rx="4" fill="#c7e1d7"/>
+<text x="473.5" y="327" text-anchor="middle" font-size="16">45.50%</text>
+<rect x="545.3" y="302" width="131.7" height="43" rx="4" fill="#b7dace"/>
+<text x="611.2" y="327" text-anchor="middle" font-size="16">61.25%</text>
+<rect x="683.0" y="302" width="131.7" height="43" rx="4" fill="#9ecec0"/>
+<text x="748.8" y="327" text-anchor="middle" font-size="16">85.00%</text>
+<rect x="820.7" y="302" width="131.7" height="43" rx="4" fill="#c4e0d5"/>
+<text x="886.5" y="327" text-anchor="middle" font-size="16">48.75%</text>
+<rect x="958.3" y="302" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="1024.2" y="327" text-anchor="middle" font-size="16">50.00%</text>
+<text x="24" y="375" font-size="15" font-weight="normal">Qwen2.5-72B BF16</text>
+<rect x="270.0" y="350" width="131.7" height="43" rx="4" fill="#97cbbb"/>
+<text x="335.8" y="375" text-anchor="middle" font-size="16">92.50%</text>
+<rect x="407.7" y="350" width="131.7" height="43" rx="4" fill="#cce3da"/>
+<text x="473.5" y="375" text-anchor="middle" font-size="16">41.24%</text>
+<rect x="545.3" y="350" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="611.2" y="375" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="683.0" y="350" width="131.7" height="43" rx="4" fill="#9dcebf"/>
+<text x="748.8" y="375" text-anchor="middle" font-size="16">86.25%</text>
+<rect x="820.7" y="350" width="131.7" height="43" rx="4" fill="#b8dacf"/>
+<text x="886.5" y="375" text-anchor="middle" font-size="16">60.00%</text>
+<rect x="958.3" y="350" width="131.7" height="43" rx="4" fill="#c6e1d7"/>
+<text x="1024.2" y="375" text-anchor="middle" font-size="16">46.25%</text>
+<text x="24" y="423" font-size="15" font-weight="normal">Qwen3.5-4B scores</text>
+<rect x="270.0" y="398" width="131.7" height="43" rx="4" fill="#a6d2c4"/>
+<text x="335.8" y="423" text-anchor="middle" font-size="16">77.50%</text>
+<rect x="407.7" y="398" width="131.7" height="43" rx="4" fill="#ddece4"/>
+<text x="473.5" y="423" text-anchor="middle" font-size="16">23.89%</text>
+<rect x="545.3" y="398" width="131.7" height="43" rx="4" fill="#c1ded4"/>
+<text x="611.2" y="423" text-anchor="middle" font-size="16">51.25%</text>
+<rect x="683.0" y="398" width="131.7" height="43" rx="4" fill="#c1ded4"/>
+<text x="748.8" y="423" text-anchor="middle" font-size="16">51.25%</text>
+<rect x="820.7" y="398" width="131.7" height="43" rx="4" fill="#c0ded3"/>
+<text x="886.5" y="423" text-anchor="middle" font-size="16">52.50%</text>
+<rect x="958.3" y="398" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="1024.2" y="423" text-anchor="middle" font-size="16">50.00%</text>
+<text x="24" y="471" font-size="15" font-weight="normal">Decider-2B v11</text>
+<rect x="270.0" y="446" width="131.7" height="43" rx="4" fill="#b9dbcf"/>
+<text x="335.8" y="471" text-anchor="middle" font-size="16">58.75%</text>
+<rect x="407.7" y="446" width="131.7" height="43" rx="4" fill="#eaf1eb"/>
+<text x="473.5" y="471" text-anchor="middle" font-size="16">12.09%</text>
+<rect x="545.3" y="446" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="611.2" y="471" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="683.0" y="446" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="748.8" y="471" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="820.7" y="446" width="131.7" height="43" rx="4" fill="#c6e1d7"/>
+<text x="886.5" y="471" text-anchor="middle" font-size="16">46.25%</text>
+<rect x="958.3" y="446" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="1024.2" y="471" text-anchor="middle" font-size="16">50.00%</text>
+<text x="24" y="519" font-size="15" font-weight="normal">Kev-4B</text>
+<rect x="270.0" y="494" width="131.7" height="43" rx="4" fill="#a5d1c4"/>
+<text x="335.8" y="519" text-anchor="middle" font-size="16">78.75%</text>
+<rect x="407.7" y="494" width="131.7" height="43" rx="4" fill="#e2ede6"/>
+<text x="473.5" y="519" text-anchor="middle" font-size="16">19.88%</text>
+<rect x="545.3" y="494" width="131.7" height="43" rx="4" fill="#bbdbd0"/>
+<text x="611.2" y="519" text-anchor="middle" font-size="16">57.50%</text>
+<rect x="683.0" y="494" width="131.7" height="43" rx="4" fill="#b9dbcf"/>
+<text x="748.8" y="519" text-anchor="middle" font-size="16">58.75%</text>
+<rect x="820.7" y="494" width="131.7" height="43" rx="4" fill="#c1ded4"/>
+<text x="886.5" y="519" text-anchor="middle" font-size="16">51.25%</text>
+<rect x="958.3" y="494" width="131.7" height="43" rx="4" fill="#c8e1d7"/>
+<text x="1024.2" y="519" text-anchor="middle" font-size="16">45.00%</text>
+<text x="24" y="567" font-size="15" font-weight="normal">Laya</text>
+<rect x="270.0" y="542" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="335.8" y="567" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="407.7" y="542" width="131.7" height="43" rx="4" fill="#ebf2ec"/>
+<text x="473.5" y="567" text-anchor="middle" font-size="16">10.87%</text>
+<rect x="545.3" y="542" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="611.2" y="567" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="683.0" y="542" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="748.8" y="567" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="820.7" y="542" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="886.5" y="567" text-anchor="middle" font-size="16">50.00%</text>
+<rect x="958.3" y="542" width="131.7" height="43" rx="4" fill="#c2dfd4"/>
+<text x="1024.2" y="567" text-anchor="middle" font-size="16">50.00%</text>
+<text x="24" y="608" font-size="13" font-weight="bold">SEPARATE GPT REFERENCES — default reasoning, not matched compute</text>
+<text x="24" y="645" font-size="15" font-weight="normal">GPT-5.4 (reasoning)</text>
+<rect x="270.0" y="620" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="335.8" y="645" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="407.7" y="620" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="473.5" y="645" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="545.3" y="620" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="611.2" y="645" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="683.0" y="620" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="748.8" y="645" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="820.7" y="620" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="886.5" y="645" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="958.3" y="620" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="1024.2" y="645" text-anchor="middle" font-size="16">100.00%</text>
+<text x="24" y="693" font-size="15" font-weight="normal">Astra (reasoning)</text>
+<rect x="270.0" y="668" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="335.8" y="693" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="407.7" y="668" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="473.5" y="693" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="545.3" y="668" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="611.2" y="693" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="683.0" y="668" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="748.8" y="693" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="820.7" y="668" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="886.5" y="693" text-anchor="middle" font-size="16">100.00%</text>
+<rect x="958.3" y="668" width="131.7" height="43" rx="4" fill="#8fc7b7"/>
+<text x="1024.2" y="693" text-anchor="middle" font-size="16">100.00%</text>
+<text x="24" y="746" font-size="13">Binary chance reference: 50%; degree is multiclass. All-size degree is macro, not pooled.</text>
+<text x="24" y="770" font-size="13">GraphDecide · canonical inspected bank · n = 8–12 · point estimates, not significance claims</text>
+</g></svg>

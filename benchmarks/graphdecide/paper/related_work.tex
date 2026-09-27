@@ -1,0 +1,80 @@
+\section{Related work}
+\label{sec:related-work}
+\paragraph{Graph reasoning benchmarks.}
+NLGraph evaluates language models on graph problems expressed in natural
+language, while GraphArena extends graph-computation evaluation to
+real-world-derived graphs and distinguishes optimal, feasible but
+suboptimal, infeasible, and missing solutions
+\cite{wang2023nlgraph,tang2025grapharena}.
+These benchmarks establish graph computation and solution verification
+as existing evaluation directions.
+GraphWiz uses the GraphInstruct instruction-tuning corpus to train models
+that produce explicit reasoning paths for graph problems
+\cite{chen2024graphwiz}. GraphLLM integrates graph learning models with
+language models, illustrating that graph representation and model design
+can change together \cite{chai2023graphllm}.
+CLRS provides a complementary algorithmic-learning perspective spanning
+graph algorithms and other classical procedures \cite{velickovic2022clrs}.
+Our study examines exact decisions and bounded-choice construction under
+interface and verification controls, rather than proposing a graph-trained
+model or a general algorithmic-learning benchmark.
+
+\paragraph{Learned constructive optimization.}
+Sequential neural decisions for combinatorial optimization predate the
+systems evaluated here. Khalil et al.\ combine graph embeddings and
+reinforcement learning to learn greedy constructive policies for problems
+including MaxCut and TSP; Kool et al.\ train attention-based routing policies
+using REINFORCE with a greedy rollout baseline
+\cite{khalil2017learning,kool2019attention}.
+Our tasks share the incremental-decision setting but evaluate general-purpose
+decision interfaces without claiming to replace specialized learned policies.
+The community task uses standard modularity \cite{newman2004community},
+restricted to at most two communities; it is not unrestricted community
+detection or recovery of ground-truth communities. Likewise, our influence
+task uses fixed thresholds and deterministic diffusion. It must not be
+conflated with the classical independently randomized-threshold LT model
+whose expected spread is submodular \cite{kempe2015influence}.
+That model's greedy approximation guarantee is not assumed here.
+
+\paragraph{Typed decisions and contemporary systems.}
+TypeSafe's launch article describes Jev as returning typed probabilistic
+decisions rather than generated strings \cite{almeida2026jev}.
+Its model documentation identifies weaknesses in numeric precision and
+multi-step indirection \cite{typesafe2026jaggedness}.
+These are vendor descriptions, not independent architecture or graph-performance
+evidence. Two contemporary, non-peer-reviewed software projects are relevant
+\cite{semif2026,worldtour2026}. SemIf implements direct option-logit readout
+from open models and distinguishes reproducing an interface pattern from
+reproducing Jev's undisclosed model. WorldTour already evaluates Jev-guided
+next-city choices for heuristic routing and disclaims global optimality of its
+large tour. We therefore make no priority claim for typed-choice evaluation
+or Jev-guided TSP.
+
+\paragraph{Typed-decision leaderboards.}
+JevBench evaluates bounded decisions across routing, policy application,
+answer judgment and related reasoning tasks \cite{jevbench2026}.
+Its v1.4.2 ranking combines accuracy-related and calibration axes with
+deployment-dependent speed and cost; outranking Jev therefore need not mean
+better decision accuracy or predictive-distribution equivalence.
+The published label-scoring protocol does not verify complete graph
+constructions. We do not exclude graph-related content in private items,
+but distinguish that decision-evaluation contract from our exact objectives
+and accumulated own-history construction errors. Leaderboard ranks provide
+context for candidate selection, not evidence of transfer to our tasks.
+
+\paragraph{Scope of this benchmark.}
+Our combination of matched query pairs, explicit identity checks and
+exactly scored own-history construction addresses particular shortcuts and
+accumulated decision errors. It does not establish immunity to every shortcut
+or training-data contamination. Same-backbone interface comparisons do not
+identify a closed service's architecture; exact performance on tiny instances
+does not establish large-graph scaling or general solver superiority.
+
+\paragraph{Predictive reliability.}
+Returning a numeric distribution is not evidence of calibrated uncertainty.
+Proper scoring rules evaluate the predictive distribution against outcomes
+\cite{gneiting2007proper}; modern-network calibration studies distinguish
+classification accuracy from confidence reliability \cite{guo2017calibration}.
+These motivate separate probability diagnostics rather than treating a typed
+API or normalized option logits as calibrated by construction. We do not
+transfer published calibration findings to the present models without data.

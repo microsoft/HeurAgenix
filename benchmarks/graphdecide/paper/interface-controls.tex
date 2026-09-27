@@ -1,0 +1,291 @@
+\section{Interface controls and stronger-model context}
+\label{sec:controls}
+\paragraph{Graph-preserving presentation changes.}
+We preregistered 120 exact-task cases from the confirmation bank: four per
+task and size. Binary tasks use two complete query/construction pairs;
+degree uses four prespecified degree strata, not every class. Original,
+identical-repeat, node-relabeling, edge-shuffling and option-reversal arms
+produce 2,400 decisions across the four methods. Independent NetworkX checks
+preserve every transformed label. The relabeling consistently transforms
+queries and edge endpoints without also shuffling edge positions.
+Two edge permutations leave the actual serialized input unchanged; both
+are retained and identified rather than replaced.
+
+All actions are valid. Four Jev strict-native observations are retained
+separately. Adjacency remains robust for Jev on all twenty selected cases,
+but its degree correctness falls from 15/20 in the original arm to 11/20
+after relabeling; only 9/20 are correct across all five arms
+(Table~\ref{tab:robust}). An identical repeat already changes two Jev
+degree choices, so individual flips cannot all be causally attributed to
+the intervention.
+
+Conversely, 4B grammar connectivity chooses the same answer across all five
+arms on every case, yet is consistently wrong on ten of twenty cases.
+For 9B articulation, original and reversed-option accuracy are both 10/20,
+yet reversing options flips all twenty semantic choices; identical repeats,
+relabeling and edge shuffling flip none. No case is correct across all five
+arms. Marginal accuracy can therefore
+hide severe semantic-choice instability; invariant wrong output is not
+successful robustness. This is a finite descriptive panel with dependent
+query pairs, one repeat, and fixed arm ordering, not a population guarantee
+or a comparison over 600 independent graphs per method.
+
+\begin{table}[t]
+\centering\small
+\input{generated-robustness/robust-correct.tex}
+\caption{Cases correct in all five presentation arms, over twenty selected
+cases per task. Full arm accuracies and paired choice-flip counts appear in
+the appendix. The degree panel uses four prespecified degree strata per size.}
+\label{tab:robust}
+\end{table}
+
+\paragraph{Isolating the readout at a fixed token prefix.}
+The main 4B comparison changes rendering, label coding and decoding, not
+only the mathematical selection rule. To test the latter directly, we
+registered 100 initial states: two opaque-ID-first cases per task and size
+from the completed confirmation bank. Three rotating-order arms use exactly
+the same prompt token IDs and candidate tokens: requested candidate scores,
+an identical repeat, and candidate-masked greedy one-token generation.
+The greedy action is mapped from its actually emitted token; it is not
+substituted by a post-hoc argmax. The generated token is ignored only in
+the score arms, and all generated tokens are counted.
+
+All 300 calls succeed. Score argmax and greedy generation agree on 100/100
+choices, as do the score repeats. The largest conditional-probability
+difference is exactly zero in these observed responses. Payload replay checks
+identical prefixes, the mask, candidate mapping and token accounting.
+This is consistent with the elementary equivalence of greedy selection and
+argmax on the same logits; it is not a universal backend equivalence or a
+successful CPU SemIf reproduction. In particular, the main adjacency gain
+must be described as a \emph{decision-pipeline} effect, not an isolated
+benefit of using argmax. Which remaining rendering or coding component causes
+that gain is not identified by this control. Construction states here are
+initial states only, not new rollout scores.
+
+\paragraph{Teacher-forced controls are not rollout scores.}
+On 24 development graphs, 48 informative optimum-prefix states were tested
+with original, repeated, reversed-option and explicit-description arms:
+384 real decisions across Jev and constrained 9B. Relative to the original,
+9B changed 15/48 valid choices under option reversal and 0/48 on identical
+repeats; Jev changed 5/46 and 2/46. Repetition variability prevents attributing
+every changed choice to the treatment. Both methods solve all six late
+MaxCut original-arm states, despite poor free-running cut performance.
+This illustrates why favorable oracle-prefix decisions cannot substitute for
+own-history episodes.
+
+\paragraph{Prospective probability diagnostics.}
+Earlier canonical Jev logs do not retain complete probability vectors,
+so their calibration cannot be reconstructed from choices or sum diagnostics.
+We instead register new calls on all 792 exact cases of the confirmation
+bank, for Jev action and 4B candidate scores: 1,584 observations.
+Raw vector entries are neither normalized nor clipped. Probability scores
+require action eligibility, exact option keys, finite entries in $[0,1]$
+and mass within the frozen $10^{-6}$ tolerance. Omitted vectors and
+all-scheduled action accuracy remain separate outcomes.
+
+For accepted vectors, summed multiclass Brier loss is
+$\sum_k(p_k-\mathbf{1}[k=y])^2$ and logarithmic loss is $-\log p_y$.
+A zero true-label probability has positive-infinite loss; it is not replaced
+by a small epsilon or silently dropped from an average. Binary uniform
+Brier is therefore $0.5$ under this summed convention, not $0.25$.
+We compare both models and the uniform reference only on the common-valid
+intersection, alongside each model's own retained-vector count.
+Five fixed reliability bins use the probability of the \emph{actually
+supplied choice}, not an inferred replacement argmax or an assumed interpretation
+of a vendor confidence scalar. No calibration parameter or threshold is fitted.
+These are row-averaged, task-specific diagnostics on inspected synthetic
+graphs, not population calibration guarantees.
+
+All 792 actions per method are eligible. Jev retains 774 vectors after
+eighteen sum-invalid degree vectors are omitted; both choice/argmax-disagreeing
+vectors are retained with the actual supplied choices. All 792 token-score
+vectors are valid, giving 774 common-valid rows across tasks.
+Despite Jev's above-chance action accuracy on distance (48/80) and articulation
+(47/80), their Brier losses, 0.509155 and 0.508225, exceed the uniform
+reference of 0.5; their logarithmic losses also exceed $\log 2$.
+Thus accuracy above chance and numeric probability output do not establish
+useful uncertainty estimates. In contrast, Jev's adjacency Brier is
+0.000120. The task-specific pattern, not a pooled calibration ranking, is
+the intended diagnostic.
+
+\begin{table}[t]
+\centering\small
+\input{generated-robustness/brier.tex}
+\caption{Prospective probability audit: summed multiclass Brier, lower is
+better. ``Valid J/T'' gives each method's own vector denominator; loss
+columns use exactly the common-valid rows. Uniform is evaluated on the same
+rows with their actual option cardinalities. No cross-task aggregate is used.}
+\label{tab:brier}
+\end{table}
+
+This audit also exposed a bookkeeping bug after inference: canonical JSON
+key sorting changed the order of floating-point additions. Ten native
+sum metadata values differed on replay by at most $2.22\times10^{-16}$,
+although no vector's eligibility changed. The original producer failed to
+seal its native lane; all 792 recorded responses were retained without
+additional calls. Corrected offline analysis is separately versioned and
+preserves the original failure, vectors and action decisions.
+Its derived-sum roundoff check is distinct from both the unchanged $10^{-6}$
+vector gate and the failed $0.01$ CPU/GPU reproduction criterion.
+
+\paragraph{A prospective TSP wording confirmation.}
+Six late Jev TSP control failures all selected the city closest to start
+vertex 0, although the actual current endpoint differed. Independent
+enumeration confirmed the labels. This motivated a bundled state-explicit
+wording treatment, not a claim to identify an internal mechanism.
+
+Forty newly generated weighted metrics were independently excluded from
+eighty earlier weighted TSP instances within a refreshed 1,840-record pool.
+Under the original strict protocol, Jev completes 36/40 original-wording
+and 33/40 explicit-wording episodes. On the 29 commonly feasible graphs,
+relative gap improves by 0.3761 (pointwise 95\% interval [0.2337, 0.5462]);
+this conditional comparison does not establish improved completion.
+
+A separately registered action-observation run on those same forty metrics
+completes all eighty episodes. Mean relative gap falls from 0.5152 to 0.1603;
+the paired reduction is 0.3550 [0.2463, 0.4729]. Nine strict-native observations
+remain recorded. This second protocol removes feasibility selection within
+that comparison, but is a repeated use of the metrics, not a second untouched
+confirmation set. No prior failed response was retrospectively rescued.
+
+\paragraph{Stronger reasoning models change the picture.}
+Completed earlier \emph{seven-task, legacy-protocol development} runs provide
+an important counterpoint. GPT-5.4 solves all 200 exact decisions and all 62
+feasibly completed construction episodes optimally; two timeouts leave
+two other constructions incomplete (559 actual calls). GPT-6-Astra solves
+all 200 exact decisions and 63/64 constructions optimally with no failures
+(576 calls); its single suboptimal cut has value 20 versus optimum 21.
+These are not missing columns to paste into the common-interface challenge:
+the tasks, bank and protocol differ. They nevertheless preclude interpreting
+weak bounded Qwen results as evidence of universal LLM incapacity.
+
+The subsequently completed \emph{ten-task legacy-interface Astra challenge}
+uses the same 960 graph instances and references as the inspected canonical
+challenge. Its frozen runner replays all 1,920 calls with no failures.
+All 800 exact decisions are correct, and 159/160 constructions are optimal
+(Table~\ref{tab:astra-legacy}). The sole miss is an eight-vertex community
+partition with $Q=0.0244444$ versus $Q^\star=0.08$; independent NetworkX
+evaluation confirms all forty community objectives, and enumeration of all
+128 anchored assignments confirms this optimum.
+
+This result is intentionally separate from the primary matrix: the legacy
+instructions and option descriptions differ, with zero of 960 full initial
+requests identical to their canonical counterparts. Astra uses default
+reasoning and a 4,096-token ceiling rather than the bounded local decoding
+settings. The result demonstrates that these graph instances are tractable
+for this stronger configuration; it does not isolate model architecture,
+protocol effects or equal-compute superiority.
+
+\begin{table}[t]
+\centering\small
+\input{generated-astra-legacy/challenge.tex}
+\caption{Completed Astra legacy-interface challenge on the same graphs as
+the inspected primary challenge. The first six rows report correct answers;
+the final four report optimum hits. Mean gaps are task-specific and are not
+pooled. This is a separate protocol/default-reasoning reference, not an
+additional column of the canonical four-method matrix.}
+\label{tab:astra-legacy}
+\end{table}
+
+\input{generated-gpt/anchor.tex}
+Request identity here concerns all 960 initial public requests. Later
+construction requests follow each method's own choices and need not match;
+neither model receives the other's trajectory or oracle actions.
+All nine failed attempts are timeouts in construction episodes: four MaxCut,
+one TSP and four modularity. Across 960 scheduled episodes, all 800 exact
+answers are correct and all 151 feasible constructions attain exact optima.
+An additional independent objective check reproduces every feasible
+construction using NetworkX or exact-rational diffusion. This strengthens
+the interpretation that the bounded models' failures are not unavoidable
+properties of the graph instances or the canonical action interface.
+It does not establish equal-compute superiority, out-of-distribution
+generalization, or unconditional construction perfection: the nine incomplete
+episodes remain in every all-scheduled denominator.
+
+\paragraph{Exploratory larger-local-model check.}
+After inspecting the primary results, we registered a small, score-blind
+selection from the confirmation bank: four cases per exact task and two per
+construction at each of $n=8,12$, retaining binary pairs and degree strata.
+The resulting 64-episode, 160-decision panel compares a fresh Qwen3.5-27B
+BF16 run with reused Jev and bounded-Qwen reference traces on exactly the
+same instances. The 27B configuration keeps the 64-token, no-thinking,
+legal-choice grammar contract and completes every episode without failure.
+This is an inspected-bank exploratory extension, not an independent replication.
+
+On this panel Jev exceeds bounded 27B on degree (6/8 versus 4/8), connectivity
+(7/8 versus 6/8), and cycle detection (5/8 versus 4/8), while 27B exceeds Jev
+on distance (5/8 versus 4/8). Adjacency and articulation tie
+(Appendix~\ref{app:larger-local}). Jev has better mean cut, TSP and community
+objectives; LT ties, including 2/4 optimum hits for both. Neither reaches
+any cut, TSP or community optimum on these four-case tasks.
+These observations concern the specified no-thinking grammar configuration
+only. They do not establish parameter equivalence or bound 27B's unrestricted
+capacity; the completed thinking comparison below substantially changes the
+exact-task interpretation. Historical reference latency is not a controlled
+timing comparison, and these small denominators support no significance claim.
+
+\paragraph{Thinking improves exact answers but exposes deadline failures.}
+The completed 27B and 9B thinking lanes use the same selected instances and
+canonical initial requests, but enable thinking, remove grammar constraints,
+and raise the output-token cap from 64 to 8,192 jointly. The per-request
+deadline is 180 seconds. Their exact counts are \EPLargeThinkingExact{} and
+\EPSmallThinkingExact{}, versus \EPJevExact{} for reused Jev and
+\EPGrammarExact{} for 27B grammar. Every returned exact answer is correct:
+\EPLargeThinkingReturned/\EPLargeThinkingReturned{} and
+\EPSmallThinkingReturned/\EPSmallThinkingReturned{}, respectively. The
+remaining exact cases are timeouts, not observed wrong predictions; 27B's
+one timeout is a distance query. All 48 scheduled exact cases remain in
+the reported accuracy denominators.
+
+Both thinking lanes time out within every one of their sixteen construction
+episodes, leaving zero feasible constructions. Across the whole panel, 27B
+records \EPLargeThinkingFailures{} timed-out calls among
+\EPLargeThinkingCalls{} attempts; 9B records \EPSmallThinkingFailures{}
+among \EPSmallThinkingCalls{}. Conditional construction gaps are therefore
+undefined, not zero, and provide no quality ranking between these
+configurations and methods that finish. The substantially stronger exact
+results overturn an interpretation of the bounded comparison as
+Jev--27B capability equivalence. This is a joint inference-configuration
+effect, not an isolated causal effect of reasoning.
+
+A separate timeout-only 9B control raises the deadline to 600 seconds while
+retaining the 8,192-token cap. All sixteen construction attempts then terminate
+at that token cap, still yielding no feasible trajectories
+(Table~\ref{tab:deadline-control}). Increasing wall time alone therefore does
+not resolve these completion failures.
+
+\paragraph{Two additional trained decision readouts.}
+We also evaluate the released Decider-2B v11 and Kev-4B trained inference
+paths \cite{decider2026model,decider2026code,kev2026model,kev2026code},
+not ordinary next-token substitutes. Both complete all 64 episodes in
+160 calls, without execution failures. Decider obtains \EPDeciderExact{}
+exact answers and Kev \EPKevExact{}, versus \EPJevExact{} for Jev.
+Neither answers a degree query correctly, despite legal, varied predictions
+and the full eight- or twelve-class vocabulary. Decider reaches no construction
+optimum; Kev reaches one LT optimum, compared with Jev's two LT optima.
+This is not an all-task Jev win: Kev's mean modularity gap is
+\EPKevCommunityGap{}, better than Jev's \EPJevCommunityGap{}.
+Appendix~\ref{app:larger-local} reports taskwise coverage, optimum hits and
+conditional gaps separately, along with dtype, source-version and environment
+limitations. Native probability conformance is not evidence of calibration
+on these graph tasks.
+
+\paragraph{An encoder-based trained decision model.}
+A separate Laya typed-decisions pilot evaluates a roughly 421M-parameter
+ModernBERT encoder with its genuine trained choice head \cite{laya2026},
+using native CPU FP32 inference on the same 64-case panel.
+Its checkpoint contract permits 1,024 total tokens and a 256-token head.
+Lossless tokenization checks reject two $n=12$ LT requests before inference;
+no graph, question or option is truncated. The remaining 62 episodes require
+156 successful forwards, with no later context overflow.
+Laya obtains 22/48 exact answers versus 33/48 for reused Jev, and no optimal
+construction among fourteen initially supported cases versus two for Jev.
+All forty binary answers are \texttt{yes}, yielding the constant-yes baseline
+of 20/40; degree contributes 2/8. Native logits, probability-to-ID mapping
+and canonical action replay are checked rather than assuming these constant
+predictions are a parser failure. A separate twenty-call option-order
+diagnostic preserves \texttt{yes} on all ten paired states after reversal,
+arguing against a fixed-first-option explanation on this selected subset,
+not establishing a claim about every Laya prompt or task.
+Appendix~\ref{app:laya} separates input coverage from solution quality and
+discloses an offline postprocessing recovery.

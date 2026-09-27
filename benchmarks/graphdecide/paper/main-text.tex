@@ -1,0 +1,398 @@
+\begin{abstract}
+Can valid local decisions compose into good graph solutions? GraphDecide
+evaluates Jev and open decision-oriented models on six exact graph tasks and
+four irreversible construction tasks. Small graphs permit independently
+checked labels, exact optima and own-history error analysis. Twelve
+configurations share 960 instances: ten direct-decision configurations and
+two GPT upper reference points with different reasoning budgets. Jev achieves
+100\% adjacency accuracy but 61.43\% degree accuracy and 58.75\% distance
+accuracy. Its mean TSP gap is 45.85 versus 100.90 for bounded Qwen3.5-27B;
+on influence maximization their gaps are 0.600 and 0.425. Jev has smaller
+construction gaps than added Qwen3.8-27B and Qwen2.5-72B configurations,
+without establishing general parameter equivalence. A separate 952-instance
+confirmation covers the original four configurations. Classical references,
+presentation controls and probability audits distinguish valid actions from
+correct decisions and competitive solutions. The benchmark characterizes
+task-dependent capabilities, not a universal ranking or a fitted size limit.
+\end{abstract}
+
+\section{Introduction}
+Decision models offer a finite choice instead of an open-ended response.
+This makes them attractive for controllers and sequential workflows, but
+output validity does not establish algorithmic competence. Recognizing an
+edge, counting neighbors, identifying a path and choosing the next city in a
+tour require different capabilities. A model can consistently return legal
+actions while accumulating irreversible errors.
+
+We study \emph{bounded graph decisions}: the model receives a public state
+and legal actions; deterministic code applies the chosen transition without
+providing an oracle action or repairing a poor choice. Exact tasks require
+one decision, while optimization tasks require complete model-generated
+trajectories. All configurations receive identical initial logical
+information, but their renderings, subsequent histories and compute are
+not identical. ``Jev-like'' denotes open decision-oriented readouts, not
+verified reconstructions of Jev's undisclosed architecture.
+
+Our contribution is a diagnostic evaluation package combining consecutive
+size strata, matched binary pairs, exact objectives, explicit failure
+accounting and independently replayable own-history decisions. The completed
+twelve-configuration matrix connects primitive correctness to construction
+quality, while a separate confirmation and targeted controls qualify what
+can be inferred. The research questions are:
+\begin{description}
+\item[RQ1: Primitive discrimination.] Which graph decisions distinguish
+Jev, open trained readouts and bounded language-model baselines?
+\item[RQ2: Sequential composition.] Do local choices yield good complete
+solutions, and where does a trajectory lose attainable quality?
+\item[RQ3: Interpreting failure.] Which findings survive fresh graphs and
+interface checks rather than merely reflecting valid output?
+\end{description}
+The objective is not to increase difficulty until Astra fails. Easy
+adjacency cases are positive controls; low optimum-hit rates motivate
+graded quality measures rather than automatic expansion to larger graphs.
+GPT configurations are upper reference points under different budgets.
+Code and aggregate results are released at
+\url{https://github.com/microsoft/HeurAgenix.git},
+on branch \texttt{graph\_benchmark}, in
+\texttt{benchmarks/graphdecide}. Raw provider logs and model weights are
+not included in this code release.
+
+\paragraph{Positioning.}
+NLGraph and GraphArena establish graph reasoning and verified solution
+quality as existing evaluation directions
+\cite{wang2023nlgraph,tang2025grapharena}; GraphWiz, GraphLLM and CLRS
+address graph-specific training, representations or algorithmic learning
+\cite{chen2024graphwiz,chai2023graphllm,velickovic2022clrs}.
+Learned constructive optimization also predates Jev
+\cite{khalil2017learning,kool2019attention}.
+Jev's typed-decision claims, SemIf's option-logit readout, WorldTour's
+Jev-guided routing and JevBench's decision leaderboard motivate this study,
+not a priority claim for typed choices or Jev-guided TSP
+\cite{almeida2026jev,semif2026,worldtour2026,jevbench2026}.
+Our focus is exactly scored graph decisions and accumulated own-history
+errors under explicit interface controls. Extended context is in
+Appendix~\ref{sec:related-work}.
+
+\section{Tasks and benchmark data}
+\label{sec:tasks}
+Public inputs contain graph structure and the current question, never
+generation-family labels, reference answers or optimum values.
+Unless specified otherwise, graphs are simple, undirected and unweighted,
+with integer vertices including isolates.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{llrr}
+\toprule
+Task & Answer or objective & Cases & Choices/case\\
+\midrule
+Adjacency & Shared edge: yes/no & 80 & 1\\
+Degree & Neighbor count: $0,\ldots,n-1$ & 400 & 1\\
+Cycle & Cycle exists: yes/no & 80 & 1\\
+Connectivity & Path exists: yes/no & 80 & 1\\
+Distance & Distance $\leq h$: yes/no & 80 & 1\\
+Articulation & Components increase: yes/no & 80 & 1\\
+\midrule
+MaxCut & Maximize crossing edges & 40 & $n-1$\\
+Manhattan TSP & Minimize closed-tour length & 40 & $n-2$\\
+Deterministic LT & Maximize activated nodes & 40 & 2\\
+Modularity & Maximize two-group modularity & 40 & $n-1$\\
+\bottomrule
+\end{tabular}
+\caption{Canonical task inventory on the shared $n=8,\ldots,12$ bank.
+Counts are scheduled cases per configuration, not independent graphs.
+Construction choices form one complete own-history trajectory.}
+\label{tab:task-overview}
+\end{table}
+
+\paragraph{Exact decisions.}
+The six tasks ask whether two vertices share an edge (\emph{adjacency}),
+the number of distinct neighbors (\emph{degree}), whether any component has
+a simple cycle of length at least three (\emph{cycle}), whether a path
+connects a pair (\emph{connectivity}), whether shortest-path distance is at
+most a supplied threshold (\emph{distance}), and whether deleting a vertex
+increases the total component count (\emph{articulation}). Degree offers
+all $n$ answers from 0 to $n-1$; the other tasks are binary. Distance
+challenge pairs have finite distances exactly $h$ and $h+1$.
+
+\paragraph{Irreversible constructions.}
+MaxCut assigns vertices in order to two sides, fixing vertex 0 in A,
+to maximize crossing edges in $n-1$ choices. Manhattan TSP starts at city 0
+and chooses unvisited cities in $n-2$ decisions; the final city and return
+edge are forced, and full closed-tour distance is minimized.
+Deterministic normalized linear-threshold (LT) influence selects two
+distinct seeds on a directed graph to maximize final activated nodes.
+Incoming weights are $1/d^-(v)$, threshold is $1/2$, seeds activate
+simultaneously, and diffusion is synchronous and irreversible.
+The modularity task assigns vertices to at most two communities, again
+fixing vertex 0, to maximize standard resolution-1 modularity
+\cite{newman2004community}. Empty sides and one community are legal.
+This is neither unrestricted community detection nor the random-threshold
+LT model: its classical submodularity guarantee is not assumed
+\cite{kempe2015influence}. Exact contracts and invariants are in
+Appendices~\ref{app:task-details} and \ref{app:contracts}.
+
+\paragraph{Consecutive sizes and coverage.}
+Development contains 356 realized cases at every integer size 5--12;
+the canonical challenge contains 960 at sizes 8--12. At each challenge
+size there are sixteen queries for each binary task, $8n$ degree queries,
+and eight episodes for each construction. Thus every model receives
+800 exact queries and 160 constructions, requiring at most 1,920 calls.
+Four development cases were not generated within the bounded proposal
+budget; the canonical challenge has no omissions.
+The separate prospective confirmation realizes 952 of 960 requested
+cases, retaining eight missing cycle cases as generation shortfalls.
+Full counts and chronology are in Appendix~\ref{app:data-details}.
+
+\paragraph{Controls and exact verification.}
+Heterogeneous graph-generation procedures vary structure within sizes.
+Binary positive/negative pairs match audited degree-based attributes:
+query tasks generally share a graph; cycle twins share $n,m$ and the degree
+multiset. The audited cells are label-balanced, giving a 50\% empirical
+lookup ceiling for those attributes, not immunity to every shortcut.
+Graph fingerprints select candidate identity matches; exact isomorphism
+checks enforce exclusion against the recorded prior pool. TSP identity uses
+weighted distance graphs and LT uses directed topology.
+
+Labels and objectives are independently checked. Adjacency, distance and
+articulation oracles were tested on all 1,024 labeled five-vertex graphs;
+subset dynamic programming checks TSP optima, while small partition and seed
+spaces permit exhaustive checks. Public request construction is separate
+from privileged references. ``Independent'' here means separate computation
+within this project, not external replication. The canonical bank was
+already inspected before later model extensions; it is not a newly blind
+test. Locally frozen registrations are not external preregistration.
+
+\section{Evaluation protocol}
+\label{sec:methods}
+\paragraph{Models and budgets.}
+The ten direct-decision configurations are Jev's native action selection;
+no-thinking Qwen3.5-4B/9B/27B grammar generation; a Qwen3.5-4B
+candidate-token-score reference; trained Decider-2B v11, Kev-4B and Laya;
+and full-BF16 Qwen3.8-27B and Qwen2.5-72B-Instruct.
+Grammar configurations use greedy legal-choice generation with a 64-token
+ceiling. The larger/newer local lanes use a 180-second request deadline;
+thinking is disabled for Qwen3.8, while Qwen2.5 uses its standard instruct
+template without added reasoning. The older-generation 72B is not a scale-only
+ablation of Qwen3.5/3.8. GPT-5.4 and Astra use tool-free default reasoning,
+a 4,096-token ceiling and a 180-second deadline, and remain separately grouped.
+No Jev outputs are used to train a replacement. Checkpoints, serving settings
+and compatibility qualifications are in Appendix~\ref{app:method-details}.
+
+\paragraph{Interactions and failures.}
+Every model receives the same initial logical request with explicit action
+descriptions. Each later state follows that model's actual previous choices,
+not teacher-forced or oracle prefixes. A valid native Jev action is not
+replaced by probability argmax; probability conformance is audited separately.
+Unsupported inputs, timeouts and invalid outputs remain in scheduled
+denominators. There is no answer repair, silent truncation or replacement
+of failed cases. Feasibility means a valid answer or complete legal trajectory,
+not mathematical correctness. All tied optima are accepted.
+
+\paragraph{Metrics and uncertainty.}
+Exact-task accuracy is the equal-weight mean of five size-specific
+accuracies. Degree's pooled correct count is different because each size has
+$8n$ queries. The primary construction-quality metric is mean additive
+objective gap over feasible completed episodes, always accompanied by
+feasible coverage over all scheduled episodes:
+\[
+\gap_i=
+\begin{cases}
+f_i^\star-f_i,&\text{maximization},\\
+f_i-f_i^\star,&\text{minimization}.
+\end{cases}
+\]
+We average per-episode gaps, not optimum-hit indicators. Units are crossing
+edges, Manhattan distance, activated nodes and modularity; absolute gaps
+must not be pooled across tasks or interpreted as percentages.
+Zero conditional gap does not imply zero failures. Optimum-hit counts
+are supplementary (Appendix~\ref{app:construction-hits}).
+
+The twelve-configuration tables are descriptive point estimates, not
+family-wise significance claims. Original four-configuration uncertainty
+uses 2,000 size-stratified paired bootstrap replicates over clusters joining
+graph identity and matched-pair relations, rather than treating related
+queries as independent (Appendix~\ref{app:method-details}).
+Generation omissions have no model prediction and are not scored as model
+errors; model failures on generated cases remain in the denominator.
+Only the original four configurations receive prospective new-graph
+confirmation; model extensions do not inherit that replication.
+
+\clearpage
+\section{Canonical results}
+\label{sec:full-matrix}
+The complete comparison comprises 11,520 scheduled episode evaluations on
+the same 960 instances, not 11,520 independent graphs. Frozen results are
+reused when adding models. The public presentation contains
+720 task/size/configuration cells. Historical pilots and legacy Astra
+protocols are separate, not mixed into the main columns.
+
+\begin{table}[t]
+\centering\small
+\resizebox{\textwidth}{!}{\input{generated-twelve-model/coverage.tex}}
+\caption{Full canonical coverage. Exact feasibility means a valid returned
+answer, not a correct answer. Construction feasibility requires a complete
+legal trajectory. Input rejects and execution failures are episode counts.
+All twelve configurations retain 960 scheduled cases. The lower block contains
+GPT default-reasoning anchors, not matched-compute direct-decision baselines.}
+\label{tab:full-coverage}
+\end{table}
+
+\paragraph{Coverage.}
+All configurations except Laya and GPT-5.4 complete 960/960 episodes.
+Laya rejects nine LT inputs at its lossless context/head limits, leaving
+31/40 feasible LT episodes. GPT-5.4 retains nine construction timeouts:
+36/40 cut, 39/40 TSP, 40/40 LT and 36/40 modularity episodes are feasible.
+Every other construction cell has 40/40 feasible episodes.
+Table~\ref{tab:full-coverage} gives the complete counts; integrity checks
+are in Appendix~\ref{app:coverage-integrity}.
+
+\begin{table}[t]
+\centering\small
+\resizebox{\textwidth}{!}{\input{generated-twelve-model/exact.tex}}
+\caption{Canonical exact-task macro-size accuracy (\%). Qwen4/9/27 G denote
+Qwen3.5 no-thinking grammar configurations; other Qwen generations are named.
+GPT default-reasoning anchors form a separate lower block.}
+\label{tab:full-exact}
+\end{table}
+
+\paragraph{RQ1: Strengths are task dependent.}
+Jev's 100\% adjacency accuracy does not extend to uniform structural
+reliability: degree is 61.43\%, cycle 66.25\%, and distance 58.75\%
+(Table~\ref{tab:full-exact}). Open trained readouts do not recover its
+exact-task profile. Kev reaches 78.75\% adjacency and 19.88\% degree;
+Decider reaches 58.75\% and 12.09\%. Laya selects \texttt{yes} on all
+400 binary queries. Native-score, mapping and replay checks retain that
+outcome as observed behavior, not an assumed parser failure.
+
+Jev's exact-task point estimates exceed bounded Qwen3.5-27B on all six
+tasks, but this does not establish general parameter equivalence.
+The newer Qwen3.8-27B and larger Qwen2.5-72B reach degree macro accuracies
+of 45.50\% and 41.24\%, respectively, not their pooled rates of 44.50\%
+and 40.50\%. The 72B connectivity and distance estimates exceed Jev by
+only one answer out of eighty each. Model size and generation therefore
+do not induce a monotone ordering under this bounded protocol.
+
+\begin{table}[t]
+\centering\small
+\input{generated-twelve-model/gaps.tex}
+\caption{Primary construction outcome: mean additive objective gap over
+feasible completions; lower is better. Units differ across columns.
+All cells use forty episodes except Laya LT (31), GPT-5.4 cut (36),
+TSP (39) and modularity (36). Different coverage is not a matched-subset
+comparison.}
+\label{tab:full-gaps}
+\end{table}
+
+\paragraph{RQ2: Quality is not optimum-hit frequency.}
+Jev's TSP gap is 45.85, compared with 100.90 for Qwen3.5-27B and
+349.65 for Kev (Table~\ref{tab:full-gaps}). LT reverses the Jev--Qwen3.5-27B
+ordering: their gaps are 0.600 and 0.425. Kev ties Jev at 0.600;
+its larger optimum-hit count does not establish better mean quality.
+Qwen3.5-27B also has a slightly smaller cut gap (8.025 versus 8.150),
+whereas Jev has the smaller modularity gap (0.1694 versus 0.2810).
+These are taskwise observations, not established significant differences.
+
+Jev has smaller mean gaps on all four constructions than either added
+Qwen3.8-27B or Qwen2.5-72B configuration, each with complete feasible
+coverage. In TSP their gaps are 183.70 and 152.40, respectively.
+This supports a direct-decision advantage on these instances, not a
+claim that Jev matches a general 72B model. No equal-hardware latency comparison
+or causal architecture attribution follows from these scores.
+
+Absolute quality requires algorithmic references. Jev's MaxCut gap of
+8.150 exceeds the uniform legal policy's exact expected gap of 5.325;
+classical cut search achieves 0.450. Nearest-neighbor plus 2-opt has
+TSP gap 0.200 versus Jev's 45.850. These algorithms may revise choices
+and are quality references, not equal-budget online competitors.
+Relative neural superiority is not competitiveness with classical solvers.
+Own-history continuation analysis gives a complementary error measure:
+over 640 constructions of the original four configurations, stepwise
+continuation losses telescope to final gap for all 4,480 decisions.
+Jev loses TSP optimality at its first choice in 3/40 episodes, compared
+with 22/40 for grammar-4B (Appendix~\ref{sec:regret}).
+
+\paragraph{Reasoning anchors.}
+Both GPT configurations answer all 800 exact queries correctly.
+Astra reaches zero gap with all 160 constructions feasible; GPT-5.4
+reaches zero conditional gap with 151/160 feasible. This demonstrates
+that stronger reasoning can solve these small instances, without making
+matched-compute claims or requiring further difficulty escalation.
+
+\section{Robustness and interpretation}
+\label{sec:discussion}
+\paragraph{RQ3: Confirmation has a defined scope.}
+The topology-excluded prospective confirmation contains 952 new instances
+for the original four configurations, not all twelve.
+Jev retains perfect adjacency, and all four again have larger MaxCut gaps
+than the uniform policy. Some rankings change, so confirmation supports
+selected patterns rather than every canonical estimate
+(Appendix~\ref{sec:confirmation}).
+Likewise, Kev's community advantage in an exploratory 64-case panel does
+not persist on the canonical bank. The smaller and larger panels are
+different graph sets, not a paired sample-size intervention.
+
+\paragraph{Interface and probability controls.}
+Option/state transformations expose semantic-choice reversals that
+aggregate accuracy can hide. At an identical token prefix, 4B
+candidate-score argmax and masked greedy agree on 100/100 states:
+argmax alone does not explain the main pipeline's gains.
+A separate CPU/GPU SemIf check matches choices but exceeds the registered
+0.01 probability-error tolerance; the failed numerical reproduction
+gate remains unresolved. Hence the score baseline is an interface
+reference, not a certified reproduction.
+Laya's option-reversal pilot argues against a simple first-option bias,
+not against all prompting effects.
+
+Numeric probability output does not imply calibration
+\cite{gneiting2007proper,guo2017calibration}. Jev's above-chance distance
+accuracy coexists with probability losses worse than uniform on
+common-valid audit rows. These diagnostics separate mathematical
+correctness, action validity and probability quality; they do not prove
+absence of every implementation error. Full controls and probability
+tables remain in Appendix~\ref{sec:controls}.
+
+\paragraph{Size and speed are bounded observations.}
+Consecutive sizes reveal different profiles, not a fitted common boundary.
+Jev degree accuracy decreases from 70.3\% at $n=8$ to 49.0\% at $n=12$;
+cycle decreases from 81.25\% to 50\%, with nonmonotone intermediate cells.
+Adjacency stays perfect. Binary cells have only sixteen queries and
+construction cells eight episodes, and degree's number of classes grows.
+These observations do not identify ``failure at twelve vertices.''
+In the original four-configuration timing panel, Jev's median response is
+70.01 ms, versus 64.41 ms for 4B candidate scoring and 94.24 ms for
+4B grammar generation. Jev is not invariably fastest; different hardware,
+network paths and serving conditions prevent architecture or cost attribution
+(Appendix~\ref{app:original-results}).
+
+\section{Limitations and conclusion}
+\label{sec:limits}
+Small graphs enable exact checking but do not establish operational-scale
+performance, size-OOD generalization or an ordering of causal difficulty.
+Finite generation procedures, degree conditioning and matching determine
+the tested distribution. Prior-topology exclusion is local, not proof
+against pretraining contamination. Later model choices use inspected banks;
+only four configurations have prospective new-graph confirmation.
+Taskwise estimates and exploratory bootstrap intervals do not correct
+all selection or multiplicity. Jev is closed, renderings and budgets are
+not fully matched, and trained readouts use compatible rather than
+identical upstream environments. Extended limitations and protocol
+details are retained in the appendices.
+
+The artifacts contain synthetic graph states, not personal-network data;
+deterministic LT is not a validated model of human behavior. Public
+aggregates and scoring artifacts exclude credentials and raw provider
+responses. Local registrations and independent replay are not third-party
+attestation; extension-artifact distribution and publication permissions
+remain release requirements.
+
+GraphDecide shows why valid choices, exact reasoning and good complete
+solutions must be evaluated separately. Jev has task-specific advantages
+over open readouts and several bounded Qwen configurations, including
+the added 72B baseline, yet remains far from classical optimization
+quality. Mean gaps reveal differences hidden by optimum-hit counts.
+The supported result is a capability profile with explicit uncertainty,
+not a universal model ranking. Fresh-graph confirmation and controlled
+transition-region studies are more informative next steps than increasing
+size solely because the GPT anchors remain successful.
+\label{sec:main-end}

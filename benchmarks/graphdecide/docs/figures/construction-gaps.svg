@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="790" viewBox="0 0 1120 790" role="img" aria-labelledby="title desc">
+<title id="title">Sequential construction: mean objective gap</title><desc id="desc">Lower is better; absolute task units. Color scales are separate per column. Twelve configurations on 960 shared cases. GPT uses a separate reasoning budget. Exact numeric tables are available in RESULTS.md.</desc>
+<rect width="1120" height="790" rx="12" fill="#faf9f6"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#172c35">
+<text x="24" y="34" font-size="24" font-weight="bold">Sequential construction: mean objective gap</text>
+<text x="24" y="60" font-size="14">Lower is better; absolute task units. Color scales are separate per column.</text>
+<text x="373.2" y="93" text-anchor="middle" font-size="14" font-weight="bold">MaxCut (edges)</text>
+<text x="579.8" y="93" text-anchor="middle" font-size="14" font-weight="bold">TSP (distance)</text>
+<text x="786.2" y="93" text-anchor="middle" font-size="14" font-weight="bold">LT (nodes)</text>
+<text x="992.8" y="93" text-anchor="middle" font-size="14" font-weight="bold">Modularity</text>
+<text x="24" y="135" font-size="15" font-weight="bold">Jev</text>
+<rect x="270.0" y="110" width="200.5" height="43" rx="4" fill="#c6e1d7"/>
+<text x="370.2" y="129" text-anchor="middle" font-size="16">8.150</text>
+<text x="370.2" y="145" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="110" width="200.5" height="43" rx="4" fill="#9ccdbf"/>
+<text x="576.8" y="129" text-anchor="middle" font-size="16">45.850</text>
+<text x="576.8" y="145" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="110" width="200.5" height="43" rx="4" fill="#9ecec0"/>
+<text x="783.2" y="129" text-anchor="middle" font-size="16">0.600</text>
+<text x="783.2" y="145" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="110" width="200.5" height="43" rx="4" fill="#c5e0d6"/>
+<text x="989.8" y="129" text-anchor="middle" font-size="16">0.1694</text>
+<text x="989.8" y="145" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="183" font-size="15" font-weight="normal">Qwen3.5-4B grammar</text>
+<rect x="270.0" y="158" width="200.5" height="43" rx="4" fill="#daeae2"/>
+<text x="370.2" y="177" text-anchor="middle" font-size="16">11.125</text>
+<text x="370.2" y="193" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="158" width="200.5" height="43" rx="4" fill="#f1f5ef"/>
+<text x="576.8" y="177" text-anchor="middle" font-size="16">338.150</text>
+<text x="576.8" y="193" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="158" width="200.5" height="43" rx="4" fill="#d1e6dd"/>
+<text x="783.2" y="177" text-anchor="middle" font-size="16">2.625</text>
+<text x="783.2" y="193" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="158" width="200.5" height="43" rx="4" fill="#ecf2ec"/>
+<text x="989.8" y="177" text-anchor="middle" font-size="16">0.2900</text>
+<text x="989.8" y="193" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="231" font-size="15" font-weight="normal">Qwen3.5-9B grammar</text>
+<rect x="270.0" y="206" width="200.5" height="43" rx="4" fill="#daeae2"/>
+<text x="370.2" y="225" text-anchor="middle" font-size="16">11.050</text>
+<text x="370.2" y="241" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="206" width="200.5" height="43" rx="4" fill="#e8f0ea"/>
+<text x="576.8" y="225" text-anchor="middle" font-size="16">306.450</text>
+<text x="576.8" y="241" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="206" width="200.5" height="43" rx="4" fill="#ecf2ec"/>
+<text x="783.2" y="225" text-anchor="middle" font-size="16">3.725</text>
+<text x="783.2" y="241" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="206" width="200.5" height="43" rx="4" fill="#f6f7f2"/>
+<text x="989.8" y="225" text-anchor="middle" font-size="16">0.3203</text>
+<text x="989.8" y="241" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="279" font-size="15" font-weight="normal">Qwen3.5-27B grammar</text>
+<rect x="270.0" y="254" width="200.5" height="43" rx="4" fill="#c5e0d6"/>
+<text x="370.2" y="273" text-anchor="middle" font-size="16">8.025</text>
+<text x="370.2" y="289" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="254" width="200.5" height="43" rx="4" fill="#acd5c8"/>
+<text x="576.8" y="273" text-anchor="middle" font-size="16">100.900</text>
+<text x="576.8" y="289" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="254" width="200.5" height="43" rx="4" fill="#9accbd"/>
+<text x="783.2" y="273" text-anchor="middle" font-size="16">0.425</text>
+<text x="783.2" y="289" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="254" width="200.5" height="43" rx="4" fill="#e9f1eb"/>
+<text x="989.8" y="273" text-anchor="middle" font-size="16">0.2810</text>
+<text x="989.8" y="289" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="327" font-size="15" font-weight="normal">Qwen3.8-27B BF16</text>
+<rect x="270.0" y="302" width="200.5" height="43" rx="4" fill="#daeae2"/>
+<text x="370.2" y="321" text-anchor="middle" font-size="16">11.150</text>
+<text x="370.2" y="337" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="302" width="200.5" height="43" rx="4" fill="#c4e0d5"/>
+<text x="576.8" y="321" text-anchor="middle" font-size="16">183.700</text>
+<text x="576.8" y="337" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="302" width="200.5" height="43" rx="4" fill="#d2e6dd"/>
+<text x="783.2" y="321" text-anchor="middle" font-size="16">2.675</text>
+<text x="783.2" y="337" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="302" width="200.5" height="43" rx="4" fill="#f0f4ee"/>
+<text x="989.8" y="321" text-anchor="middle" font-size="16">0.3012</text>
+<text x="989.8" y="337" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="375" font-size="15" font-weight="normal">Qwen2.5-72B BF16</text>
+<rect x="270.0" y="350" width="200.5" height="43" rx="4" fill="#d1e6dd"/>
+<text x="370.2" y="369" text-anchor="middle" font-size="16">9.775</text>
+<text x="370.2" y="385" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="350" width="200.5" height="43" rx="4" fill="#bbdcd0"/>
+<text x="576.8" y="369" text-anchor="middle" font-size="16">152.400</text>
+<text x="576.8" y="385" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="350" width="200.5" height="43" rx="4" fill="#c0ded3"/>
+<text x="783.2" y="369" text-anchor="middle" font-size="16">1.950</text>
+<text x="783.2" y="385" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="350" width="200.5" height="43" rx="4" fill="#e4efe8"/>
+<text x="989.8" y="369" text-anchor="middle" font-size="16">0.2645</text>
+<text x="989.8" y="385" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="423" font-size="15" font-weight="normal">Qwen3.5-4B scores</text>
+<rect x="270.0" y="398" width="200.5" height="43" rx="4" fill="#cde4db"/>
+<text x="370.2" y="417" text-anchor="middle" font-size="16">9.200</text>
+<text x="370.2" y="433" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="398" width="200.5" height="43" rx="4" fill="#f5f6f1"/>
+<text x="576.8" y="417" text-anchor="middle" font-size="16">351.000</text>
+<text x="576.8" y="433" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="398" width="200.5" height="43" rx="4" fill="#f6f7f2"/>
+<text x="783.2" y="417" text-anchor="middle" font-size="16">4.125</text>
+<text x="783.2" y="433" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="398" width="200.5" height="43" rx="4" fill="#e9f1eb"/>
+<text x="989.8" y="417" text-anchor="middle" font-size="16">0.2810</text>
+<text x="989.8" y="433" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="471" font-size="15" font-weight="normal">Decider-2B v11</text>
+<rect x="270.0" y="446" width="200.5" height="43" rx="4" fill="#daeae2"/>
+<text x="370.2" y="465" text-anchor="middle" font-size="16">11.125</text>
+<text x="370.2" y="481" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="446" width="200.5" height="43" rx="4" fill="#f6f7f2"/>
+<text x="576.8" y="465" text-anchor="middle" font-size="16">355.700</text>
+<text x="576.8" y="481" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="446" width="200.5" height="43" rx="4" fill="#f5f7f2"/>
+<text x="783.2" y="465" text-anchor="middle" font-size="16">4.100</text>
+<text x="783.2" y="481" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="446" width="200.5" height="43" rx="4" fill="#e9f1eb"/>
+<text x="989.8" y="465" text-anchor="middle" font-size="16">0.2810</text>
+<text x="989.8" y="481" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="519" font-size="15" font-weight="normal">Kev-4B</text>
+<rect x="270.0" y="494" width="200.5" height="43" rx="4" fill="#daeae2"/>
+<text x="370.2" y="513" text-anchor="middle" font-size="16">11.075</text>
+<text x="370.2" y="529" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="494" width="200.5" height="43" rx="4" fill="#f4f6f1"/>
+<text x="576.8" y="513" text-anchor="middle" font-size="16">349.650</text>
+<text x="576.8" y="529" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="494" width="200.5" height="43" rx="4" fill="#9ecec0"/>
+<text x="783.2" y="513" text-anchor="middle" font-size="16">0.600</text>
+<text x="783.2" y="529" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="494" width="200.5" height="43" rx="4" fill="#dfece5"/>
+<text x="989.8" y="513" text-anchor="middle" font-size="16">0.2502</text>
+<text x="989.8" y="529" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="567" font-size="15" font-weight="normal">Laya</text>
+<rect x="270.0" y="542" width="200.5" height="43" rx="4" fill="#f6f7f2"/>
+<text x="370.2" y="561" text-anchor="middle" font-size="16">15.250</text>
+<text x="370.2" y="577" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="542" width="200.5" height="43" rx="4" fill="#f3f6f0"/>
+<text x="576.8" y="561" text-anchor="middle" font-size="16">344.750</text>
+<text x="576.8" y="577" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="542" width="200.5" height="43" rx="4" fill="#d7e8e0"/>
+<text x="783.2" y="561" text-anchor="middle" font-size="16">2.871</text>
+<text x="783.2" y="577" text-anchor="middle" font-size="11">31/40 feasible</text>
+<rect x="889.5" y="542" width="200.5" height="43" rx="4" fill="#f1f5ef"/>
+<text x="989.8" y="561" text-anchor="middle" font-size="16">0.3039</text>
+<text x="989.8" y="577" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="608" font-size="13" font-weight="bold">SEPARATE GPT REFERENCES — default reasoning, not matched compute</text>
+<text x="24" y="645" font-size="15" font-weight="normal">GPT-5.4 (reasoning)</text>
+<rect x="270.0" y="620" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="370.2" y="639" text-anchor="middle" font-size="16">0.000</text>
+<text x="370.2" y="655" text-anchor="middle" font-size="11">36/40 feasible</text>
+<rect x="476.5" y="620" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="576.8" y="639" text-anchor="middle" font-size="16">0.000</text>
+<text x="576.8" y="655" text-anchor="middle" font-size="11">39/40 feasible</text>
+<rect x="683.0" y="620" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="783.2" y="639" text-anchor="middle" font-size="16">0.000</text>
+<text x="783.2" y="655" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="620" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="989.8" y="639" text-anchor="middle" font-size="16">0.0000</text>
+<text x="989.8" y="655" text-anchor="middle" font-size="11">36/40 feasible</text>
+<text x="24" y="693" font-size="15" font-weight="normal">Astra (reasoning)</text>
+<rect x="270.0" y="668" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="370.2" y="687" text-anchor="middle" font-size="16">0.000</text>
+<text x="370.2" y="703" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="476.5" y="668" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="576.8" y="687" text-anchor="middle" font-size="16">0.000</text>
+<text x="576.8" y="703" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="683.0" y="668" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="783.2" y="687" text-anchor="middle" font-size="16">0.000</text>
+<text x="783.2" y="703" text-anchor="middle" font-size="11">40/40 feasible</text>
+<rect x="889.5" y="668" width="200.5" height="43" rx="4" fill="#8fc7b7"/>
+<text x="989.8" y="687" text-anchor="middle" font-size="16">0.0000</text>
+<text x="989.8" y="703" text-anchor="middle" font-size="11">40/40 feasible</text>
+<text x="24" y="746" font-size="13">Units: edges / Manhattan distance / activated nodes / modularity. No pooled OR score.</text>
+<text x="24" y="770" font-size="13">GraphDecide · canonical inspected bank · n = 8–12 · point estimates, not significance claims</text>
+</g></svg>

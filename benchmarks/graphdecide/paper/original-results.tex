@@ -1,0 +1,128 @@
+\section{Results on the inspected structural challenge}
+\label{app:original-results}
+\begin{table}[t]
+\centering\small
+\input{generated/exact.tex}
+\caption{Exact-task macro-size accuracy (\%). All four methods complete all
+960 challenge instances. Each binary task has eighty cases; degree has 400.
+These are bounded configurations, not unrestricted model-capacity rankings.}
+\label{tab:exact}
+\end{table}
+
+\subsection{Primitive correctness is task dependent}
+Jev obtains 100\% adjacency accuracy but 58.75\% distance and 65\%
+articulation accuracy (Table~\ref{tab:exact}). Its degree macro accuracy is
+61.43\%, whereas pooled accuracy is 241/400, or 60.25\%. Reporting only
+the direct-lookup ceiling would obscure these differences.
+
+Candidate scoring improves 4B adjacency from 60\% to 77.5\% but does not
+uniformly improve other tasks. Nor does the bounded 9B configuration
+uniformly improve on 4B. Binary chance-level results are accompanied by
+prediction counts and per-label/per-degree recall, since a constant answer
+can achieve 50\% on balanced pairs without discriminating either case.
+The size curves (Figure~\ref{fig:size}) are descriptive; topology,
+serialization length and action cardinality also vary.
+
+\begin{figure}[t]
+\centering
+\input{generated/size-figure.tex}
+\caption{Selected size curves on the structural challenge. Exact-task
+accuracy and construction optimum-hit rate are different metrics. Each
+construction point has eight episodes; curves do not imply monotone or
+size-causal difficulty. Full task/size counts are in the artifact.}
+\label{fig:size}
+\end{figure}
+
+\subsection{Legal construction does not imply competitive optimization}
+\begin{table}[t]
+\centering\small
+\input{generated/optimal.tex}
+\caption{Optimal solutions over forty scheduled episodes per construction
+task. Classical references use separate revisable full-solution algorithms.
+All model episodes in this table are feasible.}
+\label{tab:optimal}
+\end{table}
+\begin{table}[t]
+\centering\small
+\resizebox{\textwidth}{!}{\input{generated/gaps.tex}}
+\caption{Mean additive objective gap, lower is better. Uniform is the exact
+expected gap of uniform legal decisions, not a sampled solver. Columns are
+comparable within a row only; the four objectives have different units.}
+\label{tab:gaps}
+\end{table}
+
+All four primary bounded configurations miss every MaxCut optimum; their mean gaps also
+exceed the uniform-policy expected gap (Table~\ref{tab:gaps}). Classical cut
+search reaches 29/40 optima. For TSP, Jev reaches 3/40 optima versus
+37/40 for nearest-neighbor plus 2-opt. Thus neither legal output nor relative
+improvement over a weak neural configuration implies a useful solver.
+On LT, 4B scoring attains only 3/40 optima versus 13/40 for 4B generation;
+the same readout that improves adjacency can harm sequential performance.
+
+The suspicious cut and modularity floors triggered independent NetworkX
+objective recomputation, with zero mismatches. The 4B grammar configuration
+assigns every remaining vertex to B in all forty cuts; 9B does so in 39/40,
+scoring in 20/40, and Jev in 13/40. The scoring method chooses all-A on every
+modularity episode, legally obtaining $Q=0$. These are observed policies, not
+proofs of an internal failure mechanism or an exhaustive absence of bugs.
+
+\subsection{Where actual trajectories lose optimality}
+\label{sec:regret}
+Let $s_t$ include all choices through time $t$, and let $V(s_t)$ be the best
+final objective still reachable by any legal completion. Define
+\[
+ r_t =
+ \begin{cases}
+ V(s_{t-1})-V(s_t), & \text{maximization},\\
+ V(s_t)-V(s_{t-1}), & \text{minimization}.
+ \end{cases}
+\]
+Restricting the completion set cannot improve the optimum, so $r_t\geq0$.
+For a complete trajectory, $V(s_0)=f^\star$ and $V(s_T)=f$; consequently
+$\sum_{t=1}^T r_t=\gap$. This elementary telescoping identity distinguishes
+the first irreversible loss from a later locally optimal action in an already
+damaged state. It does not require one unique optimal action.
+
+We compute this diagnostic \emph{after inference} from actual histories,
+using exact prefix-conditioned continuations. Across 640 complete
+construction episodes and 4,480 decisions, every decomposition equals the
+independently replayed final gap within $10^{-12}$.
+Table~\ref{tab:loss} shows how often optimality is lost immediately.
+For MaxCut, only 7--8 of forty episodes lose optimality at the first action
+despite every complete neural solution being suboptimal. In TSP, the first
+action already loses optimality in 22/40 grammar-4B and 29/40 scoring episodes,
+versus 3/40 for Jev. No oracle continuation value was returned to the model.
+
+\begin{table}[t]
+\centering\small
+\input{generated/first-loss.tex}
+\caption{Episodes losing every globally optimal completion at the first
+decision, over all forty feasible episodes. Later errors remain represented
+in the full per-step regret artifact. This is a retrospective diagnostic,
+not a new inference experiment.}
+\label{tab:loss}
+\end{table}
+
+\subsection{Latency and native conformance are separate outcomes}
+\begin{table}[t]
+\centering\small
+\input{generated/timing.tex}
+\caption{Observed client-path request latency on the challenge. Network,
+rendering, cache and hosting differ; this is not an architecture-isolated
+speed comparison. No compute-equivalence claim is made.}
+\label{tab:latency}
+\end{table}
+Across development and challenge, the four-method matrix makes 10,352
+actual calls for 5,264 scheduled instance evaluations. Jev retains 25 strict
+native observations: 24 probability-sum checks and one choice/argmax check.
+All supplied actions are eligible under the separately frozen action protocol.
+We neither normalize probabilities nor infer replacement choices.
+The unchanged strict production parser and its historical results remain
+available as a different protocol.
+
+The challenge scoring method evaluates 8,880 candidates in 1,920 prefixes,
+with 1,920 unused generated tokens. Median request latency is 64.41 ms,
+compared with Jev's 70.01 ms (Table~\ref{tab:latency}). This is not evidence
+that one architecture is inherently faster. Vendor-reported tokens are
+preserved but are not interchangeable autoregressive steps, FLOPs, energy,
+or monetary cost. No unsupported carbon or cost saving is inferred.
