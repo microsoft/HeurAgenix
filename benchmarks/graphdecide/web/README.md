@@ -16,9 +16,9 @@ model details, coverage and descriptive size profiles. GPT references remain
 separately grouped. Gap is the primary construction metric; optimum hits are
 supplementary. Missing quality is never fabricated as zero.
 
-- [Paper](assets/graphdecide-v17.pdf): eight-page main text plus references
+- [Paper](assets/graphdecide-v18.pdf): revised eight-page main text plus 24 references
   and appendices; SHA-256
-  `97f6ae0998a20aecac3e37b8c1cfb441b4019c96f2dbbdd4b8866a2f3cf7bf2d`.
+  `11c4869e60c52bc41259b92deb6531aaabf526d21a4589b397c9d44c7ed23988`.
 - [JSON](data/benchmark.json): public aggregate metrics and safe source hashes.
 - [CSV](data/benchmark.csv): identical metrics in tabular form.
 - [README visualization](../docs/RESULTS.md): static figures and accessible tables.

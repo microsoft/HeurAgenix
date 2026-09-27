@@ -115,3 +115,51 @@ class PaperStructureTests(unittest.TestCase):
         self.assertIn(r"\texttt{graph\_benchmark}", self.body)
         self.assertIn(r"\texttt{benchmarks/graphdecide}", self.body)
         self.assertIn("not included in this code release", self.body)
+
+    def test_introduction_cites_prior_work_and_separates_outcomes(self):
+        intro = self.body.split(r"\section{Introduction}", 1)[1].split(
+            r"\section{Tasks and benchmark data}", 1
+        )[0]
+        cited = {
+            key
+            for group in re.findall(r"\\cite\{([^}]+)\}", intro)
+            for key in group.split(",")
+        }
+        self.assertTrue({
+            "almeida2026jev", "semif2026", "decider2026model", "kev2026model",
+            "laya2026", "wang2023nlgraph", "tang2025grapharena",
+            "khalil2017learning", "kool2019attention", "worldtour2026",
+            "jevbench2026",
+        }.issubset(cited))
+        self.assertEqual(intro.count(r"\item \textbf{"), 4)
+        for phrase in ("mathematical correctness and optimization quality",
+                       "feasible coverage over all scheduled",
+                       "not all twelve configurations", "3/40", "22/40", "10/20"):
+            self.assertIn(phrase, intro)
+        for label in ("sec:methods", "sec:full-matrix", "sec:regret",
+                      "sec:confirmation", "sec:controls"):
+            self.assertIn(r"\ref{" + label + "}", intro)
+
+    def test_all_citations_have_unique_bibliography_entries(self):
+        entries = []
+        for name in ("references.bib", "expanded-references.bib"):
+            entries.extend(re.findall(
+                r"@\w+\s*\{\s*([^,\s]+)", (ROOT / name).read_text()
+            ))
+        self.assertEqual(len(entries), len(set(entries)))
+        cited = set()
+        for path in ROOT.rglob("*.tex"):
+            for group in re.findall(r"\\cite\w*\{([^}]+)\}", path.read_text()):
+                cited.update(group.split(","))
+        self.assertFalse(cited - set(entries), f"Missing references: {cited - set(entries)}")
+
+    def test_evaluated_qwen_generations_have_primary_source_citations(self):
+        methods = self.body.split(r"\section{Evaluation protocol}", 1)[1].split(
+            r"\section{Canonical results}", 1
+        )[0]
+        for key in ("qwen2024qwen25", "qwen2026qwen35", "qwen2026qwen38"):
+            self.assertIn(r"\cite{" + key + "}", methods)
+        bibliography = (ROOT / "expanded-references.bib").read_text()
+        for source in ("2412.15115", "https://qwen.ai/blog?id=qwen3.5",
+                       "https://huggingface.co/Qwen/Qwen3.8-27B"):
+            self.assertIn(source, bibliography)

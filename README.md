@@ -10,7 +10,7 @@ This branch also includes **GraphDecide: Benchmarking Decision Models on Graphs*
 on 960 shared instances. The existing HeurAgenix framework is preserved.
 
 [Benchmark README and setup](benchmarks/graphdecide/README.md) ·
-[Paper](benchmarks/graphdecide/web/assets/graphdecide-v17.pdf) ·
+[Paper](benchmarks/graphdecide/web/assets/graphdecide-v18.pdf) ·
 [Numeric results](benchmarks/graphdecide/docs/RESULTS.md)
 
 ![GraphDecide exact-task results](benchmarks/graphdecide/docs/figures/exact-accuracy.svg)

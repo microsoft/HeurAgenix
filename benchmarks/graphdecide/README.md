@@ -12,7 +12,7 @@ irreversible construction tasks on small, exactly verifiable graphs.
 
 **12 configurations · 10 tasks · 960 shared canonical instances · sizes 8–12**
 
-[Paper: 8-page main text + appendices](web/assets/graphdecide-v17.pdf) ·
+[Paper: 8-page main text + appendices](web/assets/graphdecide-v18.pdf) ·
 [All numeric results](docs/RESULTS.md) · [CSV](web/data/benchmark.csv) ·
 [JSON and provenance](web/data/benchmark.json) · [Code guide](docs/CODE.md)
 

@@ -5,9 +5,15 @@
 Xianliang Yang (Microsoft), Yapu Zhang (Beijing University of Technology),
 and Li Zhao (Microsoft; corresponding author).
 
-[Current PDF](../web/assets/graphdecide-v17.pdf): 8 pages of main text,
-references on pages 9--11, and appendices from page 12. This is a working
+[Current PDF](../web/assets/graphdecide-v18.pdf): 8 pages of main text,
+24 references on pages 9--11, and appendices from page 12. This is a working
 manuscript, not a claim of venue acceptance or third-party replication.
+
+V18 rewrites the introduction around prior work, three research questions
+and four evidence-backed findings. It adds the Qwen2.5 technical report,
+the official Qwen3.5 release citation and the Qwen3.8-27B model card.
+The previous 21 references already occupied three pages; that page count
+was not a count of cited works. All experimental results are unchanged.
 
 ## Rebuild without inference
 

@@ -84,9 +84,10 @@ test("new BF16 rows preserve generation, macro accuracy, gap and complete covera
 
 test("page links and headline values belong to the current twelve-model snapshot", () => {
   const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
-  assert.match(html, /Working paper v17/);
-  assert.match(html, /v17 has 8 pages of main text/);
-  assert.match(html, /href="assets\/graphdecide-v17\.pdf"/);
+  assert.match(html, /Working paper v18/);
+  assert.match(html, /v18 has 8 pages of main text/);
+  assert.match(html, /24 references on pages 9–11/);
+  assert.match(html, /href="assets\/graphdecide-v18\.pdf"/);
   assert.match(html, /<title>GraphDecide: Benchmarking Decision Models on Graphs<\/title>/);
   assert.match(html, /Li Zhao<\/a> \(corresponding author\)/);
   assert.match(html, /Xianliang Yang<\/a> — Microsoft/);

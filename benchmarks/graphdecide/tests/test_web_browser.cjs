@@ -86,12 +86,12 @@ async function main() {
     assert.equal(await page.locator(".anchor-group").count(), 0);
     assert.match(await page.locator("#model-details h4").innerText(), /^Jev$/);
 
-    for (const path of ["data/benchmark.csv", "data/benchmark.json", "assets/mark.svg", "assets/graphdecide-v17.pdf"]) {
+    for (const path of ["data/benchmark.csv", "data/benchmark.json", "assets/mark.svg", "assets/graphdecide-v18.pdf"]) {
       const response = await context.request.get(new URL(path, base).href);
       assert.equal(response.status(), 200, path);
       if (path.endsWith(".pdf")) {
         const bytes = await response.body();
-        assert.equal(createHash("sha256").update(bytes).digest("hex"), "97f6ae0998a20aecac3e37b8c1cfb441b4019c96f2dbbdd4b8866a2f3cf7bf2d");
+        assert.equal(createHash("sha256").update(bytes).digest("hex"), "11c4869e60c52bc41259b92deb6531aaabf526d21a4589b397c9d44c7ed23988");
       }
     }
     for (const width of [390, 320]) {

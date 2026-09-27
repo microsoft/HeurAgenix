@@ -17,61 +17,110 @@ task-dependent capabilities, not a universal ranking or a fitted size limit.
 \end{abstract}
 
 \section{Introduction}
-Decision models offer a finite choice instead of an open-ended response.
-This makes them attractive for controllers and sequential workflows, but
-output validity does not establish algorithmic competence. Recognizing an
-edge, counting neighbors, identifying a path and choosing the next city in a
-tour require different capabilities. A model can consistently return legal
-actions while accumulating irreversible errors.
+Decision-oriented models offer an alternative to open-ended generation:
+rather than producing a free-form answer, they select an action from supplied
+choices. Jev, developed by TypeSafe AI, is designed to return structured
+choices and associated probabilities \cite{almeida2026jev}.
+Open models also provide mechanisms for selecting among predefined options
+\cite{semif2026,decider2026model,kev2026model,laya2026}.
+These interfaces ease integration into deterministic programs, but restricting
+outputs does not establish understanding of the underlying problem.
+A model may recognize an edge without correctly counting a vertex's degree,
+or repeatedly choose legal actions without constructing a good solution.
+Beyond producing valid choices, to what extent can bounded decision models
+support structural reasoning and sequential optimization?
 
-We study \emph{bounded graph decisions}: the model receives a public state
-and legal actions; deterministic code applies the chosen transition without
-providing an oracle action or repairing a poor choice. Exact tasks require
-one decision, while optimization tasks require complete model-generated
-trajectories. All configurations receive identical initial logical
-information, but their renderings, subsequent histories and compute are
-not identical. ``Jev-like'' denotes open decision-oriented readouts, not
-verified reconstructions of Jev's undisclosed architecture.
+Graphs provide a natural setting for this question. Local queries test
+elementary discrimination; structural queries require reasoning beyond a
+single edge; constructive tasks require decisions to remain useful as their
+consequences accumulate. NLGraph and GraphArena establish graph reasoning
+and solution verification as important evaluation directions
+\cite{wang2023nlgraph,tang2025grapharena}.
+Learned constructive optimization has a substantial history
+\cite{khalil2017learning,kool2019attention}, and Jev-guided next-city
+selection has already been explored in routing \cite{worldtour2026}.
+Typed-decision evaluations such as JevBench assess bounded choices across
+application domains \cite{jevbench2026}. These efforts motivate a
+complementary diagnostic question: how does one-step correctness relate to
+complete-solution quality when models follow their own previous decisions?
 
-Our contribution is a diagnostic evaluation package combining consecutive
-size strata, matched binary pairs, exact objectives, explicit failure
-accounting and independently replayable own-history decisions. The completed
-twelve-configuration matrix connects primitive correctness to construction
-quality, while a separate confirmation and targeted controls qualify what
-can be inferred. The research questions are:
-\begin{description}
-\item[RQ1: Primitive discrimination.] Which graph decisions distinguish
-Jev, open trained readouts and bounded language-model baselines?
-\item[RQ2: Sequential composition.] Do local choices yield good complete
-solutions, and where does a trajectory lose attainable quality?
-\item[RQ3: Interpreting failure.] Which findings survive fresh graphs and
-interface checks rather than merely reflecting valid output?
-\end{description}
-The objective is not to increase difficulty until Astra fails. Easy
-adjacency cases are positive controls; low optimum-hit rates motivate
-graded quality measures rather than automatic expansion to larger graphs.
-GPT configurations are upper reference points under different budgets.
+Answering this question requires more than final accuracy. Output validity,
+mathematical correctness and optimization quality are distinct outcomes.
+A legal trajectory may be far from optimal, while a method whose completed
+solutions are all optimal may fail to finish many scheduled episodes.
+Presentation, option order and decoding can also affect decisions without
+changing the mathematical problem. Aggregate scores may therefore obscure
+both accumulated errors and interface sensitivity. Evaluation should
+separate these outcomes while retaining the trajectories and failures that
+produced them.
+
+We investigate three research questions:
+\textbf{RQ1:} Which local and structural graph decisions distinguish Jev
+from open trained decision models and bounded language-model baselines?
+\textbf{RQ2:} Do useful one-step decisions compose into competitive solutions,
+and where do actual trajectories irreversibly lose optimality?
+\textbf{RQ3:} Which strengths and failures persist on new graphs and under
+interface controls?
+We introduce \emph{GraphDecide}, covering six single-step queries---adjacency,
+degree, cycle detection, connectivity, distance thresholds and articulation
+points---and four constructions: MaxCut, Manhattan traveling salesperson
+(TSP), deterministic normalized linear-threshold influence maximization,
+and modularity maximization with at most two communities.
+At each step, a model receives the current public state and finite legal
+actions. Deterministic code applies its choice without supplying oracle
+actions, repairing incorrect responses or revising previous choices.
+Small graphs permit independently checked answers, exact optimal objectives
+and analysis of the best solution still reachable after each decision.
+
+To reduce reliance on superficial statistics and repeated structures, we
+match structural properties and pair opposite labels for selected binary
+queries, and exclude graph structures overlapping a specified historical
+pool. These controls do not establish immunity to all shortcuts or
+pretraining contamination. Ten direct-decision configurations span Jev,
+Decider, Kev, Laya and the Qwen family on 960 instances with 8--12 vertices;
+GPT-5.4 and Astra provide reasoning references under different inference
+settings (Section~\ref{sec:methods}). ``Jev-like'' denotes open
+decision-oriented readouts, not verified reconstructions of Jev's
+undisclosed architecture. We separately report query accuracy, mean objective
+gap for complete legal solutions, and feasible coverage over all scheduled
+episodes. Holding generation rules and sizes fixed, a new seed and
+historical-topology exclusion yield 952 confirmation instances for Jev,
+Qwen3.5-4B/9B grammar generation and Qwen3.5-4B candidate scoring,
+not all twelve configurations. Four observations summarize the findings:
+\begin{enumerate}
+\item \textbf{Local discrimination does not imply structural reliability.}
+Jev reaches 100\% adjacency accuracy, but 61.43\% degree and 58.75\%
+distance accuracy. Open trained decision models do not recover its overall
+exact-task profile (Table~\ref{tab:full-exact}).
+\item \textbf{Sequential quality is task dependent.}
+Jev has a smaller TSP gap than no-thinking, grammar-constrained Qwen3.5-27B;
+the ordering reverses on deterministic influence maximization.
+Classical and exact uniform-policy references show that outperforming a
+neural configuration need not imply competitive optimization quality
+(Section~\ref{sec:full-matrix}).
+\item \textbf{Trajectory analysis identifies irreversible losses.}
+The first TSP choice rules out every globally optimal completion in 3/40
+Jev episodes, versus 22/40 for no-thinking, grammar-constrained Qwen3.5-4B.
+Exact continuation values distinguish an early irreversible mistake from
+a later choice that is optimal only within an already compromised state
+(Appendix~\ref{sec:regret}).
+\item \textbf{Selected failures recur, but rankings and choices can change.}
+None of the four confirmation configurations reaches a MaxCut optimum,
+as on the main set, while some taskwise orderings change
+(Appendix~\ref{sec:confirmation}). Reversing option order flips all semantic
+choices on twenty selected Qwen3.5-9B grammar articulation queries,
+although accuracy remains 10/20 in both conditions
+(Appendix~\ref{sec:controls}).
+\end{enumerate}
+Together, exact verification, trajectory analysis and controlled comparisons
+make GraphDecide a diagnostic framework for individual graph decisions and
+the solutions they collectively produce, not a universal model ranking.
+Extended related work is in Appendix~\ref{sec:related-work}.
 Code and aggregate results are released at
 \url{https://github.com/microsoft/HeurAgenix.git},
 on branch \texttt{graph\_benchmark}, in
 \texttt{benchmarks/graphdecide}. Raw provider logs and model weights are
 not included in this code release.
-
-\paragraph{Positioning.}
-NLGraph and GraphArena establish graph reasoning and verified solution
-quality as existing evaluation directions
-\cite{wang2023nlgraph,tang2025grapharena}; GraphWiz, GraphLLM and CLRS
-address graph-specific training, representations or algorithmic learning
-\cite{chen2024graphwiz,chai2023graphllm,velickovic2022clrs}.
-Learned constructive optimization also predates Jev
-\cite{khalil2017learning,kool2019attention}.
-Jev's typed-decision claims, SemIf's option-logit readout, WorldTour's
-Jev-guided routing and JevBench's decision leaderboard motivate this study,
-not a priority claim for typed choices or Jev-guided TSP
-\cite{almeida2026jev,semif2026,worldtour2026,jevbench2026}.
-Our focus is exactly scored graph decisions and accumulated own-history
-errors under explicit interface controls. Extended context is in
-Appendix~\ref{sec:related-work}.
 
 \section{Tasks and benchmark data}
 \label{sec:tasks}
@@ -80,7 +129,7 @@ generation-family labels, reference answers or optimum values.
 Unless specified otherwise, graphs are simple, undirected and unweighted,
 with integer vertices including isolates.
 
-\begin{table}[t]
+\begin{table}[ht]
 \centering\small
 \begin{tabular}{llrr}
 \toprule
@@ -167,9 +216,10 @@ test. Locally frozen registrations are not external preregistration.
 \label{sec:methods}
 \paragraph{Models and budgets.}
 The ten direct-decision configurations are Jev's native action selection;
-no-thinking Qwen3.5-4B/9B/27B grammar generation; a Qwen3.5-4B
+no-thinking Qwen3.5-4B/9B/27B grammar generation \cite{qwen2026qwen35}; a Qwen3.5-4B
 candidate-token-score reference; trained Decider-2B v11, Kev-4B and Laya;
-and full-BF16 Qwen3.8-27B and Qwen2.5-72B-Instruct.
+and full-BF16 Qwen3.8-27B \cite{qwen2026qwen38} and
+Qwen2.5-72B-Instruct \cite{qwen2024qwen25}.
 Grammar configurations use greedy legal-choice generation with a 64-token
 ceiling. The larger/newer local lanes use a 180-second request deadline;
 thinking is disabled for Qwen3.8, while Qwen2.5 uses its standard instruct
@@ -218,7 +268,6 @@ errors; model failures on generated cases remain in the denominator.
 Only the original four configurations receive prospective new-graph
 confirmation; model extensions do not inherit that replication.
 
-\clearpage
 \section{Canonical results}
 \label{sec:full-matrix}
 The complete comparison comprises 11,520 scheduled episode evaluations on
